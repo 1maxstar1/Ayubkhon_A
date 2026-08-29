@@ -235,7 +235,7 @@
   }
 
   function introFrom(title) {
-    return '«' + String(title).replace(/^«|»\.?$/g, '') +
+    return '«' + String(title).replace(/^«+/, '').replace(/[».\s]+$/, '') +
       '» obyekti bo\'yicha loyiha-smeta hujjatlarida ko\'rsatilgan resurslarning ' +
       'narx parametrlarini o\'rganish natijalariga ko\'ra';
   }

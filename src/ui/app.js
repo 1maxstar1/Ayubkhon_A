@@ -10,7 +10,7 @@
     stamp: '2026 y.  "____"_______________ dagi   \n\n  №________________________ xulosaga \n2-qo\'yilma',
     docTitle: 'TAQQOSLASH JADVALI  №2',
     noteText: 'Пересмотреть стоимость по всему проекту',
-    autoNote: true, hideSums: true, hideQty: true,
+    autoNote: true, hideSums: true, hideQty: true, contents: true,
     cfLimit: 10000000, sheetName: 'Лист1'
   };
 
@@ -120,6 +120,7 @@
     bindChk(this, 'optAutoNote', 'autoNote');
     bindChk(this, 'optHideSums', 'hideSums');
     bindChk(this, 'optHideQty', 'hideQty');
+    bindChk(this, 'optContents', 'contents');
   };
 
   function bindOpt(app, id, key, numeric) {
@@ -143,6 +144,7 @@
     document.getElementById('optAutoNote').checked = !!this.opts.autoNote;
     document.getElementById('optHideSums').checked = !!this.opts.hideSums;
     document.getElementById('optHideQty').checked = !!this.opts.hideQty;
+    document.getElementById('optContents').checked = this.opts.contents !== false;
     if (this.opts.mode) document.getElementById('reportMode').value = this.opts.mode;
   };
 
@@ -167,10 +169,19 @@
     files = files.filter(function (f) { return /\.xlsx?$|\.xlsm$/i.test(f.name); });
     if (!files.length) { this.toast('Faqat .xlsx fayllar qabul qilinadi', true); return; }
     this.busy(true, files.length + ' ta fayl o\'qilmoqda…');
-    files.forEach(function (f) { self.readOne(f); });
+    // Files finish parsing in whatever order the worker gets to them, so each
+    // one keeps the slot it was picked in; the projects are appended in that
+    // order once the whole batch is in. Order matters — it decides the column A
+    // ranges and the sheet order.
+    if (!this.queue) this.queue = [];
+    var base = this.queue.length;
+    files.forEach(function (f, i) {
+      self.queue.push({ slot: base + i, project: null });
+      self.readOne(f, base + i);
+    });
   };
 
-  App.prototype.readOne = function (file) {
+  App.prototype.readOne = function (file, slot) {
     var self = this;
     this.pending++;
     var reader = new FileReader();
@@ -181,44 +192,53 @@
         var onMsg = function (e) {
           if (e.data.id !== id) return;
           self.worker.removeEventListener('message', onMsg);
-          self.onParsed(file.name, e.data);
+          self.onParsed(file.name, e.data, slot);
         };
         self.worker.addEventListener('message', onMsg);
         self.worker.postMessage({ cmd: 'parse', id: id, name: file.name, buffer: buf }, [buf]);
       } else {
         try {
           var wb = S.readXlsx(new Uint8Array(buf));
-          self.onParsed(file.name, { ok: true, objects: S.smeta.parseWorkbook(wb, file.name), sheetCount: wb.sheets.length });
+          self.onParsed(file.name, { ok: true, objects: S.smeta.parseWorkbook(wb, file.name), sheetCount: wb.sheets.length }, slot);
         } catch (err) {
-          self.onParsed(file.name, { ok: false, error: String(err.message || err) });
+          self.onParsed(file.name, { ok: false, error: String(err.message || err) }, slot);
         }
       }
     };
-    reader.onerror = function () { self.onParsed(file.name, { ok: false, error: 'Faylni o\'qib bo\'lmadi' }); };
+    reader.onerror = function () { self.onParsed(file.name, { ok: false, error: 'Faylni o\'qib bo\'lmadi' }, slot); };
     reader.readAsArrayBuffer(file);
   };
 
-  App.prototype.onParsed = function (name, res) {
+  App.prototype.onParsed = function (name, res, slot) {
     this.pending--;
+    var entry = this.queue && this.queue[slot];
     if (!res.ok) {
       this.toast(name + ': ' + res.error, true);
     } else if (!res.objects.length) {
       this.toast(name + ': resurs varaqlari topilmadi', true);
     } else {
-      var base = name.replace(/\.[^.]+$/, '');
-      this.projects.push({
-        id: 'p' + (++this.seq),
-        file: name,
-        name: shortTab(base, this.projects),
-        title: res.objects[0].title || base,
-        intro: introFrom(res.objects[0].title || base),
-        objects: res.objects,
-        enabled: true,
-        open: true
-      });
+      var title = res.objects[0].title || name.replace(/\.[^.]+$/, '');
+      if (entry) {
+        entry.project = {
+          id: 'p' + (++this.seq),
+          file: name,
+          title: title,
+          intro: introFrom(title),
+          objects: res.objects,
+          enabled: true,
+          open: true
+        };
+      }
       this.toast(name + ': ' + res.objects.length + ' ta obyekt varaqi topildi');
     }
     if (this.pending <= 0) {
+      var self = this;
+      (this.queue || []).forEach(function (q) {
+        if (!q.project) return;
+        q.project.name = shortTab(q.project.file.replace(/\.[^.]+$/, ''), self.projects);
+        self.projects.push(q.project);
+      });
+      this.queue = [];
       this.busy(false);
       this.rebuild();
       this.renderSide();
@@ -252,6 +272,9 @@
         '<header>' +
         '<input type="checkbox" ' + (p.enabled ? 'checked' : '') + ' data-act="proj-on" title="Loyihani qo\'shish">' +
         '<input class="tab-name" data-act="tab" value="' + S.esc(p.name) + '" title="Excel varaq nomi">' +
+        range(p, 'Лист1 A ustuni') +
+        '<button class="link" data-act="pup" title="Yuqoriga — A ustuni raqamlari o\'zgaradi">▲</button>' +
+        '<button class="link" data-act="pdown" title="Pastga">▼</button>' +
         '<button class="link" data-act="del" title="Olib tashlash">×</button>' +
         '</header>' +
         '<div class="meta">' + S.esc(p.file) + ' · ' + on + '/' + p.objects.length + ' varaq' +
@@ -262,6 +285,7 @@
             '<input type="checkbox" ' + (o.enabled === false ? '' : 'checked') + ' data-act="obj-on">' +
             '<span class="nm" title="' + S.esc(o.subtitle) + '">' + S.esc(o.subtitle) + '</span>' +
             '<small>' + o.items + '</small>' +
+            range(o, 'Лист1 A ustuni') +
             '<button class="mv" data-act="up" title="Yuqoriga">▲</button>' +
             '<button class="mv" data-act="down" title="Pastga">▼</button>' +
             '</li>';
@@ -286,6 +310,14 @@
           self.projects.splice(self.projects.indexOf(proj), 1);
           self.rebuild(); self.renderSide();
         });
+      } else if (act === 'pup' || act === 'pdown') {
+        el.addEventListener('click', function () {
+          var i = self.projects.indexOf(proj), j = act === 'pup' ? i - 1 : i + 1;
+          if (j < 0 || j >= self.projects.length) return;
+          self.projects.splice(i, 1);
+          self.projects.splice(j, 0, proj);
+          self.rebuild(); self.renderSide();
+        });
       } else if (act === 'up' || act === 'down') {
         el.addEventListener('click', function () {
           var i = proj.objects.indexOf(obj), j = act === 'up' ? i - 1 : i + 1;
@@ -298,6 +330,11 @@
     });
   };
 
+  function range(x, title) {
+    if (!x._from) return '';
+    return '<span class="rng" title="' + title + '">' + x._from + '–' + x._to + '</span>';
+  }
+
   /* ----------------------------------------------------------------- model */
 
   App.prototype.rebuild = function () {
@@ -309,6 +346,7 @@
       this.model = S.assemble(this.projects, this.prices);
       document.getElementById('export').disabled = !this.model.rows.length;
     }
+    this.indexRanges();
     this.sheetRows = this.model ? this.model.rows : [];
     this.sheetView = this.sheetRows;
     this.sheetList.setCount(this.sheetView.length);
@@ -319,6 +357,31 @@
     this._buildMs = Math.round(performance.now() - t0);
     document.getElementById('sheetCount').textContent =
       this.sheetView.length + ' qator · ' + this._buildMs + ' ms';
+  };
+
+  /**
+   * Hang the column A ranges off the projects and build a row -> block lookup.
+   * These are the numbers that used to be written down by hand to tell the
+   * projects apart inside one long sheet.
+   */
+  App.prototype.indexRanges = function () {
+    this.projects.forEach(function (p) {
+      p._from = p._to = 0;
+      p.objects.forEach(function (o) { o._from = o._to = o._items = 0; });
+    });
+    this.rowOwner = [];
+    if (!this.model) return;
+    var owner = this.rowOwner;
+    this.model.spans.forEach(function (sp) {
+      var proj = sp.project;
+      proj._from = sp.from; proj._to = sp.to; proj._items = sp.items;
+      var live = proj.objects.filter(function (o) { return o.enabled !== false; });
+      sp.objects.forEach(function (r, i) {
+        var o = live[i];
+        if (o) { o._from = r.from; o._to = r.to; o._items = r.items; }
+        for (var k = r.from; k <= r.to; k++) owner[k] = { p: proj, name: r.name, from: r.from, to: r.to };
+      });
+    });
   };
 
   App.prototype.setPrice = function (key, value) {
@@ -410,11 +473,18 @@
   App.prototype.fillJump = function () {
     var sel = document.getElementById('jump');
     var opts = ['<option value="-1">Blokka o\'tish…</option>'];
+    var owner = this.rowOwner || [];
     (this.sheetRows || []).forEach(function (r, i) {
-      if (r.kind === 'title' || r.kind === 'object') {
-        var t = r.cells[2] && r.cells[2].v;
-        if (t) opts.push('<option value="' + i + '">' + (r.kind === 'title' ? '▸ ' : '   ') + S.esc(String(t).slice(0, 60)) + '</option>');
-      }
+      if (r.kind !== 'title' && r.kind !== 'object') return;
+      var t = r.cells[2] && r.cells[2].v;
+      if (!t) return;
+      var o = owner[r.r] || owner[r.r + 1];
+      // A project line shows the project's whole range, a street line its own.
+      var lo = r.kind === 'title' ? (o && o.p._from) : (o && o.from);
+      var hi = r.kind === 'title' ? (o && o.p._to) : (o && o.to);
+      var tail = lo ? '   [' + lo + '–' + hi + ']' : '';
+      opts.push('<option value="' + i + '">' + (r.kind === 'title' ? '▸ ' : '\u00a0\u00a0\u00a0') +
+        S.esc(String(t).slice(0, 58)) + tail + '</option>');
     });
     sel.innerHTML = opts.join('');
   };
@@ -442,7 +512,18 @@
       if (!r) continue;
       out.push(rowHtml(r, r.cells, 2, 3, 4, 5, 6, 8));
     }
+    this.showWhere(rows[from]);
     return out.join('');
+  };
+
+  /** Which project and street the top visible row belongs to. */
+  App.prototype.showWhere = function (row) {
+    var el = document.getElementById('sheetWhere');
+    var o = row && this.rowOwner ? this.rowOwner[row.r] : null;
+    el.innerHTML = o
+      ? 'A' + row.r + ' · <b>' + S.esc(o.p.name) + '</b> ' + o.p._from + '–' + o.p._to +
+        ' · ' + S.esc(o.name) + ' ' + o.from + '–' + o.to
+      : '';
   };
 
   /** Shared row renderer for both previews; column indexes differ per sheet. */
@@ -487,7 +568,8 @@
       mode: document.getElementById('reportMode').value,
       stamp: this.opts.stamp, docTitle: this.opts.docTitle, noteText: this.opts.noteText,
       autoNote: this.opts.autoNote, hideSums: this.opts.hideSums, hideQty: this.opts.hideQty,
-      cfLimit: this.opts.cfLimit, sheetName: this.opts.sheetName
+      cfLimit: this.opts.cfLimit, sheetName: this.opts.sheetName,
+      contents: this.opts.contents !== false
     };
   };
 

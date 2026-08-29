@@ -76,6 +76,14 @@ body.drag::after{content:"";position:fixed;inset:8px;border:2px dashed var(--acc
 .toolbar input[type=search],.toolbar select,.toolbar input[type=text]{border:1px solid var(--rule2);border-radius:6px;padding:5px 8px;background:var(--sf)}
 .toolbar input[type=search]{min-width:230px}
 .count{color:var(--mute);font-size:12px;white-space:nowrap}
+.count.where{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;min-width:0}
+#jump{flex:0 1 340px;min-width:150px}
+.count.where b{color:var(--ink);font-weight:600}
+.rng{font-size:10px;color:var(--accent);background:var(--accent-w);border-radius:3px;padding:0 4px;
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.objs li .rng{margin-left:auto}
+.proj header .rng{margin-left:2px}
+.proj > header .link{padding:2px 3px;font-size:11px}
 
 /* ------------------------------------------------------------ data tables */
 .thead,.vrow{display:flex;align-items:stretch}

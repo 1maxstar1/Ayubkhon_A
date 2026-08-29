@@ -29,7 +29,22 @@ fayllar kompyuterdan chiqmaydi.
    tomoni uchun esa `F→H`, `G→I` almashtirish bilan aynan shu formulaning
    ikkinchi nusxasi yasaladi.
 
-3. **Narxlarni tekshiring.** «Narxlarni tekshirish» varag'ida har bir resurs
+3. **Qator raqamlari (A ustuni).** `Лист1` ning `A` ustuni butun varaq bo'ylab
+   `1 … N` bo'lib boradi, va dastur qaysi raqamlar qaysi loyihaga tegishli
+   ekanini o'zi ko'rsatadi — daftarga yozib qo'yish shart emas:
+
+   * chap tomonda har bir loyiha va har bir ko'cha yonida oralig'i turadi
+     (`Фарғона 1–3749`, `Марғилон 3750–6246`, `G-54 KO'CHASI 1814–2380`);
+   * «Yig'ilgan jadval» varag'ida yuqorida — hozir ko'rinib turgan qator qaysi
+     loyiha va qaysi ko'chaga tegishli;
+   * «Blokka o'tish» ro'yxatida ham shu oraliqlar yozilgan;
+   * Excel faylida **«Mundarija»** varag'i — har bir loyiha va ko'cha uchun
+     `dan – gacha`, qatorlar soni, resurslar soni, smeta/bozor summasi va farq.
+
+   Oraliqlar loyihalar tartibiga bog'liq. Tartibni chap tomondagi `▲ ▼`
+   tugmalari bilan o'zgartirasiz — raqamlar darhol qayta hisoblanadi.
+
+4. **Narxlarni tekshiring.** «Narxlarni tekshirish» varag'ida har bir resurs
    **bir marta** ko'rinadi — nechta ko'chada uchrashidan qat'i nazar. Bozor
    narxini bir joyda yozasiz, u butun loyiha bo'ylab barcha qatorlarga qo'llanadi.
    Narxi to'g'ri bo'lganini tegmay qoldirasiz — farq `0` bo'lib qoladi.
@@ -41,10 +56,11 @@ fayllar kompyuterdan chiqmaydi.
    * `Narx kitobi` — tuzatilgan narxlarni `.json` ga saqlash va keyingi
      loyihada qayta ishlatish (`.xlsx` ro'yxatini ham qabul qiladi).
 
-4. **Excel yuklab oling.** Bitta fayl chiqadi:
+5. **Excel yuklab oling.** Bitta fayl chiqadi:
    * `Лист1` — yig'ilgan to'liq jadval;
    * har bir loyiha uchun alohida varaq (nomini chap tomondan o'zgartirasiz) —
-     `TAQQOSLASH JADVALI №2`.
+     `TAQQOSLASH JADVALI №2`;
+   * `Mundarija` — qator raqamlari indeksi (sozlamalardan o'chirsa ham bo'ladi).
 
 ---
 
@@ -110,7 +126,7 @@ src/
     xlsx-write.js     to'liq formatli .xlsx yozish
     smeta.js          obyekt varaqlarini tanish va qatorlarga ajratish
     assemble.js       Лист1 ni yig'ish + resurslar ro'yxati
-    report.js         TAQQOSLASH JADVALI №2 (uch rejim)
+    report.js         TAQQOSLASH JADVALI №2 (uch rejim) + Mundarija
     export.js         uslublar va tayyor kitob
   ui/
     grid.js           virtual jadval

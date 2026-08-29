@@ -5,3 +5,4 @@ test/shot-*.png
 test/browser-errors.txt
 test/dbg.mjs
 *.log
+test/dbg*.mjs

@@ -75,6 +75,7 @@
       <div class="toolbar">
         <input type="search" id="q2" placeholder="Yig'ilgan jadvalda qidirish…" spellcheck="false">
         <select id="jump"></select>
+        <span class="count where" id="sheetWhere"></span>
         <div class="grow"></div>
         <span class="count" id="sheetCount"></span>
       </div>
@@ -112,6 +113,9 @@
           Summa ustunlarini yashirish (chop etish uchun)</label>
         <label class="row"><input type="checkbox" id="optHideQty" checked>
           КОЛ-ВО ustunini yashirish</label>
+        <label class="row"><input type="checkbox" id="optContents" checked>
+          «Mundarija» varag'ini qo'shish — har bir loyiha va ko'chaning «Лист1»dagi
+          qator raqamlari (A ustuni: dan – gacha)</label>
         <label>Pushti rang chegarasi (shartli formatlash)
           <input id="optCf" type="number" step="1000000" value="10000000"></label>
         <h3>Yig'ilgan varaq nomi</h3>

@@ -271,6 +271,81 @@
     return cols;
   }
 
+  /* ----------------------------------------------------------- contents */
+
+  /**
+   * "Mundarija" — which column A numbers belong to which project and object.
+   * This is the note that used to live in a paper notebook: 1-3000 Marg'ilon,
+   * 3001-6140 Farg'ona.
+   */
+  function contents(model, opts) {
+    var rows = [
+      { kind: 'bigtitle', ht: 20.25, cells: cell(1, opts.contentsTitle || 'MUNDARIJA — «Лист1» qator raqamlari') },
+      { kind: 'blank', cells: {} }
+    ];
+    var head = {};
+    ['№', 'Loyiha', "Obyekt / ko'cha", 'A ustuni: dan', 'gacha', 'Qatorlar',
+     'Resurs qatorlari', 'Smeta summasi', 'Bozor summasi', 'Farq']
+      .forEach(function (h, i) { head[i + 1] = { v: h }; });
+    rows.push({ kind: 'header', ht: 25.5, cells: head });
+
+    var n = 0, gs = 0, gm = 0, gi = 0;
+    model.spans.forEach(function (sp) {
+      n++;
+      var pc = {};
+      pc[1] = { v: n };
+      pc[2] = { v: sp.project.name };
+      pc[3] = { v: sp.project.title || '' };
+      pc[4] = { v: sp.from };
+      pc[5] = { v: sp.to };
+      pc[6] = { v: sp.to - sp.from + 1 };
+      pc[7] = { v: sp.items };
+      pc[8] = { v: sp.smetaSum };
+      pc[9] = { v: sp.marketSum };
+      pc[10] = { v: sp.smetaSum - sp.marketSum };
+      rows.push({ kind: 'total', cells: pc });
+      gs += sp.smetaSum; gm += sp.marketSum; gi += sp.items;
+
+      sp.objects.forEach(function (o, i) {
+        var oc = {};
+        oc[2] = { v: '' };
+        oc[3] = { v: (i + 1) + '. ' + o.name };
+        oc[4] = { v: o.from };
+        oc[5] = { v: o.to };
+        oc[6] = { v: o.to - o.from + 1 };
+        oc[7] = { v: o.items };
+        oc[8] = { v: o.smetaSum };
+        oc[9] = { v: o.marketSum };
+        oc[10] = { v: o.smetaSum - o.marketSum };
+        rows.push({ kind: 'item', cells: oc });
+      });
+      rows.push({ kind: 'blank', cells: {} });
+    });
+
+    var tc = {};
+    tc[3] = { v: 'JAMI' };
+    tc[4] = { v: 1 };
+    tc[5] = { v: model.rows.length };
+    tc[6] = { v: model.rows.length };
+    tc[7] = { v: gi };
+    tc[8] = { v: gs };
+    tc[9] = { v: gm };
+    tc[10] = { v: gs - gm };
+    rows.push({ kind: 'grandtotal', ht: 24.75, cells: tc });
+
+    return {
+      rows: rows,
+      cols: [
+        { min: 1, max: 1, width: 5.5 },
+        { min: 2, max: 2, width: 18 },
+        { min: 3, max: 3, width: 52 },
+        { min: 4, max: 5, width: 12 },
+        { min: 6, max: 7, width: 14 },
+        { min: 8, max: 10, width: 19 }
+      ]
+    };
+  }
+
   function build(model, span, opts) {
     opts = opts || {};
     return opts.mode === 'full' ? buildFull(model, span, opts) : buildDedup(model, span, opts);
@@ -278,6 +353,7 @@
 
   S.report = {
     build: build,
+    contents: contents,
     cols: { IDX: R_IDX, NO: R_NO, CODE: R_CODE, NAME: R_NAME, UNIT: R_UNIT, QTY: R_QTY,
             PRICE: R_PRICE, SUM: R_SUM, MPRICE: R_MPRICE, MSUM: R_MSUM, DIFF: R_DIFF,
             NOTE: R_NOTE, EXTRA: R_EXTRA },

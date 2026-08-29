@@ -95,6 +95,31 @@
     }
   }
 
+  /* ---------------------------------------------------- contents profile */
+
+  var IDX_FMT = { 1: '#,##0', 4: '#,##0', 5: '#,##0', 6: '#,##0', 7: '#,##0',
+                  8: '#,##0', 9: '#,##0', 10: '#,##0' };
+
+  function contentsStyle(kind, c) {
+    if (c > 10) return { fmt: 'General' };
+    var fmt = IDX_FMT[c] || 'General';
+    switch (kind) {
+      case 'bigtitle': return { font: F11B, h: 'left', v: 'center' };
+      case 'header':
+        return { font: F, fill: CYAN, border: ALL, h: 'center', v: 'center', wrap: true };
+      case 'total':
+        return { fmt: fmt, font: F, fill: CYAN, border: ALL,
+                 h: c === 2 || c === 3 ? 'left' : 'center', v: 'center', wrap: c === 3 };
+      case 'grandtotal':
+        return { fmt: fmt, font: F, fill: CYAN, border: ALL,
+                 h: c === 3 ? 'left' : 'center', v: 'center' };
+      case 'item':
+        if (c === 3) return { border: ALL, h: 'left', v: 'center', wrap: true, indent: 1 };
+        return { fmt: fmt, border: ALL, h: 'center', v: 'center' };
+      default: return { fmt: 'General' };
+    }
+  }
+
   /* --------------------------------------------------------------- build */
 
   function toSheet(styles, name, rows, lastCol, styleOf, extra) {
@@ -188,6 +213,13 @@
         ]
       }));
     });
+
+    if (opts.contents !== false) {
+      var idx = S.report.contents(model, opts);
+      sheets.push(toSheet(styles, uniqueName(sheets, opts.contentsSheet || 'Mundarija'),
+        idx.rows, 10, contentsStyle, { cols: idx.cols, printCentered: true,
+        pageSetup: { scale: 90, orientation: 'landscape' } }));
+    }
 
     return S.writeWorkbook({ sheets: sheets, styles: styles, title: opts.docTitle });
   }

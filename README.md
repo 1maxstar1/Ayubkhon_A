@@ -85,7 +85,10 @@ fayllar kompyuterdan chiqmaydi.
    * `Narx kitobi` — tuzatilgan narxlarni `.json` ga saqlash va keyingi
      loyihada qayta ishlatish (`.xlsx` ro'yxatini ham qabul qiladi).
 
-5. **Excel yuklab oling.** Bitta fayl chiqadi:
+5. **Excel yuklab oling.** Yuqorida, «Excel yuklab olish» tugmasi yonida
+   **«Hisobot varaqlari»** ro'yxati turadi — u loyiha varaqlariga nima
+   tushishini belgilaydi (pastdagi jadvalga qarang). Odatdagi holat —
+   `Faqat o'zgargan narxlar`. Bitta fayl chiqadi:
    * `Лист1` — yig'ilgan to'liq jadval;
    * har bir loyiha uchun alohida varaq (nomini chap tomondan o'zgartirasiz) —
      `TAQQOSLASH JADVALI №2`;
@@ -94,6 +97,10 @@ fayllar kompyuterdan chiqmaydi.
 ---
 
 ## Hisobot varaqining uch rejimi
+
+Rejim yuqori satrdan, «Excel yuklab olish» tugmasi yonidan tanlanadi va
+**«Hisobot ko'rinishi» varag'iga ham, yuklab olinadigan Excel faylga ham**
+bir xilda tegishli.
 
 | Rejim | Nima chiqadi |
 |---|---|

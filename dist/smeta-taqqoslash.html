@@ -33,6 +33,10 @@ button,input,select,textarea{font:inherit;color:inherit}
 .btn.sm{padding:4px 9px;font-size:12px}
 .btn.file{position:relative;overflow:hidden}
 .btn.file input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+.pickmode{display:flex;align-items:center;gap:6px;border:1px solid var(--rule2);border-radius:6px;
+  padding:2px 4px 2px 9px;background:var(--sf)}
+.pickmode span{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.05em}
+.pickmode select{border:0;background:none;padding:4px 2px;cursor:pointer;max-width:270px}
 .link{border:0;background:none;color:var(--mute);cursor:pointer;padding:2px 6px;border-radius:4px}
 .link:hover{background:var(--sf2);color:var(--ink)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:1px}
@@ -159,6 +163,14 @@ body.drag::after{content:"";position:fixed;inset:8px;border:2px dashed var(--acc
   </label>
   <button class="btn" id="loadBook">Narx kitobi</button>
   <button class="btn" id="saveBook">Narx kitobini saqlash</button>
+  <label class="pickmode" title="Loyiha varaqlariga nima tushishini belgilaydi">
+    <span>Hisobot varaqlari:</span>
+    <select id="reportMode">
+      <option value="changed">Faqat o'zgargan narxlar (tozalangan)</option>
+      <option value="dedup">Barcha resurslar (tozalangan)</option>
+      <option value="full">To'liq nusxa (Excel filtr + saralash kabi)</option>
+    </select>
+  </label>
   <button class="btn primary" id="export" disabled>Excel yuklab olish</button>
 </header>
 
@@ -225,11 +237,7 @@ body.drag::after{content:"";position:fixed;inset:8px;border:2px dashed var(--acc
     <div class="pane" id="pane-report">
       <div class="toolbar">
         <select id="reportProject"></select>
-        <select id="reportMode">
-          <option value="changed">Faqat o'zgargan narxlar (tozalangan)</option>
-          <option value="dedup">Barcha resurslar (tozalangan)</option>
-          <option value="full">To'liq nusxa (Excel filtr + saralash kabi)</option>
-        </select>
+        <span class="count" id="modeHint"></span>
         <div class="grow"></div>
         <span class="count" id="reportCount"></span>
       </div>
@@ -2540,7 +2548,10 @@ if (typeof self !== 'undefined') self.S = S;
     });
     document.getElementById('reportProject').addEventListener('change', function () { self.buildReportPreview(); });
     document.getElementById('reportMode').addEventListener('change', function () {
-      self.opts.mode = this.value; self.saveOpts(); self.buildReportPreview();
+      self.opts.mode = this.value;
+      self.saveOpts();
+      self.buildReportPreview();
+      self.toast('Hisobot varaqlari: ' + modeLabel() + '. Excel faylga ham shu tegishli.');
     });
 
     bindOpt(this, 'optStamp', 'stamp');
@@ -3144,7 +3155,14 @@ if (typeof self !== 'undefined') self.S = S;
     };
   };
 
+  function modeLabel() {
+    var sel = document.getElementById('reportMode');
+    return sel.options[sel.selectedIndex].text;
+  }
+
   App.prototype.buildReportPreview = function () {
+    document.getElementById('modeHint').textContent =
+      'Rejim: ' + modeLabel() + ' — yuqoridan o\'zgartiriladi, Excel faylga ham shu tushadi';
     var i = +document.getElementById('reportProject').value;
     if (!this.model || !this.model.spans[i]) {
       this.reportRows = [];
@@ -3188,8 +3206,8 @@ if (typeof self !== 'undefined') self.S = S;
         var t0 = performance.now();
         var bytes = S.buildWorkbook(self.model, self.reportOpts());
         download(bytes, fileName(self));
-        self.toast('Fayl tayyor · ' + (bytes.length / 1024 / 1024).toFixed(1) + ' MB · ' +
-          Math.round(performance.now() - t0) + ' ms');
+        self.toast('Fayl tayyor · ' + modeLabel() + ' · ' +
+          (bytes.length / 1024 / 1024).toFixed(1) + ' MB · ' + Math.round(performance.now() - t0) + ' ms');
       } catch (e) {
         self.toast('Eksport xatosi: ' + (e.message || e), true);
       } finally {

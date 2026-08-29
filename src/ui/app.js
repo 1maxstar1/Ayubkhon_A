@@ -111,7 +111,10 @@
     });
     document.getElementById('reportProject').addEventListener('change', function () { self.buildReportPreview(); });
     document.getElementById('reportMode').addEventListener('change', function () {
-      self.opts.mode = this.value; self.saveOpts(); self.buildReportPreview();
+      self.opts.mode = this.value;
+      self.saveOpts();
+      self.buildReportPreview();
+      self.toast('Hisobot varaqlari: ' + modeLabel() + '. Excel faylga ham shu tegishli.');
     });
 
     bindOpt(this, 'optStamp', 'stamp');
@@ -715,7 +718,14 @@
     };
   };
 
+  function modeLabel() {
+    var sel = document.getElementById('reportMode');
+    return sel.options[sel.selectedIndex].text;
+  }
+
   App.prototype.buildReportPreview = function () {
+    document.getElementById('modeHint').textContent =
+      'Rejim: ' + modeLabel() + ' — yuqoridan o\'zgartiriladi, Excel faylga ham shu tushadi';
     var i = +document.getElementById('reportProject').value;
     if (!this.model || !this.model.spans[i]) {
       this.reportRows = [];
@@ -759,8 +769,8 @@
         var t0 = performance.now();
         var bytes = S.buildWorkbook(self.model, self.reportOpts());
         download(bytes, fileName(self));
-        self.toast('Fayl tayyor · ' + (bytes.length / 1024 / 1024).toFixed(1) + ' MB · ' +
-          Math.round(performance.now() - t0) + ' ms');
+        self.toast('Fayl tayyor · ' + modeLabel() + ' · ' +
+          (bytes.length / 1024 / 1024).toFixed(1) + ' MB · ' + Math.round(performance.now() - t0) + ' ms');
       } catch (e) {
         self.toast('Eksport xatosi: ' + (e.message || e), true);
       } finally {

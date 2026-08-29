@@ -58,12 +58,19 @@ fayllar kompyuterdan chiqmaydi.
    * Ikkalasida ham: `Enter` / `↓` `↑` — qatordan qatorga, `Esc` — smeta narxini
      qaytarish. Raqam yozayotganda oddiy, yozib bo'lgach ajratilgan ko'rinishda.
 
-   **`2 xil narx` belgisi.** Bitta resurs turli smetalarda turli narx bilan
-   uchrashi mumkin (masalan `АВТОГРЕЙДЕР "КАМАЦУ"` — bir loyihada `364 298`,
-   ikkinchisida `413 117`). Bunday resursning «Smeta narxi» ustunida ikkala
-   narx oralig'i ko'rsatiladi. Siz tegmagan bo'lsangiz **har bir qator o'z
-   narxida turadi**, shuning uchun farq `0`. Bozor narxini yozganingizdan
-   keyingina barcha qatorlar shu bitta narxga o'tadi va farq paydo bo'ladi.
+   **Qatorlar qanday birlashtiriladi.** Bitta qator = bitta **nom + o'lchov
+   birligi + smeta narxi**:
+
+   * nomi ham, narxi ham bir xil bo'lsa — **bitta** qator (`DUB` 14 marta
+     uchraydi, ro'yxatda bitta qator, `SONI = 14`);
+   * nomi bir xil, narxi har xil bo'lsa — **har biri alohida** qator
+     (`АВТОГРЕЙДЕР "КАМАЦУ"`: `364 298` — 9 qator, `413 117` — 8 qator);
+   * nomi har xil, narxi bir xil bo'lsa — ham **alohida** qatorlar.
+
+   Nomi yonidagi `2 xil narx` belgisi shu nom boshqa narx bilan ham
+   uchrashini bildiradi; ustiga bossangiz, o'sha nomning barcha narx
+   variantlari bir joyda ko'rinadi. Bozor narxini yozsangiz, u faqat **o'sha
+   narxdagi** qatorlarga tushadi — ikkinchi variant o'z holicha qoladi.
    * Filtrlar: faqat o'zgartirilganlar, narxi `0` bo'lganlar, bitta nom ostida
      bir nechta smeta narxi uchraydiganlar.
    * `% qo'llash` — ko'rinib turgan barcha resurslarga foizda tuzatish.
@@ -82,7 +89,7 @@ fayllar kompyuterdan chiqmaydi.
 
 | Rejim | Nima chiqadi |
 |---|---|
-| **Faqat o'zgargan narxlar (tozalangan)** | Faqat narxi tuzatilgan resurslar. Bir xil **nom + narx** — bitta qator, `КОЛ-ВО` barcha ko'chalar bo'yicha qo'shiladi. Nomi bir xil, narxi boshqa bo'lsa — alohida qatorlar. Nomi boshqa, narxi bir xil bo'lsa — ham alohida. Bo'limlar (`ЗАТРАТЫ ТРУДА`, `МАШИНЫ`, `МАТЕРИАЛЫ`, `ОБОРУДОВАНИЕ`), har biriga `ИТОГО` va oxirida `ЖАМИ / ВСЕГО`. |
+| **Faqat o'zgargan narxlar (tozalangan)** | Faqat narxi tuzatilgan resurslar. Birlashtirish qoidasi narxlar varag'idagi bilan bir xil: nom + narx bir xil bo'lsa bitta qator (`КОЛ-ВО` barcha ko'chalar bo'yicha qo'shiladi), nomi bir xil narxi har xil bo'lsa — alohida qatorlar, nomi har xil narxi bir xil bo'lsa — ham alohida. Bo'limlar (`ЗАТРАТЫ ТРУДА`, `МАШИНЫ`, `МАТЕРИАЛЫ`, `ОБОРУДОВАНИЕ`), har biriga `ИТОГО` va oxirida `ЖАМИ / ВСЕГО`. |
 | **Barcha resurslar (tozalangan)** | Yuqoridagi bilan bir xil, lekin narxi o'zgarmaganlar ham qoladi. |
 | **To'liq nusxa** | Loyihaning har bir qatori, hech narsa tashlanmaydi. Narxi o'zgargan qatorlar o'z o'rnida alifbo tartibida saralanadi — ya'ni Excelda `фарқ ≠ 0` bo'yicha filtr qo'yib, nom bo'yicha saralaganda chiqadigan natijaning aynan o'zi. |
 

@@ -14,7 +14,7 @@
     { k: 'unit', w: 70, cls: 'mid', h: "O'lch." },
     { k: 'count', w: 54, cls: 'num', h: 'Soni' },
     { k: 'qty', w: 100, cls: 'num', h: 'Jami kol-vo' },
-    { k: 'price', w: 156, cls: 'num', h: 'Smeta narxi' },
+    { k: 'price', w: 126, cls: 'num', h: 'Smeta narxi' },
     { k: 'market', w: 126, cls: 'num', h: 'Bozor narxi' },
     { k: 'delta', w: 88, cls: 'num', h: 'Farq, %' },
     { k: 'econ', w: 138, cls: 'num', h: 'Farq, so\'m' }
@@ -91,6 +91,14 @@
       }
     });
 
+    scroll.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('.tagm') : null;
+      if (!b) return;
+      document.getElementById('q').value = b.dataset.nm;
+      document.getElementById('filter').value = 'all';
+      self.apply();
+    });
+
     document.getElementById('q').addEventListener('input', S.debounce(function () { self.apply(); }, 90));
     document.getElementById('filter').addEventListener('change', function () { self.apply(); });
     document.getElementById('sort').addEventListener('change', function () { self.apply(); });
@@ -159,7 +167,7 @@
         case 'changed': return isChanged(r);
         case 'same': return !isChanged(r);
         case 'zero': return !r.price;
-        case 'multi': return r.prices.length > 1;
+        case 'multi': return r.variants > 1;
         default: return true;
       }
     });
@@ -167,7 +175,9 @@
     if (sort === 'diff') list.sort(function (a, b) { return Math.abs(econOf(b)) - Math.abs(econOf(a)); });
     else if (sort === 'sum') list.sort(function (a, b) { return b.smetaSum - a.smetaSum; });
     else if (sort === 'count') list.sort(function (a, b) { return b.count - a.count; });
-    else list.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+    else list.sort(function (a, b) {
+      return a.name < b.name ? -1 : a.name > b.name ? 1 : a.price - b.price;
+    });
 
     this.view = list;
     this.list.setCount(list.length);
@@ -190,9 +200,9 @@
       var changed = isChanged(r);
       var pct = pctOf(r);
       var e = econOf(r);
-      var many = r.prices.length > 1;
-      var multi = many ? '<span class="tagm" title="' + S.esc(multiHint(r)) + '">' +
-        r.prices.length + ' xil narx</span>' : '';
+      var many = r.variants > 1;
+      var multi = many ? '<button class="tagm" data-nm="' + S.esc(r.name) + '" title="' +
+        S.esc(multiHint(r)) + '">' + r.variants + ' xil narx</button>' : '';
       out.push(
         '<div class="vrow' + (changed ? ' chg' : '') + (many ? ' many' : '') + '">' +
         cell(COLS[0], i + 1) +
@@ -200,8 +210,7 @@
         cell(COLS[2], S.esc(r.unit)) +
         cell(COLS[3], r.count) +
         cell(COLS[4], S.qty(r.qty)) +
-        '<div class="c num" style="' + width(COLS[5]) + '" title="' + S.esc(priceHint(r)) + '">' +
-        smetaCell(r) + '</div>' +
+        '<div class="c num" style="' + width(COLS[5]) + '">' + S.price(r.price) + '</div>' +
         '<div class="c num" style="' + width(COLS[6]) + '">' +
         '<input class="pin' + (changed ? ' edited' : '') + '" data-key="' + S.esc(r.key) + '" data-i="' + i +
         '" inputmode="decimal" value="' + S.price(r.market) + '"></div>' +
@@ -214,24 +223,10 @@
     return out.join('');
   };
 
-  /** One smeta price, or the span when the resource carries several. */
-  function smetaCell(r) {
-    if (r.prices.length < 2) return S.price(r.price);
-    var lo = Math.min.apply(null, r.prices), hi = Math.max.apply(null, r.prices);
-    return '<span class="span">' + S.price(lo) + ' – ' + S.price(hi) + '</span>';
-  }
-
-  function priceHint(r) {
-    if (r.prices.length < 2) return 'Smeta narxi';
-    return 'Smetalarda ' + r.prices.length + ' xil narx: ' +
-      r.prices.map(function (p) { return S.price(p); }).join(' · ');
-  }
-
   function multiHint(r) {
-    return 'Bu resurs smetalarda ' + r.prices.length + ' xil narx bilan uchraydi: ' +
-      r.prices.map(function (p) { return S.price(p); }).join(' · ') +
-      '. Hozircha har bir qator o\'z narxida turibdi, shuning uchun farq 0. ' +
-      'Bozor narxini yozsangiz, ' + r.count + ' ta qatorning hammasi shu narxga o\'tadi.';
+    return 'Bu nom smetalarda ' + r.variants + ' xil narx bilan uchraydi: ' +
+      r.siblings.map(function (p) { return S.price(p); }).join('  ·  ') +
+      '. Har biri alohida qator — bosing, hammasi bir joyda ko\'rinadi.';
   }
 
   function fmtIn(v) {

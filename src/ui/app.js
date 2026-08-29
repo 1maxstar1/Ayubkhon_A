@@ -438,6 +438,10 @@
       document.getElementById('export').disabled = true;
     } else {
       this.model = S.assemble(this.projects, this.prices);
+      if (this.looseBook) {
+        this.spreadLooseBook();
+        S.applyPrices(this.model, this.prices);
+      }
       document.getElementById('export').disabled = !this.model.rows.length;
     }
     this.indexRanges();
@@ -475,6 +479,17 @@
         if (o) { o._from = r.from; o._to = r.to; o._items = r.items; }
         for (var k = r.from; k <= r.to; k++) owner[k] = { p: proj, name: r.name, from: r.from, to: r.to };
       });
+    });
+  };
+
+  /** Resolve name-only price-book entries against the resources now loaded. */
+  App.prototype.spreadLooseBook = function () {
+    var loose = this.looseBook;
+    if (!loose || !this.model) return;
+    var self = this;
+    this.model.resources.forEach(function (r) {
+      var p = loose[r.nk];
+      if (p != null && self.prices[r.key] == null) self.prices[r.key] = p;
     });
   };
 
@@ -777,6 +792,7 @@
     var book = this.model.resources
       .filter(function (r) { return !S.near(r.price, r.market); })
       .map(function (r) {
+        // `smeta` identifies which priced line this belongs to when reloaded.
         return { name: r.name, unit: r.unit, price: r.market, smeta: r.price, note: self.opts.noteText };
       });
     if (!book.length) { this.toast('Hali birorta narx o\'zgartirilmagan', true); return; }
@@ -802,14 +818,21 @@
         return;
       }
       if (!Array.isArray(entries)) { self.toast('Narx kitobi ro\'yxat ko\'rinishida bo\'lishi kerak', true); return; }
-      var map = {}, n = 0;
+      // An entry that records the smeta price it was taken from lands on exactly
+      // that line; an older book without one is applied to every priced variant
+      // of the name.
+      var exact = {}, loose = {}, n = 0;
       entries.forEach(function (e) {
         var p = S.num(e.price != null ? e.price : e.market);
         if (!e.name || p == null) return;
-        map[S.resKey(e.name, e.unit || '')] = p;
+        var sm = S.num(e.smeta);
+        if (sm != null) exact[S.resKey(e.name, e.unit || '', sm)] = p;
+        else loose[S.nameUnitKey(e.name, e.unit || '')] = p;
         n++;
       });
-      self.prices = Object.assign(self.prices, map);
+      self.prices = Object.assign(self.prices, exact);
+      self.looseBook = Object.assign(self.looseBook || {}, loose);
+      self.spreadLooseBook();
       if (self.model) S.applyPrices(self.model, self.prices);
       self.prices_ui.apply();
       self.ledger();

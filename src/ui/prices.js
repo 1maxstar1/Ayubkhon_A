@@ -11,14 +11,24 @@
   var COLS = [
     { k: 'n', w: 46, cls: 'mid', h: '№' },
     { k: 'name', w: 0, h: 'Resurs nomi' },
-    { k: 'unit', w: 76, cls: 'mid', h: "O'lch." },
-    { k: 'count', w: 56, cls: 'num', h: 'Soni' },
-    { k: 'qty', w: 104, cls: 'num', h: 'Jami kol-vo' },
-    { k: 'price', w: 118, cls: 'num', h: 'Smeta narxi' },
-    { k: 'market', w: 128, cls: 'num', h: 'Bozor narxi' },
-    { k: 'delta', w: 96, cls: 'num', h: 'Farq, %' },
-    { k: 'econ', w: 140, cls: 'num', h: 'Farq, so\'m' }
+    { k: 'unit', w: 70, cls: 'mid', h: "O'lch." },
+    { k: 'count', w: 54, cls: 'num', h: 'Soni' },
+    { k: 'qty', w: 100, cls: 'num', h: 'Jami kol-vo' },
+    { k: 'price', w: 156, cls: 'num', h: 'Smeta narxi' },
+    { k: 'market', w: 126, cls: 'num', h: 'Bozor narxi' },
+    { k: 'delta', w: 88, cls: 'num', h: 'Farq, %' },
+    { k: 'econ', w: 138, cls: 'num', h: 'Farq, so\'m' }
   ];
+
+  /**
+   * The saving, per row: sum(qty x smeta price) - sum(qty x market price).
+   * It has to be summed row by row — a resource can carry several smeta prices,
+   * and until the market price is actually set each row keeps its own, so the
+   * difference is genuinely zero even though the two prices differ.
+   */
+  function econOf(r) { return r.smetaSum - r.marketSum; }
+  function pctOf(r) { return r.smetaSum ? econOf(r) / r.smetaSum * 100 : 0; }
+  function isChanged(r) { return !S.near(r.smetaSum, r.marketSum); }
 
   function Prices(app) {
     this.app = app;
@@ -121,13 +131,12 @@
     var row = inp.closest('.vrow');
     if (!row) return;
     var cells = row.querySelectorAll('.c');
-    var econ = rec.smetaSum - rec.qty * rec.market;
-    var pct = rec.price ? (rec.market - rec.price) / rec.price * 100 : 0;
-    cells[7].textContent = rec.price ? pct.toFixed(1) + '%' : '';
+    var econ = econOf(rec), pct = pctOf(rec), chg = isChanged(rec);
+    cells[7].textContent = rec.smetaSum ? pct.toFixed(1) + '%' : '';
     cells[8].textContent = S.money(econ);
-    cells[7].classList.toggle('diff', Math.abs(pct) > 0.0001);
-    cells[8].classList.toggle('diff', Math.abs(econ) > 0.5);
-    row.classList.toggle('chg', !S.near(rec.price, rec.market));
+    cells[7].classList.toggle('diff', chg);
+    cells[8].classList.toggle('diff', chg);
+    row.classList.toggle('chg', chg);
   };
 
   Prices.prototype.focusRow = function (i) {
@@ -147,15 +156,15 @@
     var list = m.resources.filter(function (r) {
       if (q && S.nameKey(r.name).indexOf(q) < 0) return false;
       switch (f) {
-        case 'changed': return !S.near(r.price, r.market);
-        case 'same': return S.near(r.price, r.market);
+        case 'changed': return isChanged(r);
+        case 'same': return !isChanged(r);
         case 'zero': return !r.price;
         case 'multi': return r.prices.length > 1;
         default: return true;
       }
     });
 
-    if (sort === 'diff') list.sort(function (a, b) { return econ(b) - econ(a); });
+    if (sort === 'diff') list.sort(function (a, b) { return Math.abs(econOf(b)) - Math.abs(econOf(a)); });
     else if (sort === 'sum') list.sort(function (a, b) { return b.smetaSum - a.smetaSum; });
     else if (sort === 'count') list.sort(function (a, b) { return b.count - a.count; });
     else list.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
@@ -165,12 +174,10 @@
     this.status();
   };
 
-  function econ(r) { return Math.abs(r.smetaSum - r.qty * r.market); }
-
   Prices.prototype.status = function () {
     var m = this.app.model;
     var total = m ? m.resources.length : 0;
-    var changed = m ? m.resources.filter(function (r) { return !S.near(r.price, r.market); }).length : 0;
+    var changed = m ? m.resources.filter(isChanged).length : 0;
     document.getElementById('priceCount').textContent =
       this.view.length + ' / ' + total + ' resurs · ' + changed + ' tasi o\'zgartirilgan';
   };
@@ -180,30 +187,52 @@
     for (var i = from; i < to; i++) {
       var r = this.view[i];
       if (!r) continue;
-      var changed = !S.near(r.price, r.market);
-      var pct = r.price ? (r.market - r.price) / r.price * 100 : 0;
-      var e = r.smetaSum - r.qty * r.market;
-      var multi = r.prices.length > 1 ? '<span class="tagm" title="Bu resurs turli smeta narxlari bilan uchraydi">' +
-        r.prices.length + ' narx</span>' : '';
+      var changed = isChanged(r);
+      var pct = pctOf(r);
+      var e = econOf(r);
+      var many = r.prices.length > 1;
+      var multi = many ? '<span class="tagm" title="' + S.esc(multiHint(r)) + '">' +
+        r.prices.length + ' xil narx</span>' : '';
       out.push(
-        '<div class="vrow' + (changed ? ' chg' : '') + '">' +
+        '<div class="vrow' + (changed ? ' chg' : '') + (many ? ' many' : '') + '">' +
         cell(COLS[0], i + 1) +
         '<div class="c" style="' + width(COLS[1]) + '" title="' + S.esc(r.name) + '">' + S.esc(r.name) + multi + '</div>' +
         cell(COLS[2], S.esc(r.unit)) +
         cell(COLS[3], r.count) +
         cell(COLS[4], S.qty(r.qty)) +
-        cell(COLS[5], S.price(r.price)) +
+        '<div class="c num" style="' + width(COLS[5]) + '" title="' + S.esc(priceHint(r)) + '">' +
+        smetaCell(r) + '</div>' +
         '<div class="c num" style="' + width(COLS[6]) + '">' +
         '<input class="pin' + (changed ? ' edited' : '') + '" data-key="' + S.esc(r.key) + '" data-i="' + i +
         '" inputmode="decimal" value="' + S.price(r.market) + '"></div>' +
         '<div class="c num' + (changed ? ' diff' : '') + '" style="' + width(COLS[7]) + '">' +
-        (r.price ? pct.toFixed(1) + '%' : '') + '</div>' +
-        '<div class="c num' + (Math.abs(e) > 0.5 ? ' diff' : '') + '" style="' + width(COLS[8]) + '">' +
+        (r.smetaSum ? pct.toFixed(1) + '%' : '') + '</div>' +
+        '<div class="c num' + (changed ? ' diff' : '') + '" style="' + width(COLS[8]) + '">' +
         S.money(e) + '</div>' +
         '</div>');
     }
     return out.join('');
   };
+
+  /** One smeta price, or the span when the resource carries several. */
+  function smetaCell(r) {
+    if (r.prices.length < 2) return S.price(r.price);
+    var lo = Math.min.apply(null, r.prices), hi = Math.max.apply(null, r.prices);
+    return '<span class="span">' + S.price(lo) + ' – ' + S.price(hi) + '</span>';
+  }
+
+  function priceHint(r) {
+    if (r.prices.length < 2) return 'Smeta narxi';
+    return 'Smetalarda ' + r.prices.length + ' xil narx: ' +
+      r.prices.map(function (p) { return S.price(p); }).join(' · ');
+  }
+
+  function multiHint(r) {
+    return 'Bu resurs smetalarda ' + r.prices.length + ' xil narx bilan uchraydi: ' +
+      r.prices.map(function (p) { return S.price(p); }).join(' · ') +
+      '. Hozircha har bir qator o\'z narxida turibdi, shuning uchun farq 0. ' +
+      'Bozor narxini yozsangiz, ' + r.count + ' ta qatorning hammasi shu narxga o\'tadi.';
+  }
 
   function fmtIn(v) {
     if (v == null) return '';

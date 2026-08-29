@@ -113,7 +113,10 @@ body.drag::after{content:"";position:fixed;inset:8px;border:2px dashed var(--acc
 .pin:hover{border-color:var(--rule2);background:#fff}
 .pin:focus{border-color:var(--accent);background:#fff;outline:none}
 .pin.edited{background:#fff7e6;font-weight:600}
-.tagm{display:inline-block;background:#fde7c7;color:#8a5300;border-radius:3px;padding:0 4px;font-size:10px;margin-left:5px}
+.tagm{display:inline-block;background:#fde7c7;color:#8a5300;border-radius:3px;padding:0 4px;font-size:10px;
+  margin-left:5px;cursor:help}
+.vrow .c .span{color:var(--mute);font-size:11px}
+.vrow.many .pin{border-color:#e6c58a;border-style:dashed}
 
 /* ------------------------------------------------------------------ forms */
 .form{padding:16px 18px;overflow:auto;max-width:720px}

@@ -70,7 +70,11 @@ var S = (typeof S !== 'undefined' && S) || {};
 
   var NF = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
   var NF3 = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 3 });
-  function money(v) { return v == null ? '' : NF.format(Math.round(v)); }
+  function money(v) {
+    if (v == null) return '';
+    var n = Math.round(v);
+    return NF.format(n === 0 ? 0 : n);   // never render "-0"
+  }
   /** Unit prices keep their fractional tail, the way the sheet shows them. */
   function price(v) {
     if (v == null) return '';

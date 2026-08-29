@@ -57,6 +57,13 @@ fayllar kompyuterdan chiqmaydi.
 
    * Ikkalasida ham: `Enter` / `↓` `↑` — qatordan qatorga, `Esc` — smeta narxini
      qaytarish. Raqam yozayotganda oddiy, yozib bo'lgach ajratilgan ko'rinishda.
+
+   **`2 xil narx` belgisi.** Bitta resurs turli smetalarda turli narx bilan
+   uchrashi mumkin (masalan `АВТОГРЕЙДЕР "КАМАЦУ"` — bir loyihada `364 298`,
+   ikkinchisida `413 117`). Bunday resursning «Smeta narxi» ustunida ikkala
+   narx oralig'i ko'rsatiladi. Siz tegmagan bo'lsangiz **har bir qator o'z
+   narxida turadi**, shuning uchun farq `0`. Bozor narxini yozganingizdan
+   keyingina barcha qatorlar shu bitta narxga o'tadi va farq paydo bo'ladi.
    * Filtrlar: faqat o'zgartirilganlar, narxi `0` bo'lganlar, bitta nom ostida
      bir nechta smeta narxi uchraydiganlar.
    * `% qo'llash` — ko'rinib turgan barcha resurslarga foizda tuzatish.

@@ -531,11 +531,14 @@
       el.innerHTML = '<span class="empty">Smeta fayllarini qo\'shing — .xlsx fayllarni oynaga tashlash ham mumkin.</span>';
       return;
     }
+    // Both sides are summed row by row: a resource can carry several smeta
+    // prices, and an untouched row keeps its own, so it must not be valued at
+    // one representative price.
     var smeta = 0, market = 0, changed = 0;
     m.resources.forEach(function (r) {
       smeta += r.smetaSum;
-      market += r.qty * r.market;
-      if (!S.near(r.price, r.market)) changed++;
+      market += r.marketSum;
+      if (!S.near(r.smetaSum, r.marketSum)) changed++;
     });
     var diff = smeta - market;
     var pct = smeta ? diff / smeta * 100 : 0;

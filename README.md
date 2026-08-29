@@ -12,9 +12,17 @@ fayllar kompyuterdan chiqmaydi.
 ## Ish tartibi
 
 1. **Smeta fayllarini qo'shing.** Har bir `.xlsx` — bitta loyiha. Ichidagi
-   ko'cha/obyekt varaqlari (`1.G-27`, `2.G-27,1`, … `14.Перевозка`) avtomatik
-   topiladi; `свод`, `сводная` kabi yig'ma varaqlar chetlab o'tiladi.
-   Bir vaqtning o'zida istagancha loyiha qo'shsa bo'ladi.
+   ko'cha/obyekt varaqlari avtomatik topiladi; `свод`, `сводная` kabi yig'ma
+   varaqlar chetlab o'tiladi. Bir vaqtning o'zida istagancha loyiha qo'shsa
+   bo'ladi.
+
+   Varaq **nomi ahamiyatga ega emas** va ustunlar qayerdan boshlanishi ham
+   muhim emas — jadval sarlavhasi (`НАИМЕНОВАНИЕ · ЕД.ИЗМ. · КОЛ-ВО · ЦЕНА ·
+   СУММА`) bo'yicha topiladi. Sarlavha qatori umuman bo'lmasa (masalan
+   `ПЕРЕВОЗКА` varaqlari), tuzilma birinchi resurs qatoridan aniqlanadi — bu
+   holda `ЗАТРАТЫ ТРУДА / МАШИНЫ / МАТЕРИАЛЫ / ОБОРУДОВАНИЕ` bo'limlaridan
+   kamida bittasi bo'lishi shart (o'zbekcha nomlari ham tanib olinadi).
+   Narxlari `ВПР`/`VLOOKUP` formulasi bilan qo'yilgan bo'lsa ham o'qiladi.
 
 2. **Yig'ish.** Barcha obyekt varaqlari bitta uzluksiz `Лист1` ga ketma-ket
    qo'yiladi, ustunlar bir pozitsiyaga suriladi va `ЦЕНА ЗА ЕД.` / `СУММА`

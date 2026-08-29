@@ -309,7 +309,9 @@
     if (!res.ok) {
       this.toast(name + ': ' + res.error, true);
     } else if (!res.objects.length) {
-      this.toast(name + ': resurs varaqlari topilmadi', true);
+      this.toast(name + ': resurs varaqlari topilmadi. Varaqda «НАИМЕНОВАНИЕ · КОЛ-ВО · ' +
+        'ЦЕНА · СУММА» sarlavhali qator, yoki «ЗАТРАТЫ ТРУДА / МАШИНЫ / МАТЕРИАЛЫ / ' +
+        'ОБОРУДОВАНИЕ» bo\'limlaridan bittasi bo\'lishi kerak.', true);
     } else {
       var title = res.objects[0].title || name.replace(/\.[^.]+$/, '');
       if (entry) {

@@ -32,20 +32,33 @@
     var u = up(t);
     return u.indexOf('ИТОГО') === 0 || u.indexOf('ВСЕГО') === 0;
   }
+  // The four bands, as they are actually written in the wild: Russian, and
+  // Uzbek in both alphabets.
+  var LABOR = /^(ЗАТРАТЫ ТРУДА|ТРУДОЗАТРАТЫ|МЕҲНАТ|MEHNAT|ISHCHILAR)/;
+  var MACH = /^((СТРОИТЕЛЬНЫЕ )?МАШИНЫ|МЕХАНИЗМЫ|(ҚУРИЛИШ )?МАШИНА|МЕХАНИЗМ|(QURILISH )?MASHINA|MEXANIZM)/;
+  var MAT = /^((СТРОИТЕЛЬНЫЕ )?МАТЕРИАЛЫ|(ҚУРИЛИШ )?МАТЕРИАЛ|(QURILISH )?MATERIAL)/;
+  var EQUIP = /^(ОБОРУДОВАНИ|УСКУНА|ЖИҲОЗ|USKUNA|JIHOZ|ASBOB)/;
+
   function isSection(t) {
     var u = up(t);
     for (var i = 0; i < SECTIONS.length; i++) if (u === SECTIONS[i]) return true;
-    // Tolerate spelling drift in real files ("СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ" etc).
-    return /^(ЗАТРАТЫ ТРУДА|СТРОИТЕЛЬНЫЕ (МАШИНЫ|МАТЕРИАЛЫ)|ОБОРУДОВАНИ|МАТЕРИАЛЫ|МАШИНЫ)/.test(u);
+    return LABOR.test(u) || MACH.test(u) || MAT.test(u) || EQUIP.test(u);
   }
   function sectionOf(t) {
     var u = up(t);
-    if (u.indexOf('ЗАТРАТЫ ТРУДА') === 0) return 'labor';
-    if (u.indexOf('СТРОИТЕЛЬНЫЕ МАШИНЫ') === 0 || u.indexOf('МАШИНЫ') === 0) return 'machines';
-    if (u.indexOf('СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ') === 0 || u.indexOf('МАТЕРИАЛЫ') === 0) return 'materials';
-    if (u.indexOf('ОБОРУДОВАНИ') === 0) return 'equipment';
+    if (LABOR.test(u)) return 'labor';
+    if (MACH.test(u)) return 'machines';
+    if (MAT.test(u)) return 'materials';
+    if (EQUIP.test(u)) return 'equipment';
     return 'other';
   }
+
+  /**
+   * A resource line needs a name, not just a number in the name column.
+   * Spelled out rather than \W, which is ASCII-only and would reject every
+   * Cyrillic name.
+   */
+  var LETTER = /[A-Za-z\u00C0-\u024F\u0400-\u04FF]/;
 
   /** Locate the header row and the six meaningful columns. */
   function findLayout(rows) {
@@ -96,7 +109,7 @@
         if (!priced || !summed) continue;
         return {
           no: c, name: c + 1, unit: c + 2, qty: c + 3, price: c + 4, sum: c + 5,
-          headerRow: 0, numRow: 0, lastCol: c + 5
+          headerRow: 0, numRow: 0, lastCol: c + 5, guessed: true
         };
       }
     }
@@ -163,7 +176,7 @@
       else if (r === L.numRow) kind = 'numbering';
       else if (isTotal(noTxt) || isTotal(nm)) kind = 'total';
       else if (noTxt && isSection(noTxt) && qty == null) { kind = 'section'; section = sectionOf(noTxt); sections++; }
-      else if (nm && qty != null) { kind = 'item'; items++; }
+      else if (nm && LETTER.test(nm) && qty != null) { kind = 'item'; items++; }
       else if (nm) kind = 'extra';
       else if (noTxt) kind = 'section';
       else kind = 'blank';
@@ -180,9 +193,11 @@
         cells: cells
       });
     }
-    // A summary ("свод") sheet has the same column shape but never carries the
-    // ЗАТРАТЫ ТРУДА / МАШИНЫ / МАТЕРИАЛЫ / ОБОРУДОВАНИЕ bands. That is the tell.
-    if (!items || !sections) return null;
+    // A sheet with a proper header row (НАИМЕНОВАНИЕ + КОЛ-ВО + ЦЕНА + СУММА)
+    // is a resource sheet, section bands or not. When the layout had to be
+    // guessed, at least one band is required — that is what keeps the summary
+    // ("свод") sheets out, since they carry no header of their own.
+    if (!items || (L.guessed && !sections)) return null;
 
     return {
       name: sheet.name, title: title, subtitle: subtitle || sheet.name,

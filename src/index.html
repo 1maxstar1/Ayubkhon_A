@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smeta — Taqqoslash jadvali №2</title>
+<style>/*__CSS__*/</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="brand">
+    <b>Taqqoslash jadvali №2</b>
+    <span>smeta resurs narxlarini tekshirish va yig'ish</span>
+  </div>
+  <div class="grow"></div>
+  <label class="btn file">
+    <input type="file" id="pick" multiple accept=".xlsx,.xlsm">
+    Smeta fayllarini qo'shish
+  </label>
+  <button class="btn" id="loadBook">Narx kitobi</button>
+  <button class="btn" id="saveBook">Narx kitobini saqlash</button>
+  <button class="btn primary" id="export" disabled>Excel yuklab olish</button>
+</header>
+
+<div class="ledger" id="ledger"></div>
+
+<main id="main">
+  <aside id="side">
+    <div class="side-head">
+      <span>Loyihalar</span>
+      <button class="link" id="collapseAll" title="Varaqlar ro'yxatini yig'ish">–</button>
+    </div>
+    <div id="projects" class="projects"></div>
+    <div class="drop-hint" id="dropHint">
+      <b>Fayllarni shu yerga tashlang</b>
+      <span>Har bir .xlsx = bitta loyiha. Ichidagi ko'cha/obyekt varaqlari avtomatik topiladi.</span>
+    </div>
+  </aside>
+
+  <section id="work">
+    <nav class="tabs">
+      <button class="tab on" data-pane="prices">Narxlarni tekshirish</button>
+      <button class="tab" data-pane="sheet">Yig'ilgan jadval</button>
+      <button class="tab" data-pane="report">Hisobot ko'rinishi</button>
+      <button class="tab" data-pane="settings">Hujjat sozlamalari</button>
+    </nav>
+
+    <div class="pane on" id="pane-prices">
+      <div class="toolbar">
+        <input type="search" id="q" placeholder="Resurs nomi bo'yicha qidirish…" spellcheck="false">
+        <select id="filter">
+          <option value="all">Barchasi</option>
+          <option value="changed">Faqat o'zgartirilgan</option>
+          <option value="same">O'zgarmagan</option>
+          <option value="zero">Narxi 0 bo'lganlar</option>
+          <option value="multi">Bir nechta smeta narxi</option>
+        </select>
+        <select id="sort">
+          <option value="name">Nomi bo'yicha</option>
+          <option value="diff">Farq bo'yicha (katta → kichik)</option>
+          <option value="sum">Smeta summasi bo'yicha</option>
+          <option value="count">Takrorlanish soni bo'yicha</option>
+        </select>
+        <div class="grow"></div>
+        <button class="btn sm" id="pctBtn">% qo'llash</button>
+        <button class="btn sm" id="resetBtn">Tanlanganni tiklash</button>
+        <span class="count" id="priceCount"></span>
+      </div>
+      <div class="thead" id="priceHead"></div>
+      <div class="vscroll" id="priceScroll"><div class="vspace"><div class="vbody"></div></div></div>
+    </div>
+
+    <div class="pane" id="pane-sheet">
+      <div class="toolbar">
+        <input type="search" id="q2" placeholder="Yig'ilgan jadvalda qidirish…" spellcheck="false">
+        <select id="jump"></select>
+        <div class="grow"></div>
+        <span class="count" id="sheetCount"></span>
+      </div>
+      <div class="thead" id="sheetHead"></div>
+      <div class="vscroll" id="sheetScroll"><div class="vspace"><div class="vbody"></div></div></div>
+    </div>
+
+    <div class="pane" id="pane-report">
+      <div class="toolbar">
+        <select id="reportProject"></select>
+        <select id="reportMode">
+          <option value="changed">Faqat o'zgargan narxlar (tozalangan)</option>
+          <option value="dedup">Barcha resurslar (tozalangan)</option>
+          <option value="full">To'liq nusxa (Excel filtr + saralash kabi)</option>
+        </select>
+        <div class="grow"></div>
+        <span class="count" id="reportCount"></span>
+      </div>
+      <div class="thead" id="reportHead"></div>
+      <div class="vscroll" id="reportScroll"><div class="vspace"><div class="vbody"></div></div></div>
+    </div>
+
+    <div class="pane" id="pane-settings">
+      <div class="form">
+        <h3>Hisobot varaqlari</h3>
+        <label>Yuqori o'ng burchakdagi shtamp
+          <textarea id="optStamp" rows="4"></textarea></label>
+        <label>Hujjat sarlavhasi
+          <input id="optTitle" type="text"></label>
+        <label>Standart eslatma matni
+          <input id="optNote" type="text"></label>
+        <label class="row"><input type="checkbox" id="optAutoNote" checked>
+          Eslatma matnini har bir o'zgargan qatorga avtomatik qo'yish</label>
+        <label class="row"><input type="checkbox" id="optHideSums" checked>
+          Summa ustunlarini yashirish (chop etish uchun)</label>
+        <label class="row"><input type="checkbox" id="optHideQty" checked>
+          КОЛ-ВО ustunini yashirish</label>
+        <label>Pushti rang chegarasi (shartli formatlash)
+          <input id="optCf" type="number" step="1000000" value="10000000"></label>
+        <h3>Yig'ilgan varaq nomi</h3>
+        <label><input id="optSheetName" type="text" value="Лист1"></label>
+        <p class="note">Bu sozlamalar brauzerda saqlanadi va keyingi safar avtomatik tiklanadi.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="toast" class="toast"></div>
+<div id="busy" class="busy"><div class="spin"></div><span id="busyText">Ishlanmoqda…</span></div>
+
+<input type="file" id="bookInput" accept=".json,.xlsx" hidden>
+
+<script>window.__WORKER_SRC__ = /*__WORKER__*/;</script>
+<script>/*__JS__*/</script>
+</body>
+</html>

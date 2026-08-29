@@ -1,0 +1,14 @@
+{
+  "name": "smeta-taqqoslash",
+  "version": "1.0.0",
+  "description": "Smeta resurs narxlarini taqqoslash va TAQQOSLASH JADVALI №2 tayyorlash vositasi",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.1"
+  }
+}

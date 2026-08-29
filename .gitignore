@@ -1,0 +1,7 @@
+node_modules/
+test/out.xlsx
+test/export-browser.xlsx
+test/shot-*.png
+test/browser-errors.txt
+test/dbg.mjs
+*.log

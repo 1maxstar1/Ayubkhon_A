@@ -50,6 +50,20 @@
       self.updateRowEcho(inp, rec);
     });
 
+    scroll.addEventListener('focusin', function (e) {
+      var inp = e.target;
+      if (!inp.classList || !inp.classList.contains('pin')) return;
+      var rec = self.byKey(inp.dataset.key);
+      if (rec) inp.value = fmtIn(rec.market);
+      inp.select();
+    });
+    scroll.addEventListener('focusout', function (e) {
+      var inp = e.target;
+      if (!inp.classList || !inp.classList.contains('pin')) return;
+      var rec = self.byKey(inp.dataset.key);
+      if (rec) inp.value = S.price(rec.market);
+    });
+
     scroll.addEventListener('keydown', function (e) {
       var inp = e.target;
       if (!inp.classList || !inp.classList.contains('pin')) return;
@@ -181,7 +195,7 @@
         cell(COLS[5], S.price(r.price)) +
         '<div class="c num" style="' + width(COLS[6]) + '">' +
         '<input class="pin' + (changed ? ' edited' : '') + '" data-key="' + S.esc(r.key) + '" data-i="' + i +
-        '" inputmode="decimal" value="' + fmtIn(r.market) + '"></div>' +
+        '" inputmode="decimal" value="' + S.price(r.market) + '"></div>' +
         '<div class="c num' + (changed ? ' diff' : '') + '" style="' + width(COLS[7]) + '">' +
         (r.price ? pct.toFixed(1) + '%' : '') + '</div>' +
         '<div class="c num' + (Math.abs(e) > 0.5 ? ' diff' : '') + '" style="' + width(COLS[8]) + '">' +

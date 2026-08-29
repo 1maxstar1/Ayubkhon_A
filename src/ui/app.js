@@ -102,6 +102,8 @@
       e.target.value = '';
     });
 
+    this.bindSheetEditing();
+
     document.getElementById('q2').addEventListener('input', S.debounce(function () { self.applySheetFilter(); }, 120));
     document.getElementById('jump').addEventListener('change', function () {
       var i = +this.value;
@@ -121,6 +123,98 @@
     bindChk(this, 'optHideSums', 'hideSums');
     bindChk(this, 'optHideQty', 'hideQty');
     bindChk(this, 'optContents', 'contents');
+  };
+
+  /**
+   * The market price is editable straight from the assembled sheet, not only on
+   * the prices tab. One edit still means one resource: it lands on every row
+   * with the same name and unit, which is what "review the price across the
+   * whole project" means.
+   */
+  App.prototype.bindSheetEditing = function () {
+    var self = this;
+    var scroll = document.getElementById('sheetScroll');
+
+    scroll.addEventListener('input', function (e) {
+      var inp = e.target;
+      if (!inp.classList || !inp.classList.contains('pin')) return;
+      var key = inp.dataset.key;
+      var row = self.rowByKeyFirst(key);
+      if (!row) return;
+      var v = S.num(inp.value);
+      self.setPrice(key, v == null ? row.price : v);
+      self.echoSheetRows(key);
+    });
+
+    // Grouped digits while reading, plain digits while typing.
+    scroll.addEventListener('focusin', function (e) {
+      var inp = e.target;
+      if (!inp.classList || !inp.classList.contains('pin')) return;
+      var row = self.rowByKeyFirst(inp.dataset.key);
+      if (row) inp.value = inVal(row.market);
+      inp.select();
+    });
+    scroll.addEventListener('focusout', function (e) {
+      var inp = e.target;
+      if (!inp.classList || !inp.classList.contains('pin')) return;
+      var row = self.rowByKeyFirst(inp.dataset.key);
+      if (row) inp.value = S.price(row.market);
+    });
+
+    scroll.addEventListener('keydown', function (e) {
+      var inp = e.target;
+      if (!inp.classList || !inp.classList.contains('pin')) return;
+      if (e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); self.stepSheet(+inp.dataset.i, 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); self.stepSheet(+inp.dataset.i, -1); }
+      else if (e.key === 'Escape') {
+        var row = self.rowByKeyFirst(inp.dataset.key);
+        if (row) { self.setPrice(inp.dataset.key, row.price); self.sheetList.refresh(); }
+      }
+    });
+  };
+
+  /** Move the caret to the next/previous priced row, skipping the banners. */
+  App.prototype.stepSheet = function (i, dir) {
+    var rows = this.sheetView || [];
+    for (var j = i + dir; j >= 0 && j < rows.length; j += dir) {
+      if (rows[j] && rows[j].kind === 'item' && rows[j].key) {
+        this.sheetList.scrollToRow(j);
+        var el = document.querySelector('#sheetScroll .pin[data-i="' + j + '"]');
+        if (el) { el.focus(); el.select(); }
+        return;
+      }
+    }
+  };
+
+  App.prototype.rowByKeyFirst = function (key) {
+    var rows = this._rowsByKey && this._rowsByKeyFor === this.model ? this._rowsByKey.get(key) : null;
+    if (rows && rows.length) return rows[0];
+    var all = this.model ? this.model.rows : [];
+    for (var i = 0; i < all.length; i++) if (all[i].key === key) return all[i];
+    return null;
+  };
+
+  /** Repaint the derived cells of every visible row of one resource. */
+  App.prototype.echoSheetRows = function (key) {
+    var rows = document.querySelectorAll('#sheetScroll .vrow[data-key="' + key.replace(/["\\]/g, '\\$&') + '"]');
+    var view = this.sheetView || [];
+    var byRow = new Map();
+    view.forEach(function (r) { if (r.key === key) byRow.set('r' + r.r, r); });
+    for (var i = 0; i < rows.length; i++) {
+      var el = rows[i];
+      var inp = el.querySelector('.pin');
+      var r = inp ? byRow.get(inp.dataset.focus) : null;
+      if (!r) continue;
+      var qty = r.qty || 0, sm = qty * r.price, mk = qty * r.market, d = sm - mk;
+      var chg = !S.near(r.price, r.market);
+      var cells = el.querySelectorAll('.c');
+      cells[8].textContent = S.money(mk);
+      cells[9].textContent = S.money(d);
+      cells[9].classList.toggle('diff', chg);
+      el.classList.toggle('chg', chg);
+      inp.classList.toggle('edited', chg);
+      if (document.activeElement !== inp) inp.value = S.price(r.market);
+    }
   };
 
   function bindOpt(app, id, key, numeric) {
@@ -424,7 +518,11 @@
     this.ledgerSoon();
   };
 
-  App.prototype.ledgerSoon = S.debounce(function () { this.ledger(); this.prices_ui.status(); }, 160);
+  App.prototype.ledgerSoon = S.debounce(function () {
+    this.ledger();
+    this.prices_ui.status();
+    this.prices_ui.list.refresh();
+  }, 200);
 
   App.prototype.ledger = function () {
     var el = document.getElementById('ledger');
@@ -455,6 +553,10 @@
   }
 
   /* ------------------------------------------------------- sheet preview */
+
+  // The continuous 1..N number that lives in column A of the assembled sheet —
+  // the one that says which rows belong to which project.
+  var IDX_COL = { w: 62, cls: 'num idx', h: 'A' };
 
   var SHEET_COLS = [
     { w: 58, cls: 'mid', h: '№' },
@@ -501,8 +603,10 @@
 
   App.prototype.renderSheet = function (from, to) {
     if (!this._sheetHead) {
-      document.getElementById('sheetHead').innerHTML = SHEET_COLS.map(function (c) {
-        return '<div class="c' + (c.cls ? ' ' + c.cls : '') + '" style="' + w(c) + '">' + S.esc(c.h) + '</div>';
+      document.getElementById('sheetHead').innerHTML = [IDX_COL].concat(SHEET_COLS).map(function (c) {
+        return '<div class="c' + (c.cls ? ' ' + c.cls : '') + '" style="' + w(c) +
+          '"' + (c === IDX_COL ? ' title="Лист1 A ustuni — umumiy qator raqami"' : '') + '>' +
+          S.esc(c.h) + '</div>';
       }).join('');
       this._sheetHead = true;
     }
@@ -510,7 +614,7 @@
     for (var i = from; i < to; i++) {
       var r = rows[i];
       if (!r) continue;
-      out.push(rowHtml(r, r.cells, 2, 3, 4, 5, 6, 8));
+      out.push(rowHtml(r, r.cells, 2, 3, 4, 5, 6, 8, i, true, true));
     }
     this.showWhere(rows[from]);
     return out.join('');
@@ -526,30 +630,48 @@
       : '';
   };
 
-  /** Shared row renderer for both previews; column indexes differ per sheet. */
-  function rowHtml(r, cells, cNo, cName, cUnit, cQty, cPrice, cMarket) {
+  /**
+   * Shared row renderer for both previews; column indexes differ per sheet.
+   * `editable` puts a live input in the БОЗОР ЦЕНА cell — the same edit as on
+   * the prices tab, so it lands on every row of that resource at once.
+   */
+  function rowHtml(r, cells, cNo, cName, cUnit, cQty, cPrice, cMarket, i, editable, showIndex) {
     var kind = r.kind || 'blank';
+    var idx = showIndex
+      ? '<div class="c num idx" style="' + w(IDX_COL) + '">' + (r.r || '') + '</div>' : '';
     if (kind !== 'item') {
       var label = '';
       for (var c = cNo; c <= cName + 1; c++) { if (cells[c] && cells[c].v != null) { label = String(cells[c].v); break; } }
       if (!label && cells[12] && cells[12].v != null) label = String(cells[12].v);
-      return '<div class="vrow k-' + kind + '"><div class="c" style="flex:1 1 auto">' +
+      return '<div class="vrow k-' + kind + '">' + idx + '<div class="c" style="flex:1 1 auto">' +
         S.esc(label.replace(/\n/g, ' ')) + '</div></div>';
     }
     var qty = r.qty || 0, sm = qty * r.price, mk = qty * r.market, d = sm - mk;
     var chg = !S.near(r.price, r.market);
     var no = cells[cNo] && cells[cNo].v;
-    return '<div class="vrow k-item' + (chg ? ' chg' : '') + '">' +
+    var market = editable && r.key
+      ? '<div class="c num" style="' + w(SHEET_COLS[6]) + '">' +
+        '<input class="pin' + (chg ? ' edited' : '') + '" data-key="' + S.esc(r.key) +
+        '" data-focus="r' + r.r + '" data-i="' + i + '" inputmode="decimal" value="' +
+        S.price(r.market) + '"></div>'
+      : '<div class="c num" style="' + w(SHEET_COLS[6]) + '">' + S.price(r.market) + '</div>';
+    return '<div class="vrow k-item' + (chg ? ' chg' : '') + '"' +
+      (r.key ? ' data-key="' + S.esc(r.key) + '"' : '') + '>' + idx +
       '<div class="c mid" style="' + w(SHEET_COLS[0]) + '">' + (no == null ? '' : S.esc(no)) + '</div>' +
       '<div class="c" style="' + w(SHEET_COLS[1]) + '" title="' + S.esc(r.nm) + '">' + S.esc(r.nm) + '</div>' +
       '<div class="c mid" style="' + w(SHEET_COLS[2]) + '">' + S.esc(r.unit) + '</div>' +
       '<div class="c num" style="' + w(SHEET_COLS[3]) + '">' + S.qty(qty) + '</div>' +
       '<div class="c num" style="' + w(SHEET_COLS[4]) + '">' + S.price(r.price) + '</div>' +
       '<div class="c num" style="' + w(SHEET_COLS[5]) + '">' + S.money(sm) + '</div>' +
-      '<div class="c num" style="' + w(SHEET_COLS[6]) + '">' + S.price(r.market) + '</div>' +
+      market +
       '<div class="c num" style="' + w(SHEET_COLS[7]) + '">' + S.money(mk) + '</div>' +
       '<div class="c num' + (chg ? ' diff' : '') + '" style="' + w(SHEET_COLS[8]) + '">' + S.money(d) + '</div>' +
       '</div>';
+  }
+
+  function inVal(v) {
+    if (v == null) return '';
+    return Math.abs(v - Math.round(v)) < 1e-6 ? String(Math.round(v)) : String(Math.round(v * 1000) / 1000);
   }
 
   /* ------------------------------------------------------ report preview */
@@ -601,7 +723,7 @@
     for (var i = from; i < to; i++) {
       var r = rows[i];
       if (!r) continue;
-      out.push(rowHtml(r, r.cells, 2, 4, 5, 6, 7, 9));
+      out.push(rowHtml(r, r.cells, 2, 4, 5, 6, 7, 9, i, false, false));
     }
     return out.join('');
   };

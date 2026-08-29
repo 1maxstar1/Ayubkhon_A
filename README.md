@@ -44,12 +44,19 @@ fayllar kompyuterdan chiqmaydi.
    Oraliqlar loyihalar tartibiga bog'liq. Tartibni chap tomondagi `▲ ▼`
    tugmalari bilan o'zgartirasiz — raqamlar darhol qayta hisoblanadi.
 
-4. **Narxlarni tekshiring.** «Narxlarni tekshirish» varag'ida har bir resurs
-   **bir marta** ko'rinadi — nechta ko'chada uchrashidan qat'i nazar. Bozor
-   narxini bir joyda yozasiz, u butun loyiha bo'ylab barcha qatorlarga qo'llanadi.
-   Narxi to'g'ri bo'lganini tegmay qoldirasiz — farq `0` bo'lib qoladi.
+4. **Narxlarni tekshiring.** Bozor narxini ikki joyda tahrirlash mumkin, ikkalasi
+   ham bir xil ishlaydi — bitta tuzatish shu resursning butun loyihadagi barcha
+   qatorlariga tushadi. Narxi to'g'ri bo'lganini tegmay qoldirasiz — farq `0`
+   bo'lib qoladi.
 
-   * `Enter` / `↓` — keyingi qatorga o'tish, `Esc` — smeta narxini qaytarish.
+   * **«Narxlarni tekshirish»** — har bir resurs **bir marta** ko'rinadi, nechta
+     ko'chada uchrashidan qat'i nazar. Ro'yxat bo'ylab tez yurish uchun qulay.
+   * **«Yig'ilgan jadval»** — `БОЗОР ЦЕНА` ustunining o'zida, smetaning aynan
+     shu qatorida turib tuzatasiz. `A` ustunida umumiy qator raqami ko'rinib
+     turadi.
+
+   * Ikkalasida ham: `Enter` / `↓` `↑` — qatordan qatorga, `Esc` — smeta narxini
+     qaytarish. Raqam yozayotganda oddiy, yozib bo'lgach ajratilgan ko'rinishda.
    * Filtrlar: faqat o'zgartirilganlar, narxi `0` bo'lganlar, bitta nom ostida
      bir nechta smeta narxi uchraydiganlar.
    * `% qo'llash` — ko'rinib turgan barcha resurslarga foizda tuzatish.

@@ -57,14 +57,19 @@
 
     // Preserve the caret when a repaint happens while the user is typing.
     var act = document.activeElement;
-    var keep = act && this.body.contains(act) && act.dataset ? act.dataset.key : null;
+    // data-focus when a key can repeat across rows (the same resource appears on
+    // many streets); data-key otherwise.
+    var keep = act && this.body.contains(act) && act.dataset
+      ? (act.dataset.focus || act.dataset.key) : null;
     var selStart = keep ? act.selectionStart : 0, selEnd = keep ? act.selectionEnd : 0;
 
     this.body.style.transform = 'translateY(' + (first * this.rowHeight) + 'px)';
     this.body.innerHTML = this.render(first, last);
 
     if (keep) {
-      var again = this.body.querySelector('[data-key="' + cssEscape(keep) + '"]');
+      var esc = cssEscape(keep);
+      var again = this.body.querySelector('[data-focus="' + esc + '"]') ||
+                  this.body.querySelector('[data-key="' + esc + '"]');
       if (again && again.focus) {
         again.focus();
         try { again.setSelectionRange(selStart, selEnd); } catch (e) { /* not a text input */ }

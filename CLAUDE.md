@@ -1,7 +1,8 @@
 # Loyiha haqida
 
 Smeta resurs narxlarini tekshirish va **TAQQOSLASH JADVALI №2** hujjatini
-tayyorlash vositasi. To'liq tavsif — `README.md` da.
+tayyorlash vositasi. To'liq tavsif — `README.md` da. Keyingi bosqich
+(ko'p foydalanuvchi, PocketBase, narx xotirasi) rejasi — `docs/2-bosqich-reja.md`.
 
 ## Muloqot tili
 

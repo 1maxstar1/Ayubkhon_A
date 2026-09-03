@@ -160,7 +160,7 @@ body.drag::after{content:"";position:fixed;inset:8px;border:2px dashed var(--acc
 
 /* ------------------------------------------------------------------ admin */
 body.admin{overflow:auto}
-.admin-main{max-width:960px;margin:0 auto;padding:18px 16px 40px}
+main.admin-main{display:block;height:auto;max-width:960px;margin:0 auto;padding:18px 16px 40px}
 .admin-main[hidden]{display:none}
 .panel{background:var(--sf);border:1px solid var(--rule);border-radius:10px;padding:18px 20px;margin-bottom:16px}
 .panel h2{margin:0 0 6px;font-size:15px}

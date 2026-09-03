@@ -7,6 +7,13 @@ set -e
 cd "$(dirname "$0")/.."
 export PB_ADMIN_EMAIL="${PB_ADMIN_EMAIL:-admin@example.com}" PB_ADMIN_PASS="${PB_ADMIN_PASS:-adminpass1234}"
 PORT="${PB_HTTP:-127.0.0.1:8090}"
+# stop a server left from a previous run
+if [ -f server/pb_data/serve.pid ] && kill -0 "$(cat server/pb_data/serve.pid)" 2>/dev/null; then
+  kill "$(cat server/pb_data/serve.pid)"; sleep 1
+fi
+if curl -sS -m 2 -o /dev/null "http://$PORT/api/health" 2>/dev/null; then
+  echo "http://$PORT band — boshqa server ishlayapti (pkill pocketbase yoki PB_HTTP=127.0.0.1:8091)"; exit 1
+fi
 sh server/setup.sh
 node build.mjs --serve
 ( cd server; mkdir -p pb_data; PB_DEV=1 PB_HTTP="$PORT" sh run.sh >pb_data/serve.log 2>&1 & echo $! > pb_data/serve.pid )

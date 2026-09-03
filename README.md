@@ -232,4 +232,20 @@ node test/e2e-workspace.mjs    # brauzer: ariza → viloyat → fayllar → narx
 node test/e2e-hints.mjs        # brauzer: eslatmalar (viloyat, kontragent)
 ```
 
+### Lokal sinov (bir buyruq)
+
+```sh
+sh server/dev.sh        # binary + sxema + admin@example.com + namuna reyestr (400 ariza) + server
+sh server/otp.sh        # oxirgi kirish kodini ko'rsatadi (dev rejimida email yuborilmaydi)
+```
+
+Keyin `http://127.0.0.1:8090/` → `admin@example.com` → «Kod yuborish» →
+`sh server/otp.sh` dagi kodni kiriting. Admin sahifa `…/admin.html`, PocketBase
+paneli `…/_/` (parol `adminpass1234`, `PB_ADMIN_PASS` bilan o'zgartiriladi).
+To'xtatish: `kill $(cat server/pb_data/serve.pid)`. Ma'lumotlar `server/pb_data/` da,
+tozalash uchun shu papkani o'chiring.
+
+To'liq reyestr bilan yuklama sinovi: `node test/e2e-fullregistry.mjs Report_1.xls`
+(28 000 qator ≈ 35 s, qidiruv va filtrlar millisekundlarda).
+
 Joylashtirish (VPS, HTTPS, SMTP, zaxira) — `server/deploy/README.md`.

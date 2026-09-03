@@ -115,6 +115,19 @@ check(after.projects === before.projects && after.rows === before.rows && after.
 check(after.price === Math.round(first.price * 1.1) && after.changed === 1, 'changed price restored');
 check((await count('corrections')) === 1, 'restore did not duplicate corrections');
 
+// remove one project -> its file leaves the server too
+await page.click('#projects .proj:last-child button[data-act=del]');
+await page.waitForFunction(() => !S.Sync.dirty && document.getElementById('wsSave').textContent === '✓', null, { timeout: 15000 });
+await page.evaluate(() => S.Sync.q);
+const w2 = (await api('/api/collections/workspaces/records?perPage=1', {}, su)).items[0];
+check(w2.files.length === 1 && w2.state.projects.length === 1 && Object.keys(w2.state.files).length === 1, 'deleting a project removes its file from the workspace');
+// add it back (same file name as before) -> two files again, no duplicate entry
+await page.setInputFiles('#pick', [smetas[1]]);
+await page.waitForFunction(() => app.projects.length === 2 && S.Sync.ws.files.length === 2 && !S.Sync.dirty, null, { timeout: 90000 });
+await page.evaluate(() => S.Sync.q);
+const w3 = (await api('/api/collections/workspaces/records?perPage=1', {}, su)).items[0];
+check(w3.files.length === 2 && Object.keys(w3.state.files).length === 2, 're-adding the file uploads it again');
+
 // export -> stored on the server
 await page.click('#export');
 await page.waitForFunction(() => document.getElementById('toast').textContent.includes('serverda saqlandi'), null, { timeout: 60000 });

@@ -43,6 +43,9 @@ keyingi sessiyalar uchun qisqa xulosa.
 
 ## Bosqichlar
 
+Amaldagi kodlash rejasi — `docs/2-bosqich-kod-rejasi.md`; quyidagi ro'yxat
+dastlabki baho.
+
 0. Tayyorgarlik — maydonlar ro'yxati, rollar, domen, VPS, SMTP (3–5 kun)
 1. Backend skeleti — PocketBase, HTTPS, 6 jadval, huquqlar, OTP test (1 hafta)
 2. Kirish + qulf hozirgi dasturda; dastur PocketBase dan ochiladi (1 hafta)

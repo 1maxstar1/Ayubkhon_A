@@ -2,7 +2,8 @@
 
 Smeta resurs narxlarini tekshirish va **TAQQOSLASH JADVALI №2** hujjatini
 tayyorlash vositasi. To'liq tavsif — `README.md` da. Keyingi bosqich
-(ko'p foydalanuvchi, PocketBase, narx xotirasi) rejasi — `docs/2-bosqich-reja.md`.
+(ko'p foydalanuvchi, PocketBase, narx xotirasi) talablari — `docs/2-bosqich-reja.md`,
+bosqichma-bosqich kodlash ko'rsatmasi — `docs/2-bosqich-kod-rejasi.md`.
 
 ## Muloqot tili
 

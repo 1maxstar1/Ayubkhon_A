@@ -125,6 +125,7 @@
           app.toast(Object.keys(self.map).length + ' ta resurs uchun oldingi loyihalardan narx eslatmalari bor');
         }
       }).catch(function (e) {
+        if (e && e.status === 0) return;      // page left / request aborted — nothing to report
         console.error('hints', e);
         app.toast('Eslatmalar yuklanmadi: ' + S.pbErr(e), true);
       });

@@ -7,6 +7,6 @@ test/dbg.mjs
 *.log
 test/dbg*.mjs
 server/pocketbase
-server/pb_data/
+server/pb_data*/
 server/pb_public/
 server/*.zip

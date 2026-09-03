@@ -163,6 +163,29 @@ body.drag::after{content:"";position:fixed;inset:8px;border:2px dashed var(--acc
 .userbox{display:flex;align-items:center;gap:4px;font-size:12px;margin-left:6px;padding-left:10px;border-left:1px solid var(--rule)}
 .userbox .who{font-weight:600;margin-right:4px}
 .userbox a.link{text-decoration:none}
+
+/* ------------------------------------------------------------------ admin */
+body.admin{overflow:auto}
+.admin-main{max-width:960px;margin:0 auto;padding:18px 16px 40px}
+.admin-main[hidden]{display:none}
+.panel{background:var(--sf);border:1px solid var(--rule);border-radius:10px;padding:18px 20px;margin-bottom:16px}
+.panel h2{margin:0 0 6px;font-size:15px}
+.panel h3{margin:18px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute)}
+.panel .lead{color:var(--mute);font-size:12.5px;margin:0 0 12px}
+.panel .err{color:var(--bad);font-size:12px}
+.panel .stat{font-size:13px;margin-top:8px;font-weight:600}
+.panel .mute{color:var(--mute);font-weight:400}
+.progress{position:relative;height:22px;border:1px solid var(--rule2);border-radius:6px;margin-top:10px;overflow:hidden;background:var(--sf2)}
+.progress .bar-fill{position:absolute;inset:0 auto 0 0;background:var(--accent-w);transition:width .2s}
+.progress span{position:relative;line-height:22px;padding-left:8px;font-size:12px}
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.tbl th,.tbl td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--rule)}
+.tbl th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);font-weight:600}
+form.inline{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+form.inline input,form.inline select{border:1px solid var(--rule2);border-radius:6px;padding:6px 8px;background:var(--sf)}
+form.inline input{flex:1;min-width:160px}
+.denied{text-align:center;color:var(--mute);margin-top:60px}
+a.btn{text-decoration:none;color:var(--ink)}
 </style>
 </head>
 <body>

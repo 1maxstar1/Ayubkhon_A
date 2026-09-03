@@ -99,7 +99,7 @@ emaillar» talabi avtomatik bajariladi.
 | `workspaces` | `application` rel (unique) · `region` select (15) · `files` file[] (max 30, 60 MB har biri, `.xlsx .xlsm`) · `state` json · `status` select `[in_progress, done]` · `opened_by` rel→users · `updated_by` rel→users · `changed` number (o'zgargan narxlar soni) | unique `application` |
 | `corrections` | `workspace` rel · `application` rel · `contragent` rel · `region` select · `res_key` text (S.resKey) · `name` · `name_key` · `unit` · `unit_key` · `smeta_price` number · `market_price` number · `note` · `by` rel→users | unique (`workspace`,`res_key`); (`region`,`name_key`); (`contragent`,`name_key`) |
 | `exports` | `workspace` rel · `application` rel · `file` file · `mode` · `by` rel | `application` |
-| `registry_imports` | `file` file · `rows` · `added` · `updated` · `by` rel | — |
+| `registry_imports` | `file` file · `rows` · `rows_added` · `rows_updated` · `by` rel | — |
 
 **Viloyat `workspaces` da**, `applications` da emas: ariza yozuvi faqat admin
 importidan o'zgaradi, viloyatni xodim ish maydonini ochganda tanlaydi. Eslatma

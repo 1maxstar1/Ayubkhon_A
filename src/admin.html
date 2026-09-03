@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — Taqqoslash jadvali №2</title>
+<style>/*__CSS__*/</style>
+</head>
+<body class="admin">
+
+<header class="bar">
+  <div class="brand">
+    <b>Administrator</b>
+    <span>reyestr va foydalanuvchilar</span>
+  </div>
+  <div class="grow"></div>
+  <a class="btn" href="./">Dasturga qaytish</a>
+  <div class="userbox" id="userBox" hidden></div>
+</header>
+
+<main class="admin-main" id="adminMain" hidden>
+  <section class="panel">
+    <h2>Arizalar reyestri</h2>
+    <p class="lead">control.expertcenter.uz dan yuklab olingan hisobot (<code>.xls</code>). Qatorlar ariza raqami bo'yicha
+      solishtiriladi: yangi — qo'shiladi, mavjud — yangilanadi. Hech narsa o'chirilmaydi.</p>
+    <label class="btn file primary">
+      <input type="file" id="regFile" accept=".xls,.xlsx">
+      Reyestr faylini yuklash
+    </label>
+    <div class="progress" id="regProgress" hidden><div class="bar-fill" id="regBar"></div><span id="regText"></span></div>
+    <p class="err" id="regErr" hidden></p>
+    <div class="stat" id="regStat"></div>
+    <h3>Yuklashlar tarixi</h3>
+    <table class="tbl" id="regHistory"><thead><tr><th>Sana</th><th>Kim</th><th>Qatorlar</th><th>Qo'shildi</th><th>Yangilandi</th><th>Fayl</th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="panel">
+    <h2>Foydalanuvchilar</h2>
+    <form class="inline" id="userForm" autocomplete="off">
+      <input type="email" id="uEmail" placeholder="pochta@tashkilot.uz" required>
+      <input type="text" id="uName" placeholder="Ism familiya" required>
+      <select id="uRole"><option value="ekspert">Ekspert</option><option value="admin">Admin</option></select>
+      <button class="btn primary" type="submit">Qo'shish</button>
+    </form>
+    <p class="err" id="userErr" hidden></p>
+    <table class="tbl" id="userTable"><thead><tr><th>Pochta</th><th>Ism</th><th>Rol</th><th>Holat</th><th></th></tr></thead><tbody></tbody></table>
+  </section>
+</main>
+<p class="denied" id="denied" hidden>Bu sahifa faqat administrator uchun.</p>
+
+<!--__SCREENS__-->
+<div id="toast" class="toast"></div>
+
+<script>/*__JS__*/</script>
+</body>
+</html>

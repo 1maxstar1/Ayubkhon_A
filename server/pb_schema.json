@@ -580,11 +580,11 @@
      "type": "number"
     },
     {
-     "name": "added",
+     "name": "rows_added",
      "type": "number"
     },
     {
-     "name": "updated",
+     "name": "rows_updated",
      "type": "number"
     },
     {

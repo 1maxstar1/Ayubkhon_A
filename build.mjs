@@ -71,6 +71,7 @@ function build() {
   if (existsSync(join(root, 'src/admin.html'))) {
     const admin = read('src/admin.html')
       .replace('/*__CSS__*/', () => read('src/app.css'))
+      .replace('<!--__SCREENS__-->', () => read('src/screens.html'))
       .replace('/*__JS__*/', () => ['src/vendor/pocketbase.umd.js', 'src/vendor/xlsx.full.min.js',
         'src/lib/util.js', 'src/lib/pb.js', 'src/lib/registry-parse.js', 'src/ui/auth.js', 'src/ui/admin.js']
         .filter((p) => existsSync(join(root, p))).map(read).join('\n;\n'));

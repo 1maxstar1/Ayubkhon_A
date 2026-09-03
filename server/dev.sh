@@ -5,6 +5,8 @@
 # Sign-in codes are not emailed in dev mode: run `sh server/otp.sh` to see the last one.
 set -e
 cd "$(dirname "$0")/.."
+command -v node >/dev/null 2>&1 || { echo "node topilmadi — https://nodejs.org dan o'rnating (macOS: brew install node)"; exit 1; }
+command -v curl >/dev/null 2>&1 || { echo "curl topilmadi"; exit 1; }
 export PB_ADMIN_EMAIL="${PB_ADMIN_EMAIL:-admin@example.com}" PB_ADMIN_PASS="${PB_ADMIN_PASS:-adminpass1234}"
 PORT="${PB_HTTP:-127.0.0.1:8090}"
 # stop a server left from a previous run

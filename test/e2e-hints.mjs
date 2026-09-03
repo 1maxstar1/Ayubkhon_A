@@ -6,6 +6,7 @@
  *   node test/e2e-hints.mjs [a.xlsx]
  */
 import { chromium } from 'playwright';
+import { launchOpts } from './chromium.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -38,7 +39,7 @@ const B = rows.find((r) => r.inn && r.inn !== A.inn);
 const C = rows.find((r) => r.inn === A.inn && r.number !== A.number);
 console.log('applications:', A.number, B.number, C ? C.number : '(no second application for the same contragent)');
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
+const browser = await chromium.launch(launchOpts);
 const page = await browser.newPage({ viewport: { width: 1500, height: 950 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));

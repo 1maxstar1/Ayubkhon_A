@@ -10,29 +10,30 @@ PB_DEV=1 PB_HTTP="127.0.0.1:$PORT" ./run.sh >pb_data_test/serve.log 2>&1 &
 PID=$!
 trap 'kill $PID 2>/dev/null' EXIT
 for i in 1 2 3 4 5 6 7 8 9 10; do curl -sS -m 2 -o /dev/null "$BASE/api/health" && break || sleep 1; done
-json() { python3 -c "import sys,json;print(json.load(sys.stdin)$1)"; }
+json() { node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d)$1))"; }
 SU=$(curl -sS -X POST "$BASE/api/collections/_superusers/auth-with-password" -H 'content-type: application/json' \
-  -d "{\"identity\":\"$PB_ADMIN_EMAIL\",\"password\":\"$PB_ADMIN_PASS\"}" | json '["token"]')
+  -d "{\"identity\":\"$PB_ADMIN_EMAIL\",\"password\":\"$PB_ADMIN_PASS\"}" | json '.token')
 curl -sS -o /dev/null -X POST "$BASE/api/collections/users/records" -H "Authorization: $SU" -H 'content-type: application/json' \
   -d '{"email":"test@example.com","password":"Xx12345678901","passwordConfirm":"Xx12345678901","name":"Test Ekspert","role":"ekspert","active":true,"emailVisibility":true}'
 # OTP: no SMTP in dev — the code lands in dev-otp.txt via the hook
 OTPID=$(curl -sS -X POST "$BASE/api/collections/users/request-otp" -H 'content-type: application/json' \
-  -d '{"email":"test@example.com"}' | json '["otpId"]')
+  -d '{"email":"test@example.com"}' | json '.otpId')
 sleep 1
 CODE=$(sed -n 's/.*code=\([0-9]*\).*/\1/p' pb_data_test/dev-otp.txt | tail -1)
 [ -n "$CODE" ] || { echo "FAIL: no OTP code in dev-otp.txt"; exit 1; }
 TOK=$(curl -sS -X POST "$BASE/api/collections/users/auth-with-otp" -H 'content-type: application/json' \
-  -d "{\"otpId\":\"$OTPID\",\"password\":\"$CODE\"}" | json '["token"]')
+  -d "{\"otpId\":\"$OTPID\",\"password\":\"$CODE\"}" | json '.token')
 # token lifetime must be 4 hours
-python3 - "$TOK" <<'PY'
-import sys,json,base64
-p=sys.argv[1].split('.')[1]; p+='='*(-len(p)%4); c=json.loads(base64.urlsafe_b64decode(p))
-life=c['exp']-c.get('iat',c['exp']-14400); assert 14300<=life<=14400, life; print('token lifetime s', life)
-PY
+node -e "
+const c = JSON.parse(Buffer.from(process.argv[1].split('.')[1], 'base64url').toString());
+const life = c.exp - (c.iat != null ? c.iat : c.exp - 14400);
+if (life < 14300 || life > 14400) { console.log('FAIL: token lifetime', life); process.exit(1); }
+console.log('token lifetime s', life);
+" "$TOK"
 # rules: superuser seeds one application; the user sees it, anonymous sees none
 curl -sS -o /dev/null -X POST "$BASE/api/collections/applications/records" -H "Authorization: $SU" -H 'content-type: application/json' -d '{"number":"1","org_name":"Probe"}'
-N=$(curl -sS "$BASE/api/collections/applications/records?perPage=1" -H "Authorization: $TOK" | json '["totalItems"]')
-A=$(curl -sS "$BASE/api/collections/applications/records?perPage=1" | json '["totalItems"]')
+N=$(curl -sS "$BASE/api/collections/applications/records?perPage=1" -H "Authorization: $TOK" | json '.totalItems')
+A=$(curl -sS "$BASE/api/collections/applications/records?perPage=1" | json '.totalItems')
 [ "$N" = 1 ] || { echo "FAIL: user sees $N applications, expected 1"; exit 1; }
 [ "$A" = 0 ] || { echo "FAIL: anonymous sees $A applications, expected 0"; exit 1; }
 C1=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$BASE/api/collections/applications/records" -H "Authorization: $TOK" -H 'content-type: application/json' -d '{"number":"2"}')

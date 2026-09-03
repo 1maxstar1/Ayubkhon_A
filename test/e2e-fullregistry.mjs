@@ -5,6 +5,7 @@
  *   node test/e2e-fullregistry.mjs /path/to/Report_1.xls
  */
 import { chromium } from 'playwright';
+import { launchOpts } from './chromium.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -29,7 +30,7 @@ const api = async (path, opts = {}, token) => (await fetch(BASE + path, { ...opt
 const su = (await api('/api/collections/_superusers/auth-with-password', { method: 'POST', body: JSON.stringify({ identity: 'admin@example.com', password: 'adminpass1234' }) })).token;
 await api('/api/collections/users/records', { method: 'POST', body: JSON.stringify({ email: 'boss@example.com', password: 'Xx12345678901', passwordConfirm: 'Xx12345678901', name: 'Boss', role: 'admin', active: true, emailVisibility: true }) }, su);
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
+const browser = await chromium.launch(launchOpts);
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));

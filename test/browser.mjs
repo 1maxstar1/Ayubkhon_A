@@ -5,6 +5,7 @@
  *   node test/browser.mjs <file1.xlsx> <file2.xlsx>
  */
 import { chromium } from 'playwright';
+import { launchOpts } from './chromium.mjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -13,7 +14,7 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const inputs = process.argv.slice(2);
 if (inputs.length === 0) { console.error('usage: node test/browser.mjs <file.xlsx>…'); process.exit(1); }
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
+const browser = await chromium.launch(launchOpts);
 const page = await browser.newPage({ viewport: { width: 1500, height: 950 } });
 
 const errors = [];

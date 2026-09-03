@@ -243,8 +243,12 @@ Keyin `http://127.0.0.1:8090/` → `admin@example.com` → «Kod yuborish» →
 `sh server/otp.sh` dagi kodni kiriting. Admin sahifa `…/admin.html`, PocketBase
 paneli `…/_/` (parol `adminpass1234`, `PB_ADMIN_PASS` bilan o'zgartiriladi).
 To'xtatish: `kill $(cat server/pb_data/serve.pid)`. Ma'lumotlar `server/pb_data/` da,
-tozalash uchun shu papkani o'chiring. Windows'da skriptlarni **Git Bash** dan
-ishga tushiring (`node`, `curl` kerak); binary `pocketbase.exe` avtomatik yuklanadi.
+tozalash uchun shu papkani o'chiring.
+
+Talab: `node` (18+) va `curl`. **macOS** — Terminal, `brew install node`; PocketBase
+binary (`darwin_arm64` yoki `darwin_amd64`) avtomatik yuklanadi. **Windows** —
+skriptlarni **Git Bash** dan ishga tushiring, binary `pocketbase.exe` bo'ladi.
+Brauzer testlari uchun: `npm i -D playwright && npx playwright install chromium`.
 
 To'liq reyestr bilan yuklama sinovi: `node test/e2e-fullregistry.mjs Report_1.xls`
 (28 000 qator ≈ 35 s, qidiruv va filtrlar millisekundlarda).

@@ -11,7 +11,8 @@ echo "--- $HOST:$PORT serverdan ochiqmi (IPv4):"
 BANNER=$(ssh "$TARGET" "curl -4 -sS -m 8 telnet://$HOST:$PORT </dev/null 2>&1 | head -1" || true)
 case "$BANNER" in
   220*) echo "OCHIQ: $BANNER" ;;
-  *)    echo "YOPIQ yoki javob yo'q: ${BANNER:-(bo'sh)}"
+  *)    [ -n "$BANNER" ] || BANNER="(javob kelmadi)"
+        echo "YOPIQ yoki javob yo'q: $BANNER"
         echo "Provayder chiquvchi SMTP portini bloklagan bo'lishi mumkin — Serverspace qo'llab-quvvatlashiga"
         echo "\"chiquvchi 465 va 587 portlarni oching\" deb yozing, yoki boshqa portni sinang (465 + tls=true)."
         exit 1 ;;

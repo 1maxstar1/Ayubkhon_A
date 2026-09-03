@@ -1,6 +1,6 @@
 // Single-file bundler: concatenates the app into one self-contained HTML file.
 // No runtime dependencies, no network — the output opens by double-click.
-import { readFileSync, writeFileSync, mkdirSync, watch } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, watch, existsSync, copyFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -35,18 +35,54 @@ const WORKER_LIBS = [
   'src/lib/assemble.js',
 ];
 
-function build() {
+// Server mode adds the PocketBase client in front and the sign-in / registry /
+// sync screens behind; files that a later phase has not written yet are skipped.
+const SERVER_SCRIPTS = [
+  'src/vendor/pocketbase.umd.js',
+  ...SCRIPTS.slice(0, 2),      // fflate, util (defines the S namespace)
+  'src/lib/pb.js',
+  ...SCRIPTS.slice(2),
+  'src/ui/auth.js',
+  'src/ui/registry.js',
+  'src/ui/sync.js',
+  'src/ui/hints.js',
+].filter((p) => existsSync(join(root, p)));
+
+function page(scripts, screens) {
   const css = read('src/app.css');
   const workerSrc = WORKER_LIBS.map(read).join('\n;\n') + '\n;\n' + read('src/worker.js');
-  const js = SCRIPTS.map(read).join('\n;\n');
-  const html = read('src/index.html')
+  const js = scripts.map(read).join('\n;\n');
+  return read('src/index.html')
     .replace('/*__CSS__*/', () => css)
+    .replace('<!--__SCREENS__-->', () => (screens && existsSync(join(root, 'src/screens.html')) ? read('src/screens.html') : ''))
     .replace('/*__WORKER__*/', () => JSON.stringify(workerSrc))
     .replace('/*__JS__*/', () => js);
+}
+
+function emit(name, html) {
+  writeFileSync(join(root, 'dist', name), html);
+  console.log(`built dist/${name}  ${(html.length / 1024).toFixed(0)} KB`);
+}
+
+function build() {
   mkdirSync(join(root, 'dist'), { recursive: true });
-  const out = join(root, 'dist/smeta-taqqoslash.html');
-  writeFileSync(out, html);
-  console.log(`built dist/smeta-taqqoslash.html  ${(html.length / 1024).toFixed(0)} KB`);
+  emit('smeta-taqqoslash.html', page(SCRIPTS, false));   // offline, double-click
+  emit('index.html', page(SERVER_SCRIPTS, true));         // served by PocketBase
+  if (existsSync(join(root, 'src/admin.html'))) {
+    const admin = read('src/admin.html')
+      .replace('/*__CSS__*/', () => read('src/app.css'))
+      .replace('/*__JS__*/', () => ['src/vendor/pocketbase.umd.js', 'src/vendor/xlsx.full.min.js',
+        'src/lib/util.js', 'src/lib/pb.js', 'src/lib/registry-parse.js', 'src/ui/auth.js', 'src/ui/admin.js']
+        .filter((p) => existsSync(join(root, p))).map(read).join('\n;\n'));
+    emit('admin.html', admin);
+  }
+  if (process.argv.includes('--serve')) {
+    mkdirSync(join(root, 'server/pb_public'), { recursive: true });
+    for (const f of ['index.html', 'admin.html']) {
+      if (existsSync(join(root, 'dist', f))) copyFileSync(join(root, 'dist', f), join(root, 'server/pb_public', f));
+    }
+    console.log('copied to server/pb_public/');
+  }
 }
 
 build();

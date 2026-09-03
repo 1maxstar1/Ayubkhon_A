@@ -1,0 +1,16 @@
+<div class="screen" id="screen-login" hidden>
+  <form class="card" id="loginForm" autocomplete="off">
+    <h2>Taqqoslash jadvali №2</h2>
+    <p class="lead" id="loginMsg">Tizimga kirish uchun ish elektron pochtangizni kiriting. Bir martalik kod pochtaga yuboriladi.</p>
+    <label>Elektron pochta
+      <input type="email" id="loginEmail" required autocomplete="email" spellcheck="false" placeholder="ism@tashkilot.uz"></label>
+    <div id="codeBox" hidden>
+      <label>Pochtaga kelgan 8 xonali kod
+        <input type="text" id="loginCode" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="one-time-code"></label>
+      <p class="hint">Kod 5 daqiqa amal qiladi. Kelmasa — <button type="button" class="link" id="resendBtn">qayta yuborish</button>.</p>
+    </div>
+    <p class="err" id="loginErr" hidden></p>
+    <button class="btn primary wide" id="loginBtn" type="submit">Kod yuborish</button>
+    <p class="foot">Faqat administrator ro'yxatga qo'shgan pochtalar kira oladi.</p>
+  </form>
+</div>

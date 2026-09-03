@@ -141,3 +141,19 @@ body.drag::after{content:"";position:fixed;inset:8px;border:2px dashed var(--acc
 .busy.on{display:flex}
 .spin{width:20px;height:20px;border:2.5px solid var(--rule2);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
+
+/* ---------------------------------------------------------------- screens */
+.screen{position:fixed;inset:0;background:var(--bg);z-index:70;overflow:auto;display:flex;align-items:center;justify-content:center;padding:24px}
+.screen[hidden]{display:none}
+.card{background:var(--sf);border:1px solid var(--rule);border-radius:12px;padding:28px 30px;width:100%;max-width:420px;box-shadow:0 8px 30px rgba(20,23,28,.08)}
+.card h2{margin:0 0 6px;font-size:18px}
+.card .lead{color:var(--mute);margin:0 0 18px;font-size:12.5px}
+.card label{display:block;font-size:12px;color:var(--mute);margin-bottom:12px}
+.card input{display:block;width:100%;margin-top:4px;border:1px solid var(--rule2);border-radius:6px;padding:8px 10px;font-size:14px;color:var(--ink)}
+.card .hint{font-size:11.5px;color:var(--mute);margin:-4px 0 12px}
+.card .err{color:var(--bad);font-size:12px;margin:0 0 10px}
+.card .foot{color:var(--mute);font-size:11px;margin:14px 0 0}
+.btn.wide{width:100%;padding:9px}
+.userbox{display:flex;align-items:center;gap:4px;font-size:12px;margin-left:6px;padding-left:10px;border-left:1px solid var(--rule)}
+.userbox .who{font-weight:600;margin-right:4px}
+.userbox a.link{text-decoration:none}

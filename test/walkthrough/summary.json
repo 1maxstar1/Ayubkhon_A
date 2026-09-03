@@ -1,0 +1,134 @@
+{
+ "steps": [
+  {
+   "n": 1,
+   "title": "Kirish ekrani",
+   "note": "Parol yo'q — faqat ish pochtasi",
+   "file": "/home/user/Ayubkhon_A/test/walkthrough/01.png"
+  },
+  {
+   "n": 2,
+   "title": "Bir martalik kod",
+   "note": "Pochtaga 8 xonali kod ketadi, 5 daqiqa amal qiladi",
+   "file": "/home/user/Ayubkhon_A/test/walkthrough/02.png"
+  },
+  {
+   "n": 3,
+   "title": "Administrator sahifasi",
+   "note": "Haqiqiy reyestr (28 337 qator) 29 soniyada yuklandi",
+   "file": "/home/user/Ayubkhon_A/test/walkthrough/03.png"
+  },
+  {
+   "n": 4,
+   "title": "Reyestrni qayta yuklash",
+   "note": "Bir xil fayl ikkinchi marta: 28337 qator o'qildi · qo'shildi 0 · yangilandi 28337 · yangi kontragentlar 0",
+   "file": "/home/user/Ayubkhon_A/test/walkthrough/04.png"
+  },
+  {
+   "n": 5,
+   "title": "Arizalar ro'yxati",
+   "note": "Reyestrdagi barcha arizalar: 28337 ariza",
+   "file": "/home/user/Ayubkhon_A/test/walkthrough/05.png"
+  },
+  {
+   "n": 6,
+   "title": "Qidiruv",
+   "note": "Raqam, kontragent, STIR yoki loyiha nomi bo'yicha — 519 ms",
+   "file": "/home/user/Ayubkhon_A/test/walkthrough/06.png"
+  },
+  {
+   "n": 7,
+   "title": "Viloyat tanlash",
+   "note": "Fayl yuklashdan oldin bir marta; ariza matnidan taklif qilinadi",
+   "file": "/home/user/Ayubkhon_A/test/walkthrough/07.png"
+  },
+  {
+   "n": 8,
+   "title": "Narxlarni tekshirish",
+   "note": "2 ta smeta fayli, 1172 ta resurs — 3 soniyada",
+   "file": "/home/user/Ayubkhon_A/test/walkthrough/08.png"
+  },
+  {
+   "n": 9,
+   "title": "O'zgartirilgan narxlar",
+   "note": "Har tuzatish darhol serverga yoziladi (yuqorida ✓)",
+   "file": "/home/user/Ayubkhon_A/test/walkthrough/09.png"
+  },
+  {
+   "n": 10,
+   "title": "Yig'ilgan jadval",
+   "note": "Barcha ko'chalar bitta ro'yxatda, A ustuni raqamlari bilan; narx shu yerda ham tahrirlanadi",
+   "file": "/home/user/Ayubkhon_A/test/walkthrough/10.png"
+  },
+  {
+   "n": 11,
+   "title": "Hisobot ko'rinishi",
+   "note": "Excel faylga tushadigan TAQQOSLASH JADVALI №2",
+   "file": "/home/user/Ayubkhon_A/test/walkthrough/11.png"
+  },
+  {
+   "n": 12,
+   "title": "Excel eksport",
+   "note": "Fayl yuklab olinadi va serverda saqlanadi — 1 soniya",
+   "file": "/home/user/Ayubkhon_A/test/walkthrough/12.png"
+  },
+  {
+   "n": 13,
+   "title": "Narx eslatmalari",
+   "note": "Shu viloyatdagi oldingi loyihalar narxlari; shu kontragent yuqorida turadi",
+   "file": "/home/user/Ayubkhon_A/test/walkthrough/13.png"
+  },
+  {
+   "n": 14,
+   "title": "Ariza kartochkasi",
+   "note": "Reyestr maydonlari, yuklangan fayllar va eksportlar tarixi",
+   "file": "/home/user/Ayubkhon_A/test/walkthrough/14.png"
+  },
+  {
+   "n": 15,
+   "title": "Qayta ochish",
+   "note": "Fayllar va 3 ta tuzatilgan narx 1 soniyada tiklandi",
+   "file": "/home/user/Ayubkhon_A/test/walkthrough/15.png"
+  }
+ ],
+ "timings": {
+  "registryFirst": 29,
+  "registrySecond": 30,
+  "registryStat2": "28337 qator o'qildi · qo'shildi 0 · yangilandi 28337 · yangi kontragentlar 0",
+  "search": 519,
+  "load": 3,
+  "export": 1,
+  "reopen": 1
+ },
+ "model": {
+  "projects": 2,
+  "rows": 6246,
+  "res": 1172
+ },
+ "after": {
+  "projects": 2,
+  "rows": 6246,
+  "res": 1172,
+  "prices": [
+   7171,
+   10997,
+   30615
+  ],
+  "changed": 3
+ },
+ "ok": {
+  "restored": true,
+  "prices": true,
+  "changed": true
+ },
+ "counts": {
+  "applications": 28337,
+  "contragents": 996,
+  "workspaces": 2,
+  "corrections": 3,
+  "exports": 1,
+  "registry_imports": 2,
+  "users": 3
+ },
+ "errors": []
+}

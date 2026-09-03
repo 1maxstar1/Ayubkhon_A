@@ -12,3 +12,6 @@ server/pb_public/
 server/*.zip
 server/pb_migrations/
 server/pocketbase.exe
+test/.log-*.txt
+test/all-results.txt
+server/pb_data_walk/

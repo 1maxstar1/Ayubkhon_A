@@ -268,6 +268,7 @@
     },
     renderBox: function () {
       var box = $('wsBox'), self = this;
+      document.body.classList.toggle('ws', !!this.ws);
       if (!this.ws) { box.hidden = true; box.innerHTML = ''; return; }
       var a = this.app, w = this.ws;
       var c = a.expand && a.expand.contragent;

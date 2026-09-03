@@ -16,6 +16,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* ---------------------------------------------------------------- top bar */
 .bar{display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--sf);border-bottom:1px solid var(--rule)}
+.brand{flex:0 0 auto;white-space:nowrap}
 .brand b{font-size:15px;font-weight:650;letter-spacing:.01em}
 .brand span{display:block;font-size:11px;color:var(--mute);letter-spacing:.04em;text-transform:uppercase;margin-top:1px}
 .grow{flex:1}
@@ -200,7 +201,10 @@ body.nows .bar > .btn,body.nows .bar > .pickmode{display:none}
 .ws{font-size:11px;border-radius:3px;padding:1px 5px;background:#fde7c7;color:#8a5300}
 .ws.done{background:#d9f2e3;color:var(--good)}
 .listfoot{padding:12px;text-align:center}
-.wsbox{display:flex;align-items:center;gap:8px;font-size:12px;min-width:0;max-width:52vw}
+/* With a workspace open the bar is crowded: drop the strapline and let the
+   application title take whatever room is left. */
+body.ws .brand span{display:none}
+.wsbox{display:flex;align-items:center;gap:8px;font-size:12px;flex:0 1 auto;min-width:90px}
 .wsbox .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;color:var(--mute)}
 .wsbox .rg{font-size:11px;background:var(--accent-w);color:var(--accent);border-radius:3px;padding:1px 5px;white-space:nowrap}
 .wsbox .sv{color:var(--mute);width:14px;text-align:center}

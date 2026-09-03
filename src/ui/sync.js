@@ -59,6 +59,7 @@
       app.projects = []; app.prices = {}; app.looseBook = null; app.queue = [];
       app.rebuild(); app.renderSide();
       this.renderBox();
+      document.dispatchEvent(new CustomEvent('ws:open', { detail: w }));
 
       var by = w.expand && w.expand.updated_by;
       if (by && by.id !== S.me().id && Date.now() - new Date(w.updated).getTime() < 10 * 60000) {
@@ -303,6 +304,7 @@
         app.rebuild(); app.renderSide();
         self.loading = false;
         self.renderBox();
+        document.dispatchEvent(new CustomEvent('ws:close'));
         S.Registry.show();
       });
     }

@@ -168,6 +168,7 @@
         case 'same': return !isChanged(r);
         case 'zero': return !r.price;
         case 'multi': return r.variants > 1;
+        case 'hint': return !!(S.Hints && S.Hints.has(r.nk));
         default: return true;
       }
     });
@@ -188,8 +189,10 @@
     var m = this.app.model;
     var total = m ? m.resources.length : 0;
     var changed = m ? m.resources.filter(isChanged).length : 0;
+    var hinted = m && S.Hints ? m.resources.filter(function (r) { return S.Hints.has(r.nk); }).length : 0;
     document.getElementById('priceCount').textContent =
-      this.view.length + ' / ' + total + ' resurs · ' + changed + ' tasi o\'zgartirilgan';
+      this.view.length + ' / ' + total + ' resurs · ' + changed + ' tasi o\'zgartirilgan' +
+      (hinted ? ' · ' + hinted + ' tasiga eslatma bor' : '');
   };
 
   Prices.prototype.renderRange = function (from, to) {
@@ -203,10 +206,11 @@
       var many = r.variants > 1;
       var multi = many ? '<button class="tagm" data-nm="' + S.esc(r.name) + '" title="' +
         S.esc(multiHint(r)) + '">' + r.variants + ' xil narx</button>' : '';
+      var hint = S.Hints ? S.Hints.tag(r) : '';
       out.push(
         '<div class="vrow' + (changed ? ' chg' : '') + (many ? ' many' : '') + '">' +
         cell(COLS[0], i + 1) +
-        '<div class="c" style="' + width(COLS[1]) + '" title="' + S.esc(r.name) + '">' + S.esc(r.name) + multi + '</div>' +
+        '<div class="c" style="' + width(COLS[1]) + '" title="' + S.esc(r.name) + '">' + S.esc(r.name) + multi + hint + '</div>' +
         cell(COLS[2], S.esc(r.unit)) +
         cell(COLS[3], r.count) +
         cell(COLS[4], S.qty(r.qty)) +

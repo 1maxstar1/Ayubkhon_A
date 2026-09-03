@@ -212,6 +212,23 @@ body.nows .bar > .btn,body.nows .bar > .pickmode{display:none}
 .wsbox .sv{color:var(--mute);width:14px;text-align:center}
 .wsbox .done{font-size:11px;color:var(--good);font-weight:600}
 .card .lead{white-space:pre-line}
+
+/* ------------------------------------------------------------------ hints */
+.tagh{display:inline-block;background:#e3f0ff;color:#174a8c;border:0;border-radius:3px;padding:1px 6px;
+  font-size:10px;margin-left:6px;cursor:pointer;font-family:inherit;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tagh:hover{background:#cfe3ff}
+.tagh.same{background:#d9f2e3;color:var(--good)}
+#hintPop{position:fixed;z-index:75;background:var(--sf);border:1px solid var(--rule2);border-radius:8px;
+  box-shadow:0 10px 30px rgba(20,23,28,.14);width:440px;max-height:60vh;overflow:auto;font-size:12px}
+#hintPop[hidden]{display:none}
+.hp-head{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-bottom:1px solid var(--rule);
+  font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);position:sticky;top:0;background:var(--sf)}
+.hp-row{display:grid;grid-template-columns:110px 1fr auto;gap:8px;align-items:center;padding:6px 10px;border-bottom:1px solid #f0f2f5}
+.hp-row b{font-variant-numeric:tabular-nums;text-align:right;font-size:13px}
+.hp-row.same{background:#f2faf5}
+.hp-meta{color:var(--mute);font-size:11px;min-width:0}
+.hp-meta em{font-style:normal;color:var(--good);font-weight:600}
+.hp-meta small{display:block;font-size:10.5px}
 </style>
 </head>
 <body>
@@ -273,6 +290,7 @@ body.nows .bar > .btn,body.nows .bar > .pickmode{display:none}
           <option value="same">O'zgarmagan</option>
           <option value="zero">Narxi 0 bo'lganlar</option>
           <option value="multi">Bir nechta smeta narxi</option>
+          <option value="hint">Eslatmasi borlar</option>
         </select>
         <select id="sort">
           <option value="name">Nomi bo'yicha</option>
@@ -2429,6 +2447,7 @@ if (typeof self !== 'undefined') self.S = S;
         case 'same': return !isChanged(r);
         case 'zero': return !r.price;
         case 'multi': return r.variants > 1;
+        case 'hint': return !!(S.Hints && S.Hints.has(r.nk));
         default: return true;
       }
     });
@@ -2449,8 +2468,10 @@ if (typeof self !== 'undefined') self.S = S;
     var m = this.app.model;
     var total = m ? m.resources.length : 0;
     var changed = m ? m.resources.filter(isChanged).length : 0;
+    var hinted = m && S.Hints ? m.resources.filter(function (r) { return S.Hints.has(r.nk); }).length : 0;
     document.getElementById('priceCount').textContent =
-      this.view.length + ' / ' + total + ' resurs · ' + changed + ' tasi o\'zgartirilgan';
+      this.view.length + ' / ' + total + ' resurs · ' + changed + ' tasi o\'zgartirilgan' +
+      (hinted ? ' · ' + hinted + ' tasiga eslatma bor' : '');
   };
 
   Prices.prototype.renderRange = function (from, to) {
@@ -2464,10 +2485,11 @@ if (typeof self !== 'undefined') self.S = S;
       var many = r.variants > 1;
       var multi = many ? '<button class="tagm" data-nm="' + S.esc(r.name) + '" title="' +
         S.esc(multiHint(r)) + '">' + r.variants + ' xil narx</button>' : '';
+      var hint = S.Hints ? S.Hints.tag(r) : '';
       out.push(
         '<div class="vrow' + (changed ? ' chg' : '') + (many ? ' many' : '') + '">' +
         cell(COLS[0], i + 1) +
-        '<div class="c" style="' + width(COLS[1]) + '" title="' + S.esc(r.name) + '">' + S.esc(r.name) + multi + '</div>' +
+        '<div class="c" style="' + width(COLS[1]) + '" title="' + S.esc(r.name) + '">' + S.esc(r.name) + multi + hint + '</div>' +
         cell(COLS[2], S.esc(r.unit)) +
         cell(COLS[3], r.count) +
         cell(COLS[4], S.qty(r.qty)) +

@@ -236,14 +236,15 @@ node test/e2e-hints.mjs        # brauzer: eslatmalar (viloyat, kontragent)
 
 ```sh
 sh server/dev.sh        # binary + sxema + admin@example.com + namuna reyestr (400 ariza) + server
-sh server/otp.sh        # oxirgi kirish kodini ko'rsatadi (dev rejimida email yuborilmaydi)
 ```
 
-Keyin `http://127.0.0.1:8090/` → `admin@example.com` → «Kod yuborish» →
-`sh server/otp.sh` dagi kodni kiriting. Admin sahifa `…/admin.html`, PocketBase
-paneli `…/_/` (parol `adminpass1234`, `PB_ADMIN_PASS` bilan o'zgartiriladi).
-To'xtatish: `kill $(cat server/pb_data/serve.pid)`. Ma'lumotlar `server/pb_data/` da,
-tozalash uchun shu papkani o'chiring.
+Bitta oyna yetadi: skript serverni ko'taradi, brauzerni ochadi va **kirish
+kodlarini shu oynada ko'rsatadi** (dev rejimida email yuborilmaydi). Kirish
+pochtasi `admin@example.com`. Admin sahifa `…/admin.html`, PocketBase paneli
+`…/_/` (parol `adminpass1234`, `PB_ADMIN_PASS` bilan o'zgartiriladi).
+To'xtatish — **Ctrl+C**. Ma'lumotlar `server/pb_data/` da, noldan boshlash uchun
+shu papkani o'chiring. Alohida kerak bo'lsa `sh server/otp.sh` oxirgi kodni
+chiqaradi.
 
 Talab: `node` (18+) va `curl`. **macOS** — Terminal, `brew install node`; PocketBase
 binary (`darwin_arm64` yoki `darwin_amd64`) avtomatik yuklanadi. **Windows** —

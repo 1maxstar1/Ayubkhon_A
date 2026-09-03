@@ -35,7 +35,31 @@ if [ "$N" = 0 ]; then
   echo "sample registry imported (400 rows)"
 fi
 echo
-echo "Dastur:   http://$PORT/           kirish: $PB_ADMIN_EMAIL  (kod: sh server/otp.sh)"
-echo "Admin:    http://$PORT/admin.html"
-echo "PocketBase paneli: http://$PORT/_/   ($PB_ADMIN_EMAIL / $PB_ADMIN_PASS)"
-echo "To'xtatish: kill \$(cat server/pb_data/serve.pid)"
+echo "─────────────────────────────────────────────────────────────"
+echo "  Dastur:   http://$PORT/"
+echo "  Admin:    http://$PORT/admin.html"
+echo "  Baza:     http://$PORT/_/     ($PB_ADMIN_EMAIL / $PB_ADMIN_PASS)"
+echo
+echo "  Kirish pochtasi: $PB_ADMIN_EMAIL"
+echo "  «Kod yuborish» bosing — kod shu oynada chiqadi."
+echo "─────────────────────────────────────────────────────────────"
+echo
+command -v open >/dev/null 2>&1 && open "http://$PORT/" 2>/dev/null || true
+[ "${PB_WATCH:-1}" = 0 ] && exit 0
+# Codes are not emailed in dev mode: watch the file the hook writes and print
+# each new one here, so one terminal window is all the testing needs.
+stop() { kill "$(cat server/pb_data/serve.pid)" 2>/dev/null; echo; echo "server to'xtatildi"; exit 0; }
+trap stop INT TERM
+F=server/pb_data/dev-otp.txt
+LAST=""
+echo "kirish kodlari shu yerda chiqadi · to'xtatish uchun Ctrl+C"
+while kill -0 "$(cat server/pb_data/serve.pid)" 2>/dev/null; do
+  if [ -f "$F" ]; then
+    CUR=$(tail -1 "$F")
+    if [ "$CUR" != "$LAST" ]; then
+      LAST="$CUR"
+      echo "  KIRISH KODI  $(echo "$CUR" | sed 's/.*OTP \([^ ]*\) .*code=\([0-9]*\).*/\2   (\1)/')"
+    fi
+  fi
+  sleep 1
+done

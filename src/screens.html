@@ -14,3 +14,39 @@
     <p class="foot">Faqat administrator ro'yxatga qo'shgan pochtalar kira oladi.</p>
   </form>
 </div>
+
+<div class="screen list" id="screen-list" hidden>
+  <div class="listwrap">
+    <div class="listbar">
+      <h2>Arizalar</h2>
+      <input type="search" id="appQ" placeholder="Raqam, kontragent yoki loyiha nomi…" spellcheck="false">
+      <select id="appWork">
+        <option value="">Barchasi</option>
+        <option value="none">Boshlanmagan</option>
+        <option value="in_progress">Ishlanmoqda</option>
+        <option value="done">Yakunlangan</option>
+      </select>
+      <span class="count" id="appCount"></span>
+    </div>
+    <div class="listscroll">
+      <table class="tbl apps" id="appTable">
+        <thead><tr><th>№</th><th>Sana</th><th>Kontragent</th><th>Loyiha</th><th class="num">Summa (НДС bilan)</th><th>Holat</th><th>Ish</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="listfoot"><button class="btn" id="appMore" hidden>Yana ko'rsatish</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="screen" id="screen-region" hidden>
+  <form class="card" id="regionForm">
+    <h2 id="regionTitle">Ariza</h2>
+    <p class="lead" id="regionLead"></p>
+    <label>Viloyat (loyiha amalga oshiriladigan hudud)
+      <select id="regionSel" required></select></label>
+    <p class="hint" id="regionHint"></p>
+    <p class="err" id="regionErr" hidden></p>
+    <button class="btn primary wide" type="submit">Ish maydonini ochish</button>
+    <button class="btn wide" type="button" id="regionBack">Orqaga</button>
+  </form>
+</div>

@@ -186,6 +186,32 @@ form.inline input,form.inline select{border:1px solid var(--rule2);border-radius
 form.inline input{flex:1;min-width:160px}
 .denied{text-align:center;color:var(--mute);margin-top:60px}
 a.btn{text-decoration:none;color:var(--ink)}
+
+/* ---------------------------------------------------------- application list */
+.screen.list{align-items:stretch;padding:0;z-index:60;border-top:1px solid var(--rule)}
+body.nows .bar > .btn,body.nows .bar > .pickmode{display:none}
+.listwrap{display:flex;flex-direction:column;width:100%;height:100%;background:var(--sf)}
+.listbar{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--rule)}
+.listbar h2{margin:0 12px 0 0;font-size:15px}
+.listbar input[type=search]{flex:0 1 420px;border:1px solid var(--rule2);border-radius:6px;padding:6px 9px}
+.listbar select{border:1px solid var(--rule2);border-radius:6px;padding:6px 8px;background:var(--sf)}
+.listscroll{flex:1;overflow:auto}
+.tbl.apps th{position:sticky;top:0;background:var(--sf2);z-index:1}
+.tbl.apps td{vertical-align:top}
+.tbl.apps td.wrap{max-width:360px;white-space:normal}
+.tbl.apps td.mono{font-variant-numeric:tabular-nums;font-weight:600}
+.tbl.apps .num,.tbl.apps th.num{text-align:right;white-space:nowrap}
+.tbl.apps tr:hover td{background:var(--accent-w)}
+.tbl.apps small{display:block;color:var(--mute);font-size:10.5px}
+.ws{font-size:11px;border-radius:3px;padding:1px 5px;background:#fde7c7;color:#8a5300}
+.ws.done{background:#d9f2e3;color:var(--good)}
+.listfoot{padding:12px;text-align:center}
+.wsbox{display:flex;align-items:center;gap:8px;font-size:12px;min-width:0;max-width:52vw}
+.wsbox .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;color:var(--mute)}
+.wsbox .rg{font-size:11px;background:var(--accent-w);color:var(--accent);border-radius:3px;padding:1px 5px;white-space:nowrap}
+.wsbox .sv{color:var(--mute);width:14px;text-align:center}
+.wsbox .done{font-size:11px;color:var(--good);font-weight:600}
+.card .lead{white-space:pre-line}
 </style>
 </head>
 <body class="admin">
@@ -244,6 +270,42 @@ a.btn{text-decoration:none;color:var(--ink)}
     <p class="err" id="loginErr" hidden></p>
     <button class="btn primary wide" id="loginBtn" type="submit">Kod yuborish</button>
     <p class="foot">Faqat administrator ro'yxatga qo'shgan pochtalar kira oladi.</p>
+  </form>
+</div>
+
+<div class="screen list" id="screen-list" hidden>
+  <div class="listwrap">
+    <div class="listbar">
+      <h2>Arizalar</h2>
+      <input type="search" id="appQ" placeholder="Raqam, kontragent yoki loyiha nomi…" spellcheck="false">
+      <select id="appWork">
+        <option value="">Barchasi</option>
+        <option value="none">Boshlanmagan</option>
+        <option value="in_progress">Ishlanmoqda</option>
+        <option value="done">Yakunlangan</option>
+      </select>
+      <span class="count" id="appCount"></span>
+    </div>
+    <div class="listscroll">
+      <table class="tbl apps" id="appTable">
+        <thead><tr><th>№</th><th>Sana</th><th>Kontragent</th><th>Loyiha</th><th class="num">Summa (НДС bilan)</th><th>Holat</th><th>Ish</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="listfoot"><button class="btn" id="appMore" hidden>Yana ko'rsatish</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="screen" id="screen-region" hidden>
+  <form class="card" id="regionForm">
+    <h2 id="regionTitle">Ariza</h2>
+    <p class="lead" id="regionLead"></p>
+    <label>Viloyat (loyiha amalga oshiriladigan hudud)
+      <select id="regionSel" required></select></label>
+    <p class="hint" id="regionHint"></p>
+    <p class="err" id="regionErr" hidden></p>
+    <button class="btn primary wide" type="submit">Ish maydonini ochish</button>
+    <button class="btn wide" type="button" id="regionBack">Orqaga</button>
   </form>
 </div>
 

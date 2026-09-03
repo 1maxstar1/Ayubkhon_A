@@ -184,3 +184,52 @@ node build.mjs --watch               # ishlab chiqish paytida
 node test/pipeline.cjs a.xlsx b.xlsx --out out.xlsx   # yadro testi
 npm i -D playwright && node test/browser.mjs a.xlsx b.xlsx
 ```
+
+## Server rejimi (2-bosqich)
+
+Bir necha xodim bitta bazada ishlaydi: kirish — email + bir martalik kod,
+4 soat harakat bo'lmasa qulf, arizalar reyestri, ish maydonlari serverda,
+oldingi loyihalardan narx eslatmalari. Backend — [PocketBase](https://pocketbase.io)
+(bitta binary, SQLite, fayl saqlash, admin panel).
+
+```sh
+PB_ADMIN_EMAIL=admin@firma.uz PB_ADMIN_PASS='kuchli-parol' sh server/setup.sh   # bir marta
+node build.mjs --serve                                                        # dist/ -> server/pb_public
+sh server/run.sh                                                              # http://127.0.0.1:8090
+```
+
+* `http://127.0.0.1:8090/` — dastur (kirish → arizalar → ish maydoni).
+* `http://127.0.0.1:8090/admin.html` — administrator: reyestr (`Report_1.xls`)
+  yuklash, foydalanuvchilar. Faqat `role = admin` yoki superuser.
+* `http://127.0.0.1:8090/_/` — PocketBase boshqaruv paneli (superuser).
+* Ishlab chiqishda (`PB_DEV=1`, `run.sh` sukut bo'yicha) kod emailga
+  yuborilmaydi — `server/pb_data/dev-otp.txt` ga yoziladi. Serverda SMTP
+  PocketBase panelida (Settings → Mail) sozlanadi.
+
+**Oqim.** Admin har kuni reyestrni yuklaydi (ariza raqami bo'yicha
+qo'shiladi/yangilanadi, hech narsa o'chirilmaydi). Xodim arizani ochadi,
+birinchi marta viloyatni tanlaydi (ariza matnidan taklif qilinadi), smeta
+fayllarini yuklaydi — fayllar, sozlamalar va har tuzatish avtomatik
+saqlanadi; qayta ochganda hammasi tiklanadi. Bozor narxi katagida shu
+viloyatdagi oldingi loyihalar narxlari ko'rinadi: avval shu kontragent
+(STIR bo'yicha), keyin boshqalar; boshqa viloyat ko'rsatilmaydi. Har
+eksport `exports` da saqlanadi, ariza kartochkasidan yuklab olinadi.
+
+Fayllar: `server/` (sxema, hooklar, skriptlar), `src/lib/pb.js`,
+`src/lib/registry-parse.js`, `src/ui/{auth,registry,sync,hints,admin}.js`,
+`src/screens.html`, `src/admin.html`. Bitta-fayl `dist/smeta-taqqoslash.html`
+avvalgidek, serversiz ishlaydi.
+
+Testlar:
+
+```sh
+sh test/pb-smoke.sh            # server: sxema, OTP kirish, token muddati, huquqlar
+node test/registry.cjs         # reyestr parser (fixture, 400 qator)
+sh test/registry-import.sh     # import hook: ikki marta yuklash, huquqlar
+node test/e2e-auth.mjs         # brauzer: kirish, noto'g'ri kod, qulf
+node test/e2e-admin.mjs        # brauzer: reyestr yuklash, foydalanuvchilar
+node test/e2e-workspace.mjs    # brauzer: ariza → viloyat → fayllar → narx → qayta ochish → eksport
+node test/e2e-hints.mjs        # brauzer: eslatmalar (viloyat, kontragent)
+```
+
+Joylashtirish (VPS, HTTPS, SMTP, zaxira) — `server/deploy/README.md`.

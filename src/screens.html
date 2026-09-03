@@ -20,12 +20,14 @@
     <div class="listbar">
       <h2>Arizalar</h2>
       <input type="search" id="appQ" placeholder="Raqam, kontragent yoki loyiha nomi…" spellcheck="false">
-      <select id="appWork">
+      <select id="appWork" title="Ish holati">
         <option value="">Barchasi</option>
         <option value="none">Boshlanmagan</option>
         <option value="in_progress">Ishlanmoqda</option>
         <option value="done">Yakunlangan</option>
       </select>
+      <select id="appRegion" title="Viloyat (ish maydonida tanlangan)"><option value="">Barcha viloyatlar</option></select>
+      <select id="appYear" title="Ariza yili"><option value="">Barcha yillar</option></select>
       <span class="count" id="appCount"></span>
     </div>
     <div class="listscroll">
@@ -49,4 +51,18 @@
     <button class="btn primary wide" type="submit">Ish maydonini ochish</button>
     <button class="btn wide" type="button" id="regionBack">Orqaga</button>
   </form>
+</div>
+
+<div class="screen" id="screen-card" hidden>
+  <div class="card wide" id="appCard">
+    <div class="card-head"><h2 id="cardTitle">Ariza</h2><button class="link" id="cardClose">×</button></div>
+    <dl class="kv" id="cardFields"></dl>
+    <h3>Ish</h3>
+    <p id="cardWork" class="lead"></p>
+    <h3>Eksportlar</h3>
+    <ul class="files" id="cardExports"></ul>
+    <h3>Yuklangan smeta fayllari</h3>
+    <ul class="files" id="cardFiles"></ul>
+    <div class="card-foot"><button class="btn primary" id="cardOpen">Ochish</button></div>
+  </div>
 </div>

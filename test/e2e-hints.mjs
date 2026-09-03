@@ -50,7 +50,7 @@ async function openApp(number, region) {
   await page.waitForSelector('#screen-list:not([hidden])');
   await page.fill('#appQ', number);
   await page.waitForFunction((n) => { const tr = document.querySelector('#appTable tbody tr'); return tr && tr.textContent.includes(n) && document.querySelectorAll('#appTable tbody tr').length >= 1; }, number);
-  await page.click(`#appTable tbody tr:has-text("${number}") button`);
+  await page.click(`#appTable tbody tr:has-text("${number}") button[data-act=open]`);
   if (region) {
     await page.waitForSelector('#screen-region:not([hidden])');
     await page.selectOption('#regionSel', region);

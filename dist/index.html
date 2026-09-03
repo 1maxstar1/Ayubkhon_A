@@ -229,6 +229,21 @@ body.nows .bar > .btn,body.nows .bar > .pickmode{display:none}
 .hp-meta{color:var(--mute);font-size:11px;min-width:0}
 .hp-meta em{font-style:normal;color:var(--good);font-weight:600}
 .hp-meta small{display:block;font-size:10.5px}
+
+/* ------------------------------------------------------------ application card */
+.card.wide{max-width:720px;max-height:90vh;overflow:auto}
+.card-head{display:flex;justify-content:space-between;align-items:center}
+.card-head h2{margin:0}
+.card h3{margin:16px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute)}
+.kv{display:grid;grid-template-columns:170px 1fr;gap:4px 12px;margin:12px 0 0;font-size:12.5px}
+.kv dt{color:var(--mute)} .kv dd{margin:0;overflow-wrap:anywhere}
+ul.files{list-style:none;margin:0;padding:0;font-size:12.5px}
+ul.files li{padding:3px 0;border-bottom:1px solid #f0f2f5}
+ul.files small{display:block;color:var(--mute);font-size:11px}
+ul.files .mute{color:var(--mute)}
+.card-foot{margin-top:16px;text-align:right}
+.tbl.apps button.link.num{font-weight:600;padding:0;color:var(--accent)}
+.screen#screen-card{z-index:65}
 </style>
 </head>
 <body>
@@ -380,12 +395,14 @@ body.nows .bar > .btn,body.nows .bar > .pickmode{display:none}
     <div class="listbar">
       <h2>Arizalar</h2>
       <input type="search" id="appQ" placeholder="Raqam, kontragent yoki loyiha nomi…" spellcheck="false">
-      <select id="appWork">
+      <select id="appWork" title="Ish holati">
         <option value="">Barchasi</option>
         <option value="none">Boshlanmagan</option>
         <option value="in_progress">Ishlanmoqda</option>
         <option value="done">Yakunlangan</option>
       </select>
+      <select id="appRegion" title="Viloyat (ish maydonida tanlangan)"><option value="">Barcha viloyatlar</option></select>
+      <select id="appYear" title="Ariza yili"><option value="">Barcha yillar</option></select>
       <span class="count" id="appCount"></span>
     </div>
     <div class="listscroll">
@@ -409,6 +426,20 @@ body.nows .bar > .btn,body.nows .bar > .pickmode{display:none}
     <button class="btn primary wide" type="submit">Ish maydonini ochish</button>
     <button class="btn wide" type="button" id="regionBack">Orqaga</button>
   </form>
+</div>
+
+<div class="screen" id="screen-card" hidden>
+  <div class="card wide" id="appCard">
+    <div class="card-head"><h2 id="cardTitle">Ariza</h2><button class="link" id="cardClose">×</button></div>
+    <dl class="kv" id="cardFields"></dl>
+    <h3>Ish</h3>
+    <p id="cardWork" class="lead"></p>
+    <h3>Eksportlar</h3>
+    <ul class="files" id="cardExports"></ul>
+    <h3>Yuklangan smeta fayllari</h3>
+    <ul class="files" id="cardFiles"></ul>
+    <div class="card-foot"><button class="btn primary" id="cardOpen">Ochish</button></div>
+  </div>
 </div>
 
 <div id="toast" class="toast"></div>
@@ -3713,12 +3744,19 @@ if (typeof self !== 'undefined') self.S = S;
   }
 
   var Registry = {
-    page: 1, items: [], ws: {}, q: '', work: '',
+    page: 1, items: [], ws: {}, q: '', work: '', region: '', year: '',
 
     init: function () {
       var self = this;
       $('appQ').addEventListener('input', S.debounce(function () { self.q = $('appQ').value.trim(); self.reload(); }, 250));
       $('appWork').addEventListener('change', function () { self.work = this.value; self.render(); });
+      $('appRegion').addEventListener('change', function () { self.region = this.value; self.render(); });
+      $('appYear').addEventListener('change', function () { self.year = this.value; self.reload(); });
+      $('appRegion').innerHTML += S.REGIONS.map(function (r) { return '<option value="' + r[0] + '">' + S.esc(r[1]) + '</option>'; }).join('');
+      var y = new Date().getFullYear();
+      for (var i = y; i >= y - 6; i--) $('appYear').innerHTML += '<option value="' + i + '">' + i + '</option>';
+      $('cardClose').addEventListener('click', function () { $('screen-card').hidden = true; });
+      $('screen-card').addEventListener('click', function (e) { if (e.target === this) this.hidden = true; });
       $('appMore').addEventListener('click', function () { self.page++; self.load(); });
       $('regionForm').addEventListener('submit', function (e) { e.preventDefault(); self.createWorkspace(); });
       $('regionBack').addEventListener('click', function () { $('screen-region').hidden = true; self.show(); });
@@ -3748,13 +3786,17 @@ if (typeof self !== 'undefined') self.S = S;
     load: function () {
       var self = this;
       var opts = { sort: '-registered_at,-number', expand: 'contragent' };
-      if (this.q) {
-        opts.filter = S.pb.filter('number ~ {:q} || org_name ~ {:q} || project_title ~ {:q} || inn ~ {:q}', { q: this.q });
+      var parts = [], params = {};
+      if (this.q) { parts.push('(number ~ {:q} || org_name ~ {:q} || project_title ~ {:q} || inn ~ {:q})'); params.q = this.q; }
+      if (this.year) {
+        parts.push('registered_at >= {:y0} && registered_at < {:y1}');
+        params.y0 = this.year + '-01-01 00:00:00'; params.y1 = (+this.year + 1) + '-01-01 00:00:00';
       }
+      if (parts.length) opts.filter = S.pb.filter(parts.join(' && '), params);
       $('appCount').textContent = 'yuklanmoqda…';
       Promise.all([
         S.pb.collection('applications').getList(this.page, PAGE, opts),
-        this.page === 1 ? S.pb.collection('workspaces').getFullList({ expand: 'updated_by', fields: 'id,application,status,region,updated,changed,expand.updated_by.name,expand.updated_by.email' }) : null
+        this.page === 1 ? S.pb.collection('workspaces').getFullList({ expand: 'updated_by', fields: 'id,application,status,region,updated,changed,files,collectionId,collectionName,expand.updated_by.name,expand.updated_by.email' }) : null
       ]).then(function (res) {
         var list = res[0];
         if (res[1]) {
@@ -3778,6 +3820,7 @@ if (typeof self !== 'undefined') self.S = S;
         var w = self.ws[a.id];
         var st = w ? w.status : 'none';
         if (self.work && st !== self.work) return '';
+        if (self.region && (!w || w.region !== self.region)) return '';
         shown++;
         var who = w && w.expand && w.expand.updated_by ? (w.expand.updated_by.name || w.expand.updated_by.email) : '';
         var work = !w ? '<span class="mute">—</span>' :
@@ -3785,7 +3828,7 @@ if (typeof self !== 'undefined') self.S = S;
           '<small>' + S.esc(who) + (w.updated ? ' · ' + ago(w.updated) : '') +
           (w.region ? ' · ' + S.esc(S.regionLabel(w.region)) : '') + '</small>';
         return '<tr data-i="' + i + '">' +
-          '<td class="mono">' + S.esc(a.number) + '</td>' +
+          '<td class="mono"><button class="link num" data-act="card" title="Ariza kartochkasi">' + S.esc(a.number) + '</button></td>' +
           '<td>' + day(a.registered_at) + '</td>' +
           '<td class="wrap" title="STIR ' + S.esc(a.inn) + '">' + S.esc(a.org_name) + '</td>' +
           '<td class="wrap">' + S.esc(a.project_title) + '</td>' +
@@ -3798,6 +3841,50 @@ if (typeof self !== 'undefined') self.S = S;
       tb.querySelectorAll('button[data-act=open]').forEach(function (b) {
         b.addEventListener('click', function () { self.open(self.items[+b.closest('tr').dataset.i]); });
       });
+      tb.querySelectorAll('button[data-act=card]').forEach(function (b) {
+        b.addEventListener('click', function () { self.card(self.items[+b.closest('tr').dataset.i]); });
+      });
+    },
+
+    /* ------------------------------------------------------------- card */
+    card: function (a) {
+      var self = this;
+      var w = this.ws[a.id];
+      var c = a.expand && a.expand.contragent;
+      $('cardTitle').textContent = 'Ariza № ' + a.number;
+      var rows = [
+        ['Holat', a.status], ['Ro\'yxatga olingan', day(a.registered_at)], ['To\'langan', day(a.paid_at)],
+        ['Kontragent', (c ? c.name : a.org_name) + (a.inn ? ' · STIR ' + a.inn : '')],
+        ['Loyiha', a.project_title], ['Obyekt ID', a.object_id],
+        ['Ekspertiza turi', a.expertise_type], ['Buyurtmachi turi', a.buyer_type],
+        ['Summa (НДСsiz)', a.cost ? S.money(a.cost) : ''], ['Summa (НДС bilan)', a.cost_vat ? S.money(a.cost_vat) : ''],
+        ['Valyuta', a.currency], ['Ekspert', a.expert], ['Soekspert', a.coexpert],
+        ['Joy (reyestr)', a.place], ['Soha', a.branch],
+        ['Mas\'ul ijrochi', [a.executor_name, a.executor_email, a.executor_phone].filter(Boolean).join(' · ')]
+      ];
+      Object.keys(a.raw || {}).forEach(function (k) { if (a.raw[k]) rows.push([k, a.raw[k]]); });
+      $('cardFields').innerHTML = rows.filter(function (r) { return r[1]; }).map(function (r) {
+        return '<dt>' + S.esc(r[0]) + '</dt><dd>' + S.esc(String(r[1])) + '</dd>';
+      }).join('');
+      var who = w && w.expand && w.expand.updated_by ? (w.expand.updated_by.name || w.expand.updated_by.email) : '';
+      $('cardWork').textContent = !w ? 'Hali boshlanmagan.' :
+        (w.status === 'done' ? 'Yakunlangan' : 'Ishlanmoqda') + ' · ' + S.regionLabel(w.region) +
+        (who ? ' · oxirgi: ' + who + ', ' + ago(w.updated) : '') + (w.changed ? ' · ' + w.changed + ' ta narx o\'zgartirilgan' : '');
+      $('cardExports').innerHTML = '<li class="mute">yuklanmoqda…</li>';
+      $('cardFiles').innerHTML = w && w.files && w.files.length
+        ? w.files.map(function (f) { return '<li><a href="' + S.pb.files.getURL(w, f) + '">' + S.esc(f.replace(/_[a-z0-9]{10}(\.[a-z]+)$/i, '$1')) + '</a></li>'; }).join('')
+        : '<li class="mute">yo\'q</li>';
+      $('cardOpen').onclick = function () { $('screen-card').hidden = true; self.open(a); };
+      $('cardOpen').textContent = w ? 'Davom etish' : 'Ochish';
+      $('screen-card').hidden = false;
+      S.pb.collection('exports').getFullList({ filter: S.pb.filter('application = {:a}', { a: a.id }), sort: '-created', expand: 'by' })
+        .then(function (list) {
+          $('cardExports').innerHTML = list.length ? list.map(function (x) {
+            var by = x.expand && x.expand.by;
+            return '<li><a href="' + S.pb.files.getURL(x, x.file) + '">' + S.esc(x.file.replace(/_[a-z0-9]{10}(\.[a-z]+)$/i, '$1')) + '</a>' +
+              '<small>' + day(x.created) + (by ? ' · ' + S.esc(by.name || by.email) : '') + (x.mode ? ' · ' + S.esc(x.mode) : '') + '</small></li>';
+          }).join('') : '<li class="mute">hali eksport qilinmagan</li>';
+        }).catch(function (e) { $('cardExports').innerHTML = '<li class="mute">' + S.esc(S.pbErr(e)) + '</li>'; });
     },
 
     /* ------------------------------------------------------------- open */
@@ -4032,7 +4119,9 @@ if (typeof self !== 'undefined') self.S = S;
         }).catch(function (e) {
           self.dirty = true;
           self.mark('!');
-          app.toast('Saqlanmadi: ' + S.pbErr(e), true);
+          app.toast('Saqlanmadi: ' + S.pbErr(e) + ' — 15 soniyadan keyin qayta uriniladi', true);
+          clearTimeout(self.t);
+          self.t = setTimeout(function () { if (self.dirty) self.saveNow(); }, 15000);
         });
       });
     },

@@ -15,13 +15,17 @@ shunday.
 ## Ishlash tartibi
 
 ```sh
-node build.mjs                                        # dist/smeta-taqqoslash.html
+node build.mjs                                        # dist/smeta-taqqoslash.html + index.html + admin.html
+node build.mjs --serve                                # ... va server/pb_public ga nusxa
 node test/pipeline.cjs a.xlsx b.xlsx --out out.xlsx   # brauzersiz tekshiruv
-node test/browser.mjs a.xlsx b.xlsx                   # haqiqiy brauzerda
+node test/browser.mjs a.xlsx b.xlsx                   # haqiqiy brauzerda (bitta-fayl rejim)
+sh server/setup.sh && sh server/run.sh                # PocketBase (server rejimi), README «Server rejimi»
+sh test/pb-smoke.sh; node test/e2e-workspace.mjs      # server rejimi testlari
 ```
 
-Yakuniy mahsulot — bitta fayl: `dist/smeta-taqqoslash.html`. O'zgartirishdan
-keyin uni qayta yig'ish va foydalanuvchiga yuborish kerak.
+Ikki mahsulot: bitta-fayl `dist/smeta-taqqoslash.html` (serversiz, avvalgidek)
+va server rejimi `dist/index.html` + `dist/admin.html` (PocketBase orqali).
+`src/lib/` yadro ikkalasiga umumiy; server qismi `S.pb` bo'lmasa o'zini o'chiradi.
 
 ## Muhim qoidalar
 

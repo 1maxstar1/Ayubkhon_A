@@ -63,7 +63,7 @@ check((await page.textContent('#appCount')).includes('401'), 'count shows all ap
 await page.fill('#appQ', '67159');
 await page.waitForFunction(() => document.querySelectorAll('#appTable tbody tr').length === 1);
 check((await page.textContent('#appTable tbody tr')).includes('Avtoyo'), 'search by number finds 67159');
-await page.click('#appTable tbody tr button');
+await page.click('#appTable tbody tr button[data-act=open]');
 await page.waitForSelector('#screen-region:not([hidden])');
 check((await page.textContent('#regionTitle')).includes('67159'), 'region screen names the application');
 check((await page.inputValue('#regionSel')) === 'respublika', 'region suggested from «Общереспубликанский»');
@@ -105,7 +105,7 @@ await page.waitForSelector('#screen-list:not([hidden])');
 await page.fill('#appQ', '67159');
 await page.waitForFunction(() => document.querySelectorAll('#appTable tbody tr').length === 1);
 check((await page.textContent('#appTable tbody tr')).includes('ishlanmoqda'), 'list shows the application as in progress');
-await page.click('#appTable tbody tr button');
+await page.click('#appTable tbody tr button[data-act=open]');
 await page.waitForFunction(() => window.app && window.app.model && window.app.model.rows.length > 100 && !S.Sync.loading, null, { timeout: 120000 });
 const after = await page.evaluate((k) => ({
   projects: app.projects.length, rows: app.model.rows.length, res: app.model.resources.length,
@@ -133,6 +133,19 @@ await page.waitForSelector('#screen-list:not([hidden])');
 await page.fill('#appQ', '67159');
 await page.waitForFunction(() => /yakunlangan/.test(document.querySelector('#appTable tbody').textContent));
 check(true, 'list shows the application as finished');
+await page.click('#appTable tbody tr button[data-act=card]');
+await page.waitForSelector('#screen-card:not([hidden])');
+await page.waitForFunction(() => document.querySelectorAll('#cardExports li a').length === 1);
+check((await page.textContent('#cardFields')).includes('67159') === false && (await page.textContent('#cardTitle')).includes('67159'), 'card opens for the application');
+check((await page.$$eval('#cardFiles li a', (a) => a.length)) === 2, 'card lists the two uploaded smeta files');
+check((await page.textContent('#cardWork')).includes('Yakunlangan'), 'card shows the work status');
+await page.click('#cardClose');
+await page.selectOption('#appRegion', 'fargona');
+await page.waitForFunction(() => document.querySelectorAll('#appTable tbody tr').length === 1);
+await page.selectOption('#appRegion', 'andijon');
+await page.waitForFunction(() => document.querySelectorAll('#appTable tbody tr').length === 0);
+check(true, 'region filter works on the list');
+await page.selectOption('#appRegion', '');
 check(await page.evaluate(() => app.projects.length === 0 && !S.Sync.ws), 'app cleared after closing the workspace');
 
 await page.screenshot({ path: join(root, 'test/shot-list.png') });

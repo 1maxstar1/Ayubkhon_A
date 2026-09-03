@@ -229,6 +229,21 @@ body.nows .bar > .btn,body.nows .bar > .pickmode{display:none}
 .hp-meta{color:var(--mute);font-size:11px;min-width:0}
 .hp-meta em{font-style:normal;color:var(--good);font-weight:600}
 .hp-meta small{display:block;font-size:10.5px}
+
+/* ------------------------------------------------------------ application card */
+.card.wide{max-width:720px;max-height:90vh;overflow:auto}
+.card-head{display:flex;justify-content:space-between;align-items:center}
+.card-head h2{margin:0}
+.card h3{margin:16px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute)}
+.kv{display:grid;grid-template-columns:170px 1fr;gap:4px 12px;margin:12px 0 0;font-size:12.5px}
+.kv dt{color:var(--mute)} .kv dd{margin:0;overflow-wrap:anywhere}
+ul.files{list-style:none;margin:0;padding:0;font-size:12.5px}
+ul.files li{padding:3px 0;border-bottom:1px solid #f0f2f5}
+ul.files small{display:block;color:var(--mute);font-size:11px}
+ul.files .mute{color:var(--mute)}
+.card-foot{margin-top:16px;text-align:right}
+.tbl.apps button.link.num{font-weight:600;padding:0;color:var(--accent)}
+.screen#screen-card{z-index:65}
 </style>
 </head>
 <body>

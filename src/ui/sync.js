@@ -178,7 +178,9 @@
         }).catch(function (e) {
           self.dirty = true;
           self.mark('!');
-          app.toast('Saqlanmadi: ' + S.pbErr(e), true);
+          app.toast('Saqlanmadi: ' + S.pbErr(e) + ' — 15 soniyadan keyin qayta uriniladi', true);
+          clearTimeout(self.t);
+          self.t = setTimeout(function () { if (self.dirty) self.saveNow(); }, 15000);
         });
       });
     },

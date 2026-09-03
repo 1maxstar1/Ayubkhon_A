@@ -21,6 +21,17 @@ manzillarni chiqaradi. **Qayta ishga tushirish = yangilash** — `pb_data` va
    sh server/deploy/smtp.sh root@SERVER_IP smtp.gmail.com 587 siz@gmail.com 'app-parol'
    ```
    Admin pochtasiga sinov xati keladi. Kelmasa, chiqqan xatoni o'qing.
+   **Provayder chiquvchi SMTP portlarini (465/587) bloklagan bo'lsa** — `smtp.sh`
+   buni o'zi aytadi. Unda xat HTTPS orqali Brevo API bilan yuboriladi (443
+   ochiq bo'lsa yetarli, bepul 300 ta/kun):
+   ```sh
+   sh server/deploy/mail-api.sh root@SERVER_IP 'xkeysib-…' siz@gmail.com
+   ```
+   Brevo'da (`app.brevo.com`) jo'natuvchi manzil tasdiqlangan bo'lishi kerak
+   (Senders & IP → Add a sender). Kalit `.env` dagi `BREVO_API_KEY` ga yoziladi;
+   u bo'sh bo'lsa PocketBase odatdagidek SMTP ishlatadi (`pb_hooks/mail-api.pb.js`).
+   Parallel ravishda provayderga «откройте исходящие порты 465 и 587» deb
+   yozib qo'ying — ochilsa, kalitni o'chirib SMTP ga qaytish mumkin.
 2. **Reyestr** — `http://SERVER_IP/admin.html` → `Report_1.xls` yuklash.
 3. **Xodimlar** — o'sha sahifada qo'shiladi.
 4. **Domen va HTTPS** (ixtiyoriy, keyin ham bo'ladi): domenning A yozuvini
@@ -60,7 +71,9 @@ sh /opt/taqqoslash/server/deploy/configure.sh   # .env ni qayta qo'llash
 | `configure.sh` | server | `.env` → PocketBase sozlamalari (SMTP, zaxira, rate limit) |
 | `serve.sh` | server (systemd) | IP bo'lsa http:80, domen bo'lsa http+https |
 | `pocketbase.service` | server | systemd birligi |
-| `smtp.sh` | Mac | SMTP ni `.env` ga yozish, qo'llash, sinov xati |
+| `smtp.sh` | Mac | portni tekshirish, SMTP ni `.env` ga yozish, sinov xati |
+| `mail-api.sh` | Mac | SMTP bloklangan bo'lsa: Brevo API kaliti, sinov xati |
+| `users.sh` | Mac | xodim hisoblarini qo'shish |
 | `pull-backup.sh` | Mac | yangi zaxira olib, yuklab olish |
 | `env.example` | — | `.env` shabloni |
 

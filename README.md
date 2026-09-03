@@ -254,4 +254,19 @@ Brauzer testlari uchun: `npm i -D playwright && npx playwright install chromium`
 To'liq reyestr bilan yuklama sinovi: `node test/e2e-fullregistry.mjs Report_1.xls`
 (28 000 qator ≈ 35 s, qidiruv va filtrlar millisekundlarda).
 
+### Ofis kompyuterini server qilish (VPSsiz)
+
+```sh
+sh server/lan.sh              # butun ofis uchun: http://<shu kompyuter IP>:8090
+PB_DEV=1 sh server/lan.sh     # yolg'iz sinash: kodlar shu oynada chiqadi
+```
+
+`dev.sh` dan farqi: server `0.0.0.0` ga ulanadi, ya'ni bir tarmoqdagi boshqa
+kompyuterlar ham kira oladi, va skript xodimlar ochadigan manzilni ko'rsatadi.
+Kerak bo'ladi: kompyuter ish vaqtida yoqiq tursin (uyqu o'chirilgan), lokal IP
+o'zgarmasin (routerda DHCP rezervatsiya), tarmoqlararo ekranda `8090` port
+ochiq bo'lsin, va kirish kodlari uchun SMTP sozlangan bo'lsin (baza paneli →
+Settings → Mail). Zaxira: Settings → Backups, keyin `pb_data/backups/` ni
+boshqa diskka nusxalab turing.
+
 Joylashtirish (VPS, HTTPS, SMTP, zaxira) — `server/deploy/README.md`.

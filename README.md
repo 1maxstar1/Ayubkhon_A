@@ -243,7 +243,8 @@ Keyin `http://127.0.0.1:8090/` → `admin@example.com` → «Kod yuborish» →
 `sh server/otp.sh` dagi kodni kiriting. Admin sahifa `…/admin.html`, PocketBase
 paneli `…/_/` (parol `adminpass1234`, `PB_ADMIN_PASS` bilan o'zgartiriladi).
 To'xtatish: `kill $(cat server/pb_data/serve.pid)`. Ma'lumotlar `server/pb_data/` da,
-tozalash uchun shu papkani o'chiring.
+tozalash uchun shu papkani o'chiring. Windows'da skriptlarni **Git Bash** dan
+ishga tushiring (`node`, `curl` kerak); binary `pocketbase.exe` avtomatik yuklanadi.
 
 To'liq reyestr bilan yuklama sinovi: `node test/e2e-fullregistry.mjs Report_1.xls`
 (28 000 qator ≈ 35 s, qidiruv va filtrlar millisekundlarda).

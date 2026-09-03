@@ -11,3 +11,4 @@ server/pb_data*/
 server/pb_public/
 server/*.zip
 server/pb_migrations/
+server/pocketbase.exe

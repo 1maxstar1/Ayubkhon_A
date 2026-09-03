@@ -18,17 +18,17 @@ sh server/setup.sh
 node build.mjs --serve
 ( cd server; mkdir -p pb_data; PB_DEV=1 PB_HTTP="$PORT" sh run.sh >pb_data/serve.log 2>&1 & echo $! > pb_data/serve.pid )
 for i in 1 2 3 4 5 6 7 8 9 10; do curl -sS -m 2 -o /dev/null "http://$PORT/api/health" 2>/dev/null && break || sleep 1; done
-json() { python3 -c "import sys,json;print(json.load(sys.stdin)$1)"; }
+json() { node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d)$1))"; }
 SU=$(curl -sS -X POST "http://$PORT/api/collections/_superusers/auth-with-password" -H 'content-type: application/json' \
-  -d "{\"identity\":\"$PB_ADMIN_EMAIL\",\"password\":\"$PB_ADMIN_PASS\"}" | json '["token"]')
+  -d "{\"identity\":\"$PB_ADMIN_EMAIL\",\"password\":\"$PB_ADMIN_PASS\"}" | json '.token')
 # first admin user (same email as the superuser) — ignored if it already exists
 curl -sS -o /dev/null -X POST "http://$PORT/api/collections/users/records" -H "Authorization: $SU" -H 'content-type: application/json' \
   -d "{\"email\":\"$PB_ADMIN_EMAIL\",\"password\":\"$PB_ADMIN_PASS\",\"passwordConfirm\":\"$PB_ADMIN_PASS\",\"name\":\"Administrator\",\"role\":\"admin\",\"active\":true,\"emailVisibility\":true}" || true
 # sample registry so the list is not empty
-N=$(curl -sS "http://$PORT/api/collections/applications/records?perPage=1" -H "Authorization: $SU" | json '["totalItems"]')
+N=$(curl -sS "http://$PORT/api/collections/applications/records?perPage=1" -H "Authorization: $SU" | json '.totalItems')
 if [ "$N" = 0 ]; then
   node test/registry.cjs --json server/pb_data/rows.json >/dev/null
-  python3 -c "import json;json.dump({'rows':json.load(open('server/pb_data/rows.json'))},open('server/pb_data/body.json','w'))"
+  node -e "const f=require('fs');f.writeFileSync('server/pb_data/body.json',JSON.stringify({rows:JSON.parse(f.readFileSync('server/pb_data/rows.json','utf8'))}))"
   curl -sS -o /dev/null -X POST "http://$PORT/api/registry/import" -H "Authorization: $SU" -H 'content-type: application/json' --data-binary @server/pb_data/body.json
   echo "sample registry imported (400 rows)"
 fi

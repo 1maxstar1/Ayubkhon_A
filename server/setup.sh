@@ -6,9 +6,9 @@ cd "$(dirname "$0")"
 : "${PB_ADMIN_EMAIL:?set PB_ADMIN_EMAIL}"
 : "${PB_ADMIN_PASS:?set PB_ADMIN_PASS (10+ chars)}"
 PORT="${PB_SETUP_PORT:-8091}"
-[ -x ./pocketbase ] || ./get-pocketbase.sh
-./pocketbase superuser upsert "$PB_ADMIN_EMAIL" "$PB_ADMIN_PASS" --dir "${PB_DATA_DIR:-pb_data}"
-./pocketbase serve --http "127.0.0.1:$PORT" --dir "${PB_DATA_DIR:-pb_data}" --hooksDir pb_hooks >/dev/null 2>&1 &
+. ./pb.sh
+"$PB" superuser upsert "$PB_ADMIN_EMAIL" "$PB_ADMIN_PASS" --dir "${PB_DATA_DIR:-pb_data}"
+"$PB" serve --http "127.0.0.1:$PORT" --dir "${PB_DATA_DIR:-pb_data}" --hooksDir pb_hooks >/dev/null 2>&1 &
 PID=$!
 trap 'kill $PID 2>/dev/null' EXIT
 for i in 1 2 3 4 5 6 7 8 9 10; do

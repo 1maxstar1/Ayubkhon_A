@@ -1,16 +1,15 @@
-# /etc/systemd/system/pocketbase.service
-# PocketBase serves the API, the built frontend (pb_public) and obtains the
-# Let's Encrypt certificate itself when started with --http and --https.
+# /etc/systemd/system/pocketbase.service  (installed by deploy/install.sh)
 [Unit]
 Description=Taqqoslash jadvali (PocketBase)
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
 User=pocketbase
 Group=pocketbase
 WorkingDirectory=/opt/taqqoslash/server
-ExecStart=/opt/taqqoslash/server/pocketbase serve smeta.example.uz --http=0.0.0.0:80 --https=0.0.0.0:443 --dir=/opt/taqqoslash/server/pb_data --hooksDir=/opt/taqqoslash/server/pb_hooks --publicDir=/opt/taqqoslash/server/pb_public
+ExecStart=/bin/sh /opt/taqqoslash/server/deploy/serve.sh
 Restart=always
 RestartSec=5
 LimitNOFILE=4096

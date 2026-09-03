@@ -1,43 +1,69 @@
-# Joylashtirish (Ubuntu 22.04+, Toshkentdagi VPS)
+# Joylashtirish (Ubuntu 22.04 / 24.04 VPS, Toshkent)
 
-Kerak: domen (masalan `smeta.firma.uz`, A yozuvi → server IP), 80/443 portlar
-ochiq, SMTP hisobi (kod yuborish uchun).
+Hammasi Mac'dan bitta buyruq bilan. Serverga faqat `ssh root@IP` kirishi kerak.
 
 ```sh
-# 1. Foydalanuvchi va papka
-sudo useradd -r -s /usr/sbin/nologin pocketbase
-sudo mkdir -p /opt/taqqoslash && sudo chown pocketbase:pocketbase /opt/taqqoslash
-
-# 2. Kod (git clone yoki nusxa) — server/ va dist/ kerak
-sudo -u pocketbase git clone <repo> /opt/taqqoslash
-cd /opt/taqqoslash && npm ci --omit=dev 2>/dev/null; node build.mjs --serve
-
-# 3. PocketBase + sxema + superuser
-cd server
-PB_ADMIN_EMAIL=admin@firma.uz PB_ADMIN_PASS='kuchli-parol-12' sudo -E -u pocketbase sh setup.sh
-
-# 4. systemd (domenni pocketbase.service ichida almashtiring)
-sudo cp deploy/pocketbase.service /etc/systemd/system/
-sudo systemctl daemon-reload && sudo systemctl enable --now pocketbase
-sudo journalctl -u pocketbase -f
+PB_ADMIN_EMAIL=siz@firma.uz sh server/deploy/push.sh root@SERVER_IP
 ```
 
-Keyin brauzerda `https://smeta.firma.uz/_/` → superuser bilan kiring:
+`push.sh` frontendni yig'adi, `server/` papkasini VPS ga ko'chiradi va u yerda
+`deploy/install.sh` ni ishga tushiradi. Installer: kerakli paketlar, `pocketbase`
+foydalanuvchisi, PocketBase binary, `.env` (superuser paroli avtomatik
+yaratiladi), sxema, sozlamalar (zaxira 03:00 da, rate limit, jurnal), dasturning
+birinchi admin foydalanuvchisi, systemd xizmati, `ufw` (22/80/443). Oxirida
+manzillarni chiqaradi. **Qayta ishga tushirish = yangilash** — `pb_data` va
+`.env` saqlanadi.
 
-1. **Settings → Mail** — SMTP (host, port, login, parol, «From» manzili).
-   «Send test email» bilan tekshiring. SPF/DKIM yozuvlarini domen egasi qo'shsin,
-   aks holda kodlar spamga tushadi.
-2. **Settings → Application** — `Application URL` = `https://smeta.firma.uz`.
-3. **Settings → Backups** — kunlik zaxira (`0 3 * * *`), 7 nusxa saqlash.
-   Zaxira `pb_data/backups/` da; uni boshqa joyga ham ko'chiring
-   (masalan `rsync` bilan ikkinchi serverga yoki cron bilan obyekt-omborga).
-4. **Collections → users** — birinchi adminni yarating: email, `name`,
-   `role = admin`, `active = true`, ixtiyoriy parol (ishlatilmaydi).
-   Qolgan xodimlarni `https://smeta.firma.uz/admin.html` orqali qo'shasiz.
-5. `https://smeta.firma.uz/admin.html` → reyestr faylini yuklang.
+## Keyingi qadamlar
 
-Yangilash: `git pull && node build.mjs --serve && sudo systemctl restart pocketbase`
-(sxema o'zgargan bo'lsa avval `sh setup.sh` — u mavjud yozuvlarni saqlab, faqat
-kolleksiyalarni yangilaydi).
+1. **SMTP** — kirish kodlari shu orqali ketadi (Gmail: App password):
+   ```sh
+   sh server/deploy/smtp.sh root@SERVER_IP smtp.gmail.com 587 siz@gmail.com 'app-parol'
+   ```
+   Admin pochtasiga sinov xati keladi. Kelmasa, chiqqan xatoni o'qing.
+2. **Reyestr** — `http://SERVER_IP/admin.html` → `Report_1.xls` yuklash.
+3. **Xodimlar** — o'sha sahifada qo'shiladi.
+4. **Domen va HTTPS** (ixtiyoriy, keyin ham bo'ladi): domenning A yozuvini
+   serverga qarating, keyin
+   ```sh
+   sh server/deploy/push.sh root@SERVER_IP smeta.firma.uz
+   ```
+   Sertifikat Let's Encrypt'dan avtomatik olinadi (80 va 443 ochiq bo'lishi kerak).
 
-`PB_DEV=0` bo'lganda OTP faqat emailga ketadi; `dev-otp.txt` yozilmaydi.
+## Zaxira
+
+PocketBase har kuni 03:00 da `pb_data/backups/` ga zaxira oladi (7 nusxa
+saqlanadi). Uni serverdan tashqariga ham olib turing:
+
+```sh
+sh server/deploy/pull-backup.sh root@SERVER_IP          # ~/Backups/smeta/ ga
+```
+
+Tiklash: baza paneli (`/_/` → Settings → Backups → Restore) yoki
+`pb_data` ni zaxiradan qaytarib `systemctl restart pocketbase`.
+
+## Serverda foydali buyruqlar
+
+```sh
+systemctl status pocketbase          # holat
+journalctl -u pocketbase -n 100 -f   # jurnal
+cat /opt/taqqoslash/server/.env      # superuser paroli va sozlamalar
+sh /opt/taqqoslash/server/deploy/configure.sh   # .env ni qayta qo'llash
+```
+
+## Fayllar
+
+| Fayl | Qayerda ishlaydi | Vazifa |
+|---|---|---|
+| `push.sh` | Mac | yig'ish, yuklash, `install.sh` ni chaqirish |
+| `install.sh` | server (root) | paketlar, binary, `.env`, sxema, xizmat, firewall |
+| `configure.sh` | server | `.env` → PocketBase sozlamalari (SMTP, zaxira, rate limit) |
+| `serve.sh` | server (systemd) | IP bo'lsa http:80, domen bo'lsa http+https |
+| `pocketbase.service` | server | systemd birligi |
+| `smtp.sh` | Mac | SMTP ni `.env` ga yozish, qo'llash, sinov xati |
+| `pull-backup.sh` | Mac | yangi zaxira olib, yuklab olish |
+| `env.example` | — | `.env` shabloni |
+
+Xavfsizlik: superuser paroli faqat serverdagi `.env` da (chmod 600). Baza
+paneli `/_/` internetdan ochiq — parol kuchli, rate limit yoqiq. Domen
+ulangach hamma trafik HTTPS bo'ladi.

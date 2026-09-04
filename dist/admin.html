@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="uz">
+<html lang="ru">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Admin — Taqqoslash jadvali №2</title>
+<title>Администратор — Таблица сопоставления №2</title>
 <style>/* Palette follows the reference workbook (321.xlsx): light-blue band D9E2F3,
    cyan CCFFFF header cells, pink FFC7CE / 9C0006 "bad" cells, and the Excel
    "good" pair C6EFCE / 006100 for finished / positive actions. Navy 16305C is
@@ -299,174 +299,174 @@ ul.files .mute{color:var(--mute)}
 
 <header class="bar">
   <div class="brand">
-    <b>Administrator</b>
-    <span>reyestr, ish maydonlari va foydalanuvchilar</span>
+    <b>Администратор</b>
+    <span>реестр, рабочие области и пользователи</span>
   </div>
   <div class="grow"></div>
-  <a class="btn primary" href="./">‹ Dasturga qaytish</a>
+  <a class="btn primary" href="./">‹ В программу</a>
   <div class="userbox" id="userBox" hidden></div>
 </header>
 
 <main class="admin-main" id="adminMain" hidden>
   <section class="panel">
-    <h2>Arizalar reyestri</h2>
-    <p class="lead">control.expertcenter.uz dan yuklab olingan hisobot (<code>.xls</code>). Qatorlar ariza raqami bo'yicha
-      solishtiriladi: yangi — qo'shiladi, mavjud — yangilanadi. Hech narsa o'chirilmaydi.</p>
+    <h2>Реестр заявок</h2>
+    <p class="lead">Отчёт, выгруженный с control.expertcenter.uz (<code>.xls</code>). Строки сопоставляются по номеру заявки:
+      новые добавляются, существующие обновляются. Ничего не удаляется.</p>
     <label class="btn file primary">
       <input type="file" id="regFile" accept=".xls,.xlsx">
-      <span class="ic">↑</span> Reyestr faylini yuklash
+      <span class="ic">↑</span> Загрузить файл реестра
     </label>
     <div class="progress" id="regProgress" hidden><div class="bar-fill" id="regBar"></div><span id="regText"></span></div>
     <p class="err" id="regErr" hidden></p>
     <div class="stat" id="regStat"></div>
-    <h3>Yuklashlar tarixi</h3>
-    <table class="tbl" id="regHistory"><thead><tr><th>Sana</th><th>Kim</th><th>Qatorlar</th><th>Qo'shildi</th><th>Yangilandi</th><th>Fayl</th></tr></thead><tbody></tbody></table>
+    <h3>История загрузок</h3>
+    <table class="tbl" id="regHistory"><thead><tr><th>Дата</th><th>Кто</th><th>Строк</th><th>Добавлено</th><th>Обновлено</th><th>Файл</th></tr></thead><tbody></tbody></table>
   </section>
 
   <section class="panel">
-    <h2>Ish maydonlari</h2>
-    <p class="lead">Xodimlar ochgan arizalar. <b>Tozalash</b> — yuklangan smeta fayllari, narx tuzatishlari va eksportlar
-      o'chiriladi, ariza «boshidan» holatiga qaytadi (viloyat saqlanadi). <b>O'chirish</b> — ish maydoni butunlay yo'q qilinadi,
-      ariza reyestrda qoladi va qayta ochilishi mumkin.</p>
+    <h2>Рабочие области</h2>
+    <p class="lead">Заявки, открытые сотрудниками. <b>Очистить</b> — удаляются загруженные сметы, правки цен и экспорты,
+      заявка возвращается «к началу» (регион сохраняется). <b>Удалить</b> — рабочая область удаляется полностью,
+      заявка остаётся в реестре и может быть открыта заново.</p>
     <form class="inline" id="wsFilter" autocomplete="off" onsubmit="return false">
-      <input type="search" id="wsQ" placeholder="Ariza raqami, kontragent yoki loyiha…" spellcheck="false">
-      <select id="wsStatus"><option value="">Holat: barchasi</option><option value="in_progress">Ishlanmoqda</option><option value="done">Yakunlangan</option></select>
+      <input type="search" id="wsQ" placeholder="Номер заявки, контрагент или проект…" spellcheck="false">
+      <select id="wsStatus"><option value="">Статус: все</option><option value="in_progress">В работе</option><option value="done">Завершена</option></select>
       <span class="count" id="wsCount"></span>
     </form>
-    <table class="tbl" id="wsTable"><thead><tr><th>№</th><th>Kontragent · STIR</th><th>Viloyat</th><th>Holat</th><th>Fayl</th><th>Tuzatish</th><th>Oxirgi</th><th></th></tr></thead><tbody></tbody></table>
+    <table class="tbl" id="wsTable"><thead><tr><th>№</th><th>Контрагент · ИНН</th><th>Регион</th><th>Статус</th><th>Файлов</th><th>Правок</th><th>Последнее</th><th></th></tr></thead><tbody></tbody></table>
   </section>
 
   <section class="panel">
-    <h2>Arizani qo'lda qo'shish</h2>
-    <p class="lead">Reyestrda hali yo'q ariza uchun. Raqam mavjud bo'lsa, faqat to'ldirilgan maydonlar yangilanadi; keyingi
-      reyestr yuklashda ham shu raqam bo'yicha yangilanadi. Xuddi shu amallar arizalar ro'yxatida ham bor (admin uchun).</p>
-    <button class="btn primary" type="button" id="appAddBtn"><span class="ic">＋</span> Arizani qo'shish</button>
+    <h2>Добавить заявку вручную</h2>
+    <p class="lead">Для заявки, которой ещё нет в реестре. Если номер уже существует, обновятся только заполненные поля;
+      при следующей загрузке реестра она тоже обновится по номеру. Те же действия есть в списке заявок (для администратора).</p>
+    <button class="btn primary" type="button" id="appAddBtn"><span class="ic">＋</span> Добавить заявку</button>
     <span class="stat" id="appStat"></span>
-    <h3>Arizani topish va o'chirish</h3>
+    <h3>Найти и удалить заявку</h3>
     <form class="inline" id="findForm" autocomplete="off">
-      <input type="search" id="findQ" placeholder="Ariza raqami yoki kontragent…" spellcheck="false">
-      <button class="btn" type="submit">Topish</button>
+      <input type="search" id="findQ" placeholder="Номер заявки или контрагент…" spellcheck="false">
+      <button class="btn" type="submit">Найти</button>
     </form>
-    <table class="tbl" id="findTable" hidden><thead><tr><th>№</th><th>Sana</th><th>Kontragent · STIR</th><th>Loyiha</th><th>Ish</th><th></th></tr></thead><tbody></tbody></table>
+    <table class="tbl" id="findTable" hidden><thead><tr><th>№</th><th>Дата</th><th>Контрагент · ИНН</th><th>Проект</th><th>Работа</th><th></th></tr></thead><tbody></tbody></table>
   </section>
 
   <section class="panel">
-    <h2>Foydalanuvchilar</h2>
+    <h2>Пользователи</h2>
     <form class="inline" id="userForm" autocomplete="off">
-      <input type="email" id="uEmail" placeholder="pochta@tashkilot.uz" required>
-      <input type="text" id="uName" placeholder="Ism familiya" required>
-      <select id="uRole"><option value="ekspert">Ekspert</option><option value="admin">Admin</option></select>
-      <button class="btn primary" type="submit"><span class="ic">＋</span> Qo'shish</button>
+      <input type="email" id="uEmail" placeholder="pochta@organizaciya.uz" required>
+      <input type="text" id="uName" placeholder="Имя и фамилия" required>
+      <select id="uRole"><option value="ekspert">Эксперт</option><option value="admin">Администратор</option></select>
+      <button class="btn primary" type="submit"><span class="ic">＋</span> Добавить</button>
     </form>
     <p class="err" id="userErr" hidden></p>
-    <table class="tbl" id="userTable"><thead><tr><th>Pochta</th><th>Ism</th><th>Rol</th><th>Holat</th><th></th></tr></thead><tbody></tbody></table>
+    <table class="tbl" id="userTable"><thead><tr><th>Почта</th><th>Имя</th><th>Роль</th><th>Статус</th><th></th></tr></thead><tbody></tbody></table>
   </section>
 </main>
-<p class="denied" id="denied" hidden>Bu sahifa faqat administrator uchun.</p>
+<p class="denied" id="denied" hidden>Эта страница только для администратора.</p>
 
 <div class="screen" id="screen-login" hidden>
   <form class="card" id="loginForm" autocomplete="off">
-    <h2>Taqqoslash jadvali №2</h2>
-    <p class="lead" id="loginMsg">Tizimga kirish uchun ish elektron pochtangizni kiriting. Bir martalik kod pochtaga yuboriladi.</p>
-    <label>Elektron pochta
-      <input type="email" id="loginEmail" required autocomplete="email" spellcheck="false" placeholder="ism@tashkilot.uz"></label>
+    <h2>Таблица сопоставления №2</h2>
+    <p class="lead" id="loginMsg">Введите рабочую электронную почту. Одноразовый код придёт на неё.</p>
+    <label>Электронная почта
+      <input type="email" id="loginEmail" required autocomplete="email" spellcheck="false" placeholder="imya@organizaciya.uz"></label>
     <div id="codeBox" hidden>
-      <label>Pochtaga kelgan 8 xonali kod
+      <label>8-значный код из письма
         <input type="text" id="loginCode" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="one-time-code"></label>
-      <p class="hint">Kod 5 daqiqa amal qiladi. Kelmasa — <button type="button" class="link" id="resendBtn">qayta yuborish</button>.</p>
+      <p class="hint">Код действует 5 минут. Не пришёл — <button type="button" class="link" id="resendBtn">отправить снова</button>.</p>
     </div>
     <p class="err" id="loginErr" hidden></p>
-    <button class="btn primary wide" id="loginBtn" type="submit">Kod yuborish</button>
-    <p class="foot">Faqat administrator ro'yxatga qo'shgan pochtalar kira oladi.</p>
+    <button class="btn primary wide" id="loginBtn" type="submit">Отправить код</button>
+    <p class="foot">Войти могут только адреса, добавленные администратором.</p>
   </form>
 </div>
 
 <div class="screen list" id="screen-list" hidden>
   <div class="listwrap">
     <div class="listbar">
-      <h2>Arizalar</h2>
-      <input type="search" id="appQ" placeholder="№, kontragent, STIR, loyiha nomi yoki obyekt ID…" spellcheck="false">
-      <select id="appWork" title="Ish holati">
-        <option value="">Ish: barchasi</option>
-        <option value="none">Boshlanmagan</option>
-        <option value="in_progress">Ishlanmoqda</option>
-        <option value="done">Yakunlangan</option>
+      <h2>Заявки</h2>
+      <input type="search" id="appQ" placeholder="№, контрагент, ИНН, название проекта или ID объекта…" spellcheck="false">
+      <select id="appWork" title="Состояние работы">
+        <option value="">Работа: все</option>
+        <option value="none">Не начата</option>
+        <option value="in_progress">В работе</option>
+        <option value="done">Завершена</option>
       </select>
-      <select id="appRegion" title="Viloyat (ish maydonida tanlangan)"><option value="">Barcha viloyatlar</option></select>
-      <select id="appYear" title="Ariza yili"><option value="">Barcha yillar</option></select>
-      <select id="appType" title="Ekspertiza turi"><option value="">Ekspertiza turi: barchasi</option></select>
-      <select id="appBuyer" title="Buyurtmachi / loyiha turi"><option value="">Buyurtmachi: barchasi</option></select>
-      <select id="appStatus" title="Ariza holati (reyestr)"><option value="">Holat: barchasi</option></select>
-      <span class="range" title="Summa (НДС bilan), so'm">
-        <input type="number" id="appMin" placeholder="Summa dan" min="0" step="1000000">
-        <input type="number" id="appMax" placeholder="gacha" min="0" step="1000000">
+      <select id="appRegion" title="Регион (выбран в рабочей области)"><option value="">Все регионы</option></select>
+      <select id="appYear" title="Год заявки"><option value="">Все годы</option></select>
+      <select id="appType" title="Тип экспертизы"><option value="">Тип экспертизы: все</option></select>
+      <select id="appBuyer" title="Заказчик / тип проекта"><option value="">Заказчик: все</option></select>
+      <select id="appStatus" title="Статус заявки (реестр)"><option value="">Статус: все</option></select>
+      <span class="range" title="Сумма (с НДС), сум">
+        <input type="number" id="appMin" placeholder="Сумма от" min="0" step="1000000">
+        <input type="number" id="appMax" placeholder="до" min="0" step="1000000">
       </span>
-      <button class="btn sm" id="appClear" type="button" title="Barcha filtrlarni tozalash">✕ Filtrlar</button>
+      <button class="btn sm" id="appClear" type="button" title="Сбросить все фильтры">✕ Фильтры</button>
       <span class="count" id="appCount"></span>
       <div class="grow"></div>
-      <button class="btn sm primary" id="appAdd" type="button" hidden title="Reyestrda yo'q arizani qo'lda qo'shish"><span class="ic">＋</span> Ariza qo'shish</button>
+      <button class="btn sm primary" id="appAdd" type="button" hidden title="Добавить вручную заявку, которой нет в реестре"><span class="ic">＋</span> Добавить заявку</button>
     </div>
     <div class="listscroll">
       <table class="tbl apps" id="appTable">
-        <thead><tr><th>№</th><th>Sana</th><th>Kontragent · STIR</th><th>Loyiha · obyekt ID</th><th>Ekspertiza · buyurtmachi</th><th class="num">Summa (НДС bilan)</th><th>Holat</th><th>Ish</th><th></th></tr></thead>
+        <thead><tr><th>№</th><th>Дата</th><th>Контрагент · ИНН</th><th>Проект · ID объекта</th><th>Экспертиза · заказчик</th><th class="num">Сумма (с НДС)</th><th>Статус</th><th>Работа</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
-      <div class="listfoot"><button class="btn" id="appMore" hidden>Yana ko'rsatish</button></div>
+      <div class="listfoot"><button class="btn" id="appMore" hidden>Показать ещё</button></div>
     </div>
   </div>
 </div>
 
 <div class="screen" id="screen-region" hidden>
   <form class="card" id="regionForm">
-    <h2 id="regionTitle">Ariza</h2>
+    <h2 id="regionTitle">Заявка</h2>
     <p class="lead" id="regionLead"></p>
-    <label>Viloyat (loyiha amalga oshiriladigan hudud)
+    <label>Регион (где реализуется проект)
       <select id="regionSel" required></select></label>
     <p class="hint" id="regionHint"></p>
     <p class="err" id="regionErr" hidden></p>
-    <button class="btn primary wide" type="submit">Ish maydonini ochish</button>
-    <button class="btn wide" type="button" id="regionBack">Orqaga</button>
+    <button class="btn primary wide" type="submit">Открыть рабочую область</button>
+    <button class="btn wide" type="button" id="regionBack">Назад</button>
   </form>
 </div>
 
 <div class="screen" id="screen-card" hidden>
   <div class="card wide" id="appCard">
-    <div class="card-head"><h2 id="cardTitle">Ariza</h2><button class="link" id="cardClose">×</button></div>
+    <div class="card-head"><h2 id="cardTitle">Заявка</h2><button class="link" id="cardClose">×</button></div>
     <dl class="kv" id="cardFields"></dl>
-    <h3>Ish</h3>
+    <h3>Работа</h3>
     <p id="cardWork" class="lead"></p>
-    <h3>Eksportlar</h3>
+    <h3>Экспорты</h3>
     <ul class="files" id="cardExports"></ul>
-    <h3>Yuklangan smeta fayllari</h3>
+    <h3>Загруженные файлы смет</h3>
     <ul class="files" id="cardFiles"></ul>
-    <div class="card-foot"><button class="btn primary" id="cardOpen">Ochish</button></div>
+    <div class="card-foot"><button class="btn primary" id="cardOpen">Открыть</button></div>
   </div>
 </div>
 
 <div class="screen" id="screen-appform" hidden>
   <form class="card wide" id="appForm" autocomplete="off">
-    <div class="card-head"><h2>Arizani qo'lda qo'shish</h2><button class="link" type="button" id="appFormClose">×</button></div>
-    <p class="lead">Reyestrda hali yo'q ariza uchun. Raqam mavjud bo'lsa, faqat to'ldirilgan maydonlar yangilanadi. Kontragent STIR bo'yicha topiladi yoki yaratiladi.</p>
+    <div class="card-head"><h2>Добавить заявку вручную</h2><button class="link" type="button" id="appFormClose">×</button></div>
+    <p class="lead">Для заявки, которой ещё нет в реестре. Если номер уже существует, обновятся только заполненные поля. Контрагент находится или создаётся по ИНН.</p>
     <div class="grid">
-      <label>Ariza raqami *<input type="text" id="aNumber" required inputmode="numeric" placeholder="67155"></label>
-      <label>Ro'yxatga olingan sana<input type="date" id="aDate"></label>
-      <label>Holat<input type="text" id="aStatus" placeholder="Qo'lda qo'shilgan"></label>
-      <label>Summa (НДС bilan), so'm<input type="number" id="aCost" min="0" step="1"></label>
-      <label class="w2">Tashkilot (kontragent)<input type="text" id="aOrg" placeholder="«…» MChJ"></label>
-      <label>STIR (ИНН)<input type="text" id="aInn" inputmode="numeric" placeholder="200000000"></label>
-      <label>Obyekt ID<input type="text" id="aObject"></label>
-      <label class="w4">Loyiha nomi<input type="text" id="aTitle"></label>
-      <label class="w2">Ekspertiza turi<input type="text" id="aType" list="typeList"></label>
-      <label class="w2">Buyurtmachi / loyiha turi<input type="text" id="aBuyer" list="buyerList"></label>
-      <label class="w2">Joy (viloyat / shahar)<input type="text" id="aPlace"></label>
-      <label class="w2">Mas'ul ijrochi<input type="text" id="aExec"></label>
+      <label>Номер заявки *<input type="text" id="aNumber" required inputmode="numeric" placeholder="67155"></label>
+      <label>Дата регистрации<input type="date" id="aDate"></label>
+      <label>Статус<input type="text" id="aStatus" placeholder="Добавлена вручную"></label>
+      <label>Сумма (с НДС), сум<input type="number" id="aCost" min="0" step="1"></label>
+      <label class="w2">Организация (контрагент)<input type="text" id="aOrg" placeholder="ООО «…»"></label>
+      <label>ИНН<input type="text" id="aInn" inputmode="numeric" placeholder="200000000"></label>
+      <label>ID объекта<input type="text" id="aObject"></label>
+      <label class="w4">Название проекта<input type="text" id="aTitle"></label>
+      <label class="w2">Тип экспертизы<input type="text" id="aType" list="typeList"></label>
+      <label class="w2">Заказчик / тип проекта<input type="text" id="aBuyer" list="buyerList"></label>
+      <label class="w2">Место (регион / город)<input type="text" id="aPlace"></label>
+      <label class="w2">Ответственный исполнитель<input type="text" id="aExec"></label>
       <datalist id="typeList"></datalist>
       <datalist id="buyerList"></datalist>
     </div>
     <p class="err" id="appErr" hidden></p>
     <div class="card-foot">
-      <button class="btn" type="button" id="appFormCancel">Bekor qilish</button>
-      <button class="btn primary" type="submit"><span class="ic">＋</span> Saqlash</button>
+      <button class="btn" type="button" id="appFormCancel">Отмена</button>
+      <button class="btn primary" type="submit"><span class="ic">＋</span> Сохранить</button>
     </div>
   </form>
 </div>
@@ -624,14 +624,14 @@ if (typeof self !== 'undefined') self.S = S;
 
   /** Human-readable (Uzbek) message for a failed request. */
   S.pbErr = function (e) {
-    if (!e) return 'Noma\'lum xato';
-    if (e.status === 0) return 'Server bilan aloqa yo\'q';
-    if (e.status === 401 || e.status === 403) return 'Ruxsat yo\'q';
-    if (e.status === 404) return 'Topilmadi';
+    if (!e) return 'Неизвестная ошибка';
+    if (e.status === 0) return 'Нет связи с сервером';
+    if (e.status === 401 || e.status === 403) return 'Нет доступа';
+    if (e.status === 404) return 'Не найдено';
     var d = e.response && e.response.data;
     if (d) {
       var keys = Object.keys(d);
-      if (keys.length) return keys[0] + ': ' + (d[keys[0]].message || d[keys[0]].code || 'noto\'g\'ri qiymat');
+      if (keys.length) return keys[0] + ': ' + (d[keys[0]].message || d[keys[0]].code || 'неверное значение');
     }
     return e.message || String(e);
   };
@@ -647,21 +647,21 @@ if (typeof self !== 'undefined') self.S = S;
   'use strict';
 
   S.REGIONS = [
-    ['respublika', 'Umumrespublika'],
-    ['andijon', 'Andijon viloyati'],
-    ['buxoro', 'Buxoro viloyati'],
-    ['fargona', 'Farg\'ona viloyati'],
-    ['jizzax', 'Jizzax viloyati'],
-    ['xorazm', 'Xorazm viloyati'],
-    ['namangan', 'Namangan viloyati'],
-    ['navoiy', 'Navoiy viloyati'],
-    ['qashqadaryo', 'Qashqadaryo viloyati'],
-    ['samarqand', 'Samarqand viloyati'],
-    ['sirdaryo', 'Sirdaryo viloyati'],
-    ['surxondaryo', 'Surxondaryo viloyati'],
-    ['toshkent_vil', 'Toshkent viloyati'],
-    ['qoraqalpogiston', 'Qoraqalpog\'iston Respublikasi'],
-    ['toshkent_sh', 'Toshkent shahri']
+    ['respublika', 'Республиканский'],
+    ['andijon', 'Андижанская область'],
+    ['buxoro', 'Бухарская область'],
+    ['fargona', 'Ферганская область'],
+    ['jizzax', 'Джизакская область'],
+    ['xorazm', 'Хорезмская область'],
+    ['namangan', 'Наманганская область'],
+    ['navoiy', 'Навоийская область'],
+    ['qashqadaryo', 'Кашкадарьинская область'],
+    ['samarqand', 'Самаркандская область'],
+    ['sirdaryo', 'Сырдарьинская область'],
+    ['surxondaryo', 'Сурхандарьинская область'],
+    ['toshkent_vil', 'Ташкентская область'],
+    ['qoraqalpogiston', 'Республика Каракалпакстан'],
+    ['toshkent_sh', 'г. Ташкент']
   ];
   S.regionLabel = function (v) {
     for (var i = 0; i < S.REGIONS.length; i++) if (S.REGIONS[i][0] === v) return S.REGIONS[i][1];
@@ -782,7 +782,7 @@ if (typeof self !== 'undefined') self.S = S;
       var keys = (grid[r] || []).map(norm);
       if (keys.indexOf('номер') >= 0 && keys.indexOf('инн') >= 0) { hr = r; break; }
     }
-    if (hr < 0) throw new Error('Sarlavha qatori topilmadi («номер», «ИНН» ustunlari kerak)');
+    if (hr < 0) throw new Error('Строка заголовков не найдена (нужны столбцы «номер», «ИНН»)');
     var headers = (grid[hr] || []).map(function (h) { return text(h); });
     var map = headers.map(function (h) { return HEAD[norm(h)] || null; });
     var rows = [], skipped = 0;
@@ -850,7 +850,7 @@ if (typeof self !== 'undefined') self.S = S;
       this.otpId = null;
       document.getElementById('codeBox').hidden = true;
       document.getElementById('loginCode').value = '';
-      document.getElementById('loginBtn').textContent = 'Kod yuborish';
+      document.getElementById('loginBtn').textContent = 'Отправить код';
       document.getElementById('loginErr').hidden = true;
       if (!keepEmail) document.getElementById('loginEmail').value = '';
     },
@@ -870,21 +870,21 @@ if (typeof self !== 'undefined') self.S = S;
         S.pb.collection('users').requestOTP(email).then(function (r) {
           self.otpId = r.otpId;
           document.getElementById('codeBox').hidden = false;
-          btn.textContent = 'Kirish';
+          btn.textContent = 'Войти';
           document.getElementById('loginCode').focus();
         }).catch(function (e) {
-          self.error('Kod yuborilmadi: ' + S.pbErr(e));
+          self.error('Код не отправлен: ' + S.pbErr(e));
         }).finally(function () { btn.disabled = false; });
         return;
       }
       var code = document.getElementById('loginCode').value.trim();
-      if (code.length < 4) { btn.disabled = false; this.error('Kodni kiriting'); return; }
+      if (code.length < 4) { btn.disabled = false; this.error('Введите код'); return; }
       S.pb.collection('users').authWithOTP(this.otpId, code).then(function () {
         self.hide();
         self.start();
       }).catch(function (e) {
         var s = e && e.status;
-        self.error(s === 400 ? 'Kod noto\'g\'ri yoki muddati o\'tgan' : 'Kirib bo\'lmadi: ' + S.pbErr(e));
+        self.error(s === 400 ? 'Неверный код или срок его действия истёк' : 'Не удалось войти: ' + S.pbErr(e));
       }).finally(function () { btn.disabled = false; });
     },
 
@@ -898,8 +898,8 @@ if (typeof self !== 'undefined') self.S = S;
     },
     tick: function () {
       var now = Date.now();
-      if (!S.pb.authStore.isValid) { this.lock('Sessiya muddati tugadi. Qayta kiring.'); return; }
-      if (now - this.last > IDLE_MS) { this.lock('4 soat davomida faoliyat bo\'lmadi — dastur qulflandi. Qayta kiring.'); return; }
+      if (!S.pb.authStore.isValid) { this.lock('Сессия истекла. Войдите снова.'); return; }
+      if (now - this.last > IDLE_MS) { this.lock('4 часа без активности — программа заблокирована. Войдите снова.'); return; }
       if (now - this.lastRefresh > REFRESH_MS) {
         this.lastRefresh = now;
         S.pb.collection('users').authRefresh().catch(function () { /* next tick decides */ });
@@ -910,7 +910,7 @@ if (typeof self !== 'undefined') self.S = S;
       document.dispatchEvent(new CustomEvent('auth:signedout'));
       this.show(msg);
     },
-    signOut: function () { this.lock('Tizimdan chiqdingiz.'); },
+    signOut: function () { this.lock('Вы вышли из системы.'); },
 
     render: function () {
       var box = document.getElementById('userBox');
@@ -920,8 +920,8 @@ if (typeof self !== 'undefined') self.S = S;
       var label = me.name || me.email;
       var initial = (label.trim().charAt(0) || '?').toUpperCase();
       box.innerHTML = '<span class="who"><span class="av">' + S.esc(initial) + '</span><span id="who">' + S.esc(label) + '</span></span>' +
-        (S.isAdmin() && !/admin\.html$/.test(location.pathname) ? '<a class="btn sm" href="admin.html">Admin</a>' : '') +
-        '<button class="btn sm" id="signOut" title="Tizimdan chiqish">Chiqish</button>';
+        (S.isAdmin() && !/admin\.html$/.test(location.pathname) ? '<a class="btn sm" href="admin.html">Админ</a>' : '') +
+        '<button class="btn sm" id="signOut" title="Выйти из системы">Выйти</button>';
       var self = this;
       document.getElementById('signOut').addEventListener('click', function () { self.signOut(); });
     }
@@ -990,56 +990,56 @@ if (typeof self !== 'undefined') self.S = S;
       var v = function (id) { return $(id).value.trim(); };
       var number = v('aNumber').replace(/\s+/g, '');
       $('appErr').hidden = true;
-      if (!number) { $('appErr').textContent = 'Ariza raqami kerak'; $('appErr').hidden = false; return; }
+      if (!number) { $('appErr').textContent = 'Нужен номер заявки'; $('appErr').hidden = false; return; }
       // Only filled fields go up: the import hook leaves absent fields alone, so
       // re-adding an existing number updates what was typed and keeps the rest.
-      var row = { number: number, raw: { 'Qo\'lda qo\'shdi': (S.me().name || S.me().email) + ', ' + new Date().toLocaleDateString('ru-RU') } };
+      var row = { number: number, raw: { 'Добавил вручную': (S.me().name || S.me().email) + ', ' + new Date().toLocaleDateString('ru-RU') } };
       var put = function (f, id, fn) { var x = v(id); if (x) row[f] = fn ? fn(x) : x; };
       put('status', 'aStatus'); put('org_name', 'aOrg'); put('inn', 'aInn', function (x) { return x.replace(/\s+/g, ''); });
       put('project_title', 'aTitle'); put('object_id', 'aObject'); put('expertise_type', 'aType'); put('buyer_type', 'aBuyer');
       put('place', 'aPlace'); put('executor_name', 'aExec');
       put('registered_at', 'aDate', function (x) { return new Date(x + 'T00:00:00Z').toISOString(); });
       if (v('aCost')) { row.cost_vat = +v('aCost'); row.cost = Math.round(+v('aCost') / 1.12); row.currency = 'Узбекский сум'; }
-      if (!row.status) row.status = 'Qo\'lda qo\'shilgan';
+      if (!row.status) row.status = 'Добавлена вручную';
       if (!row.registered_at) row.registered_at = new Date().toISOString();
       // Same path as the registry upload: contragent by INN, update if the number exists.
       S.pb.send('/api/registry/import', { method: 'POST', body: { rows: [row] } }).then(function (r) {
-        var msg = r.updated ? 'Ariza № ' + number + ' mavjud edi — ma\'lumotlari yangilandi' : 'Ariza № ' + number + ' qo\'shildi';
+        var msg = r.updated ? 'Заявка № ' + number + ' уже была — данные обновлены' : 'Заявка № ' + number + ' добавлена';
         toast(msg);
         self.closeForm();
         if (self.onDone) self.onDone(number, msg);
-      }).catch(function (e) { $('appErr').textContent = 'Saqlab bo\'lmadi: ' + S.pbErr(e); $('appErr').hidden = false; });
+      }).catch(function (e) { $('appErr').textContent = 'Не удалось сохранить: ' + S.pbErr(e); $('appErr').hidden = false; });
     },
 
     /* ------------------------------------------------------- actions */
     /** @param w workspace record; a — its application (for the label) */
     clearWs: function (w, a, onDone) {
-      if (!confirm('Ariza ' + this.label(a) + '\n\nBarcha smeta fayllari, narx tuzatishlari va eksportlar o\'chiriladi. Ish boshidan boshlanadi (viloyat qoladi). Davom etilsinmi?')) return;
+      if (!confirm('Заявка ' + this.label(a) + '\n\nВсе файлы смет, правки цен и экспорты будут удалены. Работа начнётся заново (регион сохранится). Продолжить?')) return;
       var self = this;
       S.pb.send('/api/admin/workspaces/' + w.id + '/clear', { method: 'POST' }).then(function (r) {
-        toast('Tozalandi: ' + self.label(a) + ' · tuzatishlar ' + r.corrections + ', eksportlar ' + r.exports);
+        toast('Очищено: ' + self.label(a) + ' · правок ' + r.corrections + ', экспортов ' + r.exports);
         if (onDone) onDone();
-      }).catch(function (e) { toast('Tozalab bo\'lmadi: ' + S.pbErr(e), true); });
+      }).catch(function (e) { toast('Не удалось очистить: ' + S.pbErr(e), true); });
     },
 
     deleteWs: function (w, a, onDone) {
-      if (!confirm('Ariza ' + this.label(a) + '\n\nIsh maydoni butunlay o\'chiriladi (fayllar, tuzatishlar, eksportlar). Ariza reyestrda qoladi va qayta ochilishi mumkin. Davom etilsinmi?')) return;
+      if (!confirm('Заявка ' + this.label(a) + '\n\nРабочая область будет удалена полностью (файлы, правки, экспорты). Заявка останется в реестре и её можно открыть заново. Продолжить?')) return;
       var self = this;
       S.pb.send('/api/admin/workspaces/' + w.id, { method: 'DELETE' }).then(function () {
-        toast('Ish maydoni o\'chirildi: ' + self.label(a));
+        toast('Рабочая область удалена: ' + self.label(a));
         if (onDone) onDone();
-      }).catch(function (e) { toast('O\'chirib bo\'lmadi: ' + S.pbErr(e), true); });
+      }).catch(function (e) { toast('Не удалось удалить: ' + S.pbErr(e), true); });
     },
 
     deleteApp: function (a, hasWs, onDone) {
-      var msg = 'Ariza ' + this.label(a) + '\n\nReyestrdan o\'chiriladi' +
-        (hasWs ? ', ish maydoni, fayllar, tuzatishlar va eksportlar bilan birga' : '') +
-        '. Keyingi reyestr yuklashda (hisobotda bo\'lsa) qayta paydo bo\'ladi. Davom etilsinmi?';
+      var msg = 'Заявка ' + this.label(a) + '\n\nБудет удалена из реестра' +
+        (hasWs ? ' вместе с рабочей областью, файлами, правками и экспортами' : '') +
+        '. При следующей загрузке реестра (если есть в отчёте) появится снова. Продолжить?';
       if (!confirm(msg)) return;
       S.pb.send('/api/admin/applications/' + a.id, { method: 'DELETE' }).then(function () {
-        toast('Ariza № ' + a.number + ' o\'chirildi');
+        toast('Заявка № ' + a.number + ' удалена');
         if (onDone) onDone();
-      }).catch(function (e) { toast('O\'chirib bo\'lmadi: ' + S.pbErr(e), true); });
+      }).catch(function (e) { toast('Не удалось удалить: ' + S.pbErr(e), true); });
     }
   };
 
@@ -1132,15 +1132,15 @@ if (typeof self !== 'undefined') self.S = S;
         var by = w.expand && w.expand.updated_by;
         return '<tr data-id="' + w.id + '">' +
           '<td class="mono"><b>' + S.esc(a.number || '?') + '</b></td>' +
-          '<td>' + S.esc(org) + (a.inn ? '<br><span class="mute">STIR ' + S.esc(a.inn) + '</span>' : '') + '</td>' +
+          '<td>' + S.esc(org) + (a.inn ? '<br><span class="mute">ИНН ' + S.esc(a.inn) + '</span>' : '') + '</td>' +
           '<td>' + S.esc(S.regionLabel(w.region)) + '</td>' +
-          '<td><span class="ws ' + S.esc(w.status) + '">' + (w.status === 'done' ? 'yakunlangan' : 'ishlanmoqda') + '</span></td>' +
+          '<td><span class="ws ' + S.esc(w.status) + '">' + (w.status === 'done' ? 'завершена' : 'в работе') + '</span></td>' +
           '<td>' + ((w.files || []).length) + '</td>' +
           '<td>' + (w.changed || 0) + '</td>' +
           '<td>' + when(w.updated) + (by ? '<br><span class="mute">' + S.esc(by.name || by.email) + '</span>' : '') + '</td>' +
-          '<td class="act"><button class="btn sm" data-act="clear" title="Fayllar, tuzatishlar va eksportlarni o\'chirib, boshidan boshlash">Tozalash</button>' +
-          '<button class="btn sm danger" data-act="delete" title="Ish maydonini butunlay o\'chirish">✕ O\'chirish</button></td></tr>';
-      }).join('') || '<tr><td colspan="8" class="mute">Hali hech kim ariza ochmagan</td></tr>';
+          '<td class="act"><button class="btn sm" data-act="clear" title="Удалить файлы, правки и экспорты, начать заново">Очистить</button>' +
+          '<button class="btn sm danger" data-act="delete" title="Удалить рабочую область полностью">✕ Удалить</button></td></tr>';
+      }).join('') || '<tr><td colspan="8" class="mute">Никто ещё не открывал заявки</td></tr>';
       $('wsCount').textContent = shown + ' / ' + this.wsItems.length;
       tb.querySelectorAll('button[data-act]').forEach(function (b) {
         b.addEventListener('click', function () {
@@ -1162,7 +1162,7 @@ if (typeof self !== 'undefined') self.S = S;
       var tb = $('findTable').querySelector('tbody');
       if (!q) { $('findTable').hidden = true; return; }
       $('findTable').hidden = false;
-      tb.innerHTML = '<tr><td colspan="6" class="mute">qidirilmoqda…</td></tr>';
+      tb.innerHTML = '<tr><td colspan="6" class="mute">поиск…</td></tr>';
       Promise.all([
         S.pb.collection('applications').getList(1, 20, {
           filter: S.pb.filter('number ~ {:q} || org_name ~ {:q} || inn ~ {:q}', { q: q }), sort: '-registered_at', expand: 'contragent'
@@ -1176,11 +1176,11 @@ if (typeof self !== 'undefined') self.S = S;
           return '<tr data-id="' + a.id + '">' +
             '<td class="mono"><b>' + S.esc(a.number) + '</b></td>' +
             '<td>' + (a.registered_at ? when(a.registered_at).split(' ')[0] : '') + '</td>' +
-            '<td>' + S.esc(c ? c.name : a.org_name) + (a.inn ? '<br><span class="mute">STIR ' + S.esc(a.inn) + '</span>' : '') + '</td>' +
+            '<td>' + S.esc(c ? c.name : a.org_name) + (a.inn ? '<br><span class="mute">ИНН ' + S.esc(a.inn) + '</span>' : '') + '</td>' +
             '<td>' + S.esc(a.project_title || '') + '</td>' +
-            '<td>' + (w ? '<span class="ws ' + S.esc(w.status) + '">' + (w.status === 'done' ? 'yakunlangan' : 'ishlanmoqda') + '</span>' : '<span class="mute">—</span>') + '</td>' +
-            '<td class="act"><button class="btn sm danger" data-act="delapp">✕ O\'chirish</button></td></tr>';
-        }).join('') || '<tr><td colspan="6" class="mute">Topilmadi</td></tr>';
+            '<td>' + (w ? '<span class="ws ' + S.esc(w.status) + '">' + (w.status === 'done' ? 'завершена' : 'в работе') + '</span>' : '<span class="mute">—</span>') + '</td>' +
+            '<td class="act"><button class="btn sm danger" data-act="delapp">✕ Удалить</button></td></tr>';
+        }).join('') || '<tr><td colspan="6" class="mute">Не найдено</td></tr>';
         tb.querySelectorAll('button[data-act=delapp]').forEach(function (b) {
           b.addEventListener('click', function () {
             var id = b.closest('tr').dataset.id;
@@ -1207,15 +1207,15 @@ if (typeof self !== 'undefined') self.S = S;
       var self = this;
       $('regErr').hidden = true;
       $('regStat').textContent = '';
-      this.progress(0, 1, 'Fayl o\'qilmoqda…');
+      this.progress(0, 1, 'Чтение файла…');
       var reader = new FileReader();
       reader.onload = function () {
         var parsed;
         try { parsed = S.parseRegistry(reader.result); }
-        catch (e) { self.fail('Faylni o\'qib bo\'lmadi: ' + (e.message || e)); return; }
-        self.send(parsed.rows, file).catch(function (e) { self.fail('Import xatosi: ' + S.pbErr(e)); });
+        catch (e) { self.fail('Не удалось прочитать файл: ' + (e.message || e)); return; }
+        self.send(parsed.rows, file).catch(function (e) { self.fail('Ошибка импорта: ' + S.pbErr(e)); });
       };
-      reader.onerror = function () { self.fail('Faylni o\'qib bo\'lmadi'); };
+      reader.onerror = function () { self.fail('Не удалось прочитать файл'); };
       reader.readAsArrayBuffer(file);
     },
 
@@ -1234,7 +1234,7 @@ if (typeof self !== 'undefined') self.S = S;
         return S.pb.send('/api/registry/import', { method: 'POST', body: { rows: part } }).then(function (r) {
           total.added += r.added; total.updated += r.updated; total.contragents += r.contragents;
           i += part.length;
-          self.progress(i, rows.length, i + ' / ' + rows.length + ' qator');
+          self.progress(i, rows.length, i + ' / ' + rows.length + ' строк');
           return step();
         });
       }
@@ -1248,9 +1248,9 @@ if (typeof self !== 'undefined') self.S = S;
         return S.pb.collection('registry_imports').create(fd);
       }).then(function () {
         $('regProgress').hidden = true;
-        $('regStat').textContent = rows.length + ' qator o\'qildi · qo\'shildi ' + total.added +
-          ' · yangilandi ' + total.updated + ' · yangi kontragentlar ' + total.contragents;
-        toast('Reyestr yangilandi');
+        $('regStat').textContent = 'Прочитано ' + rows.length + ' строк · добавлено ' + total.added +
+          ' · обновлено ' + total.updated + ' · новых контрагентов ' + total.contragents;
+        toast('Реестр обновлён');
         self.loadHistory();
       });
     },
@@ -1264,7 +1264,7 @@ if (typeof self !== 'undefined') self.S = S;
           return '<tr><td>' + when(x.created) + '</td><td>' + S.esc(by ? (by.name || by.email) : '') +
             '</td><td>' + (x.rows || 0) + '</td><td>' + (x.rows_added || 0) + '</td><td>' + (x.rows_updated || 0) +
             '</td><td>' + (url ? '<a href="' + url + '">' + S.esc(x.file) + '</a>' : '') + '</td></tr>';
-        }).join('') || '<tr><td colspan="6" class="mute">Hali yuklanmagan</td></tr>';
+        }).join('') || '<tr><td colspan="6" class="mute">Загрузок ещё не было</td></tr>';
       }).catch(function (e) { toast(S.pbErr(e), true); });
     },
 
@@ -1275,8 +1275,8 @@ if (typeof self !== 'undefined') self.S = S;
       S.pb.collection('users').getFullList({ sort: 'name' }).then(function (items) {
         tb.innerHTML = items.map(function (u) {
           return '<tr data-id="' + u.id + '"><td>' + S.esc(u.email) + '</td><td>' + S.esc(u.name || '') +
-            '</td><td>' + S.esc(u.role || '') + '</td><td>' + (u.active ? 'faol' : '<span class="mute">o\'chirilgan</span>') +
-            '</td><td class="act"><button class="btn sm ' + (u.active ? 'danger' : 'ok') + '" data-act="toggle">' + (u.active ? 'O\'chirish' : 'Yoqish') + '</button></td></tr>';
+            '</td><td>' + S.esc(u.role || '') + '</td><td>' + (u.active ? 'активен' : '<span class="mute">отключён</span>') +
+            '</td><td class="act"><button class="btn sm ' + (u.active ? 'danger' : 'ok') + '" data-act="toggle">' + (u.active ? 'Отключить' : 'Включить') + '</button></td></tr>';
         }).join('');
         tb.querySelectorAll('button[data-act=toggle]').forEach(function (b) {
           b.addEventListener('click', function () {
@@ -1301,10 +1301,10 @@ if (typeof self !== 'undefined') self.S = S;
         password: pw, passwordConfirm: pw
       }).then(function () {
         $('uEmail').value = ''; $('uName').value = '';
-        toast(email + ' qo\'shildi');
+        toast(email + ' добавлен');
         self.loadUsers();
       }).catch(function (e) {
-        $('userErr').textContent = 'Qo\'shib bo\'lmadi: ' + S.pbErr(e); $('userErr').hidden = false;
+        $('userErr').textContent = 'Не удалось добавить: ' + S.pbErr(e); $('userErr').hidden = false;
       });
     }
   };

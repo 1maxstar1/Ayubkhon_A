@@ -10,14 +10,14 @@
 
   var COLS = [
     { k: 'n', w: 46, cls: 'mid', h: '№' },
-    { k: 'name', w: 0, h: 'Resurs nomi' },
-    { k: 'unit', w: 70, cls: 'mid', h: "O'lch." },
-    { k: 'count', w: 54, cls: 'num', h: 'Soni' },
-    { k: 'qty', w: 100, cls: 'num', h: 'Jami kol-vo' },
-    { k: 'price', w: 126, cls: 'num', h: 'Smeta narxi' },
-    { k: 'market', w: 126, cls: 'num', h: 'Bozor narxi' },
-    { k: 'delta', w: 88, cls: 'num', h: 'Farq, %' },
-    { k: 'econ', w: 138, cls: 'num', h: 'Farq, so\'m' }
+    { k: 'name', w: 0, h: 'Наименование ресурса' },
+    { k: 'unit', w: 70, cls: 'mid', h: 'Ед. изм.' },
+    { k: 'count', w: 54, cls: 'num', h: 'Повторов' },
+    { k: 'qty', w: 100, cls: 'num', h: 'Общее кол-во' },
+    { k: 'price', w: 126, cls: 'num', h: 'Цена по смете' },
+    { k: 'market', w: 126, cls: 'num', h: 'Рыночная цена' },
+    { k: 'delta', w: 88, cls: 'num', h: 'Разница, %' },
+    { k: 'econ', w: 138, cls: 'num', h: 'Разница, сум' }
   ];
 
   /**
@@ -104,22 +104,22 @@
     document.getElementById('sort').addEventListener('change', function () { self.apply(); });
 
     document.getElementById('pctBtn').addEventListener('click', function () {
-      var raw = prompt('Ko\'rinib turgan ' + self.view.length +
-        ' ta resursga foiz qo\'llansinmi?\nMasalan: -10  (smeta narxidan 10% past)', '-10');
+      var raw = prompt('Применить процент к ' + self.view.length +
+        ' видимым ресурсам?\nНапример: -10  (на 10% ниже сметной цены)', '-10');
       if (raw == null) return;
       var pct = S.num(raw);
-      if (pct == null) { self.app.toast('Foiz noto\'g\'ri kiritildi', true); return; }
+      if (pct == null) { self.app.toast('Процент введён неверно', true); return; }
       var map = {};
       self.view.forEach(function (r) { map[r.key] = Math.round(r.price * (1 + pct / 100)); });
       self.app.setPrices(map);
-      self.app.toast(self.view.length + ' ta resurs narxi ' + pct + '% ga o\'zgartirildi');
+      self.app.toast('Цены ' + self.view.length + ' ресурсов изменены на ' + pct + '%');
     });
 
     document.getElementById('resetBtn').addEventListener('click', function () {
       var map = {};
       self.view.forEach(function (r) { map[r.key] = r.price; });
       self.app.setPrices(map);
-      self.app.toast(self.view.length + ' ta resurs smeta narxiga qaytarildi');
+      self.app.toast(self.view.length + ' ресурсов возвращены к сметной цене');
     });
   };
 
@@ -191,8 +191,8 @@
     var changed = m ? m.resources.filter(isChanged).length : 0;
     var hinted = m && S.Hints ? m.resources.filter(function (r) { return S.Hints.has(r.nk); }).length : 0;
     document.getElementById('priceCount').textContent =
-      this.view.length + ' / ' + total + ' resurs · ' + changed + ' tasi o\'zgartirilgan' +
-      (hinted ? ' · ' + hinted + ' tasiga eslatma bor' : '');
+      this.view.length + ' / ' + total + ' ресурсов · изменено ' + changed +
+      (hinted ? ' · с подсказками ' + hinted : '');
   };
 
   Prices.prototype.renderRange = function (from, to) {
@@ -205,7 +205,7 @@
       var e = econOf(r);
       var many = r.variants > 1;
       var multi = many ? '<button class="tagm" data-nm="' + S.esc(r.name) + '" title="' +
-        S.esc(multiHint(r)) + '">' + r.variants + ' xil narx</button>' : '';
+        S.esc(multiHint(r)) + '">' + r.variants + ' цены</button>' : '';
       var hint = S.Hints ? S.Hints.tag(r) : '';
       out.push(
         '<div class="vrow' + (changed ? ' chg' : '') + (many ? ' many' : '') + '">' +
@@ -228,9 +228,9 @@
   };
 
   function multiHint(r) {
-    return 'Bu nom smetalarda ' + r.variants + ' xil narx bilan uchraydi: ' +
+    return 'Это название встречается в сметах с ' + r.variants + ' разными ценами: ' +
       r.siblings.map(function (p) { return S.price(p); }).join('  ·  ') +
-      '. Har biri alohida qator — bosing, hammasi bir joyda ko\'rinadi.';
+      '. Каждая — отдельная строка; нажмите, чтобы увидеть все вместе.';
   }
 
   function fmtIn(v) {

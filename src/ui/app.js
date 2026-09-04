@@ -114,7 +114,7 @@
       self.opts.mode = this.value;
       self.saveOpts();
       self.buildReportPreview();
-      self.toast('Hisobot varaqlari: ' + modeLabel() + '. Excel faylga ham shu tegishli.');
+      self.toast('Листы отчёта: ' + modeLabel() + '. То же относится к файлу Excel.');
     });
 
     bindOpt(this, 'optStamp', 'stamp');
@@ -264,8 +264,8 @@
   App.prototype.addFiles = function (files) {
     var self = this;
     files = files.filter(function (f) { return /\.xlsx?$|\.xlsm$/i.test(f.name); });
-    if (!files.length) { this.toast('Faqat .xlsx fayllar qabul qilinadi', true); return; }
-    this.busy(true, files.length + ' ta fayl o\'qilmoqda…');
+    if (!files.length) { this.toast('Принимаются только файлы .xlsx', true); return; }
+    this.busy(true, 'Чтение файлов: ' + files.length + '…');
     // Files finish parsing in whatever order the worker gets to them, so each
     // one keeps the slot it was picked in; the projects are appended in that
     // order once the whole batch is in. Order matters — it decides the column A
@@ -302,7 +302,7 @@
         }
       }
     };
-    reader.onerror = function () { self.onParsed(file.name, { ok: false, error: 'Faylni o\'qib bo\'lmadi' }, slot); };
+    reader.onerror = function () { self.onParsed(file.name, { ok: false, error: 'Не удалось прочитать файл' }, slot); };
     reader.readAsArrayBuffer(file);
   };
 
@@ -312,9 +312,9 @@
     if (!res.ok) {
       this.toast(name + ': ' + res.error, true);
     } else if (!res.objects.length) {
-      this.toast(name + ': resurs varaqlari topilmadi. Varaqda «НАИМЕНОВАНИЕ · КОЛ-ВО · ' +
-        'ЦЕНА · СУММА» sarlavhali qator, yoki «ЗАТРАТЫ ТРУДА / МАШИНЫ / МАТЕРИАЛЫ / ' +
-        'ОБОРУДОВАНИЕ» bo\'limlaridan bittasi bo\'lishi kerak.', true);
+      this.toast(name + ': листы ресурсов не найдены. На листе нужна строка заголовков «НАИМЕНОВАНИЕ · КОЛ-ВО · ' +
+        'ЦЕНА · СУММА» или хотя бы один из разделов «ЗАТРАТЫ ТРУДА / МАШИНЫ / МАТЕРИАЛЫ / ' +
+        'ОБОРУДОВАНИЕ».', true);
     } else {
       var title = res.objects[0].title || name.replace(/\.[^.]+$/, '');
       if (entry) {
@@ -328,7 +328,7 @@
           open: true
         };
       }
-      this.toast(name + ': ' + res.objects.length + ' ta obyekt varaqi topildi');
+      this.toast(name + ': найдено листов объектов: ' + res.objects.length);
     }
     if (this.pending <= 0) {
       var self = this;
@@ -347,7 +347,7 @@
   /** A sheet tab name has to be short and unique; keep it human. */
   function shortTab(base, existing) {
     var words = base.replace(/[_\d]+/g, ' ').split(/\s+/).filter(function (w) { return w.length > 2; });
-    var n = (words[0] || base).slice(0, 20) || 'Loyiha';
+    var n = (words[0] || base).slice(0, 20) || 'Проект';
     var i = 2, out = n;
     while (existing.some(function (p) { return p.name === out; })) out = n + ' ' + (i++);
     return out;
@@ -369,15 +369,15 @@
       var on = p.objects.filter(function (o) { return o.enabled !== false; }).length;
       return '<div class="proj" data-p="' + pi + '">' +
         '<header>' +
-        '<input type="checkbox" ' + (p.enabled ? 'checked' : '') + ' data-act="proj-on" title="Loyihani qo\'shish">' +
-        '<input class="tab-name" data-act="tab" value="' + S.esc(p.name) + '" title="Excel varaq nomi">' +
+        '<input type="checkbox" ' + (p.enabled ? 'checked' : '') + ' data-act="proj-on" title="Включить проект">' +
+        '<input class="tab-name" data-act="tab" value="' + S.esc(p.name) + '" title="Имя листа Excel">' +
         range(p, 'Лист1 A ustuni') +
-        '<button class="link" data-act="pup" title="Yuqoriga — A ustuni raqamlari o\'zgaradi">▲</button>' +
-        '<button class="link" data-act="pdown" title="Pastga">▼</button>' +
-        '<button class="link" data-act="del" title="Olib tashlash">×</button>' +
+        '<button class="link" data-act="pup" title="Выше — номера в столбце A изменятся">▲</button>' +
+        '<button class="link" data-act="pdown" title="Ниже">▼</button>' +
+        '<button class="link" data-act="del" title="Убрать">×</button>' +
         '</header>' +
-        '<div class="meta">' + S.esc(p.file) + ' · ' + on + '/' + p.objects.length + ' varaq' +
-        '<textarea data-act="intro" rows="3" title="Hisobot sarlavhasi ostidagi matn">' + S.esc(p.intro) + '</textarea>' +
+        '<div class="meta">' + S.esc(p.file) + ' · ' + on + '/' + p.objects.length + ' листов' +
+        '<textarea data-act="intro" rows="3" title="Текст под заголовком отчёта">' + S.esc(p.intro) + '</textarea>' +
         '</div>' +
         '<ul class="objs">' + p.objects.map(function (o, oi) {
           return '<li class="' + (o.enabled === false ? 'off' : '') + '" data-o="' + oi + '">' +
@@ -385,8 +385,8 @@
             '<span class="nm" title="' + S.esc(o.subtitle) + '">' + S.esc(o.subtitle) + '</span>' +
             '<small>' + o.items + '</small>' +
             range(o, 'Лист1 A ustuni') +
-            '<button class="mv" data-act="up" title="Yuqoriga">▲</button>' +
-            '<button class="mv" data-act="down" title="Pastga">▼</button>' +
+            '<button class="mv" data-act="up" title="Выше">▲</button>' +
+            '<button class="mv" data-act="down" title="Ниже">▼</button>' +
             '</li>';
         }).join('') + '</ul></div>';
     }).join('');
@@ -459,7 +459,7 @@
     this.ledger();
     this._buildMs = Math.round(performance.now() - t0);
     document.getElementById('sheetCount').textContent =
-      this.sheetView.length + ' qator · ' + this._buildMs + ' ms';
+      this.sheetView.length + ' строк · ' + this._buildMs + ' мс';
   };
 
   /**
@@ -548,7 +548,7 @@
     var el = document.getElementById('ledger');
     var m = this.model;
     if (!m || !m.resources.length) {
-      el.innerHTML = '<span class="empty">Smeta fayllarini qo\'shing — .xlsx fayllarni oynaga tashlash ham mumkin.</span>';
+      el.innerHTML = '<span class="empty">Добавьте файлы смет — можно перетащить .xlsx в окно.</span>';
       return;
     }
     // Both sides are summed row by row: a resource can carry several smeta
@@ -563,12 +563,12 @@
     var diff = smeta - market;
     var pct = smeta ? diff / smeta * 100 : 0;
     el.innerHTML =
-      block('Loyihalar', m.spans.length) +
-      block('Qatorlar', S.money(m.rows.length)) +
-      block('Resurslar', S.money(m.resources.length) + ' · ' + changed + ' o\'zgargan') +
-      block('Smeta bo\'yicha', S.money(smeta) + ' so\'m') +
-      block('Bozor bo\'yicha', S.money(market) + ' so\'m') +
-      block('Farq', S.money(diff) + ' so\'m  (' + pct.toFixed(2) + '%)', diff > 0 ? 'good' : diff < 0 ? 'bad' : '');
+      block('Проектов', m.spans.length) +
+      block('Строк', S.money(m.rows.length)) +
+      block('Ресурсов', S.money(m.resources.length) + ' · изменено ' + changed) +
+      block('По смете', S.money(smeta) + ' сум') +
+      block('По рынку', S.money(market) + ' сум') +
+      block('Разница', S.money(diff) + ' сум  (' + pct.toFixed(2) + '%)', diff > 0 ? 'good' : diff < 0 ? 'bad' : '');
   };
 
   function block(k, v, cls) {
@@ -586,18 +586,18 @@
     { w: 0, h: 'НАИМЕНОВАНИЕ' },
     { w: 74, cls: 'mid', h: 'ЕД.ИЗМ.' },
     { w: 96, cls: 'num', h: 'КОЛ-ВО' },
-    { w: 106, cls: 'num', h: 'Смета цена' },
-    { w: 128, cls: 'num', h: 'Смета сумма' },
-    { w: 106, cls: 'num', h: 'Бозор цена' },
-    { w: 128, cls: 'num', h: 'Бозор сумма' },
-    { w: 118, cls: 'num', h: 'Фарқ' }
+    { w: 106, cls: 'num', h: 'Цена по смете' },
+    { w: 128, cls: 'num', h: 'Сумма по смете' },
+    { w: 106, cls: 'num', h: 'Рыночная цена' },
+    { w: 128, cls: 'num', h: 'Рыночная сумма' },
+    { w: 118, cls: 'num', h: 'Разница' }
   ];
 
   function w(c) { return c.w ? 'flex:0 0 ' + c.w + 'px' : 'flex:1 1 auto;min-width:240px'; }
 
   App.prototype.fillJump = function () {
     var sel = document.getElementById('jump');
-    var opts = ['<option value="-1">Blokka o\'tish…</option>'];
+    var opts = ['<option value="-1">Перейти к блоку…</option>'];
     var owner = this.rowOwner || [];
     (this.sheetRows || []).forEach(function (r, i) {
       if (r.kind !== 'title' && r.kind !== 'object') return;
@@ -621,14 +621,14 @@
       return r.nm && S.nameKey(r.nm).indexOf(q) >= 0;
     });
     this.sheetList.setCount(this.sheetView.length);
-    document.getElementById('sheetCount').textContent = this.sheetView.length + ' qator';
+    document.getElementById('sheetCount').textContent = this.sheetView.length + ' строк';
   };
 
   App.prototype.renderSheet = function (from, to) {
     if (!this._sheetHead) {
       document.getElementById('sheetHead').innerHTML = [IDX_COL].concat(SHEET_COLS).map(function (c) {
         return '<div class="c' + (c.cls ? ' ' + c.cls : '') + '" style="' + w(c) +
-          '"' + (c === IDX_COL ? ' title="Лист1 A ustuni — umumiy qator raqami"' : '') + '>' +
+          '"' + (c === IDX_COL ? ' title="Столбец A «Лист1» — сквозной номер строки"' : '') + '>' +
           S.esc(c.h) + '</div>';
       }).join('');
       this._sheetHead = true;
@@ -725,7 +725,7 @@
 
   App.prototype.buildReportPreview = function () {
     document.getElementById('modeHint').textContent =
-      'Rejim: ' + modeLabel() + ' — yuqoridan o\'zgartiriladi, Excel faylga ham shu tushadi';
+      'Режим: ' + modeLabel() + ' — меняется вверху, в файл Excel попадает то же';
     var i = +document.getElementById('reportProject').value;
     if (!this.model || !this.model.spans[i]) {
       this.reportRows = [];
@@ -739,7 +739,7 @@
     this.reportList.setCount(rep.rows.length);
     var items = rep.rows.filter(function (r) { return r.kind === 'item'; }).length;
     document.getElementById('reportCount').textContent =
-      rep.rows.length + ' qator · ' + items + ' resurs · ' + Math.round(performance.now() - t0) + ' ms';
+      rep.rows.length + ' строк · ' + items + ' ресурсов · ' + Math.round(performance.now() - t0) + ' мс';
   };
 
   App.prototype.renderReport = function (from, to) {
@@ -763,16 +763,16 @@
   App.prototype.exportWorkbook = function () {
     if (!this.model) return;
     var self = this;
-    this.busy(true, 'Excel fayl tayyorlanmoqda…');
+    this.busy(true, 'Подготовка файла Excel…');
     setTimeout(function () {
       try {
         var t0 = performance.now();
         var bytes = S.buildWorkbook(self.model, self.reportOpts());
         download(bytes, fileName(self));
-        self.toast('Fayl tayyor · ' + modeLabel() + ' · ' +
+        self.toast('Файл готов · ' + modeLabel() + ' · ' +
           (bytes.length / 1024 / 1024).toFixed(1) + ' MB · ' + Math.round(performance.now() - t0) + ' ms');
       } catch (e) {
-        self.toast('Eksport xatosi: ' + (e.message || e), true);
+        self.toast('Ошибка экспорта: ' + (e.message || e), true);
       } finally {
         self.busy(false);
       }
@@ -799,7 +799,7 @@
   }
 
   App.prototype.savePriceBook = function () {
-    if (!this.model) { this.toast('Avval smeta fayllarini qo\'shing', true); return; }
+    if (!this.model) { this.toast('Сначала добавьте файлы смет', true); return; }
     var self = this;
     var book = this.model.resources
       .filter(function (r) { return !S.near(r.price, r.market); })
@@ -807,14 +807,14 @@
         // `smeta` identifies which priced line this belongs to when reloaded.
         return { name: r.name, unit: r.unit, price: r.market, smeta: r.price, note: self.opts.noteText };
       });
-    if (!book.length) { this.toast('Hali birorta narx o\'zgartirilmagan', true); return; }
+    if (!book.length) { this.toast('Ни одна цена ещё не изменена', true); return; }
     var blob = new Blob([JSON.stringify(book, null, 1)], { type: 'application/json' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url; a.download = 'narx_kitobi.json';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
-    this.toast(book.length + ' ta narx saqlandi');
+    this.toast('Сохранено цен: ' + book.length);
   };
 
   App.prototype.loadPriceBook = function (file) {
@@ -826,10 +826,10 @@
       try {
         entries = isJson ? JSON.parse(reader.result) : bookFromXlsx(new Uint8Array(reader.result));
       } catch (e) {
-        self.toast('Narx kitobini o\'qib bo\'lmadi: ' + (e.message || e), true);
+        self.toast('Не удалось прочитать книгу цен: ' + (e.message || e), true);
         return;
       }
-      if (!Array.isArray(entries)) { self.toast('Narx kitobi ro\'yxat ko\'rinishida bo\'lishi kerak', true); return; }
+      if (!Array.isArray(entries)) { self.toast('Книга цен должна быть списком', true); return; }
       // An entry that records the smeta price it was taken from lands on exactly
       // that line; an older book without one is applied to every priced variant
       // of the name.
@@ -849,7 +849,7 @@
       self.prices_ui.apply();
       self.ledger();
       self.sheetList.refresh();
-      self.toast(n + ' ta narx yuklandi');
+      self.toast('Загружено цен: ' + n);
     };
     if (isJson) reader.readAsText(file); else reader.readAsArrayBuffer(file);
   };
@@ -883,7 +883,7 @@
       }
       if (out.length) return out;
     }
-    throw new Error('narx ustunlari topilmadi');
+    throw new Error('столбцы цен не найдены');
   }
 
   document.addEventListener('DOMContentLoaded', function () { window.app = new App(); });

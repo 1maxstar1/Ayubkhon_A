@@ -55,56 +55,56 @@
       var v = function (id) { return $(id).value.trim(); };
       var number = v('aNumber').replace(/\s+/g, '');
       $('appErr').hidden = true;
-      if (!number) { $('appErr').textContent = 'Ariza raqami kerak'; $('appErr').hidden = false; return; }
+      if (!number) { $('appErr').textContent = 'Нужен номер заявки'; $('appErr').hidden = false; return; }
       // Only filled fields go up: the import hook leaves absent fields alone, so
       // re-adding an existing number updates what was typed and keeps the rest.
-      var row = { number: number, raw: { 'Qo\'lda qo\'shdi': (S.me().name || S.me().email) + ', ' + new Date().toLocaleDateString('ru-RU') } };
+      var row = { number: number, raw: { 'Добавил вручную': (S.me().name || S.me().email) + ', ' + new Date().toLocaleDateString('ru-RU') } };
       var put = function (f, id, fn) { var x = v(id); if (x) row[f] = fn ? fn(x) : x; };
       put('status', 'aStatus'); put('org_name', 'aOrg'); put('inn', 'aInn', function (x) { return x.replace(/\s+/g, ''); });
       put('project_title', 'aTitle'); put('object_id', 'aObject'); put('expertise_type', 'aType'); put('buyer_type', 'aBuyer');
       put('place', 'aPlace'); put('executor_name', 'aExec');
       put('registered_at', 'aDate', function (x) { return new Date(x + 'T00:00:00Z').toISOString(); });
       if (v('aCost')) { row.cost_vat = +v('aCost'); row.cost = Math.round(+v('aCost') / 1.12); row.currency = 'Узбекский сум'; }
-      if (!row.status) row.status = 'Qo\'lda qo\'shilgan';
+      if (!row.status) row.status = 'Добавлена вручную';
       if (!row.registered_at) row.registered_at = new Date().toISOString();
       // Same path as the registry upload: contragent by INN, update if the number exists.
       S.pb.send('/api/registry/import', { method: 'POST', body: { rows: [row] } }).then(function (r) {
-        var msg = r.updated ? 'Ariza № ' + number + ' mavjud edi — ma\'lumotlari yangilandi' : 'Ariza № ' + number + ' qo\'shildi';
+        var msg = r.updated ? 'Заявка № ' + number + ' уже была — данные обновлены' : 'Заявка № ' + number + ' добавлена';
         toast(msg);
         self.closeForm();
         if (self.onDone) self.onDone(number, msg);
-      }).catch(function (e) { $('appErr').textContent = 'Saqlab bo\'lmadi: ' + S.pbErr(e); $('appErr').hidden = false; });
+      }).catch(function (e) { $('appErr').textContent = 'Не удалось сохранить: ' + S.pbErr(e); $('appErr').hidden = false; });
     },
 
     /* ------------------------------------------------------- actions */
     /** @param w workspace record; a — its application (for the label) */
     clearWs: function (w, a, onDone) {
-      if (!confirm('Ariza ' + this.label(a) + '\n\nBarcha smeta fayllari, narx tuzatishlari va eksportlar o\'chiriladi. Ish boshidan boshlanadi (viloyat qoladi). Davom etilsinmi?')) return;
+      if (!confirm('Заявка ' + this.label(a) + '\n\nВсе файлы смет, правки цен и экспорты будут удалены. Работа начнётся заново (регион сохранится). Продолжить?')) return;
       var self = this;
       S.pb.send('/api/admin/workspaces/' + w.id + '/clear', { method: 'POST' }).then(function (r) {
-        toast('Tozalandi: ' + self.label(a) + ' · tuzatishlar ' + r.corrections + ', eksportlar ' + r.exports);
+        toast('Очищено: ' + self.label(a) + ' · правок ' + r.corrections + ', экспортов ' + r.exports);
         if (onDone) onDone();
-      }).catch(function (e) { toast('Tozalab bo\'lmadi: ' + S.pbErr(e), true); });
+      }).catch(function (e) { toast('Не удалось очистить: ' + S.pbErr(e), true); });
     },
 
     deleteWs: function (w, a, onDone) {
-      if (!confirm('Ariza ' + this.label(a) + '\n\nIsh maydoni butunlay o\'chiriladi (fayllar, tuzatishlar, eksportlar). Ariza reyestrda qoladi va qayta ochilishi mumkin. Davom etilsinmi?')) return;
+      if (!confirm('Заявка ' + this.label(a) + '\n\nРабочая область будет удалена полностью (файлы, правки, экспорты). Заявка останется в реестре и её можно открыть заново. Продолжить?')) return;
       var self = this;
       S.pb.send('/api/admin/workspaces/' + w.id, { method: 'DELETE' }).then(function () {
-        toast('Ish maydoni o\'chirildi: ' + self.label(a));
+        toast('Рабочая область удалена: ' + self.label(a));
         if (onDone) onDone();
-      }).catch(function (e) { toast('O\'chirib bo\'lmadi: ' + S.pbErr(e), true); });
+      }).catch(function (e) { toast('Не удалось удалить: ' + S.pbErr(e), true); });
     },
 
     deleteApp: function (a, hasWs, onDone) {
-      var msg = 'Ariza ' + this.label(a) + '\n\nReyestrdan o\'chiriladi' +
-        (hasWs ? ', ish maydoni, fayllar, tuzatishlar va eksportlar bilan birga' : '') +
-        '. Keyingi reyestr yuklashda (hisobotda bo\'lsa) qayta paydo bo\'ladi. Davom etilsinmi?';
+      var msg = 'Заявка ' + this.label(a) + '\n\nБудет удалена из реестра' +
+        (hasWs ? ' вместе с рабочей областью, файлами, правками и экспортами' : '') +
+        '. При следующей загрузке реестра (если есть в отчёте) появится снова. Продолжить?';
       if (!confirm(msg)) return;
       S.pb.send('/api/admin/applications/' + a.id, { method: 'DELETE' }).then(function () {
-        toast('Ariza № ' + a.number + ' o\'chirildi');
+        toast('Заявка № ' + a.number + ' удалена');
         if (onDone) onDone();
-      }).catch(function (e) { toast('O\'chirib bo\'lmadi: ' + S.pbErr(e), true); });
+      }).catch(function (e) { toast('Не удалось удалить: ' + S.pbErr(e), true); });
     }
   };
 

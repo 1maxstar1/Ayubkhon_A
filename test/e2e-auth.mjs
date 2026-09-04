@@ -43,7 +43,7 @@ const code = readFileSync(join(root, 'server/pb_data_test/dev-otp.txt'), 'utf8')
 await page.fill('#loginCode', '00000000');
 await page.click('#loginBtn');
 await page.waitForSelector('#loginErr:not([hidden])');
-check((await page.textContent('#loginErr')).includes('noto\'g\'ri'), 'wrong code is rejected with a message');
+check((await page.textContent('#loginErr')).includes('Неверный'), 'wrong code is rejected with a message');
 await page.fill('#loginCode', code);
 await page.click('#loginBtn');
 await page.waitForSelector('#who', { timeout: 10000 });
@@ -58,7 +58,7 @@ check(await page.isHidden('#screen-login'), 'session survives a reload');
 // simulate four hours of inactivity
 await page.evaluate(() => { S.Auth.last = Date.now() - 5 * 3600 * 1000; S.Auth.tick(); });
 await page.waitForSelector('#screen-login:not([hidden])');
-check((await page.textContent('#loginMsg')).includes('4 soat'), 'idle lock shows the four-hour message');
+check((await page.textContent('#loginMsg')).includes('4 часа'), 'idle lock shows the four-hour message');
 check(await page.evaluate(() => !S.pb.authStore.isValid), 'token cleared on lock');
 await page.reload();
 check(await page.isVisible('#screen-login'), 'locked session stays locked after reload');

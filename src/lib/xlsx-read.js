@@ -152,7 +152,7 @@
     });
 
     var wbXml = files['xl/workbook.xml'];
-    if (!wbXml) throw new Error('xl/workbook.xml topilmadi — bu .xlsx fayl emas.');
+    if (!wbXml) throw new Error('xl/workbook.xml не найден — это не файл .xlsx.');
     wbXml = decodeText(wbXml);
 
     var rels = {};

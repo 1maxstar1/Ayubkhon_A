@@ -280,12 +280,12 @@
    */
   function contents(model, opts) {
     var rows = [
-      { kind: 'bigtitle', ht: 20.25, cells: cell(1, opts.contentsTitle || 'MUNDARIJA — «Лист1» qator raqamlari') },
+      { kind: 'bigtitle', ht: 20.25, cells: cell(1, opts.contentsTitle || 'ОГЛАВЛЕНИЕ — номера строк «Лист1»') },
       { kind: 'blank', cells: {} }
     ];
     var head = {};
-    ['№', 'Loyiha', "Obyekt / ko'cha", 'A ustuni: dan', 'gacha', 'Qatorlar',
-     'Resurs qatorlari', 'Smeta summasi', 'Bozor summasi', 'Farq']
+    ['№', 'Проект', 'Объект / улица', 'Столбец A: с', 'по', 'Строк',
+     'Строк ресурсов', 'Сумма по смете', 'Сумма по рынку', 'Разница']
       .forEach(function (h, i) { head[i + 1] = { v: h }; });
     rows.push({ kind: 'header', ht: 25.5, cells: head });
 

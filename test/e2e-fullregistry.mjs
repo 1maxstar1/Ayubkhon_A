@@ -51,19 +51,19 @@ await page.goto(BASE + '/admin.html');
 await signIn('boss@example.com');
 let t0 = Date.now();
 await page.setInputFiles('#regFile', file);
-await page.waitForFunction(() => document.getElementById('regStat').textContent.includes('qator') || !document.getElementById('regErr').hidden, null, { timeout: 15 * 60000 });
+await page.waitForFunction(() => document.getElementById('regStat').textContent.includes('строк') || !document.getElementById('regErr').hidden, null, { timeout: 15 * 60000 });
 const stat = await page.textContent('#regStat');
 const err = await page.textContent('#regErr');
 console.log(`first upload: ${Math.round((Date.now() - t0) / 1000)} s — ${stat}${err ? ' ERR ' + err : ''}`);
-check(/qo'shildi 2\d\d\d\d/.test(stat), 'tens of thousands of rows added');
+check(/добавлено 2\d\d\d\d/.test(stat), 'tens of thousands of rows added');
 const n1 = (await api('/api/collections/applications/records?perPage=1', {}, su)).totalItems;
 
 t0 = Date.now();
 await page.setInputFiles('#regFile', file);
-await page.waitForFunction((prev) => document.getElementById('regStat').textContent !== prev && document.getElementById('regStat').textContent.includes('qator'), stat, { timeout: 15 * 60000 });
+await page.waitForFunction((prev) => document.getElementById('regStat').textContent !== prev && document.getElementById('regStat').textContent.includes('строк'), stat, { timeout: 15 * 60000 });
 const stat2 = await page.textContent('#regStat');
 console.log(`second upload: ${Math.round((Date.now() - t0) / 1000)} s — ${stat2}`);
-check(/qo'shildi 0 · yangilandi 2\d\d\d\d/.test(stat2), 'second upload only updates');
+check(/добавлено 0 · обновлено 2\d\d\d\d/.test(stat2), 'second upload only updates');
 const n2 = (await api('/api/collections/applications/records?perPage=1', {}, su)).totalItems;
 check(n1 === n2, `application count stable: ${n1}`);
 

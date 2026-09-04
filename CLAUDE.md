@@ -8,9 +8,9 @@ bosqichma-bosqich kodlash ko'rsatmasi — `docs/2-bosqich-kod-rejasi.md`.
 ## Muloqot tili
 
 **Foydalanuvchiga har doim o'zbek tilida (lotin alifbosida) javob berish.**
-Kod, izohlar va commit xabarlari ingliz tilida qoladi; dastur interfeysi
-o'zbekcha, hujjat matnlari rus/o'zbek tilida — manba fayllarda qanday bo'lsa,
-shunday.
+Kod, izohlar va commit xabarlari ingliz tilida qoladi; **dastur interfeysi
+ruscha** (foydalanuvchi talabi, 2026-09-04); eksport hujjat matnlari (shtamp,
+sarlavha, ikki tilli sarlavha qatori) 321.xlsx namunasidagidek rus/o'zbek.
 
 ## Ishlash tartibi
 

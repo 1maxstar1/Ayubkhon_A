@@ -19,8 +19,8 @@
   function ago(d) {
     var ms = Date.now() - new Date(d).getTime();
     var m = Math.round(ms / 60000);
-    if (m < 60) return m + ' daqiqa oldin';
-    if (m < 48 * 60) return Math.round(m / 60) + ' soat oldin';
+    if (m < 60) return m + ' мин. назад';
+    if (m < 48 * 60) return Math.round(m / 60) + ' ч. назад';
     return day(d);
   }
 
@@ -53,7 +53,7 @@
       $('appMore').addEventListener('click', function () { self.page++; self.load(); });
       $('regionForm').addEventListener('submit', function (e) { e.preventDefault(); self.createWorkspace(); });
       $('regionBack').addEventListener('click', function () { $('screen-region').hidden = true; self.show(); });
-      $('regionSel').innerHTML = '<option value="">— tanlang —</option>' + S.REGIONS.map(function (r) {
+      $('regionSel').innerHTML = '<option value="">— выберите —</option>' + S.REGIONS.map(function (r) {
         return '<option value="' + r[0] + '">' + S.esc(r[1]) + '</option>';
       }).join('');
       document.addEventListener('auth:signedin', function () { if (!S.Sync || !S.Sync.ws) self.show(); });
@@ -120,7 +120,7 @@
       if (this.min !== '' && !isNaN(+this.min)) { parts.push('cost_vat >= {:lo}'); params.lo = +this.min; }
       if (this.max !== '' && !isNaN(+this.max)) { parts.push('cost_vat <= {:hi}'); params.hi = +this.max; }
       if (parts.length) opts.filter = S.pb.filter(parts.join(' && '), params);
-      $('appCount').textContent = 'yuklanmoqda…';
+      $('appCount').textContent = 'загрузка…';
       Promise.all([
         S.pb.collection('applications').getList(this.page, PAGE, opts),
         this.page === 1 ? S.pb.collection('workspaces').getFullList({ expand: 'updated_by', fields: 'id,application,status,region,updated,changed,files,collectionId,collectionName,expand.updated_by.name,expand.updated_by.email' }) : null
@@ -151,26 +151,26 @@
         shown++;
         var who = w && w.expand && w.expand.updated_by ? (w.expand.updated_by.name || w.expand.updated_by.email) : '';
         var work = !w ? '<span class="mute">—</span>' :
-          '<span class="ws ' + st + '">' + (st === 'done' ? 'yakunlangan' : 'ishlanmoqda') + '</span>' +
+          '<span class="ws ' + st + '">' + (st === 'done' ? 'завершена' : 'в работе') + '</span>' +
           '<small>' + S.esc(who) + (w.updated ? ' · ' + ago(w.updated) : '') +
           (w.region ? ' · ' + S.esc(S.regionLabel(w.region)) : '') + '</small>';
         return '<tr data-i="' + i + '">' +
-          '<td class="mono"><button class="link num" data-act="card" title="Ariza kartochkasi">' + S.esc(a.number) + '</button></td>' +
+          '<td class="mono"><button class="link num" data-act="card" title="Карточка заявки">' + S.esc(a.number) + '</button></td>' +
           '<td>' + day(a.registered_at) + '</td>' +
-          '<td class="wrap">' + S.esc(a.org_name) + (a.inn ? '<small>STIR ' + S.esc(a.inn) + '</small>' : '') + '</td>' +
+          '<td class="wrap">' + S.esc(a.org_name) + (a.inn ? '<small>ИНН ' + S.esc(a.inn) + '</small>' : '') + '</td>' +
           '<td class="wrap">' + S.esc(a.project_title) + (a.object_id ? '<small>ID ' + S.esc(a.object_id) + '</small>' : '') + '</td>' +
           '<td class="dim">' + S.esc(a.expertise_type || '') + (a.buyer_type ? '<small>' + S.esc(a.buyer_type) + '</small>' : '') + '</td>' +
           '<td class="num">' + (a.cost_vat ? S.money(a.cost_vat) : '') + (a.currency && !/сум/i.test(a.currency) ? ' ' + S.esc(a.currency) : '') + '</td>' +
           '<td>' + S.esc(a.status) + '</td>' +
           '<td>' + work + '</td>' +
-          '<td class="act"><button class="btn sm ' + (w ? 'ok' : 'cyan') + '" data-act="open">' + (w ? 'Davom etish' : 'Ochish') + '</button>' +
+          '<td class="act"><button class="btn sm ' + (w ? 'ok' : 'cyan') + '" data-act="open">' + (w ? 'Продолжить' : 'Открыть') + '</button>' +
           (admin ? '<div class="adm">' +
-            (w ? '<button class="btn xs" data-act="clear" title="Fayllar, tuzatishlar va eksportlarni o\'chirib, boshidan boshlash">Tozalash</button>' +
-              '<button class="btn xs danger" data-act="delws" title="Ish maydonini o\'chirish (ariza qoladi)">Ishni o\'chirish</button>' : '') +
-            '<button class="btn xs danger" data-act="delapp" title="Arizani reyestrdan o\'chirish">✕ Ariza</button></div>' : '') +
+            (w ? '<button class="btn xs" data-act="clear" title="Удалить файлы, правки и экспорты, начать заново">Очистить</button>' +
+              '<button class="btn xs danger" data-act="delws" title="Удалить рабочую область (заявка остаётся)">Удалить работу</button>' : '') +
+            '<button class="btn xs danger" data-act="delapp" title="Удалить заявку из реестра">✕ Заявка</button></div>' : '') +
           '</td></tr>';
       }).join('');
-      $('appCount').textContent = shown + ' / ' + (this.total || 0) + ' ariza';
+      $('appCount').textContent = shown + ' / ' + (this.total || 0) + ' заявок';
       tb.querySelectorAll('button[data-act=open]').forEach(function (b) {
         b.addEventListener('click', function () { self.open(self.items[+b.closest('tr').dataset.i]); });
       });
@@ -193,31 +193,31 @@
       var self = this;
       var w = this.ws[a.id];
       var c = a.expand && a.expand.contragent;
-      $('cardTitle').textContent = 'Ariza № ' + a.number;
+      $('cardTitle').textContent = 'Заявка № ' + a.number;
       var rows = [
-        ['Holat', a.status], ['Ro\'yxatga olingan', day(a.registered_at)], ['To\'langan', day(a.paid_at)],
-        ['Kontragent', (c ? c.name : a.org_name) + (a.inn ? ' · STIR ' + a.inn : '')],
-        ['Loyiha', a.project_title], ['Obyekt ID', a.object_id],
-        ['Ekspertiza turi', a.expertise_type], ['Buyurtmachi turi', a.buyer_type],
-        ['Summa (НДСsiz)', a.cost ? S.money(a.cost) : ''], ['Summa (НДС bilan)', a.cost_vat ? S.money(a.cost_vat) : ''],
-        ['Valyuta', a.currency], ['Ekspert', a.expert], ['Soekspert', a.coexpert],
-        ['Joy (reyestr)', a.place], ['Soha', a.branch],
-        ['Mas\'ul ijrochi', [a.executor_name, a.executor_email, a.executor_phone].filter(Boolean).join(' · ')]
+        ['Статус', a.status], ['Зарегистрирована', day(a.registered_at)], ['Оплачена', day(a.paid_at)],
+        ['Контрагент', (c ? c.name : a.org_name) + (a.inn ? ' · ИНН ' + a.inn : '')],
+        ['Проект', a.project_title], ['ID объекта', a.object_id],
+        ['Тип экспертизы', a.expertise_type], ['Тип заказчика', a.buyer_type],
+        ['Сумма (без НДС)', a.cost ? S.money(a.cost) : ''], ['Сумма (с НДС)', a.cost_vat ? S.money(a.cost_vat) : ''],
+        ['Валюта', a.currency], ['Эксперт', a.expert], ['Соэксперт', a.coexpert],
+        ['Место (реестр)', a.place], ['Отрасль', a.branch],
+        ['Ответственный исполнитель', [a.executor_name, a.executor_email, a.executor_phone].filter(Boolean).join(' · ')]
       ];
       Object.keys(a.raw || {}).forEach(function (k) { if (a.raw[k]) rows.push([k, a.raw[k]]); });
       $('cardFields').innerHTML = rows.filter(function (r) { return r[1]; }).map(function (r) {
         return '<dt>' + S.esc(r[0]) + '</dt><dd>' + S.esc(String(r[1])) + '</dd>';
       }).join('');
       var who = w && w.expand && w.expand.updated_by ? (w.expand.updated_by.name || w.expand.updated_by.email) : '';
-      $('cardWork').textContent = !w ? 'Hali boshlanmagan.' :
-        (w.status === 'done' ? 'Yakunlangan' : 'Ishlanmoqda') + ' · ' + S.regionLabel(w.region) +
-        (who ? ' · oxirgi: ' + who + ', ' + ago(w.updated) : '') + (w.changed ? ' · ' + w.changed + ' ta narx o\'zgartirilgan' : '');
-      $('cardExports').innerHTML = '<li class="mute">yuklanmoqda…</li>';
+      $('cardWork').textContent = !w ? 'Ещё не начата.' :
+        (w.status === 'done' ? 'Завершена' : 'В работе') + ' · ' + S.regionLabel(w.region) +
+        (who ? ' · последний: ' + who + ', ' + ago(w.updated) : '') + (w.changed ? ' · изменено цен: ' + w.changed : '');
+      $('cardExports').innerHTML = '<li class="mute">загрузка…</li>';
       $('cardFiles').innerHTML = w && w.files && w.files.length
         ? w.files.map(function (f) { return '<li><a href="' + S.pb.files.getURL(w, f) + '">' + S.esc(f.replace(/_[a-z0-9]{10}(\.[a-z]+)$/i, '$1')) + '</a></li>'; }).join('')
-        : '<li class="mute">yo\'q</li>';
+        : '<li class="mute">нет</li>';
       $('cardOpen').onclick = function () { $('screen-card').hidden = true; self.open(a); };
-      $('cardOpen').textContent = w ? 'Davom etish' : 'Ochish';
+      $('cardOpen').textContent = w ? 'Продолжить' : 'Открыть';
       $('screen-card').hidden = false;
       S.pb.collection('exports').getFullList({ filter: S.pb.filter('application = {:a}', { a: a.id }), sort: '-created', expand: 'by' })
         .then(function (list) {
@@ -225,7 +225,7 @@
             var by = x.expand && x.expand.by;
             return '<li><a href="' + S.pb.files.getURL(x, x.file) + '">' + S.esc(x.file.replace(/_[a-z0-9]{10}(\.[a-z]+)$/i, '$1')) + '</a>' +
               '<small>' + day(x.created) + (by ? ' · ' + S.esc(by.name || by.email) : '') + (x.mode ? ' · ' + S.esc(x.mode) : '') + '</small></li>';
-          }).join('') : '<li class="mute">hali eksport qilinmagan</li>';
+          }).join('') : '<li class="mute">экспортов ещё нет</li>';
         }).catch(function (e) { $('cardExports').innerHTML = '<li class="mute">' + S.esc(S.pbErr(e)) + '</li>'; });
     },
 
@@ -242,13 +242,13 @@
       }
       this.pendingApp = a;
       var c = a.expand && a.expand.contragent;
-      $('regionTitle').textContent = 'Ariza № ' + a.number;
-      $('regionLead').textContent = (c ? c.name : a.org_name) + (a.inn ? ' · STIR ' + a.inn : '') +
+      $('regionTitle').textContent = 'Заявка № ' + a.number;
+      $('regionLead').textContent = (c ? c.name : a.org_name) + (a.inn ? ' · ИНН ' + a.inn : '') +
         (a.project_title ? '\n' + a.project_title : '');
       var sug = S.suggestRegion(a);
       $('regionSel').value = sug;
-      $('regionHint').textContent = sug ? 'Taklif: ' + S.regionLabel(sug) + ' — ariza matnidan aniqlandi, tekshiring.' :
-        'Ariza matnida viloyat topilmadi — o\'zingiz tanlang.';
+      $('regionHint').textContent = sug ? 'Предложение: ' + S.regionLabel(sug) + ' — определено по тексту заявки, проверьте.' :
+        'Регион в тексте заявки не найден — выберите сами.';
       $('regionErr').hidden = true;
       this.hide();
       $('screen-region').hidden = false;
@@ -258,7 +258,7 @@
       var self = this;
       var a = this.pendingApp;
       var region = $('regionSel').value;
-      if (!region) { $('regionErr').textContent = 'Viloyatni tanlang'; $('regionErr').hidden = false; return; }
+      if (!region) { $('regionErr').textContent = 'Выберите регион'; $('regionErr').hidden = false; return; }
       S.pb.collection('workspaces').create({
         application: a.id, region: region, status: 'in_progress', changed: 0,
         opened_by: S.me().id, updated_by: S.me().id, state: {}

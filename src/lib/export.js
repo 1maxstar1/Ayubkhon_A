@@ -225,7 +225,7 @@
   }
 
   function uniqueName(sheets, name) {
-    var base = String(name || 'Loyiha').replace(/[\\/*?:[\]]/g, ' ').slice(0, 31) || 'Loyiha';
+    var base = String(name || 'Проект').replace(/[\\/*?:[\]]/g, ' ').slice(0, 31) || 'Проект';
     var n = base, i = 2;
     while (sheets.some(function (s) { return s.name === n; })) n = base.slice(0, 28) + ' ' + (i++);
     return n;

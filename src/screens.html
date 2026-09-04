@@ -1,106 +1,106 @@
 <div class="screen" id="screen-login" hidden>
   <form class="card" id="loginForm" autocomplete="off">
-    <h2>Taqqoslash jadvali №2</h2>
-    <p class="lead" id="loginMsg">Tizimga kirish uchun ish elektron pochtangizni kiriting. Bir martalik kod pochtaga yuboriladi.</p>
-    <label>Elektron pochta
-      <input type="email" id="loginEmail" required autocomplete="email" spellcheck="false" placeholder="ism@tashkilot.uz"></label>
+    <h2>Таблица сопоставления №2</h2>
+    <p class="lead" id="loginMsg">Введите рабочую электронную почту. Одноразовый код придёт на неё.</p>
+    <label>Электронная почта
+      <input type="email" id="loginEmail" required autocomplete="email" spellcheck="false" placeholder="imya@organizaciya.uz"></label>
     <div id="codeBox" hidden>
-      <label>Pochtaga kelgan 8 xonali kod
+      <label>8-значный код из письма
         <input type="text" id="loginCode" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="one-time-code"></label>
-      <p class="hint">Kod 5 daqiqa amal qiladi. Kelmasa — <button type="button" class="link" id="resendBtn">qayta yuborish</button>.</p>
+      <p class="hint">Код действует 5 минут. Не пришёл — <button type="button" class="link" id="resendBtn">отправить снова</button>.</p>
     </div>
     <p class="err" id="loginErr" hidden></p>
-    <button class="btn primary wide" id="loginBtn" type="submit">Kod yuborish</button>
-    <p class="foot">Faqat administrator ro'yxatga qo'shgan pochtalar kira oladi.</p>
+    <button class="btn primary wide" id="loginBtn" type="submit">Отправить код</button>
+    <p class="foot">Войти могут только адреса, добавленные администратором.</p>
   </form>
 </div>
 
 <div class="screen list" id="screen-list" hidden>
   <div class="listwrap">
     <div class="listbar">
-      <h2>Arizalar</h2>
-      <input type="search" id="appQ" placeholder="№, kontragent, STIR, loyiha nomi yoki obyekt ID…" spellcheck="false">
-      <select id="appWork" title="Ish holati">
-        <option value="">Ish: barchasi</option>
-        <option value="none">Boshlanmagan</option>
-        <option value="in_progress">Ishlanmoqda</option>
-        <option value="done">Yakunlangan</option>
+      <h2>Заявки</h2>
+      <input type="search" id="appQ" placeholder="№, контрагент, ИНН, название проекта или ID объекта…" spellcheck="false">
+      <select id="appWork" title="Состояние работы">
+        <option value="">Работа: все</option>
+        <option value="none">Не начата</option>
+        <option value="in_progress">В работе</option>
+        <option value="done">Завершена</option>
       </select>
-      <select id="appRegion" title="Viloyat (ish maydonida tanlangan)"><option value="">Barcha viloyatlar</option></select>
-      <select id="appYear" title="Ariza yili"><option value="">Barcha yillar</option></select>
-      <select id="appType" title="Ekspertiza turi"><option value="">Ekspertiza turi: barchasi</option></select>
-      <select id="appBuyer" title="Buyurtmachi / loyiha turi"><option value="">Buyurtmachi: barchasi</option></select>
-      <select id="appStatus" title="Ariza holati (reyestr)"><option value="">Holat: barchasi</option></select>
-      <span class="range" title="Summa (НДС bilan), so'm">
-        <input type="number" id="appMin" placeholder="Summa dan" min="0" step="1000000">
-        <input type="number" id="appMax" placeholder="gacha" min="0" step="1000000">
+      <select id="appRegion" title="Регион (выбран в рабочей области)"><option value="">Все регионы</option></select>
+      <select id="appYear" title="Год заявки"><option value="">Все годы</option></select>
+      <select id="appType" title="Тип экспертизы"><option value="">Тип экспертизы: все</option></select>
+      <select id="appBuyer" title="Заказчик / тип проекта"><option value="">Заказчик: все</option></select>
+      <select id="appStatus" title="Статус заявки (реестр)"><option value="">Статус: все</option></select>
+      <span class="range" title="Сумма (с НДС), сум">
+        <input type="number" id="appMin" placeholder="Сумма от" min="0" step="1000000">
+        <input type="number" id="appMax" placeholder="до" min="0" step="1000000">
       </span>
-      <button class="btn sm" id="appClear" type="button" title="Barcha filtrlarni tozalash">✕ Filtrlar</button>
+      <button class="btn sm" id="appClear" type="button" title="Сбросить все фильтры">✕ Фильтры</button>
       <span class="count" id="appCount"></span>
       <div class="grow"></div>
-      <button class="btn sm primary" id="appAdd" type="button" hidden title="Reyestrda yo'q arizani qo'lda qo'shish"><span class="ic">＋</span> Ariza qo'shish</button>
+      <button class="btn sm primary" id="appAdd" type="button" hidden title="Добавить вручную заявку, которой нет в реестре"><span class="ic">＋</span> Добавить заявку</button>
     </div>
     <div class="listscroll">
       <table class="tbl apps" id="appTable">
-        <thead><tr><th>№</th><th>Sana</th><th>Kontragent · STIR</th><th>Loyiha · obyekt ID</th><th>Ekspertiza · buyurtmachi</th><th class="num">Summa (НДС bilan)</th><th>Holat</th><th>Ish</th><th></th></tr></thead>
+        <thead><tr><th>№</th><th>Дата</th><th>Контрагент · ИНН</th><th>Проект · ID объекта</th><th>Экспертиза · заказчик</th><th class="num">Сумма (с НДС)</th><th>Статус</th><th>Работа</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
-      <div class="listfoot"><button class="btn" id="appMore" hidden>Yana ko'rsatish</button></div>
+      <div class="listfoot"><button class="btn" id="appMore" hidden>Показать ещё</button></div>
     </div>
   </div>
 </div>
 
 <div class="screen" id="screen-region" hidden>
   <form class="card" id="regionForm">
-    <h2 id="regionTitle">Ariza</h2>
+    <h2 id="regionTitle">Заявка</h2>
     <p class="lead" id="regionLead"></p>
-    <label>Viloyat (loyiha amalga oshiriladigan hudud)
+    <label>Регион (где реализуется проект)
       <select id="regionSel" required></select></label>
     <p class="hint" id="regionHint"></p>
     <p class="err" id="regionErr" hidden></p>
-    <button class="btn primary wide" type="submit">Ish maydonini ochish</button>
-    <button class="btn wide" type="button" id="regionBack">Orqaga</button>
+    <button class="btn primary wide" type="submit">Открыть рабочую область</button>
+    <button class="btn wide" type="button" id="regionBack">Назад</button>
   </form>
 </div>
 
 <div class="screen" id="screen-card" hidden>
   <div class="card wide" id="appCard">
-    <div class="card-head"><h2 id="cardTitle">Ariza</h2><button class="link" id="cardClose">×</button></div>
+    <div class="card-head"><h2 id="cardTitle">Заявка</h2><button class="link" id="cardClose">×</button></div>
     <dl class="kv" id="cardFields"></dl>
-    <h3>Ish</h3>
+    <h3>Работа</h3>
     <p id="cardWork" class="lead"></p>
-    <h3>Eksportlar</h3>
+    <h3>Экспорты</h3>
     <ul class="files" id="cardExports"></ul>
-    <h3>Yuklangan smeta fayllari</h3>
+    <h3>Загруженные файлы смет</h3>
     <ul class="files" id="cardFiles"></ul>
-    <div class="card-foot"><button class="btn primary" id="cardOpen">Ochish</button></div>
+    <div class="card-foot"><button class="btn primary" id="cardOpen">Открыть</button></div>
   </div>
 </div>
 
 <div class="screen" id="screen-appform" hidden>
   <form class="card wide" id="appForm" autocomplete="off">
-    <div class="card-head"><h2>Arizani qo'lda qo'shish</h2><button class="link" type="button" id="appFormClose">×</button></div>
-    <p class="lead">Reyestrda hali yo'q ariza uchun. Raqam mavjud bo'lsa, faqat to'ldirilgan maydonlar yangilanadi. Kontragent STIR bo'yicha topiladi yoki yaratiladi.</p>
+    <div class="card-head"><h2>Добавить заявку вручную</h2><button class="link" type="button" id="appFormClose">×</button></div>
+    <p class="lead">Для заявки, которой ещё нет в реестре. Если номер уже существует, обновятся только заполненные поля. Контрагент находится или создаётся по ИНН.</p>
     <div class="grid">
-      <label>Ariza raqami *<input type="text" id="aNumber" required inputmode="numeric" placeholder="67155"></label>
-      <label>Ro'yxatga olingan sana<input type="date" id="aDate"></label>
-      <label>Holat<input type="text" id="aStatus" placeholder="Qo'lda qo'shilgan"></label>
-      <label>Summa (НДС bilan), so'm<input type="number" id="aCost" min="0" step="1"></label>
-      <label class="w2">Tashkilot (kontragent)<input type="text" id="aOrg" placeholder="«…» MChJ"></label>
-      <label>STIR (ИНН)<input type="text" id="aInn" inputmode="numeric" placeholder="200000000"></label>
-      <label>Obyekt ID<input type="text" id="aObject"></label>
-      <label class="w4">Loyiha nomi<input type="text" id="aTitle"></label>
-      <label class="w2">Ekspertiza turi<input type="text" id="aType" list="typeList"></label>
-      <label class="w2">Buyurtmachi / loyiha turi<input type="text" id="aBuyer" list="buyerList"></label>
-      <label class="w2">Joy (viloyat / shahar)<input type="text" id="aPlace"></label>
-      <label class="w2">Mas'ul ijrochi<input type="text" id="aExec"></label>
+      <label>Номер заявки *<input type="text" id="aNumber" required inputmode="numeric" placeholder="67155"></label>
+      <label>Дата регистрации<input type="date" id="aDate"></label>
+      <label>Статус<input type="text" id="aStatus" placeholder="Добавлена вручную"></label>
+      <label>Сумма (с НДС), сум<input type="number" id="aCost" min="0" step="1"></label>
+      <label class="w2">Организация (контрагент)<input type="text" id="aOrg" placeholder="ООО «…»"></label>
+      <label>ИНН<input type="text" id="aInn" inputmode="numeric" placeholder="200000000"></label>
+      <label>ID объекта<input type="text" id="aObject"></label>
+      <label class="w4">Название проекта<input type="text" id="aTitle"></label>
+      <label class="w2">Тип экспертизы<input type="text" id="aType" list="typeList"></label>
+      <label class="w2">Заказчик / тип проекта<input type="text" id="aBuyer" list="buyerList"></label>
+      <label class="w2">Место (регион / город)<input type="text" id="aPlace"></label>
+      <label class="w2">Ответственный исполнитель<input type="text" id="aExec"></label>
       <datalist id="typeList"></datalist>
       <datalist id="buyerList"></datalist>
     </div>
     <p class="err" id="appErr" hidden></p>
     <div class="card-foot">
-      <button class="btn" type="button" id="appFormCancel">Bekor qilish</button>
-      <button class="btn primary" type="submit"><span class="ic">＋</span> Saqlash</button>
+      <button class="btn" type="button" id="appFormCancel">Отмена</button>
+      <button class="btn primary" type="submit"><span class="ic">＋</span> Сохранить</button>
     </div>
   </form>
 </div>

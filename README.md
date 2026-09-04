@@ -3,6 +3,9 @@
 Loyiha-smeta hujjatlaridagi resurs narxlarini tekshirish, tuzatish va rasmiy
 **TAQQOSLASH JADVALI №2** hujjatini tayyorlash uchun mo'ljallangan dastur.
 
+Dastur interfeysi **rus tilida**; eksport hujjat matnlari (shtamp, sarlavha,
+ikki tilli sarlavha qatori) 321.xlsx namunasidagidek.
+
 Butun dastur — bitta HTML fayl: **`dist/smeta-taqqoslash.html`**.
 Uni yuklab olib, brauzerda ochish kifoya. O'rnatish, internet, server kerak emas;
 fayllar kompyuterdan chiqmaydi.

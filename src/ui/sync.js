@@ -63,19 +63,19 @@
 
       var by = w.expand && w.expand.updated_by;
       if (by && by.id !== S.me().id && Date.now() - new Date(w.updated).getTime() < 10 * 60000) {
-        app.toast((by.name || by.email) + ' bu arizada hozirgina ishlagan — bir vaqtda ishlasangiz oxirgi saqlagan g\'olib', true);
+        app.toast((by.name || by.email) + ' только что работал(а) с этой заявкой — при одновременной работе побеждает последнее сохранение', true);
       }
 
       S.pb.collection('corrections').getFullList({ filter: S.pb.filter('workspace = {:w}', { w: w.id }), fields: 'id,res_key,market_price' })
         .then(function (list) {
           list.forEach(function (c) { self.corr[c.res_key] = { id: c.id, market: c.market_price }; });
-        }).catch(function (e) { app.toast('Tuzatishlar yuklanmadi: ' + S.pbErr(e), true); });
+        }).catch(function (e) { app.toast('Правки не загружены: ' + S.pbErr(e), true); });
 
       var st = w.state || {};
       var wanted = (st.projects || []).map(function (p) { return { name: p.file, id: p.fileId }; })
         .filter(function (f) { return f.id && (w.files || []).indexOf(f.id) >= 0; });
       if (!wanted.length) { this.restore(); return; }
-      app.busy(true, 'Fayllar serverdan olinmoqda…');
+      app.busy(true, 'Получение файлов с сервера…');
       Promise.all(wanted.map(function (f) {
         return fetch(S.pb.files.getURL(w, f.id)).then(function (r) {
           if (!r.ok) throw new Error(f.name + ': ' + r.status);
@@ -85,7 +85,7 @@
         app.addFiles(files);                  // upload is skipped while loading
       }).catch(function (e) {
         app.busy(false);
-        app.toast('Fayllarni olib bo\'lmadi: ' + (e.message || e), true);
+        app.toast('Не удалось получить файлы: ' + (e.message || e), true);
         self.restore();
       });
     },
@@ -125,7 +125,7 @@
       this.loading = false; this.dirty = false;
       app.busy(false);
       this.renderBox();
-      if (app.projects.length) app.toast('Ish maydoni tiklandi: ' + app.projects.length + ' ta fayl');
+      if (app.projects.length) app.toast('Рабочая область восстановлена: файлов ' + app.projects.length);
     },
 
     /* ------------------------------------------------------------- save */
@@ -178,7 +178,7 @@
         }).catch(function (e) {
           self.dirty = true;
           self.mark('!');
-          app.toast('Saqlanmadi: ' + S.pbErr(e) + ' — 15 soniyadan keyin qayta uriniladi', true);
+          app.toast('Не сохранено: ' + S.pbErr(e) + ' — повтор через 15 секунд', true);
           clearTimeout(self.t);
           self.t = setTimeout(function () { if (self.dirty) self.saveNow(); }, 15000);
         });
@@ -206,7 +206,7 @@
           self.ws.files = w.files;
           self.touch();
         }).catch(function (e) {
-          app.toast('Fayl serverga yuklanmadi: ' + S.pbErr(e), true);
+          app.toast('Файл не загружен на сервер: ' + S.pbErr(e), true);
         });
       });
     },
@@ -238,7 +238,7 @@
           unit_key: S.unitKey(rec.unit || ''), smeta_price: rec.price
         }, patch);
         return S.pb.collection('corrections').create(data).then(function (r) { self.corr[key] = { id: r.id, market: value }; });
-      }).catch(function (e) { app.toast('Tuzatish saqlanmadi: ' + S.pbErr(e), true); });
+      }).catch(function (e) { app.toast('Правка не сохранена: ' + S.pbErr(e), true); });
     },
 
     /* ---------------------------------------------------------- exports */
@@ -246,7 +246,7 @@
       var self = this, app = A();
       if (!this.ws) return;
       var d = new Date(), pad = function (n) { return (n < 10 ? '0' : '') + n; };
-      var name = 'Ariza_' + this.app.number + '_taqqoslash_' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) +
+      var name = 'Zayavka_' + this.app.number + '_sopostavlenie_' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) +
         '_' + pad(d.getHours()) + pad(d.getMinutes()) + '.xlsx';
       var fd = new FormData();
       fd.append('workspace', this.ws.id);
@@ -256,15 +256,15 @@
       fd.append('file', new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), name);
       this.enqueue(function () {
         return S.pb.collection('exports').create(fd).then(function () {
-          app.toast('Eksport serverda saqlandi: ' + name);
-        }).catch(function (e) { app.toast('Eksport serverga yozilmadi: ' + S.pbErr(e), true); });
+          app.toast('Экспорт сохранён на сервере: ' + name);
+        }).catch(function (e) { app.toast('Экспорт не записан на сервер: ' + S.pbErr(e), true); });
       });
     },
 
     /* ----------------------------------------------------------- header */
     mark: function (s) {
       var el = $('wsSave');
-      if (el) { el.textContent = s; el.title = s === '●' ? 'Saqlanmoqda…' : s === '✓' ? 'Saqlandi' : 'Saqlashda xato'; }
+      if (el) { el.textContent = s; el.title = s === '●' ? 'Сохранение…' : s === '✓' ? 'Сохранено' : 'Ошибка сохранения'; }
     },
     renderBox: function () {
       var box = $('wsBox'), self = this;
@@ -273,14 +273,14 @@
       var a = this.app, w = this.ws;
       var c = a.expand && a.expand.contragent;
       box.hidden = false;
-      box.innerHTML = '<button class="btn sm" id="wsList" title="Arizalar ro\'yxatiga qaytish">‹ Arizalar</button>' +
+      box.innerHTML = '<button class="btn sm" id="wsList" title="Вернуться к списку заявок">‹ Заявки</button>' +
         '<span class="no">№ ' + S.esc(a.number) + '</span>' +
         '<span class="nm" title="' + S.esc(a.project_title || '') + '">' + S.esc(c ? c.name : a.org_name) + '</span>' +
         '<span class="rg">' + S.esc(S.regionLabel(w.region)) + '</span>' +
-        '<span class="sv" id="wsSave" title="Saqlandi">✓</span>' +
+        '<span class="sv" id="wsSave" title="Сохранено">✓</span>' +
         (w.status === 'done'
-          ? '<span class="done">yakunlangan</span>'
-          : '<button class="btn sm ok" id="wsDone" title="Ishni yakunlangan deb belgilash">✓ Yakunlash</button>');
+          ? '<span class="done">завершена</span>'
+          : '<button class="btn sm ok" id="wsDone" title="Отметить работу как завершённую">✓ Завершить</button>');
       $('wsList').addEventListener('click', function () { self.close(); });
       var d = $('wsDone');
       if (d) d.addEventListener('click', function () { self.finish(); });
@@ -293,7 +293,7 @@
       }).then(function (w) {
         self.ws.status = w.status;
         self.renderBox();
-        A().toast('Ariza yakunlangan deb belgilandi. Keyin ham ochib davom ettirish mumkin.');
+        A().toast('Заявка отмечена как завершённая. Её можно открыть и продолжить позже.');
       }).catch(function (e) { A().toast(S.pbErr(e), true); });
     },
 

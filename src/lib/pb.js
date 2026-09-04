@@ -21,14 +21,14 @@
 
   /** Human-readable (Uzbek) message for a failed request. */
   S.pbErr = function (e) {
-    if (!e) return 'Noma\'lum xato';
-    if (e.status === 0) return 'Server bilan aloqa yo\'q';
-    if (e.status === 401 || e.status === 403) return 'Ruxsat yo\'q';
-    if (e.status === 404) return 'Topilmadi';
+    if (!e) return 'Неизвестная ошибка';
+    if (e.status === 0) return 'Нет связи с сервером';
+    if (e.status === 401 || e.status === 403) return 'Нет доступа';
+    if (e.status === 404) return 'Не найдено';
     var d = e.response && e.response.data;
     if (d) {
       var keys = Object.keys(d);
-      if (keys.length) return keys[0] + ': ' + (d[keys[0]].message || d[keys[0]].code || 'noto\'g\'ri qiymat');
+      if (keys.length) return keys[0] + ': ' + (d[keys[0]].message || d[keys[0]].code || 'неверное значение');
     }
     return e.message || String(e);
   };

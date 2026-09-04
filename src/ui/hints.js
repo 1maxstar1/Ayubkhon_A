@@ -122,12 +122,12 @@
         if (got) {
           app.prices_ui.apply();
           app.sheetList.refresh();
-          app.toast(Object.keys(self.map).length + ' ta resurs uchun oldingi loyihalardan narx eslatmalari bor');
+          app.toast('Подсказки цен из прежних проектов: ресурсов ' + Object.keys(self.map).length);
         }
       }).catch(function (e) {
         if (e && e.status === 0) return;      // page left / request aborted — nothing to report
         console.error('hints', e);
-        app.toast('Eslatmalar yuklanmadi: ' + S.pbErr(e), true);
+        app.toast('Подсказки не загружены: ' + S.pbErr(e), true);
       });
     },
 
@@ -137,17 +137,17 @@
       var hs = this.for(nk);
       if (!hs.length) { this.hide(); return; }
       var rec = this.recOf(key);
-      this.pop.innerHTML = '<div class="hp-head">Oldingi loyihalar · ' + S.esc(S.regionLabel(S.Sync.ws.region)) +
+      this.pop.innerHTML = '<div class="hp-head">Прежние проекты · ' + S.esc(S.regionLabel(S.Sync.ws.region)) +
         '<button class="link" data-x>×</button></div>' +
         hs.slice(0, 12).map(function (h, i) {
           return '<div class="hp-row' + (h.same ? ' same' : '') + '">' +
             '<b>' + S.price(h.price) + '</b>' +
             '<span class="hp-meta">№ ' + S.esc(h.number) + ' · ' + S.esc(h.contragent) + ' · ' + day(h.at) +
-            (h.same ? ' <em>shu kontragent</em>' : '') +
+            (h.same ? ' <em>тот же контрагент</em>' : '') +
             (h.count > 1 ? ' · ×' + h.count : '') +
-            (h.smeta != null && rec && !S.near(h.smeta, rec.price) ? '<small>smeta narxi u yerda: ' + S.price(h.smeta) + '</small>' : '') +
+            (h.smeta != null && rec && !S.near(h.smeta, rec.price) ? '<small>сметная цена там: ' + S.price(h.smeta) + '</small>' : '') +
             '</span>' +
-            '<button class="btn sm" data-i="' + i + '">Qo\'llash</button></div>';
+            '<button class="btn sm" data-i="' + i + '">Применить</button></div>';
         }).join('');
       this.pop.querySelector('[data-x]').addEventListener('click', function () { self.hide(); });
       this.pop.querySelectorAll('button[data-i]').forEach(function (b) {
@@ -156,7 +156,7 @@
           app.setPrice(key, h.price);
           app.prices_ui.apply();
           app.sheetList.refresh();
-          app.toast(S.price(h.price) + ' qo\'llandi');
+          app.toast('Применено: ' + S.price(h.price));
           self.hide();
         });
       });
@@ -176,7 +176,7 @@
       if (!hs.length) return '';
       var best = hs[0];
       return '<button class="tagh' + (best.same ? ' same' : '') + '" data-hk="' + S.esc(r.nk) + '" data-key="' + S.esc(r.key) +
-        '" title="Oldingi loyihalardan narx eslatmalari">' + S.price(best.price) + (hs.length > 1 ? ' +' + (hs.length - 1) : '') + '</button>';
+        '" title="Подсказки цен из прежних проектов">' + S.price(best.price) + (hs.length > 1 ? ' +' + (hs.length - 1) : '') + '</button>';
     }
   };
 

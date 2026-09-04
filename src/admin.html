@@ -1,79 +1,79 @@
 <!DOCTYPE html>
-<html lang="uz">
+<html lang="ru">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Admin — Taqqoslash jadvali №2</title>
+<title>Администратор — Таблица сопоставления №2</title>
 <style>/*__CSS__*/</style>
 </head>
 <body class="admin">
 
 <header class="bar">
   <div class="brand">
-    <b>Administrator</b>
-    <span>reyestr, ish maydonlari va foydalanuvchilar</span>
+    <b>Администратор</b>
+    <span>реестр, рабочие области и пользователи</span>
   </div>
   <div class="grow"></div>
-  <a class="btn primary" href="./">‹ Dasturga qaytish</a>
+  <a class="btn primary" href="./">‹ В программу</a>
   <div class="userbox" id="userBox" hidden></div>
 </header>
 
 <main class="admin-main" id="adminMain" hidden>
   <section class="panel">
-    <h2>Arizalar reyestri</h2>
-    <p class="lead">control.expertcenter.uz dan yuklab olingan hisobot (<code>.xls</code>). Qatorlar ariza raqami bo'yicha
-      solishtiriladi: yangi — qo'shiladi, mavjud — yangilanadi. Hech narsa o'chirilmaydi.</p>
+    <h2>Реестр заявок</h2>
+    <p class="lead">Отчёт, выгруженный с control.expertcenter.uz (<code>.xls</code>). Строки сопоставляются по номеру заявки:
+      новые добавляются, существующие обновляются. Ничего не удаляется.</p>
     <label class="btn file primary">
       <input type="file" id="regFile" accept=".xls,.xlsx">
-      <span class="ic">↑</span> Reyestr faylini yuklash
+      <span class="ic">↑</span> Загрузить файл реестра
     </label>
     <div class="progress" id="regProgress" hidden><div class="bar-fill" id="regBar"></div><span id="regText"></span></div>
     <p class="err" id="regErr" hidden></p>
     <div class="stat" id="regStat"></div>
-    <h3>Yuklashlar tarixi</h3>
-    <table class="tbl" id="regHistory"><thead><tr><th>Sana</th><th>Kim</th><th>Qatorlar</th><th>Qo'shildi</th><th>Yangilandi</th><th>Fayl</th></tr></thead><tbody></tbody></table>
+    <h3>История загрузок</h3>
+    <table class="tbl" id="regHistory"><thead><tr><th>Дата</th><th>Кто</th><th>Строк</th><th>Добавлено</th><th>Обновлено</th><th>Файл</th></tr></thead><tbody></tbody></table>
   </section>
 
   <section class="panel">
-    <h2>Ish maydonlari</h2>
-    <p class="lead">Xodimlar ochgan arizalar. <b>Tozalash</b> — yuklangan smeta fayllari, narx tuzatishlari va eksportlar
-      o'chiriladi, ariza «boshidan» holatiga qaytadi (viloyat saqlanadi). <b>O'chirish</b> — ish maydoni butunlay yo'q qilinadi,
-      ariza reyestrda qoladi va qayta ochilishi mumkin.</p>
+    <h2>Рабочие области</h2>
+    <p class="lead">Заявки, открытые сотрудниками. <b>Очистить</b> — удаляются загруженные сметы, правки цен и экспорты,
+      заявка возвращается «к началу» (регион сохраняется). <b>Удалить</b> — рабочая область удаляется полностью,
+      заявка остаётся в реестре и может быть открыта заново.</p>
     <form class="inline" id="wsFilter" autocomplete="off" onsubmit="return false">
-      <input type="search" id="wsQ" placeholder="Ariza raqami, kontragent yoki loyiha…" spellcheck="false">
-      <select id="wsStatus"><option value="">Holat: barchasi</option><option value="in_progress">Ishlanmoqda</option><option value="done">Yakunlangan</option></select>
+      <input type="search" id="wsQ" placeholder="Номер заявки, контрагент или проект…" spellcheck="false">
+      <select id="wsStatus"><option value="">Статус: все</option><option value="in_progress">В работе</option><option value="done">Завершена</option></select>
       <span class="count" id="wsCount"></span>
     </form>
-    <table class="tbl" id="wsTable"><thead><tr><th>№</th><th>Kontragent · STIR</th><th>Viloyat</th><th>Holat</th><th>Fayl</th><th>Tuzatish</th><th>Oxirgi</th><th></th></tr></thead><tbody></tbody></table>
+    <table class="tbl" id="wsTable"><thead><tr><th>№</th><th>Контрагент · ИНН</th><th>Регион</th><th>Статус</th><th>Файлов</th><th>Правок</th><th>Последнее</th><th></th></tr></thead><tbody></tbody></table>
   </section>
 
   <section class="panel">
-    <h2>Arizani qo'lda qo'shish</h2>
-    <p class="lead">Reyestrda hali yo'q ariza uchun. Raqam mavjud bo'lsa, faqat to'ldirilgan maydonlar yangilanadi; keyingi
-      reyestr yuklashda ham shu raqam bo'yicha yangilanadi. Xuddi shu amallar arizalar ro'yxatida ham bor (admin uchun).</p>
-    <button class="btn primary" type="button" id="appAddBtn"><span class="ic">＋</span> Arizani qo'shish</button>
+    <h2>Добавить заявку вручную</h2>
+    <p class="lead">Для заявки, которой ещё нет в реестре. Если номер уже существует, обновятся только заполненные поля;
+      при следующей загрузке реестра она тоже обновится по номеру. Те же действия есть в списке заявок (для администратора).</p>
+    <button class="btn primary" type="button" id="appAddBtn"><span class="ic">＋</span> Добавить заявку</button>
     <span class="stat" id="appStat"></span>
-    <h3>Arizani topish va o'chirish</h3>
+    <h3>Найти и удалить заявку</h3>
     <form class="inline" id="findForm" autocomplete="off">
-      <input type="search" id="findQ" placeholder="Ariza raqami yoki kontragent…" spellcheck="false">
-      <button class="btn" type="submit">Topish</button>
+      <input type="search" id="findQ" placeholder="Номер заявки или контрагент…" spellcheck="false">
+      <button class="btn" type="submit">Найти</button>
     </form>
-    <table class="tbl" id="findTable" hidden><thead><tr><th>№</th><th>Sana</th><th>Kontragent · STIR</th><th>Loyiha</th><th>Ish</th><th></th></tr></thead><tbody></tbody></table>
+    <table class="tbl" id="findTable" hidden><thead><tr><th>№</th><th>Дата</th><th>Контрагент · ИНН</th><th>Проект</th><th>Работа</th><th></th></tr></thead><tbody></tbody></table>
   </section>
 
   <section class="panel">
-    <h2>Foydalanuvchilar</h2>
+    <h2>Пользователи</h2>
     <form class="inline" id="userForm" autocomplete="off">
-      <input type="email" id="uEmail" placeholder="pochta@tashkilot.uz" required>
-      <input type="text" id="uName" placeholder="Ism familiya" required>
-      <select id="uRole"><option value="ekspert">Ekspert</option><option value="admin">Admin</option></select>
-      <button class="btn primary" type="submit"><span class="ic">＋</span> Qo'shish</button>
+      <input type="email" id="uEmail" placeholder="pochta@organizaciya.uz" required>
+      <input type="text" id="uName" placeholder="Имя и фамилия" required>
+      <select id="uRole"><option value="ekspert">Эксперт</option><option value="admin">Администратор</option></select>
+      <button class="btn primary" type="submit"><span class="ic">＋</span> Добавить</button>
     </form>
     <p class="err" id="userErr" hidden></p>
-    <table class="tbl" id="userTable"><thead><tr><th>Pochta</th><th>Ism</th><th>Rol</th><th>Holat</th><th></th></tr></thead><tbody></tbody></table>
+    <table class="tbl" id="userTable"><thead><tr><th>Почта</th><th>Имя</th><th>Роль</th><th>Статус</th><th></th></tr></thead><tbody></tbody></table>
   </section>
 </main>
-<p class="denied" id="denied" hidden>Bu sahifa faqat administrator uchun.</p>
+<p class="denied" id="denied" hidden>Эта страница только для администратора.</p>
 
 <!--__SCREENS__-->
 <div id="toast" class="toast"></div>

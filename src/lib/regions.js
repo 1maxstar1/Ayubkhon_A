@@ -7,21 +7,21 @@
   'use strict';
 
   S.REGIONS = [
-    ['respublika', 'Umumrespublika'],
-    ['andijon', 'Andijon viloyati'],
-    ['buxoro', 'Buxoro viloyati'],
-    ['fargona', 'Farg\'ona viloyati'],
-    ['jizzax', 'Jizzax viloyati'],
-    ['xorazm', 'Xorazm viloyati'],
-    ['namangan', 'Namangan viloyati'],
-    ['navoiy', 'Navoiy viloyati'],
-    ['qashqadaryo', 'Qashqadaryo viloyati'],
-    ['samarqand', 'Samarqand viloyati'],
-    ['sirdaryo', 'Sirdaryo viloyati'],
-    ['surxondaryo', 'Surxondaryo viloyati'],
-    ['toshkent_vil', 'Toshkent viloyati'],
-    ['qoraqalpogiston', 'Qoraqalpog\'iston Respublikasi'],
-    ['toshkent_sh', 'Toshkent shahri']
+    ['respublika', 'Республиканский'],
+    ['andijon', 'Андижанская область'],
+    ['buxoro', 'Бухарская область'],
+    ['fargona', 'Ферганская область'],
+    ['jizzax', 'Джизакская область'],
+    ['xorazm', 'Хорезмская область'],
+    ['namangan', 'Наманганская область'],
+    ['navoiy', 'Навоийская область'],
+    ['qashqadaryo', 'Кашкадарьинская область'],
+    ['samarqand', 'Самаркандская область'],
+    ['sirdaryo', 'Сырдарьинская область'],
+    ['surxondaryo', 'Сурхандарьинская область'],
+    ['toshkent_vil', 'Ташкентская область'],
+    ['qoraqalpogiston', 'Республика Каракалпакстан'],
+    ['toshkent_sh', 'г. Ташкент']
   ];
   S.regionLabel = function (v) {
     for (var i = 0; i < S.REGIONS.length; i++) if (S.REGIONS[i][0] === v) return S.REGIONS[i][1];

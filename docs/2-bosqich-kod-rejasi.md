@@ -27,7 +27,9 @@ qo'shilganlar: 321.xlsx palitrasidagi yagona tugma tizimi (`src/app.css`
 tozalash/o'chirish, arizani qo'lda qo'shish/o'chirish (`src/ui/apps-admin.js`,
 `server/pb_hooks/admin.pb.js` +
 `pb_hooks/lib/admin.js`; handlerlar alohida VM da ishlagani uchun umumiy
-funksiyalar `require()` orqali olinadi). Rejadan farqlar: `registry_imports` hisoblagichlari
+funksiyalar `require()` orqali olinadi). 2026-09-04: butun interfeys rus
+tiliga o'tkazildi (HTML, `src/ui/*.js`, `lib/regions.js`, `lib/pb.js`,
+«Оглавление» varag'i); testlar ruscha satrlarni tekshiradi. Rejadan farqlar: `registry_imports` hisoblagichlari
 `rows_added`/`rows_updated`; eslatma so'rovlari filtr hajmi (bayt) bo'yicha
 bo'laklanadi — PocketBase ~3.5 KB dan uzun filtrni rad etadi.
 

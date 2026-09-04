@@ -105,7 +105,7 @@ check(hb[0][0].number === A.number, 'hint comes from application A');
 await page.selectOption('#filter', 'hint');
 await page.waitForFunction(() => document.querySelectorAll('#priceScroll .vrow').length === 2);
 check(true, 'filter «Eslatmasi borlar» lists exactly the two resources');
-check((await page.textContent('#priceCount')).includes('2 tasiga eslatma bor'), 'status line counts hinted resources');
+check((await page.textContent('#priceCount')).includes('с подсказками 2'), 'status line counts hinted resources');
 await page.click('#priceScroll .tagh');
 await page.waitForSelector('#hintPop:not([hidden])');
 check((await page.textContent('#hintPop')).includes(A.number), 'popover names the source application');

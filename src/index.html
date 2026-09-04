@@ -1,35 +1,35 @@
 <!DOCTYPE html>
-<html lang="uz">
+<html lang="ru">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Smeta — Taqqoslash jadvali №2</title>
+<title>Смета — Таблица сопоставления №2</title>
 <style>/*__CSS__*/</style>
 </head>
 <body>
 
 <header class="bar">
   <div class="brand">
-    <b>Taqqoslash jadvali №2</b>
-    <span>smeta resurs narxlarini tekshirish va yig'ish</span>
+    <b>Таблица сопоставления №2</b>
+    <span>проверка и сбор рыночных цен ресурсов сметы</span>
   </div>
   <div class="wsbox" id="wsBox" hidden></div>
   <div class="grow"></div>
-  <label class="btn cyan file" title="Smeta .xlsx fayllarini qo'shish">
+  <label class="btn cyan file" title="Добавить файлы смет .xlsx">
     <input type="file" id="pick" multiple accept=".xlsx,.xlsm">
-    <span class="ic">＋</span> Smeta fayllari
+    <span class="ic">＋</span> Файлы смет
   </label>
-  <button class="btn" id="loadBook" title="Avval saqlangan narx kitobini (.json / .xlsx) ochish">Narx kitobi</button>
-  <button class="btn" id="saveBook" title="Kiritilgan bozor narxlarini fayl sifatida saqlash">Narxlarni saqlash</button>
-  <label class="pickmode" title="Loyiha varaqlariga nima tushishini belgilaydi">
-    <span>Varaqlar:</span>
+  <button class="btn" id="loadBook" title="Открыть сохранённую книгу цен (.json / .xlsx)">Книга цен</button>
+  <button class="btn" id="saveBook" title="Сохранить введённые рыночные цены в файл">Сохранить цены</button>
+  <label class="pickmode" title="Что попадает на листы проектов">
+    <span>Листы:</span>
     <select id="reportMode">
-      <option value="changed">Faqat o'zgargan narxlar (tozalangan)</option>
-      <option value="dedup">Barcha resurslar (tozalangan)</option>
-      <option value="full">To'liq nusxa (Excel filtr + saralash kabi)</option>
+      <option value="changed">Только изменённые цены (очищенные)</option>
+      <option value="dedup">Все ресурсы (очищенные)</option>
+      <option value="full">Полная копия (как фильтр + сортировка в Excel)</option>
     </select>
   </label>
-  <button class="btn primary" id="export" disabled><span class="ic">↓</span> Excel yuklab olish</button>
+  <button class="btn primary" id="export" disabled><span class="ic">↓</span> Скачать Excel</button>
   <div class="userbox" id="userBox" hidden></div>
 </header>
 
@@ -38,44 +38,44 @@
 <main id="main">
   <aside id="side">
     <div class="side-head">
-      <span>Loyihalar</span>
-      <button class="link" id="collapseAll" title="Varaqlar ro'yxatini yig'ish">–</button>
+      <span>Проекты</span>
+      <button class="link" id="collapseAll" title="Свернуть список листов">–</button>
     </div>
     <div id="projects" class="projects"></div>
     <div class="drop-hint" id="dropHint">
-      <b>Fayllarni shu yerga tashlang</b>
-      <span>Har bir .xlsx = bitta loyiha. Ichidagi ko'cha/obyekt varaqlari avtomatik topiladi.</span>
+      <b>Перетащите файлы сюда</b>
+      <span>Каждый .xlsx = один проект. Листы улиц/объектов внутри находятся автоматически.</span>
     </div>
   </aside>
 
   <section id="work">
     <nav class="tabs">
-      <button class="tab on" data-pane="prices">Narxlarni tekshirish</button>
-      <button class="tab" data-pane="sheet">Yig'ilgan jadval</button>
-      <button class="tab" data-pane="report">Hisobot ko'rinishi</button>
-      <button class="tab" data-pane="settings">Hujjat sozlamalari</button>
+      <button class="tab on" data-pane="prices">Проверка цен</button>
+      <button class="tab" data-pane="sheet">Сводная таблица</button>
+      <button class="tab" data-pane="report">Вид отчёта</button>
+      <button class="tab" data-pane="settings">Настройки документа</button>
     </nav>
 
     <div class="pane on" id="pane-prices">
       <div class="toolbar">
-        <input type="search" id="q" placeholder="Resurs nomi bo'yicha qidirish…" spellcheck="false">
+        <input type="search" id="q" placeholder="Поиск по названию ресурса…" spellcheck="false">
         <select id="filter">
-          <option value="all">Barchasi</option>
-          <option value="changed">Faqat o'zgartirilgan</option>
-          <option value="same">O'zgarmagan</option>
-          <option value="zero">Narxi 0 bo'lganlar</option>
-          <option value="multi">Bir nechta smeta narxi</option>
-          <option value="hint">Eslatmasi borlar</option>
+          <option value="all">Все</option>
+          <option value="changed">Только изменённые</option>
+          <option value="same">Без изменений</option>
+          <option value="zero">С ценой 0</option>
+          <option value="multi">Несколько сметных цен</option>
+          <option value="hint">С подсказками</option>
         </select>
         <select id="sort">
-          <option value="name">Nomi bo'yicha</option>
-          <option value="diff">Farq bo'yicha (katta → kichik)</option>
-          <option value="sum">Smeta summasi bo'yicha</option>
-          <option value="count">Takrorlanish soni bo'yicha</option>
+          <option value="name">По названию</option>
+          <option value="diff">По разнице (от большей к меньшей)</option>
+          <option value="sum">По сметной сумме</option>
+          <option value="count">По числу повторов</option>
         </select>
         <div class="grow"></div>
-        <button class="btn sm" id="pctBtn">% qo'llash</button>
-        <button class="btn sm" id="resetBtn">Tanlanganni tiklash</button>
+        <button class="btn sm" id="pctBtn">Применить %</button>
+        <button class="btn sm" id="resetBtn">Сбросить выбранные</button>
         <span class="count" id="priceCount"></span>
       </div>
       <div class="thead" id="priceHead"></div>
@@ -84,7 +84,7 @@
 
     <div class="pane" id="pane-sheet">
       <div class="toolbar">
-        <input type="search" id="q2" placeholder="Yig'ilgan jadvalda qidirish…" spellcheck="false">
+        <input type="search" id="q2" placeholder="Поиск в сводной таблице…" spellcheck="false">
         <select id="jump"></select>
         <span class="count where" id="sheetWhere"></span>
         <div class="grow"></div>
@@ -107,27 +107,27 @@
 
     <div class="pane" id="pane-settings">
       <div class="form">
-        <h3>Hisobot varaqlari</h3>
-        <label>Yuqori o'ng burchakdagi shtamp
+        <h3>Листы отчёта</h3>
+        <label>Штамп в правом верхнем углу
           <textarea id="optStamp" rows="4"></textarea></label>
-        <label>Hujjat sarlavhasi
+        <label>Заголовок документа
           <input id="optTitle" type="text"></label>
-        <label>Standart eslatma matni
+        <label>Стандартный текст примечания
           <input id="optNote" type="text"></label>
         <label class="row"><input type="checkbox" id="optAutoNote" checked>
-          Eslatma matnini har bir o'zgargan qatorga avtomatik qo'yish</label>
+          Ставить примечание в каждую изменённую строку автоматически</label>
         <label class="row"><input type="checkbox" id="optHideSums" checked>
-          Summa ustunlarini yashirish (chop etish uchun)</label>
+          Скрывать столбцы сумм (для печати)</label>
         <label class="row"><input type="checkbox" id="optHideQty" checked>
-          КОЛ-ВО ustunini yashirish</label>
+          Скрывать столбец КОЛ-ВО</label>
         <label class="row"><input type="checkbox" id="optContents" checked>
-          «Mundarija» varag'ini qo'shish — har bir loyiha va ko'chaning «Лист1»dagi
-          qator raqamlari (A ustuni: dan – gacha)</label>
-        <label>Pushti rang chegarasi (shartli formatlash)
+          Добавлять лист «Оглавление» — номера строк «Лист1» для каждого проекта
+          и улицы (столбец A: с – по)</label>
+        <label>Порог розовой подсветки (условное форматирование)
           <input id="optCf" type="number" step="1000000" value="10000000"></label>
-        <h3>Yig'ilgan varaq nomi</h3>
+        <h3>Имя сводного листа</h3>
         <label><input id="optSheetName" type="text" value="Лист1"></label>
-        <p class="note">Bu sozlamalar brauzerda saqlanadi va keyingi safar avtomatik tiklanadi.</p>
+        <p class="note">Настройки сохраняются в браузере и восстанавливаются автоматически.</p>
       </div>
     </div>
   </section>
@@ -135,7 +135,7 @@
 
 <!--__SCREENS__-->
 <div id="toast" class="toast"></div>
-<div id="busy" class="busy"><div class="spin"></div><span id="busyText">Ishlanmoqda…</span></div>
+<div id="busy" class="busy"><div class="spin"></div><span id="busyText">Обработка…</span></div>
 
 <input type="file" id="bookInput" accept=".json,.xlsx" hidden>
 

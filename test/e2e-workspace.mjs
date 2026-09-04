@@ -72,7 +72,7 @@ check((await page.inputValue('#regionSel')) === 'respublika', 'region suggested 
 await page.selectOption('#regionSel', 'fargona');
 await page.click('#regionForm button[type=submit]');
 await page.waitForSelector('#wsBox:not([hidden])');
-check((await page.textContent('#wsBox')).includes('Farg'), 'workspace header shows the region');
+check((await page.textContent('#wsBox')).includes('Ферган'), 'workspace header shows the region');
 check(await page.isHidden('#screen-list'), 'list hidden while a workspace is open');
 check((await count('workspaces')) === 1, 'workspace record created');
 
@@ -106,7 +106,7 @@ await page.reload();
 await page.waitForSelector('#screen-list:not([hidden])');
 await page.fill('#appQ', '67159');
 await page.waitForFunction(() => document.querySelectorAll('#appTable tbody tr').length === 1);
-check((await page.textContent('#appTable tbody tr')).includes('ishlanmoqda'), 'list shows the application as in progress');
+check((await page.textContent('#appTable tbody tr')).includes('в работе'), 'list shows the application as in progress');
 await page.click('#appTable tbody tr button[data-act=open]');
 await page.waitForFunction(() => window.app && window.app.model && window.app.model.rows.length > 100 && !S.Sync.loading, null, { timeout: 120000 });
 const after = await page.evaluate((k) => ({
@@ -132,7 +132,7 @@ check(w3.files.length === 2 && Object.keys(w3.state.files).length === 2, 're-add
 
 // export -> stored on the server
 await page.click('#export');
-await page.waitForFunction(() => document.getElementById('toast').textContent.includes('serverda saqlandi'), null, { timeout: 60000 });
+await page.waitForFunction(() => document.getElementById('toast').textContent.includes('сохранён на сервере'), null, { timeout: 60000 });
 check((await count('exports')) === 1, 'export stored in exports');
 
 // reset the price -> correction removed
@@ -146,14 +146,14 @@ await page.waitForFunction(() => document.querySelector('#wsBox .done'));
 await page.click('#wsList');
 await page.waitForSelector('#screen-list:not([hidden])');
 await page.fill('#appQ', '67159');
-await page.waitForFunction(() => /yakunlangan/.test(document.querySelector('#appTable tbody').textContent));
+await page.waitForFunction(() => /завершена/.test(document.querySelector('#appTable tbody').textContent));
 check(true, 'list shows the application as finished');
 await page.click('#appTable tbody tr button[data-act=card]');
 await page.waitForSelector('#screen-card:not([hidden])');
 await page.waitForFunction(() => document.querySelectorAll('#cardExports li a').length === 1);
 check((await page.textContent('#cardFields')).includes('67159') === false && (await page.textContent('#cardTitle')).includes('67159'), 'card opens for the application');
 check((await page.$$eval('#cardFiles li a', (a) => a.length)) === 2, 'card lists the two uploaded smeta files');
-check((await page.textContent('#cardWork')).includes('Yakunlangan'), 'card shows the work status');
+check((await page.textContent('#cardWork')).includes('Завершена'), 'card shows the work status');
 await page.click('#cardClose');
 await page.selectOption('#appRegion', 'fargona');
 await page.waitForFunction(() => document.querySelectorAll('#appTable tbody tr').length === 1);

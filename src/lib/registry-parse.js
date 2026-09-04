@@ -82,7 +82,7 @@
       var keys = (grid[r] || []).map(norm);
       if (keys.indexOf('номер') >= 0 && keys.indexOf('инн') >= 0) { hr = r; break; }
     }
-    if (hr < 0) throw new Error('Sarlavha qatori topilmadi («номер», «ИНН» ustunlari kerak)');
+    if (hr < 0) throw new Error('Строка заголовков не найдена (нужны столбцы «номер», «ИНН»)');
     var headers = (grid[hr] || []).map(function (h) { return text(h); });
     var map = headers.map(function (h) { return HEAD[norm(h)] || null; });
     var rows = [], skipped = 0;

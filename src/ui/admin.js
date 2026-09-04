@@ -81,15 +81,15 @@
         var by = w.expand && w.expand.updated_by;
         return '<tr data-id="' + w.id + '">' +
           '<td class="mono"><b>' + S.esc(a.number || '?') + '</b></td>' +
-          '<td>' + S.esc(org) + (a.inn ? '<br><span class="mute">STIR ' + S.esc(a.inn) + '</span>' : '') + '</td>' +
+          '<td>' + S.esc(org) + (a.inn ? '<br><span class="mute">ИНН ' + S.esc(a.inn) + '</span>' : '') + '</td>' +
           '<td>' + S.esc(S.regionLabel(w.region)) + '</td>' +
-          '<td><span class="ws ' + S.esc(w.status) + '">' + (w.status === 'done' ? 'yakunlangan' : 'ishlanmoqda') + '</span></td>' +
+          '<td><span class="ws ' + S.esc(w.status) + '">' + (w.status === 'done' ? 'завершена' : 'в работе') + '</span></td>' +
           '<td>' + ((w.files || []).length) + '</td>' +
           '<td>' + (w.changed || 0) + '</td>' +
           '<td>' + when(w.updated) + (by ? '<br><span class="mute">' + S.esc(by.name || by.email) + '</span>' : '') + '</td>' +
-          '<td class="act"><button class="btn sm" data-act="clear" title="Fayllar, tuzatishlar va eksportlarni o\'chirib, boshidan boshlash">Tozalash</button>' +
-          '<button class="btn sm danger" data-act="delete" title="Ish maydonini butunlay o\'chirish">✕ O\'chirish</button></td></tr>';
-      }).join('') || '<tr><td colspan="8" class="mute">Hali hech kim ariza ochmagan</td></tr>';
+          '<td class="act"><button class="btn sm" data-act="clear" title="Удалить файлы, правки и экспорты, начать заново">Очистить</button>' +
+          '<button class="btn sm danger" data-act="delete" title="Удалить рабочую область полностью">✕ Удалить</button></td></tr>';
+      }).join('') || '<tr><td colspan="8" class="mute">Никто ещё не открывал заявки</td></tr>';
       $('wsCount').textContent = shown + ' / ' + this.wsItems.length;
       tb.querySelectorAll('button[data-act]').forEach(function (b) {
         b.addEventListener('click', function () {
@@ -111,7 +111,7 @@
       var tb = $('findTable').querySelector('tbody');
       if (!q) { $('findTable').hidden = true; return; }
       $('findTable').hidden = false;
-      tb.innerHTML = '<tr><td colspan="6" class="mute">qidirilmoqda…</td></tr>';
+      tb.innerHTML = '<tr><td colspan="6" class="mute">поиск…</td></tr>';
       Promise.all([
         S.pb.collection('applications').getList(1, 20, {
           filter: S.pb.filter('number ~ {:q} || org_name ~ {:q} || inn ~ {:q}', { q: q }), sort: '-registered_at', expand: 'contragent'
@@ -125,11 +125,11 @@
           return '<tr data-id="' + a.id + '">' +
             '<td class="mono"><b>' + S.esc(a.number) + '</b></td>' +
             '<td>' + (a.registered_at ? when(a.registered_at).split(' ')[0] : '') + '</td>' +
-            '<td>' + S.esc(c ? c.name : a.org_name) + (a.inn ? '<br><span class="mute">STIR ' + S.esc(a.inn) + '</span>' : '') + '</td>' +
+            '<td>' + S.esc(c ? c.name : a.org_name) + (a.inn ? '<br><span class="mute">ИНН ' + S.esc(a.inn) + '</span>' : '') + '</td>' +
             '<td>' + S.esc(a.project_title || '') + '</td>' +
-            '<td>' + (w ? '<span class="ws ' + S.esc(w.status) + '">' + (w.status === 'done' ? 'yakunlangan' : 'ishlanmoqda') + '</span>' : '<span class="mute">—</span>') + '</td>' +
-            '<td class="act"><button class="btn sm danger" data-act="delapp">✕ O\'chirish</button></td></tr>';
-        }).join('') || '<tr><td colspan="6" class="mute">Topilmadi</td></tr>';
+            '<td>' + (w ? '<span class="ws ' + S.esc(w.status) + '">' + (w.status === 'done' ? 'завершена' : 'в работе') + '</span>' : '<span class="mute">—</span>') + '</td>' +
+            '<td class="act"><button class="btn sm danger" data-act="delapp">✕ Удалить</button></td></tr>';
+        }).join('') || '<tr><td colspan="6" class="mute">Не найдено</td></tr>';
         tb.querySelectorAll('button[data-act=delapp]').forEach(function (b) {
           b.addEventListener('click', function () {
             var id = b.closest('tr').dataset.id;
@@ -156,15 +156,15 @@
       var self = this;
       $('regErr').hidden = true;
       $('regStat').textContent = '';
-      this.progress(0, 1, 'Fayl o\'qilmoqda…');
+      this.progress(0, 1, 'Чтение файла…');
       var reader = new FileReader();
       reader.onload = function () {
         var parsed;
         try { parsed = S.parseRegistry(reader.result); }
-        catch (e) { self.fail('Faylni o\'qib bo\'lmadi: ' + (e.message || e)); return; }
-        self.send(parsed.rows, file).catch(function (e) { self.fail('Import xatosi: ' + S.pbErr(e)); });
+        catch (e) { self.fail('Не удалось прочитать файл: ' + (e.message || e)); return; }
+        self.send(parsed.rows, file).catch(function (e) { self.fail('Ошибка импорта: ' + S.pbErr(e)); });
       };
-      reader.onerror = function () { self.fail('Faylni o\'qib bo\'lmadi'); };
+      reader.onerror = function () { self.fail('Не удалось прочитать файл'); };
       reader.readAsArrayBuffer(file);
     },
 
@@ -183,7 +183,7 @@
         return S.pb.send('/api/registry/import', { method: 'POST', body: { rows: part } }).then(function (r) {
           total.added += r.added; total.updated += r.updated; total.contragents += r.contragents;
           i += part.length;
-          self.progress(i, rows.length, i + ' / ' + rows.length + ' qator');
+          self.progress(i, rows.length, i + ' / ' + rows.length + ' строк');
           return step();
         });
       }
@@ -197,9 +197,9 @@
         return S.pb.collection('registry_imports').create(fd);
       }).then(function () {
         $('regProgress').hidden = true;
-        $('regStat').textContent = rows.length + ' qator o\'qildi · qo\'shildi ' + total.added +
-          ' · yangilandi ' + total.updated + ' · yangi kontragentlar ' + total.contragents;
-        toast('Reyestr yangilandi');
+        $('regStat').textContent = 'Прочитано ' + rows.length + ' строк · добавлено ' + total.added +
+          ' · обновлено ' + total.updated + ' · новых контрагентов ' + total.contragents;
+        toast('Реестр обновлён');
         self.loadHistory();
       });
     },
@@ -213,7 +213,7 @@
           return '<tr><td>' + when(x.created) + '</td><td>' + S.esc(by ? (by.name || by.email) : '') +
             '</td><td>' + (x.rows || 0) + '</td><td>' + (x.rows_added || 0) + '</td><td>' + (x.rows_updated || 0) +
             '</td><td>' + (url ? '<a href="' + url + '">' + S.esc(x.file) + '</a>' : '') + '</td></tr>';
-        }).join('') || '<tr><td colspan="6" class="mute">Hali yuklanmagan</td></tr>';
+        }).join('') || '<tr><td colspan="6" class="mute">Загрузок ещё не было</td></tr>';
       }).catch(function (e) { toast(S.pbErr(e), true); });
     },
 
@@ -224,8 +224,8 @@
       S.pb.collection('users').getFullList({ sort: 'name' }).then(function (items) {
         tb.innerHTML = items.map(function (u) {
           return '<tr data-id="' + u.id + '"><td>' + S.esc(u.email) + '</td><td>' + S.esc(u.name || '') +
-            '</td><td>' + S.esc(u.role || '') + '</td><td>' + (u.active ? 'faol' : '<span class="mute">o\'chirilgan</span>') +
-            '</td><td class="act"><button class="btn sm ' + (u.active ? 'danger' : 'ok') + '" data-act="toggle">' + (u.active ? 'O\'chirish' : 'Yoqish') + '</button></td></tr>';
+            '</td><td>' + S.esc(u.role || '') + '</td><td>' + (u.active ? 'активен' : '<span class="mute">отключён</span>') +
+            '</td><td class="act"><button class="btn sm ' + (u.active ? 'danger' : 'ok') + '" data-act="toggle">' + (u.active ? 'Отключить' : 'Включить') + '</button></td></tr>';
         }).join('');
         tb.querySelectorAll('button[data-act=toggle]').forEach(function (b) {
           b.addEventListener('click', function () {
@@ -250,10 +250,10 @@
         password: pw, passwordConfirm: pw
       }).then(function () {
         $('uEmail').value = ''; $('uName').value = '';
-        toast(email + ' qo\'shildi');
+        toast(email + ' добавлен');
         self.loadUsers();
       }).catch(function (e) {
-        $('userErr').textContent = 'Qo\'shib bo\'lmadi: ' + S.pbErr(e); $('userErr').hidden = false;
+        $('userErr').textContent = 'Не удалось добавить: ' + S.pbErr(e); $('userErr').hidden = false;
       });
     }
   };

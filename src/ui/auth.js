@@ -41,7 +41,7 @@
       this.otpId = null;
       document.getElementById('codeBox').hidden = true;
       document.getElementById('loginCode').value = '';
-      document.getElementById('loginBtn').textContent = 'Kod yuborish';
+      document.getElementById('loginBtn').textContent = 'Отправить код';
       document.getElementById('loginErr').hidden = true;
       if (!keepEmail) document.getElementById('loginEmail').value = '';
     },
@@ -61,21 +61,21 @@
         S.pb.collection('users').requestOTP(email).then(function (r) {
           self.otpId = r.otpId;
           document.getElementById('codeBox').hidden = false;
-          btn.textContent = 'Kirish';
+          btn.textContent = 'Войти';
           document.getElementById('loginCode').focus();
         }).catch(function (e) {
-          self.error('Kod yuborilmadi: ' + S.pbErr(e));
+          self.error('Код не отправлен: ' + S.pbErr(e));
         }).finally(function () { btn.disabled = false; });
         return;
       }
       var code = document.getElementById('loginCode').value.trim();
-      if (code.length < 4) { btn.disabled = false; this.error('Kodni kiriting'); return; }
+      if (code.length < 4) { btn.disabled = false; this.error('Введите код'); return; }
       S.pb.collection('users').authWithOTP(this.otpId, code).then(function () {
         self.hide();
         self.start();
       }).catch(function (e) {
         var s = e && e.status;
-        self.error(s === 400 ? 'Kod noto\'g\'ri yoki muddati o\'tgan' : 'Kirib bo\'lmadi: ' + S.pbErr(e));
+        self.error(s === 400 ? 'Неверный код или срок его действия истёк' : 'Не удалось войти: ' + S.pbErr(e));
       }).finally(function () { btn.disabled = false; });
     },
 
@@ -89,8 +89,8 @@
     },
     tick: function () {
       var now = Date.now();
-      if (!S.pb.authStore.isValid) { this.lock('Sessiya muddati tugadi. Qayta kiring.'); return; }
-      if (now - this.last > IDLE_MS) { this.lock('4 soat davomida faoliyat bo\'lmadi — dastur qulflandi. Qayta kiring.'); return; }
+      if (!S.pb.authStore.isValid) { this.lock('Сессия истекла. Войдите снова.'); return; }
+      if (now - this.last > IDLE_MS) { this.lock('4 часа без активности — программа заблокирована. Войдите снова.'); return; }
       if (now - this.lastRefresh > REFRESH_MS) {
         this.lastRefresh = now;
         S.pb.collection('users').authRefresh().catch(function () { /* next tick decides */ });
@@ -101,7 +101,7 @@
       document.dispatchEvent(new CustomEvent('auth:signedout'));
       this.show(msg);
     },
-    signOut: function () { this.lock('Tizimdan chiqdingiz.'); },
+    signOut: function () { this.lock('Вы вышли из системы.'); },
 
     render: function () {
       var box = document.getElementById('userBox');
@@ -111,8 +111,8 @@
       var label = me.name || me.email;
       var initial = (label.trim().charAt(0) || '?').toUpperCase();
       box.innerHTML = '<span class="who"><span class="av">' + S.esc(initial) + '</span><span id="who">' + S.esc(label) + '</span></span>' +
-        (S.isAdmin() && !/admin\.html$/.test(location.pathname) ? '<a class="btn sm" href="admin.html">Admin</a>' : '') +
-        '<button class="btn sm" id="signOut" title="Tizimdan chiqish">Chiqish</button>';
+        (S.isAdmin() && !/admin\.html$/.test(location.pathname) ? '<a class="btn sm" href="admin.html">Админ</a>' : '') +
+        '<button class="btn sm" id="signOut" title="Выйти из системы">Выйти</button>';
       var self = this;
       document.getElementById('signOut').addEventListener('click', function () { self.signOut(); });
     }

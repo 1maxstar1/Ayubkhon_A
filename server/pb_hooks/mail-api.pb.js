@@ -12,13 +12,15 @@ onMailerSend((e) => {
   const m = e.message;
   // Brevo rejects an empty "name"; send it only when the address carries one.
   const to = (m.to || []).map((a) => (a.name ? { email: a.address, name: a.name } : { email: a.address }));
+  // Brevo wants htmlContent and/or a NON-empty textContent — never an empty string.
   const body = {
     sender: { email: m.from.address, name: m.from.name || "Taqqoslash jadvali" },
     to: to,
     subject: m.subject,
-    htmlContent: m.html || "<pre>" + (m.text || "") + "</pre>",
-    textContent: m.text || "",
   };
+  if (m.html) body.htmlContent = m.html;
+  if (m.text) body.textContent = m.text;
+  if (!body.htmlContent && !body.textContent) body.textContent = m.subject || "-";
   const res = $http.send({
     url: $os.getenv("BREVO_API_URL") || "https://api.brevo.com/v3/smtp/email",
     method: "POST",

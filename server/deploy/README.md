@@ -32,6 +32,11 @@ manzillarni chiqaradi. **Qayta ishga tushirish = yangilash** — `pb_data` va
    u bo'sh bo'lsa PocketBase odatdagidek SMTP ishlatadi (`pb_hooks/mail-api.pb.js`).
    Parallel ravishda provayderga «откройте исходящие порты 465 и 587» deb
    yozib qo'ying — ochilsa, kalitni o'chirib SMTP ga qaytish mumkin.
+   **Kod kelmay qolsa:** `sh server/deploy/mail-check.sh root@SERVER_IP` —
+   kalit bormi, xizmat ishlayaptimi, jurnaldagi Brevo xatolari va bitta sinov
+   xatining natijasi chiqadi. Brevo'da (app.brevo.com → Transactional → Logs)
+   xat ketgan-ketmaganini ham ko'ring; yangi bepul akkauntlar tekshiruv
+   («account under validation») paytida xat yubormaydi, kunlik chegara 300 ta.
 2. **Reyestr** — `http://SERVER_IP/admin.html` → `Report_1.xls` yuklash.
 3. **Xodimlar** — o'sha sahifada qo'shiladi.
 4. **Domen va HTTPS** (ixtiyoriy, keyin ham bo'ladi): domenning A yozuvini
@@ -73,6 +78,7 @@ sh /opt/taqqoslash/server/deploy/configure.sh   # .env ni qayta qo'llash
 | `pocketbase.service` | server | systemd birligi |
 | `smtp.sh` | Mac | portni tekshirish, SMTP ni `.env` ga yozish, sinov xati |
 | `mail-api.sh` | Mac | SMTP bloklangan bo'lsa: Brevo API kaliti, sinov xati |
+| `mail-check.sh` | Mac | kod kelmasa: holat, jurnal, sinov xati bir buyruqda |
 | `users.sh` | Mac | xodim hisoblarini qo'shish |
 | `pull-backup.sh` | Mac | yangi zaxira olib, yuklab olish |
 | `env.example` | — | `.env` shabloni |

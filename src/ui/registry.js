@@ -1,59 +1,10 @@
 /*
  * Application list (from the registry the admin uploads) and the region
  * choice made when a workspace is opened for the first time.
+ * Region names and the text clues live in lib/regions.js.
  */
 (function (S) {
   'use strict';
-
-  S.REGIONS = [
-    ['respublika', 'Umumrespublika'],
-    ['andijon', 'Andijon viloyati'],
-    ['buxoro', 'Buxoro viloyati'],
-    ['fargona', 'Farg\'ona viloyati'],
-    ['jizzax', 'Jizzax viloyati'],
-    ['xorazm', 'Xorazm viloyati'],
-    ['namangan', 'Namangan viloyati'],
-    ['navoiy', 'Navoiy viloyati'],
-    ['qashqadaryo', 'Qashqadaryo viloyati'],
-    ['samarqand', 'Samarqand viloyati'],
-    ['sirdaryo', 'Sirdaryo viloyati'],
-    ['surxondaryo', 'Surxondaryo viloyati'],
-    ['toshkent_vil', 'Toshkent viloyati'],
-    ['qoraqalpogiston', 'Qoraqalpog\'iston Respublikasi'],
-    ['toshkent_sh', 'Toshkent shahri']
-  ];
-  S.regionLabel = function (v) {
-    for (var i = 0; i < S.REGIONS.length; i++) if (S.REGIONS[i][0] === v) return S.REGIONS[i][1];
-    return v || '';
-  };
-
-  // Words that pin a text to a region: RU, UZ Latin and UZ Cyrillic spellings,
-  // plus the big cities. Order matters — Tashkent city before Tashkent region.
-  var CLUES = [
-    ['toshkent_sh', /г\.?\s*ташкент|город ташкент|toshkent sh|тошкент ш|toshkent shahri|тошкент шаҳри/i],
-    ['toshkent_vil', /ташкентск|toshkent vil|тошкент вил|toshkent tuman|тошкент тумани/i],
-    ['andijon', /андижан|andijon|андижон|asaka|асака|xonobod|хонобод/i],
-    ['buxoro', /бухар|buxoro|бухоро|kogon|когон|g'ijduvon|гиждуван/i],
-    ['fargona', /ферган|farg.?ona|фарғона|marg.?ilon|маргилан|марғилон|qo.?qon|коканд|қўқон|rishton|риштан|quva\b|кува/i],
-    ['jizzax', /джизак|jizzax|жиззах|zomin|заамин|gallaorol|галляарал/i],
-    ['xorazm', /хорезм|xorazm|хоразм|urganch|ургенч|урганч|xiva|хива/i],
-    ['namangan', /наманган|namangan|наманган|chust|чуст|pop\b|поп\b/i],
-    ['navoiy', /навои|navoiy|навоий|zarafshon|зарафшан/i],
-    ['qashqadaryo', /кашкадар|qashqadaryo|қашқадарё|qarshi|карши|қарши|shahrisabz|шахрисабз|koson|косон/i],
-    ['samarqand', /самарканд|samarqand|самарқанд|kattaqo.?rg|каттакурган|urgut|ургут/i],
-    ['sirdaryo', /сырдар|sirdaryo|сирдарё|guliston|гулистан|yangiyer|янгиер/i],
-    ['surxondaryo', /сурхандар|surxondaryo|сурхондарё|termiz|термез|denov|денау/i],
-    ['qoraqalpogiston', /каракалпак|qoraqalpog|қорақалпоғ|nukus|нукус|нукус/i],
-    ['respublika', /общереспубликанск|umumrespublika|республиканск/i]
-  ];
-  S.suggestRegion = function (app) {
-    var texts = [app.place || '', app.project_title || '', app.org_name || ''];
-    for (var t = 0; t < texts.length; t++) {
-      if (!texts[t]) continue;
-      for (var i = 0; i < CLUES.length; i++) if (CLUES[i][1].test(texts[t])) return CLUES[i][0];
-    }
-    return '';
-  };
 
   if (!S.pb) return;
 
@@ -74,7 +25,8 @@
   }
 
   var Registry = {
-    page: 1, items: [], ws: {}, q: '', work: '', region: '', year: '',
+    page: 1, items: [], ws: {}, q: '', work: '', region: '', year: '', type: '', buyer: '', status: '', min: '', max: '',
+    facets: null,
 
     init: function () {
       var self = this;
@@ -82,6 +34,14 @@
       $('appWork').addEventListener('change', function () { self.work = this.value; self.render(); });
       $('appRegion').addEventListener('change', function () { self.region = this.value; self.render(); });
       $('appYear').addEventListener('change', function () { self.year = this.value; self.reload(); });
+      // filters on the registry's highlighted columns — all server-side
+      $('appType').addEventListener('change', function () { self.type = this.value; self.reload(); });
+      $('appBuyer').addEventListener('change', function () { self.buyer = this.value; self.reload(); });
+      $('appStatus').addEventListener('change', function () { self.status = this.value; self.reload(); });
+      var money = S.debounce(function () { self.min = $('appMin').value; self.max = $('appMax').value; self.reload(); }, 350);
+      $('appMin').addEventListener('input', money);
+      $('appMax').addEventListener('input', money);
+      $('appClear').addEventListener('click', function () { self.clearFilters(); });
       $('appRegion').innerHTML += S.REGIONS.map(function (r) { return '<option value="' + r[0] + '">' + S.esc(r[1]) + '</option>'; }).join('');
       var y = new Date().getFullYear();
       for (var i = y; i >= y - 6; i--) $('appYear').innerHTML += '<option value="' + i + '">' + i + '</option>';
@@ -101,10 +61,38 @@
     show: function () {
       // The list sits under the top bar so the user box (name, sign-out) stays reachable;
       // the file / export controls only make sense inside a workspace.
-      $('screen-list').style.top = document.querySelector('header.bar').offsetHeight + 'px';
+      document.body.classList.add('nows');   // before measuring: hides the file buttons, so the bar is one row
+      this.fit();
       $('screen-list').hidden = false;
-      document.body.classList.add('nows');
+      if (!this.fitBound) { this.fitBound = true; window.addEventListener('resize', this.fit); }
+      this.loadFacets();
       this.reload();
+    },
+    fit: function () { $('screen-list').style.top = document.querySelector('header.bar').offsetHeight + 'px'; },
+
+    clearFilters: function () {
+      ['appQ', 'appWork', 'appRegion', 'appYear', 'appType', 'appBuyer', 'appStatus', 'appMin', 'appMax'].forEach(function (id) { $(id).value = ''; });
+      this.q = this.work = this.region = this.year = this.type = this.buyer = this.status = this.min = this.max = '';
+      this.reload();
+    },
+
+    /** Distinct values of the categorical columns (one cheap server query). */
+    loadFacets: function () {
+      var self = this;
+      S.pb.send('/api/registry/facets', { method: 'GET' }).then(function (f) {
+        self.facets = f;
+        fill('appType', f.expertise_type, self.type);
+        fill('appBuyer', f.buyer_type, self.buyer);
+        fill('appStatus', f.status, self.status);
+      }).catch(function () { /* menus stay empty; the search box still works */ });
+      function fill(id, list, cur) {
+        var sel = $(id), first = sel.options[0].outerHTML;
+        sel.innerHTML = first + (list || []).map(function (x) {
+          var label = x.v.length > 70 ? x.v.slice(0, 68) + '…' : x.v;
+          return '<option value="' + S.esc(x.v) + '" title="' + S.esc(x.v) + '">' + S.esc(label) + ' (' + x.n + ')</option>';
+        }).join('');
+        sel.value = cur;
+      }
     },
     hide: function () { $('screen-list').hidden = true; document.body.classList.remove('nows'); },
 
@@ -117,11 +105,16 @@
       var self = this;
       var opts = { sort: '-registered_at,-number', expand: 'contragent' };
       var parts = [], params = {};
-      if (this.q) { parts.push('(number ~ {:q} || org_name ~ {:q} || project_title ~ {:q} || inn ~ {:q})'); params.q = this.q; }
+      if (this.q) { parts.push('(number ~ {:q} || org_name ~ {:q} || project_title ~ {:q} || inn ~ {:q} || object_id ~ {:q})'); params.q = this.q; }
       if (this.year) {
         parts.push('registered_at >= {:y0} && registered_at < {:y1}');
         params.y0 = this.year + '-01-01 00:00:00'; params.y1 = (+this.year + 1) + '-01-01 00:00:00';
       }
+      if (this.type) { parts.push('expertise_type = {:t}'); params.t = this.type; }
+      if (this.buyer) { parts.push('buyer_type = {:b}'); params.b = this.buyer; }
+      if (this.status) { parts.push('status = {:s}'); params.s = this.status; }
+      if (this.min !== '' && !isNaN(+this.min)) { parts.push('cost_vat >= {:lo}'); params.lo = +this.min; }
+      if (this.max !== '' && !isNaN(+this.max)) { parts.push('cost_vat <= {:hi}'); params.hi = +this.max; }
       if (parts.length) opts.filter = S.pb.filter(parts.join(' && '), params);
       $('appCount').textContent = 'yuklanmoqda…';
       Promise.all([
@@ -160,12 +153,13 @@
         return '<tr data-i="' + i + '">' +
           '<td class="mono"><button class="link num" data-act="card" title="Ariza kartochkasi">' + S.esc(a.number) + '</button></td>' +
           '<td>' + day(a.registered_at) + '</td>' +
-          '<td class="wrap" title="STIR ' + S.esc(a.inn) + '">' + S.esc(a.org_name) + '</td>' +
-          '<td class="wrap">' + S.esc(a.project_title) + '</td>' +
+          '<td class="wrap">' + S.esc(a.org_name) + (a.inn ? '<small>STIR ' + S.esc(a.inn) + '</small>' : '') + '</td>' +
+          '<td class="wrap">' + S.esc(a.project_title) + (a.object_id ? '<small>ID ' + S.esc(a.object_id) + '</small>' : '') + '</td>' +
+          '<td class="dim">' + S.esc(a.expertise_type || '') + (a.buyer_type ? '<small>' + S.esc(a.buyer_type) + '</small>' : '') + '</td>' +
           '<td class="num">' + (a.cost_vat ? S.money(a.cost_vat) : '') + (a.currency && !/сум/i.test(a.currency) ? ' ' + S.esc(a.currency) : '') + '</td>' +
           '<td>' + S.esc(a.status) + '</td>' +
           '<td>' + work + '</td>' +
-          '<td><button class="btn sm" data-act="open">' + (w ? 'Davom etish' : 'Ochish') + '</button></td></tr>';
+          '<td><button class="btn sm ' + (w ? 'ok' : 'cyan') + '" data-act="open">' + (w ? 'Davom etish' : 'Ochish') + '</button></td></tr>';
       }).join('');
       $('appCount').textContent = shown + ' / ' + (this.total || 0) + ' ariza';
       tb.querySelectorAll('button[data-act=open]').forEach(function (b) {

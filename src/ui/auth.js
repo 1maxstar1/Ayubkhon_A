@@ -108,9 +108,11 @@
       var me = S.me();
       if (!me) { box.hidden = true; box.innerHTML = ''; return; }
       box.hidden = false;
-      box.innerHTML = '<span class="who" id="who">' + S.esc(me.name || me.email) + '</span>' +
-        (S.isAdmin() ? '<a class="link" href="admin.html">Admin</a>' : '') +
-        '<button class="link" id="signOut" title="Tizimdan chiqish">Chiqish</button>';
+      var label = me.name || me.email;
+      var initial = (label.trim().charAt(0) || '?').toUpperCase();
+      box.innerHTML = '<span class="who"><span class="av">' + S.esc(initial) + '</span><span id="who">' + S.esc(label) + '</span></span>' +
+        (S.isAdmin() && !/admin\.html$/.test(location.pathname) ? '<a class="btn sm" href="admin.html">Admin</a>' : '') +
+        '<button class="btn sm" id="signOut" title="Tizimdan chiqish">Chiqish</button>';
       var self = this;
       document.getElementById('signOut').addEventListener('click', function () { self.signOut(); });
     }

@@ -48,7 +48,7 @@ routerAdd("POST", "/api/registry/import", (e) => {
         if (row[f] === undefined) continue;
         a.set(f, row[f] === null ? "" : row[f]);
       }
-      a.set("contragent", contragentId);
+      if (contragentId) a.set("contragent", contragentId);   // a row without INN keeps the old link
       a.set("imported_at", now);
       tx.save(a);
       if (isNew) added++; else updated++;

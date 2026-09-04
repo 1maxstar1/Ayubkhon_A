@@ -19,20 +19,28 @@
   <div class="listwrap">
     <div class="listbar">
       <h2>Arizalar</h2>
-      <input type="search" id="appQ" placeholder="Raqam, kontragent yoki loyiha nomi…" spellcheck="false">
+      <input type="search" id="appQ" placeholder="№, kontragent, STIR, loyiha nomi yoki obyekt ID…" spellcheck="false">
       <select id="appWork" title="Ish holati">
-        <option value="">Barchasi</option>
+        <option value="">Ish: barchasi</option>
         <option value="none">Boshlanmagan</option>
         <option value="in_progress">Ishlanmoqda</option>
         <option value="done">Yakunlangan</option>
       </select>
       <select id="appRegion" title="Viloyat (ish maydonida tanlangan)"><option value="">Barcha viloyatlar</option></select>
       <select id="appYear" title="Ariza yili"><option value="">Barcha yillar</option></select>
+      <select id="appType" title="Ekspertiza turi"><option value="">Ekspertiza turi: barchasi</option></select>
+      <select id="appBuyer" title="Buyurtmachi / loyiha turi"><option value="">Buyurtmachi: barchasi</option></select>
+      <select id="appStatus" title="Ariza holati (reyestr)"><option value="">Holat: barchasi</option></select>
+      <span class="range" title="Summa (НДС bilan), so'm">
+        <input type="number" id="appMin" placeholder="Summa dan" min="0" step="1000000">
+        <input type="number" id="appMax" placeholder="gacha" min="0" step="1000000">
+      </span>
+      <button class="btn sm" id="appClear" type="button" title="Barcha filtrlarni tozalash">✕ Filtrlar</button>
       <span class="count" id="appCount"></span>
     </div>
     <div class="listscroll">
       <table class="tbl apps" id="appTable">
-        <thead><tr><th>№</th><th>Sana</th><th>Kontragent</th><th>Loyiha</th><th class="num">Summa (НДС bilan)</th><th>Holat</th><th>Ish</th><th></th></tr></thead>
+        <thead><tr><th>№</th><th>Sana</th><th>Kontragent · STIR</th><th>Loyiha · obyekt ID</th><th>Ekspertiza · buyurtmachi</th><th class="num">Summa (НДС bilan)</th><th>Holat</th><th>Ish</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
       <div class="listfoot"><button class="btn" id="appMore" hidden>Yana ko'rsatish</button></div>

@@ -41,6 +41,7 @@ const SERVER_SCRIPTS = [
   'src/vendor/pocketbase.umd.js',
   ...SCRIPTS.slice(0, 2),      // fflate, util (defines the S namespace)
   'src/lib/pb.js',
+  'src/lib/regions.js',
   ...SCRIPTS.slice(2),
   'src/ui/auth.js',
   'src/ui/registry.js',
@@ -73,7 +74,7 @@ function build() {
       .replace('/*__CSS__*/', () => read('src/app.css'))
       .replace('<!--__SCREENS__-->', () => read('src/screens.html'))
       .replace('/*__JS__*/', () => ['src/vendor/pocketbase.umd.js', 'src/vendor/xlsx.full.min.js',
-        'src/lib/util.js', 'src/lib/pb.js', 'src/lib/registry-parse.js', 'src/ui/auth.js', 'src/ui/admin.js']
+        'src/lib/util.js', 'src/lib/pb.js', 'src/lib/regions.js', 'src/lib/registry-parse.js', 'src/ui/auth.js', 'src/ui/admin.js']
         .filter((p) => existsSync(join(root, p))).map(read).join('\n;\n'));
     emit('admin.html', admin);
   }

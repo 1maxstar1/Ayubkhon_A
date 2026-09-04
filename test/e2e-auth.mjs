@@ -49,7 +49,7 @@ await page.click('#loginBtn');
 await page.waitForSelector('#who', { timeout: 10000 });
 check(await page.isHidden('#screen-login'), 'login screen hidden after sign-in');
 check((await page.textContent('#who')) === 'Test Ekspert', 'header shows the user name');
-check(!(await page.isVisible('#userBox a.link')), 'no admin link for an ekspert');
+check(!(await page.isVisible('#userBox a[href$="admin.html"]')), 'no admin link for an ekspert');
 
 await page.reload();
 await page.waitForSelector('#who', { timeout: 10000 });

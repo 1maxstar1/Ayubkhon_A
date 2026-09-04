@@ -15,21 +15,21 @@
   </div>
   <div class="wsbox" id="wsBox" hidden></div>
   <div class="grow"></div>
-  <label class="btn file">
+  <label class="btn cyan file" title="Smeta .xlsx fayllarini qo'shish">
     <input type="file" id="pick" multiple accept=".xlsx,.xlsm">
-    Smeta fayllarini qo'shish
+    <span class="ic">＋</span> Smeta fayllari
   </label>
-  <button class="btn" id="loadBook">Narx kitobi</button>
-  <button class="btn" id="saveBook">Narx kitobini saqlash</button>
+  <button class="btn" id="loadBook" title="Avval saqlangan narx kitobini (.json / .xlsx) ochish">Narx kitobi</button>
+  <button class="btn" id="saveBook" title="Kiritilgan bozor narxlarini fayl sifatida saqlash">Narxlarni saqlash</button>
   <label class="pickmode" title="Loyiha varaqlariga nima tushishini belgilaydi">
-    <span>Hisobot varaqlari:</span>
+    <span>Varaqlar:</span>
     <select id="reportMode">
       <option value="changed">Faqat o'zgargan narxlar (tozalangan)</option>
       <option value="dedup">Barcha resurslar (tozalangan)</option>
       <option value="full">To'liq nusxa (Excel filtr + saralash kabi)</option>
     </select>
   </label>
-  <button class="btn primary" id="export" disabled>Excel yuklab olish</button>
+  <button class="btn primary" id="export" disabled><span class="ic">↓</span> Excel yuklab olish</button>
   <div class="userbox" id="userBox" hidden></div>
 </header>
 

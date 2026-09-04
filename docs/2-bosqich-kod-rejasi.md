@@ -17,11 +17,16 @@ Kod yozadigan model uchun qoida:
   (`dist/smeta-taqqoslash.html`) ishlashda davom etishi shart.
 * Foydalanuvchiga o'zbekcha (lotin) javob ber, kod va commitlar inglizcha.
 
-## Holat (2026-09-03)
+## Holat (2026-09-04)
 
-1–6-bosqichlar bajarildi va testlar bilan qoplandi (README «Server rejimi»).
-7-bosqich (joylashtirish) uchun `server/deploy/` tayyor; VPS, domen va SMTP
-foydalanuvchidan kutilmoqda. Rejadan farqlar: `registry_imports` hisoblagichlari
+1–7-bosqichlar bajarildi va testlar bilan qoplandi (README «Server rejimi»).
+VPS ga joylashtirilgan (`server/deploy/`), xat Brevo API orqali. Keyin
+qo'shilganlar: 321.xlsx palitrasidagi yagona tugma tizimi (`src/app.css`
+«buttons»), ro'yxatda hisobotning sariq ustunlari bo'yicha filtrlar
+(`/api/registry/facets`), admin sahifasida ish maydonini tozalash/o'chirish va
+arizani qo'lda qo'shish/o'chirish (`server/pb_hooks/admin.pb.js` +
+`pb_hooks/lib/admin.js`; handlerlar alohida VM da ishlagani uchun umumiy
+funksiyalar `require()` orqali olinadi). Rejadan farqlar: `registry_imports` hisoblagichlari
 `rows_added`/`rows_updated`; eslatma so'rovlari filtr hajmi (bayt) bo'yicha
 bo'laklanadi — PocketBase ~3.5 KB dan uzun filtrni rad etadi.
 

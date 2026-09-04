@@ -82,6 +82,56 @@ check(true, 'user can be deactivated');
 const n = (await (await fetch(BASE + '/api/collections/applications/records?perPage=1', { headers: { Authorization: su } })).json()).totalItems;
 check(n === 401, 'applications in the database (400 + smoke probe): ' + n);
 
+// manual application: add through the form, find it, then delete it
+await page.fill('#aNumber', '900123');
+await page.fill('#aOrg', 'Qo\'lda MChJ');
+await page.fill('#aInn', '301234567');
+await page.fill('#aTitle', 'Sinov loyihasi');
+await page.fill('#aCost', '5000000');
+await page.click('#appForm button[type=submit]');
+await page.waitForFunction(() => document.getElementById('appStat').textContent.includes('900123'));
+check((await page.textContent('#appStat')).includes('qo\'shildi'), 'manual application added: ' + await page.textContent('#appStat'));
+await page.waitForFunction(() => document.querySelectorAll('#findTable tbody tr[data-id]').length === 1);
+const found = await page.textContent('#findTable tbody tr');
+check(found.includes('900123') && found.includes('STIR 301234567'), 'find shows the new application with INN');
+const rec = (await (await fetch(BASE + '/api/collections/applications/records?perPage=1&filter=' + encodeURIComponent("number='900123'"), { headers: { Authorization: su } })).json()).items[0];
+check(rec && rec.cost_vat === 5000000 && rec.contragent, 'record carries the cost and a contragent');
+// adding the same number again updates instead of duplicating
+await page.fill('#aNumber', '900123');
+await page.fill('#aTitle', 'Sinov loyihasi (yangilangan)');
+await page.click('#appForm button[type=submit]');
+await page.waitForFunction(() => document.getElementById('appStat').textContent.includes('yangilandi'));
+const rec2 = (await (await fetch(BASE + '/api/collections/applications/records/' + rec.id, { headers: { Authorization: su } })).json());
+check(rec2.org_name === 'Qo\'lda MChJ' && rec2.inn === '301234567' && rec2.project_title.includes('yangilangan') && rec2.contragent === rec.contragent, 'update keeps the fields that were left empty');
+
+// a workspace for it (as the ekspert) shows up in the workspaces panel
+const tok = (await (await fetch(BASE + '/api/collections/users/records?perPage=1&filter=' + encodeURIComponent("email='test@example.com'"), { headers: { Authorization: su } })).json()).items[0].id;
+await fetch(BASE + '/api/collections/workspaces/records', {
+  method: 'POST', headers: { 'content-type': 'application/json', Authorization: su },
+  body: JSON.stringify({ application: rec.id, region: 'fargona', status: 'done', changed: 3, opened_by: tok, updated_by: tok, state: { prices: { a: 1 } } })
+});
+await page.reload();
+await page.waitForSelector('#adminMain:not([hidden])');
+await page.waitForFunction(() => document.querySelectorAll('#wsTable tbody tr[data-id]').length === 1);
+const wsRow = await page.textContent('#wsTable tbody tr');
+check(wsRow.includes('900123') && wsRow.includes('Farg') && wsRow.includes('yakunlangan'), 'workspaces panel lists the workspace: ' + wsRow.replace(/\s+/g, ' ').trim());
+page.once('dialog', (d) => d.accept());
+await page.click('#wsTable tbody tr button[data-act=clear]');
+await page.waitForFunction(() => /ishlanmoqda/.test(document.querySelector('#wsTable tbody').textContent));
+check(true, 'clear resets the workspace to in progress');
+page.once('dialog', (d) => d.accept());
+await page.click('#wsTable tbody tr button[data-act=delete]');
+await page.waitForFunction(() => document.querySelectorAll('#wsTable tbody tr[data-id]').length === 0);
+check(true, 'delete removes the workspace');
+await page.fill('#findQ', '900123');
+await page.click('#findForm button[type=submit]');
+await page.waitForFunction(() => document.querySelectorAll('#findTable tbody tr[data-id]').length === 1);
+page.once('dialog', (d) => d.accept());
+await page.click('#findTable tbody tr button[data-act=delapp]');
+await page.waitForFunction(() => /Topilmadi/.test(document.querySelector('#findTable tbody').textContent));
+const n2 = (await (await fetch(BASE + '/api/collections/applications/records?perPage=1', { headers: { Authorization: su } })).json()).totalItems;
+check(n2 === 401, 'manual application deleted: ' + n2);
+
 await page.screenshot({ path: join(root, 'test/shot-admin.png'), fullPage: true });
 await browser.close();
 server.kill();

@@ -1,6 +1,7 @@
 /*
  * Admin page: registry upload (parsed in the browser, upserted by the
- * /api/registry/import hook) and user management.
+ * /api/registry/import hook), workspace clean-up, manual applications and
+ * user management.
  */
 (function (S) {
   'use strict';
@@ -32,6 +33,10 @@
         e.target.value = '';
       });
       $('userForm').addEventListener('submit', function (e) { e.preventDefault(); self.addUser(); });
+      $('wsQ').addEventListener('input', S.debounce(function () { self.renderWs(); }, 200));
+      $('wsStatus').addEventListener('change', function () { self.renderWs(); });
+      $('appForm').addEventListener('submit', function (e) { e.preventDefault(); self.addApp(); });
+      $('findForm').addEventListener('submit', function (e) { e.preventDefault(); self.findApps(); });
       if (S.pb.authStore.isValid) this.open();
     },
 
@@ -41,7 +46,162 @@
       $('adminMain').hidden = !ok;
       if (!ok) return;
       this.loadHistory();
+      this.loadWs();
+      this.loadFacets();
       this.loadUsers();
+    },
+
+    /* ------------------------------------------------------- workspaces */
+    wsItems: [],
+    loadWs: function () {
+      var self = this;
+      S.pb.collection('workspaces').getFullList({
+        sort: '-updated', expand: 'application,application.contragent,updated_by',
+        fields: 'id,status,region,files,changed,updated,expand.application.number,expand.application.org_name,expand.application.inn,' +
+          'expand.application.project_title,expand.application.expand.contragent.name,expand.updated_by.name,expand.updated_by.email'
+      }).then(function (items) {
+        self.wsItems = items;
+        self.renderWs();
+      }).catch(function (e) { toast(S.pbErr(e), true); });
+    },
+
+    renderWs: function () {
+      var self = this;
+      var tb = $('wsTable').querySelector('tbody');
+      var q = $('wsQ').value.trim().toLowerCase(), st = $('wsStatus').value;
+      var shown = 0;
+      tb.innerHTML = this.wsItems.map(function (w) {
+        var a = (w.expand && w.expand.application) || {};
+        var c = a.expand && a.expand.contragent;
+        var org = c ? c.name : (a.org_name || '');
+        if (st && w.status !== st) return '';
+        if (q && ((a.number || '') + ' ' + org + ' ' + (a.project_title || '') + ' ' + (a.inn || '')).toLowerCase().indexOf(q) < 0) return '';
+        shown++;
+        var by = w.expand && w.expand.updated_by;
+        return '<tr data-id="' + w.id + '">' +
+          '<td class="mono"><b>' + S.esc(a.number || '?') + '</b></td>' +
+          '<td>' + S.esc(org) + (a.inn ? '<br><span class="mute">STIR ' + S.esc(a.inn) + '</span>' : '') + '</td>' +
+          '<td>' + S.esc(S.regionLabel(w.region)) + '</td>' +
+          '<td><span class="ws ' + S.esc(w.status) + '">' + (w.status === 'done' ? 'yakunlangan' : 'ishlanmoqda') + '</span></td>' +
+          '<td>' + ((w.files || []).length) + '</td>' +
+          '<td>' + (w.changed || 0) + '</td>' +
+          '<td>' + when(w.updated) + (by ? '<br><span class="mute">' + S.esc(by.name || by.email) + '</span>' : '') + '</td>' +
+          '<td class="act"><button class="btn sm" data-act="clear" title="Fayllar, tuzatishlar va eksportlarni o\'chirib, boshidan boshlash">Tozalash</button>' +
+          '<button class="btn sm danger" data-act="delete" title="Ish maydonini butunlay o\'chirish">✕ O\'chirish</button></td></tr>';
+      }).join('') || '<tr><td colspan="8" class="mute">Hali hech kim ariza ochmagan</td></tr>';
+      $('wsCount').textContent = shown + ' / ' + this.wsItems.length;
+      tb.querySelectorAll('button[data-act]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var tr = b.closest('tr');
+          var w = self.wsItems.find(function (x) { return x.id === tr.dataset.id; });
+          if (b.dataset.act === 'clear') self.clearWs(w); else self.deleteWs(w);
+        });
+      });
+    },
+
+    wsLabel: function (w) {
+      var a = (w.expand && w.expand.application) || {};
+      return '№ ' + (a.number || '?') + (a.org_name ? ' — ' + a.org_name : '');
+    },
+
+    clearWs: function (w) {
+      var self = this;
+      if (!confirm('Ariza ' + this.wsLabel(w) + '\n\nBarcha smeta fayllari, narx tuzatishlari va eksportlar o\'chiriladi. Ish boshidan boshlanadi. Davom etilsinmi?')) return;
+      S.pb.send('/api/admin/workspaces/' + w.id + '/clear', { method: 'POST' }).then(function (r) {
+        toast('Tozalandi: ' + self.wsLabel(w) + ' · tuzatishlar ' + r.corrections + ', eksportlar ' + r.exports);
+        self.loadWs();
+      }).catch(function (e) { toast('Tozalab bo\'lmadi: ' + S.pbErr(e), true); });
+    },
+
+    deleteWs: function (w) {
+      var self = this;
+      if (!confirm('Ariza ' + this.wsLabel(w) + '\n\nIsh maydoni butunlay o\'chiriladi (fayllar, tuzatishlar, eksportlar). Ariza reyestrda qoladi. Davom etilsinmi?')) return;
+      S.pb.send('/api/admin/workspaces/' + w.id, { method: 'DELETE' }).then(function () {
+        toast('O\'chirildi: ' + self.wsLabel(w));
+        self.loadWs();
+      }).catch(function (e) { toast('O\'chirib bo\'lmadi: ' + S.pbErr(e), true); });
+    },
+
+    /* ------------------------------------------------ manual application */
+    loadFacets: function () {
+      S.pb.send('/api/registry/facets', { method: 'GET' }).then(function (f) {
+        $('typeList').innerHTML = (f.expertise_type || []).map(function (x) { return '<option value="' + S.esc(x.v) + '">'; }).join('');
+        $('buyerList').innerHTML = (f.buyer_type || []).map(function (x) { return '<option value="' + S.esc(x.v) + '">'; }).join('');
+      }).catch(function () { /* datalists stay empty */ });
+    },
+
+    addApp: function () {
+      var self = this;
+      var v = function (id) { return $(id).value.trim(); };
+      var number = v('aNumber').replace(/\s+/g, '');
+      $('appErr').hidden = true; $('appStat').textContent = '';
+      if (!number) { $('appErr').textContent = 'Ariza raqami kerak'; $('appErr').hidden = false; return; }
+      // Only filled fields go up: the import hook leaves absent fields alone, so
+      // re-adding an existing number updates what was typed and keeps the rest.
+      var row = { number: number, raw: { 'Qo\'lda qo\'shdi': (S.me().name || S.me().email) + ', ' + new Date().toLocaleDateString('ru-RU') } };
+      var put = function (f, id, fn) { var x = v(id); if (x) row[f] = fn ? fn(x) : x; };
+      put('status', 'aStatus'); put('org_name', 'aOrg'); put('inn', 'aInn', function (x) { return x.replace(/\s+/g, ''); });
+      put('project_title', 'aTitle'); put('object_id', 'aObject'); put('expertise_type', 'aType'); put('buyer_type', 'aBuyer');
+      put('place', 'aPlace'); put('executor_name', 'aExec');
+      put('registered_at', 'aDate', function (x) { return new Date(x + 'T00:00:00Z').toISOString(); });
+      if (v('aCost')) { row.cost_vat = +v('aCost'); row.cost = Math.round(+v('aCost') / 1.12); row.currency = 'Узбекский сум'; }
+      if (!row.status) row.status = 'Qo\'lda qo\'shilgan';
+      // Same path as the registry upload: contragent by INN, update if the number exists.
+      S.pb.send('/api/registry/import', { method: 'POST', body: { rows: [row] } }).then(function (r) {
+        $('appStat').textContent = r.updated ? 'Ariza № ' + number + ' mavjud edi — ma\'lumotlari yangilandi' : 'Ariza № ' + number + ' qo\'shildi';
+        toast($('appStat').textContent);
+        ['aNumber', 'aDate', 'aStatus', 'aCost', 'aOrg', 'aInn', 'aObject', 'aTitle', 'aType', 'aBuyer', 'aPlace', 'aExec'].forEach(function (id) { $(id).value = ''; });
+        $('findQ').value = number;
+        self.findApps();
+      }).catch(function (e) { $('appErr').textContent = 'Qo\'shib bo\'lmadi: ' + S.pbErr(e); $('appErr').hidden = false; });
+    },
+
+    findApps: function () {
+      var self = this;
+      var q = $('findQ').value.trim();
+      var tb = $('findTable').querySelector('tbody');
+      if (!q) { $('findTable').hidden = true; return; }
+      $('findTable').hidden = false;
+      tb.innerHTML = '<tr><td colspan="6" class="mute">qidirilmoqda…</td></tr>';
+      Promise.all([
+        S.pb.collection('applications').getList(1, 20, {
+          filter: S.pb.filter('number ~ {:q} || org_name ~ {:q} || inn ~ {:q}', { q: q }), sort: '-registered_at', expand: 'contragent'
+        }),
+        S.pb.collection('workspaces').getFullList({ fields: 'id,application,status' })
+      ]).then(function (res) {
+        var ws = {};
+        res[1].forEach(function (w) { ws[w.application] = w; });
+        tb.innerHTML = res[0].items.map(function (a) {
+          var c = a.expand && a.expand.contragent, w = ws[a.id];
+          return '<tr data-id="' + a.id + '">' +
+            '<td class="mono"><b>' + S.esc(a.number) + '</b></td>' +
+            '<td>' + (a.registered_at ? when(a.registered_at).split(' ')[0] : '') + '</td>' +
+            '<td>' + S.esc(c ? c.name : a.org_name) + (a.inn ? '<br><span class="mute">STIR ' + S.esc(a.inn) + '</span>' : '') + '</td>' +
+            '<td>' + S.esc(a.project_title || '') + '</td>' +
+            '<td>' + (w ? '<span class="ws ' + S.esc(w.status) + '">' + (w.status === 'done' ? 'yakunlangan' : 'ishlanmoqda') + '</span>' : '<span class="mute">—</span>') + '</td>' +
+            '<td class="act"><button class="btn sm danger" data-act="delapp">✕ O\'chirish</button></td></tr>';
+        }).join('') || '<tr><td colspan="6" class="mute">Topilmadi</td></tr>';
+        tb.querySelectorAll('button[data-act=delapp]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            var id = b.closest('tr').dataset.id;
+            var a = res[0].items.find(function (x) { return x.id === id; });
+            self.deleteApp(a, !!ws[id]);
+          });
+        });
+      }).catch(function (e) { tb.innerHTML = '<tr><td colspan="6" class="mute">' + S.esc(S.pbErr(e)) + '</td></tr>'; });
+    },
+
+    deleteApp: function (a, hasWs) {
+      var self = this;
+      var msg = 'Ariza № ' + a.number + (a.org_name ? ' — ' + a.org_name : '') + '\n\nReyestrdan o\'chiriladi' +
+        (hasWs ? ', ish maydoni, fayllar, tuzatishlar va eksportlar bilan birga' : '') +
+        '. Keyingi reyestr yuklashda (agar hisobotda bo\'lsa) qayta paydo bo\'ladi. Davom etilsinmi?';
+      if (!confirm(msg)) return;
+      S.pb.send('/api/admin/applications/' + a.id, { method: 'DELETE' }).then(function () {
+        toast('Ariza № ' + a.number + ' o\'chirildi');
+        self.findApps();
+        self.loadWs();
+      }).catch(function (e) { toast('O\'chirib bo\'lmadi: ' + S.pbErr(e), true); });
     },
 
     /* --------------------------------------------------------- registry */
@@ -124,7 +284,7 @@
         tb.innerHTML = items.map(function (u) {
           return '<tr data-id="' + u.id + '"><td>' + S.esc(u.email) + '</td><td>' + S.esc(u.name || '') +
             '</td><td>' + S.esc(u.role || '') + '</td><td>' + (u.active ? 'faol' : '<span class="mute">o\'chirilgan</span>') +
-            '</td><td><button class="link" data-act="toggle">' + (u.active ? 'O\'chirish' : 'Yoqish') + '</button></td></tr>';
+            '</td><td class="act"><button class="btn sm ' + (u.active ? 'danger' : 'ok') + '" data-act="toggle">' + (u.active ? 'O\'chirish' : 'Yoqish') + '</button></td></tr>';
         }).join('');
         tb.querySelectorAll('button[data-act=toggle]').forEach(function (b) {
           b.addEventListener('click', function () {

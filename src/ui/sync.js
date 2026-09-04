@@ -273,14 +273,14 @@
       var a = this.app, w = this.ws;
       var c = a.expand && a.expand.contragent;
       box.hidden = false;
-      box.innerHTML = '<button class="link" id="wsList" title="Arizalar ro\'yxatiga qaytish">‹ Arizalar</button>' +
-        '<b>№ ' + S.esc(a.number) + '</b>' +
+      box.innerHTML = '<button class="btn sm" id="wsList" title="Arizalar ro\'yxatiga qaytish">‹ Arizalar</button>' +
+        '<span class="no">№ ' + S.esc(a.number) + '</span>' +
         '<span class="nm" title="' + S.esc(a.project_title || '') + '">' + S.esc(c ? c.name : a.org_name) + '</span>' +
         '<span class="rg">' + S.esc(S.regionLabel(w.region)) + '</span>' +
         '<span class="sv" id="wsSave" title="Saqlandi">✓</span>' +
         (w.status === 'done'
           ? '<span class="done">yakunlangan</span>'
-          : '<button class="btn sm" id="wsDone" title="Ishni yakunlangan deb belgilash">Yakunlash</button>');
+          : '<button class="btn sm ok" id="wsDone" title="Ishni yakunlangan deb belgilash">✓ Yakunlash</button>');
       $('wsList').addEventListener('click', function () { self.close(); });
       var d = $('wsDone');
       if (d) d.addEventListener('click', function () { self.finish(); });

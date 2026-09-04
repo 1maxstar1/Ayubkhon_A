@@ -4,10 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Smeta — Taqqoslash jadvali №2</title>
-<style>:root{
+<style>/* Palette follows the reference workbook (321.xlsx): light-blue band D9E2F3,
+   cyan CCFFFF header cells, pink FFC7CE / 9C0006 "bad" cells, and the Excel
+   "good" pair C6EFCE / 006100 for finished / positive actions. Navy 16305C is
+   the ink for everything in the top bar. */
+:root{
   --bg:#eef0f4; --sf:#fff; --sf2:#f7f8fa; --ink:#14171c; --mute:#6a7280;
   --rule:#dfe3ea; --rule2:#c7ccd6; --accent:#1f5fbf; --accent-w:#e8f0fd;
-  --cyan:#ccffff; --pink:#ffc7ce; --pinktx:#9c0006; --good:#116b3c; --bad:#b3261e;
+  --navy:#16305c; --navy2:#204378; --band:#d9e2f3; --band2:#aabdde;
+  --cyan:#ccffff; --cyan2:#6fc2c2; --pink:#ffc7ce; --pink2:#d2848d; --pinktx:#9c0006;
+  --green:#c6efce; --green2:#6db383; --greentx:#006100;
+  --good:#116b3c; --bad:#b3261e;
   --row:26px;
   color-scheme:light;
 }
@@ -17,40 +24,72 @@ body{
   margin:0;background:var(--bg);color:var(--ink);
   font:13px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
   font-variant-numeric:tabular-nums;overflow:hidden;
+  display:flex;flex-direction:column;
 }
 button,input,select,textarea{font:inherit;color:inherit}
 
-/* ---------------------------------------------------------------- top bar */
-.bar{display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--sf);border-bottom:1px solid var(--rule)}
-.brand{flex:0 0 auto;white-space:nowrap}
-.brand b{font-size:15px;font-weight:650;letter-spacing:.01em}
-.brand span{display:block;font-size:11px;color:var(--mute);letter-spacing:.04em;text-transform:uppercase;margin-top:1px}
-.grow{flex:1}
-.btn{border:1px solid var(--rule2);background:var(--sf);border-radius:6px;padding:6px 12px;cursor:pointer;white-space:nowrap}
-.btn:hover{background:var(--sf2);border-color:#9aa3b2}
-.btn:disabled{opacity:.45;cursor:default;background:var(--sf)}
-.btn.primary{background:#16305c;color:#fff;border-color:#16305c}
-.btn.primary:hover:not(:disabled){background:#204378}
-.btn.sm{padding:4px 9px;font-size:12px}
+/* ---------------------------------------------------------------- buttons */
+/* One system for every clickable thing: same height, solid fill, navy ink.
+   Variants: primary (navy), cyan (add / open), ok (finish / continue),
+   danger (delete / clear). Works on <button>, <a> and <label> alike. */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:34px;padding:0 14px;
+  border:1px solid var(--navy);border-radius:7px;background:#fff;color:var(--navy);font-weight:600;
+  cursor:pointer;white-space:nowrap;text-decoration:none;line-height:1;
+  box-shadow:0 1px 0 rgba(22,48,92,.18);transition:background .12s,transform .05s}
+.btn:hover:not(:disabled){background:#e9effa}
+.btn:active:not(:disabled){transform:translateY(1px);box-shadow:none}
+.btn:disabled{opacity:.5;cursor:default;box-shadow:none}
+.btn.primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+.btn.primary:hover:not(:disabled){background:var(--navy2)}
+.btn.cyan{background:var(--cyan);border-color:var(--cyan2);color:var(--navy)}
+.btn.cyan:hover:not(:disabled){background:#b3f5f5}
+.btn.ok{background:var(--green);border-color:var(--green2);color:var(--greentx)}
+.btn.ok:hover:not(:disabled){background:#b2e8bd}
+.btn.danger{background:var(--pink);border-color:var(--pink2);color:var(--pinktx)}
+.btn.danger:hover:not(:disabled){background:#ffb0ba}
+.btn.sm{height:28px;padding:0 10px;font-size:12px;border-radius:6px}
+.btn.wide{width:100%;height:38px;margin-top:6px}
 .btn.file{position:relative;overflow:hidden}
 .btn.file input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
-.pickmode{display:flex;align-items:center;gap:6px;border:1px solid var(--rule2);border-radius:6px;
-  padding:2px 4px 2px 9px;background:var(--sf)}
-.pickmode span{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.05em}
-.pickmode select{border:0;background:none;padding:4px 2px;cursor:pointer;max-width:270px}
+.btn .ic{font-size:15px;line-height:1;font-weight:700}
 .link{border:0;background:none;color:var(--mute);cursor:pointer;padding:2px 6px;border-radius:4px}
 .link:hover{background:var(--sf2);color:var(--ink)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 
+/* ---------------------------------------------------------------- top bar */
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 14px;
+  background:var(--band);border-bottom:2px solid var(--band2);flex:none}
+.brand{flex:0 0 auto;white-space:nowrap;color:var(--navy)}
+.brand b{font-size:15px;font-weight:700;letter-spacing:.01em}
+.brand span{display:block;font-size:11px;color:#3d5583;letter-spacing:.04em;text-transform:uppercase;margin-top:1px}
+.grow{flex:1}
+.pickmode{display:flex;align-items:center;gap:6px;height:34px;border:1px solid var(--navy);border-radius:7px;
+  padding:0 4px 0 10px;background:#fff;box-shadow:0 1px 0 rgba(22,48,92,.18)}
+.pickmode span{font-size:11px;color:var(--navy);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.pickmode select{border:0;background:none;padding:4px 2px;cursor:pointer;max-width:250px;color:var(--navy);font-weight:600}
+.userbox{display:flex;align-items:center;gap:6px;font-size:12px;margin-left:4px;padding-left:12px;border-left:1px solid var(--band2)}
+.userbox .who{display:inline-flex;align-items:center;gap:6px;font-weight:700;color:var(--navy);margin-right:4px}
+.userbox .av{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;
+  background:var(--navy);color:#fff;font-size:12px;font-weight:700}
+.wsbox{display:flex;align-items:center;gap:8px;font-size:12px;flex:0 1 auto;min-width:90px}
+.wsbox .no{background:var(--navy);color:#fff;border-radius:6px;padding:3px 8px;font-weight:700;white-space:nowrap}
+.wsbox .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;color:var(--navy);max-width:280px}
+.wsbox .rg{font-size:11px;background:#fff;color:var(--navy);border:1px solid var(--band2);border-radius:5px;padding:2px 7px;white-space:nowrap;font-weight:600}
+.wsbox .sv{color:var(--navy);width:16px;text-align:center;font-weight:700}
+.wsbox .done{font-size:11px;background:var(--green);color:var(--greentx);border:1px solid var(--green2);border-radius:5px;padding:2px 7px;font-weight:700}
+/* With a workspace open the bar is crowded: drop the strapline. */
+body.ws .brand span{display:none}
+body.nows .bar > .btn,body.nows .bar > .pickmode{display:none}
+
 /* ---------------------------------------------------------------- ledger */
-.ledger{padding:9px 14px;background:var(--sf);border-bottom:1px solid var(--rule);font-size:12px;min-height:38px;display:flex;gap:26px;align-items:baseline;flex-wrap:wrap}
+.ledger{padding:9px 14px;background:var(--sf);border-bottom:1px solid var(--rule);font-size:12px;min-height:38px;display:flex;gap:26px;align-items:baseline;flex-wrap:wrap;flex:none}
 .ledger .k{color:var(--mute);text-transform:uppercase;letter-spacing:.06em;font-size:10px;display:block}
 .ledger .v{font-size:16px;font-weight:600}
 .ledger .v.good{color:var(--good)} .ledger .v.bad{color:var(--bad)}
 .ledger .empty{color:var(--mute)}
 
 /* ------------------------------------------------------------------ shell */
-main{display:grid;grid-template-columns:288px 1fr;height:calc(100vh - 38px - 39px);min-height:320px}
+main{display:grid;grid-template-columns:288px 1fr;flex:1;min-height:0}
 main.narrow{grid-template-columns:0 1fr}
 main.narrow aside{display:none}
 aside{background:var(--sf);border-right:1px solid var(--rule);overflow:auto;display:flex;flex-direction:column}
@@ -78,9 +117,9 @@ body.drag::after{content:"";position:fixed;inset:8px;border:2px dashed var(--acc
 /* ------------------------------------------------------------------ panes */
 #work{display:flex;flex-direction:column;min-width:0;background:var(--sf)}
 .tabs{display:flex;gap:2px;padding:6px 10px 0;border-bottom:1px solid var(--rule);background:var(--sf2)}
-.tab{border:1px solid transparent;border-bottom:0;background:none;padding:6px 14px;border-radius:7px 7px 0 0;cursor:pointer;color:var(--mute)}
+.tab{border:1px solid transparent;border-bottom:0;background:none;padding:6px 14px;border-radius:7px 7px 0 0;cursor:pointer;color:var(--mute);font-weight:600}
 .tab:hover{color:var(--ink)}
-.tab.on{background:var(--sf);border-color:var(--rule);color:var(--ink);font-weight:600;margin-bottom:-1px;padding-bottom:7px}
+.tab.on{background:var(--sf);border-color:var(--rule);border-top:3px solid var(--navy);color:var(--navy);margin-bottom:-1px;padding-bottom:7px}
 .pane{display:none;flex:1;min-height:0;flex-direction:column}
 .pane.on{display:flex}
 .toolbar{display:flex;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--rule)}
@@ -152,76 +191,73 @@ body.drag::after{content:"";position:fixed;inset:8px;border:2px dashed var(--acc
 /* ---------------------------------------------------------------- screens */
 .screen{position:fixed;inset:0;background:var(--bg);z-index:70;overflow:auto;display:flex;align-items:center;justify-content:center;padding:24px}
 .screen[hidden]{display:none}
-.card{background:var(--sf);border:1px solid var(--rule);border-radius:12px;padding:28px 30px;width:100%;max-width:420px;box-shadow:0 8px 30px rgba(20,23,28,.08)}
-.card h2{margin:0 0 6px;font-size:18px}
+.card{background:var(--sf);border:1px solid var(--rule);border-radius:12px;padding:28px 30px;width:100%;max-width:420px;box-shadow:0 8px 30px rgba(20,23,28,.08);border-top:4px solid var(--navy)}
+.card h2{margin:0 0 6px;font-size:18px;color:var(--navy)}
 .card .lead{color:var(--mute);margin:0 0 18px;font-size:12.5px}
 .card label{display:block;font-size:12px;color:var(--mute);margin-bottom:12px}
-.card input{display:block;width:100%;margin-top:4px;border:1px solid var(--rule2);border-radius:6px;padding:8px 10px;font-size:14px;color:var(--ink)}
+.card input,.card select{display:block;width:100%;margin-top:4px;border:1px solid var(--rule2);border-radius:6px;padding:8px 10px;font-size:14px;color:var(--ink);background:#fff}
 .card .hint{font-size:11.5px;color:var(--mute);margin:-4px 0 12px}
 .card .err{color:var(--bad);font-size:12px;margin:0 0 10px}
 .card .foot{color:var(--mute);font-size:11px;margin:14px 0 0}
-.btn.wide{width:100%;padding:9px}
-.userbox{display:flex;align-items:center;gap:4px;font-size:12px;margin-left:6px;padding-left:10px;border-left:1px solid var(--rule)}
-.userbox .who{font-weight:600;margin-right:4px}
-.userbox a.link{text-decoration:none}
 
 /* ------------------------------------------------------------------ admin */
 body.admin{overflow:auto}
-main.admin-main{display:block;height:auto;max-width:960px;margin:0 auto;padding:18px 16px 40px}
+main.admin-main{display:block;flex:none;height:auto;width:100%;max-width:1040px;margin:0 auto;padding:18px 16px 40px}
 .admin-main[hidden]{display:none}
-.panel{background:var(--sf);border:1px solid var(--rule);border-radius:10px;padding:18px 20px;margin-bottom:16px}
-.panel h2{margin:0 0 6px;font-size:15px}
+.panel{background:var(--sf);border:1px solid var(--rule);border-radius:10px;padding:18px 20px;margin-bottom:16px;border-top:4px solid var(--band2)}
+.panel h2{margin:0 0 6px;font-size:15px;color:var(--navy)}
 .panel h3{margin:18px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute)}
 .panel .lead{color:var(--mute);font-size:12.5px;margin:0 0 12px}
 .panel .err{color:var(--bad);font-size:12px}
 .panel .stat{font-size:13px;margin-top:8px;font-weight:600}
 .panel .mute{color:var(--mute);font-weight:400}
 .progress{position:relative;height:22px;border:1px solid var(--rule2);border-radius:6px;margin-top:10px;overflow:hidden;background:var(--sf2)}
-.progress .bar-fill{position:absolute;inset:0 auto 0 0;background:var(--accent-w);transition:width .2s}
+.progress .bar-fill{position:absolute;inset:0 auto 0 0;background:var(--band);transition:width .2s}
 .progress span{position:relative;line-height:22px;padding-left:8px;font-size:12px}
 .tbl{width:100%;border-collapse:collapse;font-size:12.5px}
-.tbl th,.tbl td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--rule)}
-.tbl th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);font-weight:600}
-form.inline{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
-form.inline input,form.inline select{border:1px solid var(--rule2);border-radius:6px;padding:6px 8px;background:var(--sf)}
+.tbl th,.tbl td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--rule);vertical-align:middle}
+.tbl th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--navy);font-weight:700;background:var(--cyan)}
+.tbl td.act{white-space:nowrap;text-align:right}
+.tbl td.act .btn{margin-left:4px}
+form.inline{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+form.inline input,form.inline select{border:1px solid var(--rule2);border-radius:6px;padding:0 8px;height:34px;background:var(--sf)}
 form.inline input{flex:1;min-width:160px}
+form.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px 10px;margin-bottom:10px}
+form.grid label{font-size:11px;color:var(--mute);display:block}
+form.grid label.w2{grid-column:span 2}
+form.grid label.w4{grid-column:1 / -1}
+form.grid input,form.grid select{display:block;width:100%;margin-top:3px;border:1px solid var(--rule2);border-radius:6px;padding:0 8px;height:34px;background:var(--sf);color:var(--ink)}
+form.grid .foot{grid-column:1 / -1;display:flex;gap:8px;align-items:center}
 .denied{text-align:center;color:var(--mute);margin-top:60px}
-a.btn{text-decoration:none;color:var(--ink)}
+.ws{font-size:11px;border-radius:3px;padding:1px 5px;background:#fde7c7;color:#8a5300}
+.ws.done{background:var(--green);color:var(--greentx)}
 
 /* ---------------------------------------------------------- application list */
 .screen.list{align-items:stretch;padding:0;z-index:60;border-top:1px solid var(--rule)}
-body.nows .bar > .btn,body.nows .bar > .pickmode{display:none}
 .listwrap{display:flex;flex-direction:column;width:100%;height:100%;background:var(--sf)}
-.listbar{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--rule)}
-.listbar h2{margin:0 12px 0 0;font-size:15px}
+.listbar{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--rule);flex-wrap:wrap}
+.listbar h2{margin:0 12px 0 0;font-size:15px;color:var(--navy)}
 .listbar input[type=search]{flex:0 1 420px;border:1px solid var(--rule2);border-radius:6px;padding:6px 9px}
-.listbar select{border:1px solid var(--rule2);border-radius:6px;padding:6px 8px;background:var(--sf)}
+.listbar select{border:1px solid var(--rule2);border-radius:6px;padding:6px 8px;background:var(--sf);max-width:230px}
+.listbar .range{display:inline-flex;gap:4px}
+.listbar .range input{width:118px;border:1px solid var(--rule2);border-radius:6px;padding:6px 8px}
+.tbl.apps td.dim{color:var(--mute);font-size:11.5px;max-width:260px;white-space:normal}
 .listscroll{flex:1;overflow:auto}
-.tbl.apps th{position:sticky;top:0;background:var(--sf2);z-index:1}
+.tbl.apps th{position:sticky;top:0;z-index:1}
 .tbl.apps td{vertical-align:top}
 .tbl.apps td.wrap{max-width:360px;white-space:normal}
 .tbl.apps td.mono{font-variant-numeric:tabular-nums;font-weight:600}
 .tbl.apps .num,.tbl.apps th.num{text-align:right;white-space:nowrap}
 .tbl.apps tr:hover td{background:var(--accent-w)}
 .tbl.apps small{display:block;color:var(--mute);font-size:10.5px}
-.ws{font-size:11px;border-radius:3px;padding:1px 5px;background:#fde7c7;color:#8a5300}
-.ws.done{background:#d9f2e3;color:var(--good)}
 .listfoot{padding:12px;text-align:center}
-/* With a workspace open the bar is crowded: drop the strapline and let the
-   application title take whatever room is left. */
-body.ws .brand span{display:none}
-.wsbox{display:flex;align-items:center;gap:8px;font-size:12px;flex:0 1 auto;min-width:90px}
-.wsbox .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;color:var(--mute)}
-.wsbox .rg{font-size:11px;background:var(--accent-w);color:var(--accent);border-radius:3px;padding:1px 5px;white-space:nowrap}
-.wsbox .sv{color:var(--mute);width:14px;text-align:center}
-.wsbox .done{font-size:11px;color:var(--good);font-weight:600}
 .card .lead{white-space:pre-line}
 
 /* ------------------------------------------------------------------ hints */
 .tagh{display:inline-block;background:#e3f0ff;color:#174a8c;border:0;border-radius:3px;padding:1px 6px;
   font-size:10px;margin-left:6px;cursor:pointer;font-family:inherit;font-variant-numeric:tabular-nums;white-space:nowrap}
 .tagh:hover{background:#cfe3ff}
-.tagh.same{background:#d9f2e3;color:var(--good)}
+.tagh.same{background:var(--green);color:var(--greentx)}
 #hintPop{position:fixed;z-index:75;background:var(--sf);border:1px solid var(--rule2);border-radius:8px;
   box-shadow:0 10px 30px rgba(20,23,28,.14);width:440px;max-height:60vh;overflow:auto;font-size:12px}
 #hintPop[hidden]{display:none}
@@ -259,21 +295,21 @@ ul.files .mute{color:var(--mute)}
   </div>
   <div class="wsbox" id="wsBox" hidden></div>
   <div class="grow"></div>
-  <label class="btn file">
+  <label class="btn cyan file" title="Smeta .xlsx fayllarini qo'shish">
     <input type="file" id="pick" multiple accept=".xlsx,.xlsm">
-    Smeta fayllarini qo'shish
+    <span class="ic">＋</span> Smeta fayllari
   </label>
-  <button class="btn" id="loadBook">Narx kitobi</button>
-  <button class="btn" id="saveBook">Narx kitobini saqlash</button>
+  <button class="btn" id="loadBook" title="Avval saqlangan narx kitobini (.json / .xlsx) ochish">Narx kitobi</button>
+  <button class="btn" id="saveBook" title="Kiritilgan bozor narxlarini fayl sifatida saqlash">Narxlarni saqlash</button>
   <label class="pickmode" title="Loyiha varaqlariga nima tushishini belgilaydi">
-    <span>Hisobot varaqlari:</span>
+    <span>Varaqlar:</span>
     <select id="reportMode">
       <option value="changed">Faqat o'zgargan narxlar (tozalangan)</option>
       <option value="dedup">Barcha resurslar (tozalangan)</option>
       <option value="full">To'liq nusxa (Excel filtr + saralash kabi)</option>
     </select>
   </label>
-  <button class="btn primary" id="export" disabled>Excel yuklab olish</button>
+  <button class="btn primary" id="export" disabled><span class="ic">↓</span> Excel yuklab olish</button>
   <div class="userbox" id="userBox" hidden></div>
 </header>
 
@@ -398,20 +434,28 @@ ul.files .mute{color:var(--mute)}
   <div class="listwrap">
     <div class="listbar">
       <h2>Arizalar</h2>
-      <input type="search" id="appQ" placeholder="Raqam, kontragent yoki loyiha nomi…" spellcheck="false">
+      <input type="search" id="appQ" placeholder="№, kontragent, STIR, loyiha nomi yoki obyekt ID…" spellcheck="false">
       <select id="appWork" title="Ish holati">
-        <option value="">Barchasi</option>
+        <option value="">Ish: barchasi</option>
         <option value="none">Boshlanmagan</option>
         <option value="in_progress">Ishlanmoqda</option>
         <option value="done">Yakunlangan</option>
       </select>
       <select id="appRegion" title="Viloyat (ish maydonida tanlangan)"><option value="">Barcha viloyatlar</option></select>
       <select id="appYear" title="Ariza yili"><option value="">Barcha yillar</option></select>
+      <select id="appType" title="Ekspertiza turi"><option value="">Ekspertiza turi: barchasi</option></select>
+      <select id="appBuyer" title="Buyurtmachi / loyiha turi"><option value="">Buyurtmachi: barchasi</option></select>
+      <select id="appStatus" title="Ariza holati (reyestr)"><option value="">Holat: barchasi</option></select>
+      <span class="range" title="Summa (НДС bilan), so'm">
+        <input type="number" id="appMin" placeholder="Summa dan" min="0" step="1000000">
+        <input type="number" id="appMax" placeholder="gacha" min="0" step="1000000">
+      </span>
+      <button class="btn sm" id="appClear" type="button" title="Barcha filtrlarni tozalash">✕ Filtrlar</button>
       <span class="count" id="appCount"></span>
     </div>
     <div class="listscroll">
       <table class="tbl apps" id="appTable">
-        <thead><tr><th>№</th><th>Sana</th><th>Kontragent</th><th>Loyiha</th><th class="num">Summa (НДС bilan)</th><th>Holat</th><th>Ish</th><th></th></tr></thead>
+        <thead><tr><th>№</th><th>Sana</th><th>Kontragent · STIR</th><th>Loyiha · obyekt ID</th><th>Ekspertiza · buyurtmachi</th><th class="num">Summa (НДС bilan)</th><th>Holat</th><th>Ish</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
       <div class="listfoot"><button class="btn" id="appMore" hidden>Yana ko'rsatish</button></div>
@@ -591,6 +635,66 @@ if (typeof self !== 'undefined') self.S = S;
       if (keys.length) return keys[0] + ': ' + (d[keys[0]].message || d[keys[0]].code || 'noto\'g\'ri qiymat');
     }
     return e.message || String(e);
+  };
+})(S);
+
+;
+/*
+ * Regions (viloyatlar) a workspace can belong to, their labels, and the text
+ * clues that suggest one from an application's registry fields. Shared by the
+ * app and the admin page.
+ */
+(function (S) {
+  'use strict';
+
+  S.REGIONS = [
+    ['respublika', 'Umumrespublika'],
+    ['andijon', 'Andijon viloyati'],
+    ['buxoro', 'Buxoro viloyati'],
+    ['fargona', 'Farg\'ona viloyati'],
+    ['jizzax', 'Jizzax viloyati'],
+    ['xorazm', 'Xorazm viloyati'],
+    ['namangan', 'Namangan viloyati'],
+    ['navoiy', 'Navoiy viloyati'],
+    ['qashqadaryo', 'Qashqadaryo viloyati'],
+    ['samarqand', 'Samarqand viloyati'],
+    ['sirdaryo', 'Sirdaryo viloyati'],
+    ['surxondaryo', 'Surxondaryo viloyati'],
+    ['toshkent_vil', 'Toshkent viloyati'],
+    ['qoraqalpogiston', 'Qoraqalpog\'iston Respublikasi'],
+    ['toshkent_sh', 'Toshkent shahri']
+  ];
+  S.regionLabel = function (v) {
+    for (var i = 0; i < S.REGIONS.length; i++) if (S.REGIONS[i][0] === v) return S.REGIONS[i][1];
+    return v || '';
+  };
+
+  // Words that pin a text to a region: RU, UZ Latin and UZ Cyrillic spellings,
+  // plus the big cities. Order matters — Tashkent city before Tashkent region.
+  var CLUES = [
+    ['toshkent_sh', /г\.?\s*ташкент|город ташкент|toshkent sh|тошкент ш|toshkent shahri|тошкент шаҳри/i],
+    ['toshkent_vil', /ташкентск|toshkent vil|тошкент вил|toshkent tuman|тошкент тумани/i],
+    ['andijon', /андижан|andijon|андижон|asaka|асака|xonobod|хонобод/i],
+    ['buxoro', /бухар|buxoro|бухоро|kogon|когон|g'ijduvon|гиждуван/i],
+    ['fargona', /ферган|farg.?ona|фарғона|marg.?ilon|маргилан|марғилон|qo.?qon|коканд|қўқон|rishton|риштан|quva\b|кува/i],
+    ['jizzax', /джизак|jizzax|жиззах|zomin|заамин|gallaorol|галляарал/i],
+    ['xorazm', /хорезм|xorazm|хоразм|urganch|ургенч|урганч|xiva|хива/i],
+    ['namangan', /наманган|namangan|наманган|chust|чуст|pop\b|поп\b/i],
+    ['navoiy', /навои|navoiy|навоий|zarafshon|зарафшан/i],
+    ['qashqadaryo', /кашкадар|qashqadaryo|қашқадарё|qarshi|карши|қарши|shahrisabz|шахрисабз|koson|косон/i],
+    ['samarqand', /самарканд|samarqand|самарқанд|kattaqo.?rg|каттакурган|urgut|ургут/i],
+    ['sirdaryo', /сырдар|sirdaryo|сирдарё|guliston|гулистан|yangiyer|янгиер/i],
+    ['surxondaryo', /сурхандар|surxondaryo|сурхондарё|termiz|термез|denov|денау/i],
+    ['qoraqalpogiston', /каракалпак|qoraqalpog|қорақалпоғ|nukus|нукус|нукус/i],
+    ['respublika', /общереспубликанск|umumrespublika|республиканск/i]
+  ];
+  S.suggestRegion = function (app) {
+    var texts = [app.place || '', app.project_title || '', app.org_name || ''];
+    for (var t = 0; t < texts.length; t++) {
+      if (!texts[t]) continue;
+      for (var i = 0; i < CLUES.length; i++) if (CLUES[i][1].test(texts[t])) return CLUES[i][0];
+    }
+    return '';
   };
 })(S);
 
@@ -3658,9 +3762,11 @@ if (typeof self !== 'undefined') self.S = S;
       var me = S.me();
       if (!me) { box.hidden = true; box.innerHTML = ''; return; }
       box.hidden = false;
-      box.innerHTML = '<span class="who" id="who">' + S.esc(me.name || me.email) + '</span>' +
-        (S.isAdmin() ? '<a class="link" href="admin.html">Admin</a>' : '') +
-        '<button class="link" id="signOut" title="Tizimdan chiqish">Chiqish</button>';
+      var label = me.name || me.email;
+      var initial = (label.trim().charAt(0) || '?').toUpperCase();
+      box.innerHTML = '<span class="who"><span class="av">' + S.esc(initial) + '</span><span id="who">' + S.esc(label) + '</span></span>' +
+        (S.isAdmin() && !/admin\.html$/.test(location.pathname) ? '<a class="btn sm" href="admin.html">Admin</a>' : '') +
+        '<button class="btn sm" id="signOut" title="Tizimdan chiqish">Chiqish</button>';
       var self = this;
       document.getElementById('signOut').addEventListener('click', function () { self.signOut(); });
     }
@@ -3675,59 +3781,10 @@ if (typeof self !== 'undefined') self.S = S;
 /*
  * Application list (from the registry the admin uploads) and the region
  * choice made when a workspace is opened for the first time.
+ * Region names and the text clues live in lib/regions.js.
  */
 (function (S) {
   'use strict';
-
-  S.REGIONS = [
-    ['respublika', 'Umumrespublika'],
-    ['andijon', 'Andijon viloyati'],
-    ['buxoro', 'Buxoro viloyati'],
-    ['fargona', 'Farg\'ona viloyati'],
-    ['jizzax', 'Jizzax viloyati'],
-    ['xorazm', 'Xorazm viloyati'],
-    ['namangan', 'Namangan viloyati'],
-    ['navoiy', 'Navoiy viloyati'],
-    ['qashqadaryo', 'Qashqadaryo viloyati'],
-    ['samarqand', 'Samarqand viloyati'],
-    ['sirdaryo', 'Sirdaryo viloyati'],
-    ['surxondaryo', 'Surxondaryo viloyati'],
-    ['toshkent_vil', 'Toshkent viloyati'],
-    ['qoraqalpogiston', 'Qoraqalpog\'iston Respublikasi'],
-    ['toshkent_sh', 'Toshkent shahri']
-  ];
-  S.regionLabel = function (v) {
-    for (var i = 0; i < S.REGIONS.length; i++) if (S.REGIONS[i][0] === v) return S.REGIONS[i][1];
-    return v || '';
-  };
-
-  // Words that pin a text to a region: RU, UZ Latin and UZ Cyrillic spellings,
-  // plus the big cities. Order matters — Tashkent city before Tashkent region.
-  var CLUES = [
-    ['toshkent_sh', /г\.?\s*ташкент|город ташкент|toshkent sh|тошкент ш|toshkent shahri|тошкент шаҳри/i],
-    ['toshkent_vil', /ташкентск|toshkent vil|тошкент вил|toshkent tuman|тошкент тумани/i],
-    ['andijon', /андижан|andijon|андижон|asaka|асака|xonobod|хонобод/i],
-    ['buxoro', /бухар|buxoro|бухоро|kogon|когон|g'ijduvon|гиждуван/i],
-    ['fargona', /ферган|farg.?ona|фарғона|marg.?ilon|маргилан|марғилон|qo.?qon|коканд|қўқон|rishton|риштан|quva\b|кува/i],
-    ['jizzax', /джизак|jizzax|жиззах|zomin|заамин|gallaorol|галляарал/i],
-    ['xorazm', /хорезм|xorazm|хоразм|urganch|ургенч|урганч|xiva|хива/i],
-    ['namangan', /наманган|namangan|наманган|chust|чуст|pop\b|поп\b/i],
-    ['navoiy', /навои|navoiy|навоий|zarafshon|зарафшан/i],
-    ['qashqadaryo', /кашкадар|qashqadaryo|қашқадарё|qarshi|карши|қарши|shahrisabz|шахрисабз|koson|косон/i],
-    ['samarqand', /самарканд|samarqand|самарқанд|kattaqo.?rg|каттакурган|urgut|ургут/i],
-    ['sirdaryo', /сырдар|sirdaryo|сирдарё|guliston|гулистан|yangiyer|янгиер/i],
-    ['surxondaryo', /сурхандар|surxondaryo|сурхондарё|termiz|термез|denov|денау/i],
-    ['qoraqalpogiston', /каракалпак|qoraqalpog|қорақалпоғ|nukus|нукус|нукус/i],
-    ['respublika', /общереспубликанск|umumrespublika|республиканск/i]
-  ];
-  S.suggestRegion = function (app) {
-    var texts = [app.place || '', app.project_title || '', app.org_name || ''];
-    for (var t = 0; t < texts.length; t++) {
-      if (!texts[t]) continue;
-      for (var i = 0; i < CLUES.length; i++) if (CLUES[i][1].test(texts[t])) return CLUES[i][0];
-    }
-    return '';
-  };
 
   if (!S.pb) return;
 
@@ -3748,7 +3805,8 @@ if (typeof self !== 'undefined') self.S = S;
   }
 
   var Registry = {
-    page: 1, items: [], ws: {}, q: '', work: '', region: '', year: '',
+    page: 1, items: [], ws: {}, q: '', work: '', region: '', year: '', type: '', buyer: '', status: '', min: '', max: '',
+    facets: null,
 
     init: function () {
       var self = this;
@@ -3756,6 +3814,14 @@ if (typeof self !== 'undefined') self.S = S;
       $('appWork').addEventListener('change', function () { self.work = this.value; self.render(); });
       $('appRegion').addEventListener('change', function () { self.region = this.value; self.render(); });
       $('appYear').addEventListener('change', function () { self.year = this.value; self.reload(); });
+      // filters on the registry's highlighted columns — all server-side
+      $('appType').addEventListener('change', function () { self.type = this.value; self.reload(); });
+      $('appBuyer').addEventListener('change', function () { self.buyer = this.value; self.reload(); });
+      $('appStatus').addEventListener('change', function () { self.status = this.value; self.reload(); });
+      var money = S.debounce(function () { self.min = $('appMin').value; self.max = $('appMax').value; self.reload(); }, 350);
+      $('appMin').addEventListener('input', money);
+      $('appMax').addEventListener('input', money);
+      $('appClear').addEventListener('click', function () { self.clearFilters(); });
       $('appRegion').innerHTML += S.REGIONS.map(function (r) { return '<option value="' + r[0] + '">' + S.esc(r[1]) + '</option>'; }).join('');
       var y = new Date().getFullYear();
       for (var i = y; i >= y - 6; i--) $('appYear').innerHTML += '<option value="' + i + '">' + i + '</option>';
@@ -3775,10 +3841,38 @@ if (typeof self !== 'undefined') self.S = S;
     show: function () {
       // The list sits under the top bar so the user box (name, sign-out) stays reachable;
       // the file / export controls only make sense inside a workspace.
-      $('screen-list').style.top = document.querySelector('header.bar').offsetHeight + 'px';
+      document.body.classList.add('nows');   // before measuring: hides the file buttons, so the bar is one row
+      this.fit();
       $('screen-list').hidden = false;
-      document.body.classList.add('nows');
+      if (!this.fitBound) { this.fitBound = true; window.addEventListener('resize', this.fit); }
+      this.loadFacets();
       this.reload();
+    },
+    fit: function () { $('screen-list').style.top = document.querySelector('header.bar').offsetHeight + 'px'; },
+
+    clearFilters: function () {
+      ['appQ', 'appWork', 'appRegion', 'appYear', 'appType', 'appBuyer', 'appStatus', 'appMin', 'appMax'].forEach(function (id) { $(id).value = ''; });
+      this.q = this.work = this.region = this.year = this.type = this.buyer = this.status = this.min = this.max = '';
+      this.reload();
+    },
+
+    /** Distinct values of the categorical columns (one cheap server query). */
+    loadFacets: function () {
+      var self = this;
+      S.pb.send('/api/registry/facets', { method: 'GET' }).then(function (f) {
+        self.facets = f;
+        fill('appType', f.expertise_type, self.type);
+        fill('appBuyer', f.buyer_type, self.buyer);
+        fill('appStatus', f.status, self.status);
+      }).catch(function () { /* menus stay empty; the search box still works */ });
+      function fill(id, list, cur) {
+        var sel = $(id), first = sel.options[0].outerHTML;
+        sel.innerHTML = first + (list || []).map(function (x) {
+          var label = x.v.length > 70 ? x.v.slice(0, 68) + '…' : x.v;
+          return '<option value="' + S.esc(x.v) + '" title="' + S.esc(x.v) + '">' + S.esc(label) + ' (' + x.n + ')</option>';
+        }).join('');
+        sel.value = cur;
+      }
     },
     hide: function () { $('screen-list').hidden = true; document.body.classList.remove('nows'); },
 
@@ -3791,11 +3885,16 @@ if (typeof self !== 'undefined') self.S = S;
       var self = this;
       var opts = { sort: '-registered_at,-number', expand: 'contragent' };
       var parts = [], params = {};
-      if (this.q) { parts.push('(number ~ {:q} || org_name ~ {:q} || project_title ~ {:q} || inn ~ {:q})'); params.q = this.q; }
+      if (this.q) { parts.push('(number ~ {:q} || org_name ~ {:q} || project_title ~ {:q} || inn ~ {:q} || object_id ~ {:q})'); params.q = this.q; }
       if (this.year) {
         parts.push('registered_at >= {:y0} && registered_at < {:y1}');
         params.y0 = this.year + '-01-01 00:00:00'; params.y1 = (+this.year + 1) + '-01-01 00:00:00';
       }
+      if (this.type) { parts.push('expertise_type = {:t}'); params.t = this.type; }
+      if (this.buyer) { parts.push('buyer_type = {:b}'); params.b = this.buyer; }
+      if (this.status) { parts.push('status = {:s}'); params.s = this.status; }
+      if (this.min !== '' && !isNaN(+this.min)) { parts.push('cost_vat >= {:lo}'); params.lo = +this.min; }
+      if (this.max !== '' && !isNaN(+this.max)) { parts.push('cost_vat <= {:hi}'); params.hi = +this.max; }
       if (parts.length) opts.filter = S.pb.filter(parts.join(' && '), params);
       $('appCount').textContent = 'yuklanmoqda…';
       Promise.all([
@@ -3834,12 +3933,13 @@ if (typeof self !== 'undefined') self.S = S;
         return '<tr data-i="' + i + '">' +
           '<td class="mono"><button class="link num" data-act="card" title="Ariza kartochkasi">' + S.esc(a.number) + '</button></td>' +
           '<td>' + day(a.registered_at) + '</td>' +
-          '<td class="wrap" title="STIR ' + S.esc(a.inn) + '">' + S.esc(a.org_name) + '</td>' +
-          '<td class="wrap">' + S.esc(a.project_title) + '</td>' +
+          '<td class="wrap">' + S.esc(a.org_name) + (a.inn ? '<small>STIR ' + S.esc(a.inn) + '</small>' : '') + '</td>' +
+          '<td class="wrap">' + S.esc(a.project_title) + (a.object_id ? '<small>ID ' + S.esc(a.object_id) + '</small>' : '') + '</td>' +
+          '<td class="dim">' + S.esc(a.expertise_type || '') + (a.buyer_type ? '<small>' + S.esc(a.buyer_type) + '</small>' : '') + '</td>' +
           '<td class="num">' + (a.cost_vat ? S.money(a.cost_vat) : '') + (a.currency && !/сум/i.test(a.currency) ? ' ' + S.esc(a.currency) : '') + '</td>' +
           '<td>' + S.esc(a.status) + '</td>' +
           '<td>' + work + '</td>' +
-          '<td><button class="btn sm" data-act="open">' + (w ? 'Davom etish' : 'Ochish') + '</button></td></tr>';
+          '<td><button class="btn sm ' + (w ? 'ok' : 'cyan') + '" data-act="open">' + (w ? 'Davom etish' : 'Ochish') + '</button></td></tr>';
       }).join('');
       $('appCount').textContent = shown + ' / ' + (this.total || 0) + ' ariza';
       tb.querySelectorAll('button[data-act=open]').forEach(function (b) {
@@ -4218,14 +4318,14 @@ if (typeof self !== 'undefined') self.S = S;
       var a = this.app, w = this.ws;
       var c = a.expand && a.expand.contragent;
       box.hidden = false;
-      box.innerHTML = '<button class="link" id="wsList" title="Arizalar ro\'yxatiga qaytish">‹ Arizalar</button>' +
-        '<b>№ ' + S.esc(a.number) + '</b>' +
+      box.innerHTML = '<button class="btn sm" id="wsList" title="Arizalar ro\'yxatiga qaytish">‹ Arizalar</button>' +
+        '<span class="no">№ ' + S.esc(a.number) + '</span>' +
         '<span class="nm" title="' + S.esc(a.project_title || '') + '">' + S.esc(c ? c.name : a.org_name) + '</span>' +
         '<span class="rg">' + S.esc(S.regionLabel(w.region)) + '</span>' +
         '<span class="sv" id="wsSave" title="Saqlandi">✓</span>' +
         (w.status === 'done'
           ? '<span class="done">yakunlangan</span>'
-          : '<button class="btn sm" id="wsDone" title="Ishni yakunlangan deb belgilash">Yakunlash</button>');
+          : '<button class="btn sm ok" id="wsDone" title="Ishni yakunlangan deb belgilash">✓ Yakunlash</button>');
       $('wsList').addEventListener('click', function () { self.close(); });
       var d = $('wsDone');
       if (d) d.addEventListener('click', function () { self.finish(); });

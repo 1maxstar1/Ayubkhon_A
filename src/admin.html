@@ -11,10 +11,10 @@
 <header class="bar">
   <div class="brand">
     <b>Administrator</b>
-    <span>reyestr va foydalanuvchilar</span>
+    <span>reyestr, ish maydonlari va foydalanuvchilar</span>
   </div>
   <div class="grow"></div>
-  <a class="btn" href="./">Dasturga qaytish</a>
+  <a class="btn primary" href="./">‹ Dasturga qaytish</a>
   <div class="userbox" id="userBox" hidden></div>
 </header>
 
@@ -25,7 +25,7 @@
       solishtiriladi: yangi — qo'shiladi, mavjud — yangilanadi. Hech narsa o'chirilmaydi.</p>
     <label class="btn file primary">
       <input type="file" id="regFile" accept=".xls,.xlsx">
-      Reyestr faylini yuklash
+      <span class="ic">↑</span> Reyestr faylini yuklash
     </label>
     <div class="progress" id="regProgress" hidden><div class="bar-fill" id="regBar"></div><span id="regText"></span></div>
     <p class="err" id="regErr" hidden></p>
@@ -35,12 +35,58 @@
   </section>
 
   <section class="panel">
+    <h2>Ish maydonlari</h2>
+    <p class="lead">Xodimlar ochgan arizalar. <b>Tozalash</b> — yuklangan smeta fayllari, narx tuzatishlari va eksportlar
+      o'chiriladi, ariza «boshidan» holatiga qaytadi (viloyat saqlanadi). <b>O'chirish</b> — ish maydoni butunlay yo'q qilinadi,
+      ariza reyestrda qoladi va qayta ochilishi mumkin.</p>
+    <form class="inline" id="wsFilter" autocomplete="off" onsubmit="return false">
+      <input type="search" id="wsQ" placeholder="Ariza raqami, kontragent yoki loyiha…" spellcheck="false">
+      <select id="wsStatus"><option value="">Holat: barchasi</option><option value="in_progress">Ishlanmoqda</option><option value="done">Yakunlangan</option></select>
+      <span class="count" id="wsCount"></span>
+    </form>
+    <table class="tbl" id="wsTable"><thead><tr><th>№</th><th>Kontragent · STIR</th><th>Viloyat</th><th>Holat</th><th>Fayl</th><th>Tuzatish</th><th>Oxirgi</th><th></th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="panel">
+    <h2>Arizani qo'lda qo'shish</h2>
+    <p class="lead">Reyestrda hali yo'q ariza uchun. Raqam mavjud bo'lsa, uning ma'lumotlari yangilanadi; keyingi reyestr
+      yuklashda ham shu raqam bo'yicha yangilanadi. Kontragent STIR bo'yicha topiladi yoki yaratiladi.</p>
+    <form class="grid" id="appForm" autocomplete="off">
+      <label>Ariza raqami *<input type="text" id="aNumber" required inputmode="numeric" placeholder="67155"></label>
+      <label>Ro'yxatga olingan sana<input type="date" id="aDate"></label>
+      <label>Holat<input type="text" id="aStatus" placeholder="Qo'lda qo'shilgan"></label>
+      <label>Summa (НДС bilan), so'm<input type="number" id="aCost" min="0" step="1"></label>
+      <label class="w2">Tashkilot (kontragent)<input type="text" id="aOrg" placeholder="«…» MChJ"></label>
+      <label>STIR (ИНН)<input type="text" id="aInn" inputmode="numeric" placeholder="200000000"></label>
+      <label>Obyekt ID<input type="text" id="aObject"></label>
+      <label class="w4">Loyiha nomi<input type="text" id="aTitle"></label>
+      <label class="w2">Ekspertiza turi<input type="text" id="aType" list="typeList"></label>
+      <label class="w2">Buyurtmachi / loyiha turi<input type="text" id="aBuyer" list="buyerList"></label>
+      <label class="w2">Joy (viloyat / shahar)<input type="text" id="aPlace"></label>
+      <label class="w2">Mas'ul ijrochi<input type="text" id="aExec"></label>
+      <datalist id="typeList"></datalist>
+      <datalist id="buyerList"></datalist>
+      <div class="foot">
+        <button class="btn primary" type="submit"><span class="ic">＋</span> Arizani qo'shish</button>
+        <p class="err" id="appErr" hidden></p>
+        <span class="stat" id="appStat"></span>
+      </div>
+    </form>
+    <h3>Arizani topish va o'chirish</h3>
+    <form class="inline" id="findForm" autocomplete="off">
+      <input type="search" id="findQ" placeholder="Ariza raqami yoki kontragent…" spellcheck="false">
+      <button class="btn" type="submit">Topish</button>
+    </form>
+    <table class="tbl" id="findTable" hidden><thead><tr><th>№</th><th>Sana</th><th>Kontragent · STIR</th><th>Loyiha</th><th>Ish</th><th></th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="panel">
     <h2>Foydalanuvchilar</h2>
     <form class="inline" id="userForm" autocomplete="off">
       <input type="email" id="uEmail" placeholder="pochta@tashkilot.uz" required>
       <input type="text" id="uName" placeholder="Ism familiya" required>
       <select id="uRole"><option value="ekspert">Ekspert</option><option value="admin">Admin</option></select>
-      <button class="btn primary" type="submit">Qo'shish</button>
+      <button class="btn primary" type="submit"><span class="ic">＋</span> Qo'shish</button>
     </form>
     <p class="err" id="userErr" hidden></p>
     <table class="tbl" id="userTable"><thead><tr><th>Pochta</th><th>Ism</th><th>Rol</th><th>Holat</th><th></th></tr></thead><tbody></tbody></table>

@@ -200,20 +200,29 @@ sh server/run.sh                                                              # 
 
 * `http://127.0.0.1:8090/` — dastur (kirish → arizalar → ish maydoni).
 * `http://127.0.0.1:8090/admin.html` — administrator: reyestr (`Report_1.xls`)
-  yuklash, foydalanuvchilar. Faqat `role = admin` yoki superuser.
+  yuklash, ish maydonlarini tozalash/o'chirish, arizani qo'lda qo'shish yoki
+  o'chirish, foydalanuvchilar. Faqat `role = admin` yoki superuser.
 * `http://127.0.0.1:8090/_/` — PocketBase boshqaruv paneli (superuser).
 * Ishlab chiqishda (`PB_DEV=1`, `run.sh` sukut bo'yicha) kod emailga
   yuborilmaydi — `server/pb_data/dev-otp.txt` ga yoziladi. Serverda SMTP
   PocketBase panelida (Settings → Mail) sozlanadi.
 
 **Oqim.** Admin har kuni reyestrni yuklaydi (ariza raqami bo'yicha
-qo'shiladi/yangilanadi, hech narsa o'chirilmaydi). Xodim arizani ochadi,
+qo'shiladi/yangilanadi, hech narsa o'chirilmaydi). Arizalar ro'yxati
+hisobotning sariq ustunlari bo'yicha filtrlanadi: raqam / tashkilot / STIR /
+loyiha nomi / obyekt ID (qidiruv), ekspertiza turi, buyurtmachi turi, holat,
+summa oralig'i (`/api/registry/facets` — ustunlarning takrorlanmas qiymatlari).
+Xodim arizani ochadi,
 birinchi marta viloyatni tanlaydi (ariza matnidan taklif qilinadi), smeta
 fayllarini yuklaydi — fayllar, sozlamalar va har tuzatish avtomatik
 saqlanadi; qayta ochganda hammasi tiklanadi. Bozor narxi katagida shu
 viloyatdagi oldingi loyihalar narxlari ko'rinadi: avval shu kontragent
 (STIR bo'yicha), keyin boshqalar; boshqa viloyat ko'rsatilmaydi. Har
 eksport `exports` da saqlanadi, ariza kartochkasidan yuklab olinadi.
+Admin ish maydonini **tozalashi** (fayllar, tuzatishlar, eksportlar o'chadi,
+viloyat qoladi) yoki **o'chirishi**, arizani **qo'lda qo'shishi** (import
+hook orqali — raqam mavjud bo'lsa yangilanadi) yoki **o'chirishi** mumkin —
+`server/pb_hooks/admin.pb.js`.
 
 Fayllar: `server/` (sxema, hooklar, skriptlar), `src/lib/pb.js`,
 `src/lib/registry-parse.js`, `src/ui/{auth,registry,sync,hints,admin}.js`,
@@ -226,8 +235,9 @@ Testlar:
 sh test/pb-smoke.sh            # server: sxema, OTP kirish, token muddati, huquqlar
 node test/registry.cjs         # reyestr parser (fixture, 400 qator)
 sh test/registry-import.sh     # import hook: ikki marta yuklash, huquqlar
+sh test/admin-api.sh           # admin hooklari: facets, tozalash, o'chirish, huquqlar
 node test/e2e-auth.mjs         # brauzer: kirish, noto'g'ri kod, qulf
-node test/e2e-admin.mjs        # brauzer: reyestr yuklash, foydalanuvchilar
+node test/e2e-admin.mjs        # brauzer: reyestr, ish maydonlari, qo'lda ariza, foydalanuvchilar
 node test/e2e-workspace.mjs    # brauzer: ariza → viloyat → fayllar → narx → qayta ochish → eksport
 node test/e2e-hints.mjs        # brauzer: eslatmalar (viloyat, kontragent)
 ```

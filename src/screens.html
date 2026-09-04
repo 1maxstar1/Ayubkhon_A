@@ -37,6 +37,8 @@
       </span>
       <button class="btn sm" id="appClear" type="button" title="Barcha filtrlarni tozalash">✕ Filtrlar</button>
       <span class="count" id="appCount"></span>
+      <div class="grow"></div>
+      <button class="btn sm primary" id="appAdd" type="button" hidden title="Reyestrda yo'q arizani qo'lda qo'shish"><span class="ic">＋</span> Ariza qo'shish</button>
     </div>
     <div class="listscroll">
       <table class="tbl apps" id="appTable">
@@ -73,4 +75,32 @@
     <ul class="files" id="cardFiles"></ul>
     <div class="card-foot"><button class="btn primary" id="cardOpen">Ochish</button></div>
   </div>
+</div>
+
+<div class="screen" id="screen-appform" hidden>
+  <form class="card wide" id="appForm" autocomplete="off">
+    <div class="card-head"><h2>Arizani qo'lda qo'shish</h2><button class="link" type="button" id="appFormClose">×</button></div>
+    <p class="lead">Reyestrda hali yo'q ariza uchun. Raqam mavjud bo'lsa, faqat to'ldirilgan maydonlar yangilanadi. Kontragent STIR bo'yicha topiladi yoki yaratiladi.</p>
+    <div class="grid">
+      <label>Ariza raqami *<input type="text" id="aNumber" required inputmode="numeric" placeholder="67155"></label>
+      <label>Ro'yxatga olingan sana<input type="date" id="aDate"></label>
+      <label>Holat<input type="text" id="aStatus" placeholder="Qo'lda qo'shilgan"></label>
+      <label>Summa (НДС bilan), so'm<input type="number" id="aCost" min="0" step="1"></label>
+      <label class="w2">Tashkilot (kontragent)<input type="text" id="aOrg" placeholder="«…» MChJ"></label>
+      <label>STIR (ИНН)<input type="text" id="aInn" inputmode="numeric" placeholder="200000000"></label>
+      <label>Obyekt ID<input type="text" id="aObject"></label>
+      <label class="w4">Loyiha nomi<input type="text" id="aTitle"></label>
+      <label class="w2">Ekspertiza turi<input type="text" id="aType" list="typeList"></label>
+      <label class="w2">Buyurtmachi / loyiha turi<input type="text" id="aBuyer" list="buyerList"></label>
+      <label class="w2">Joy (viloyat / shahar)<input type="text" id="aPlace"></label>
+      <label class="w2">Mas'ul ijrochi<input type="text" id="aExec"></label>
+      <datalist id="typeList"></datalist>
+      <datalist id="buyerList"></datalist>
+    </div>
+    <p class="err" id="appErr" hidden></p>
+    <div class="card-foot">
+      <button class="btn" type="button" id="appFormCancel">Bekor qilish</button>
+      <button class="btn primary" type="submit"><span class="ic">＋</span> Saqlash</button>
+    </div>
+  </form>
 </div>

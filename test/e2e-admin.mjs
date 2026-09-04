@@ -83,6 +83,8 @@ const n = (await (await fetch(BASE + '/api/collections/applications/records?perP
 check(n === 401, 'applications in the database (400 + smoke probe): ' + n);
 
 // manual application: add through the form, find it, then delete it
+await page.click('#appAddBtn');
+await page.waitForSelector('#screen-appform:not([hidden])');
 await page.fill('#aNumber', '900123');
 await page.fill('#aOrg', 'Qo\'lda MChJ');
 await page.fill('#aInn', '301234567');
@@ -97,6 +99,7 @@ check(found.includes('900123') && found.includes('STIR 301234567'), 'find shows 
 const rec = (await (await fetch(BASE + '/api/collections/applications/records?perPage=1&filter=' + encodeURIComponent("number='900123'"), { headers: { Authorization: su } })).json()).items[0];
 check(rec && rec.cost_vat === 5000000 && rec.contragent, 'record carries the cost and a contragent');
 // adding the same number again updates instead of duplicating
+await page.click('#appAddBtn');
 await page.fill('#aNumber', '900123');
 await page.fill('#aTitle', 'Sinov loyihasi (yangilangan)');
 await page.click('#appForm button[type=submit]');
@@ -118,19 +121,44 @@ check(wsRow.includes('900123') && wsRow.includes('Farg') && wsRow.includes('yaku
 page.once('dialog', (d) => d.accept());
 await page.click('#wsTable tbody tr button[data-act=clear]');
 await page.waitForFunction(() => /ishlanmoqda/.test(document.querySelector('#wsTable tbody').textContent));
-check(true, 'clear resets the workspace to in progress');
+check(true, 'admin page: clear resets the workspace to in progress');
+
+// the same actions inside the application list (index.html), as the admin
+await page.goto(BASE + '/');
+await page.waitForSelector('#screen-list:not([hidden])');
+check(await page.isVisible('#appAdd'), 'list shows the add button to an admin');
+await page.fill('#appQ', '900123');
+await page.waitForFunction(() => document.querySelectorAll('#appTable tbody tr').length === 1 && document.querySelector('#appTable tbody .adm'));
+check((await page.$$eval('#appTable tbody .adm button', (b) => b.length)) === 3, 'row has clear / delete workspace / delete application');
 page.once('dialog', (d) => d.accept());
-await page.click('#wsTable tbody tr button[data-act=delete]');
-await page.waitForFunction(() => document.querySelectorAll('#wsTable tbody tr[data-id]').length === 0);
-check(true, 'delete removes the workspace');
-await page.fill('#findQ', '900123');
-await page.click('#findForm button[type=submit]');
-await page.waitForFunction(() => document.querySelectorAll('#findTable tbody tr[data-id]').length === 1);
+await page.click('#appTable tbody tr button[data-act=delws]');
+await page.waitForFunction(() => document.querySelectorAll('#appTable tbody tr').length === 1 && !document.querySelector('#appTable tbody button[data-act=delws]'));
+check((await page.textContent('#appTable tbody tr button[data-act=open]')).includes('Ochish'), 'list: workspace deleted, application stays');
+await page.click('#appAdd');
+await page.waitForSelector('#screen-appform:not([hidden])');
+await page.fill('#aNumber', '900124');
+await page.fill('#aOrg', 'Ikkinchi MChJ');
+await page.click('#appForm button[type=submit]');
+await page.waitForSelector('#screen-appform', { state: 'hidden' });
+await page.waitForFunction(() => document.querySelectorAll('#appTable tbody tr').length === 1 && document.querySelector('#appTable tbody').textContent.includes('900124'));
+check(true, 'list: application added from the list and shown');
 page.once('dialog', (d) => d.accept());
-await page.click('#findTable tbody tr button[data-act=delapp]');
-await page.waitForFunction(() => /Topilmadi/.test(document.querySelector('#findTable tbody').textContent));
+await page.click('#appTable tbody tr button[data-act=delapp]');
+await page.waitForFunction(() => document.querySelectorAll('#appTable tbody tr').length === 0);
+check(true, 'list: application deleted');
+await page.fill('#appQ', '900123');
+await page.waitForFunction(() => document.querySelectorAll('#appTable tbody tr').length === 1);
+page.once('dialog', (d) => d.accept());
+await page.click('#appTable tbody tr button[data-act=delapp]');
+await page.waitForFunction(() => document.querySelectorAll('#appTable tbody tr').length === 0);
 const n2 = (await (await fetch(BASE + '/api/collections/applications/records?perPage=1', { headers: { Authorization: su } })).json()).totalItems;
-check(n2 === 401, 'manual application deleted: ' + n2);
+check(n2 === 401, 'manual applications deleted: ' + n2);
+await page.goto(BASE + '/admin.html');
+await page.waitForSelector('#adminMain:not([hidden])');
+await page.fill('#findQ', '9001');
+await page.click('#findForm button[type=submit]');
+await page.waitForFunction(() => /Topilmadi/.test(document.querySelector('#findTable tbody').textContent));
+check(true, 'admin page: find reports nothing left');
 
 await page.screenshot({ path: join(root, 'test/shot-admin.png'), fullPage: true });
 await browser.close();

@@ -49,29 +49,10 @@
 
   <section class="panel">
     <h2>Arizani qo'lda qo'shish</h2>
-    <p class="lead">Reyestrda hali yo'q ariza uchun. Raqam mavjud bo'lsa, uning ma'lumotlari yangilanadi; keyingi reyestr
-      yuklashda ham shu raqam bo'yicha yangilanadi. Kontragent STIR bo'yicha topiladi yoki yaratiladi.</p>
-    <form class="grid" id="appForm" autocomplete="off">
-      <label>Ariza raqami *<input type="text" id="aNumber" required inputmode="numeric" placeholder="67155"></label>
-      <label>Ro'yxatga olingan sana<input type="date" id="aDate"></label>
-      <label>Holat<input type="text" id="aStatus" placeholder="Qo'lda qo'shilgan"></label>
-      <label>Summa (НДС bilan), so'm<input type="number" id="aCost" min="0" step="1"></label>
-      <label class="w2">Tashkilot (kontragent)<input type="text" id="aOrg" placeholder="«…» MChJ"></label>
-      <label>STIR (ИНН)<input type="text" id="aInn" inputmode="numeric" placeholder="200000000"></label>
-      <label>Obyekt ID<input type="text" id="aObject"></label>
-      <label class="w4">Loyiha nomi<input type="text" id="aTitle"></label>
-      <label class="w2">Ekspertiza turi<input type="text" id="aType" list="typeList"></label>
-      <label class="w2">Buyurtmachi / loyiha turi<input type="text" id="aBuyer" list="buyerList"></label>
-      <label class="w2">Joy (viloyat / shahar)<input type="text" id="aPlace"></label>
-      <label class="w2">Mas'ul ijrochi<input type="text" id="aExec"></label>
-      <datalist id="typeList"></datalist>
-      <datalist id="buyerList"></datalist>
-      <div class="foot">
-        <button class="btn primary" type="submit"><span class="ic">＋</span> Arizani qo'shish</button>
-        <p class="err" id="appErr" hidden></p>
-        <span class="stat" id="appStat"></span>
-      </div>
-    </form>
+    <p class="lead">Reyestrda hali yo'q ariza uchun. Raqam mavjud bo'lsa, faqat to'ldirilgan maydonlar yangilanadi; keyingi
+      reyestr yuklashda ham shu raqam bo'yicha yangilanadi. Xuddi shu amallar arizalar ro'yxatida ham bor (admin uchun).</p>
+    <button class="btn primary" type="button" id="appAddBtn"><span class="ic">＋</span> Arizani qo'shish</button>
+    <span class="stat" id="appStat"></span>
     <h3>Arizani topish va o'chirish</h3>
     <form class="inline" id="findForm" autocomplete="off">
       <input type="search" id="findQ" placeholder="Ariza raqami yoki kontragent…" spellcheck="false">

@@ -222,6 +222,8 @@ eksport `exports` da saqlanadi, ariza kartochkasidan yuklab olinadi.
 Admin ish maydonini **tozalashi** (fayllar, tuzatishlar, eksportlar o'chadi,
 viloyat qoladi) yoki **o'chirishi**, arizani **qo'lda qo'shishi** (import
 hook orqali — raqam mavjud bo'lsa yangilanadi) yoki **o'chirishi** mumkin —
+tugmalar arizalar ro'yxatining o'zida (faqat adminga ko'rinadi) va admin
+sahifasida; umumiy kod `src/ui/apps-admin.js`, server tomoni
 `server/pb_hooks/admin.pb.js`.
 
 Fayllar: `server/` (sxema, hooklar, skriptlar), `src/lib/pb.js`,

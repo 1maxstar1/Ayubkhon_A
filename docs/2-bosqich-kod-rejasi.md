@@ -23,8 +23,9 @@ Kod yozadigan model uchun qoida:
 VPS ga joylashtirilgan (`server/deploy/`), xat Brevo API orqali. Keyin
 qo'shilganlar: 321.xlsx palitrasidagi yagona tugma tizimi (`src/app.css`
 «buttons»), ro'yxatda hisobotning sariq ustunlari bo'yicha filtrlar
-(`/api/registry/facets`), admin sahifasida ish maydonini tozalash/o'chirish va
-arizani qo'lda qo'shish/o'chirish (`server/pb_hooks/admin.pb.js` +
+(`/api/registry/facets`), arizalar ro'yxatida va admin sahifasida ish maydonini
+tozalash/o'chirish, arizani qo'lda qo'shish/o'chirish (`src/ui/apps-admin.js`,
+`server/pb_hooks/admin.pb.js` +
 `pb_hooks/lib/admin.js`; handlerlar alohida VM da ishlagani uchun umumiy
 funksiyalar `require()` orqali olinadi). Rejadan farqlar: `registry_imports` hisoblagichlari
 `rows_added`/`rows_updated`; eslatma so'rovlari filtr hajmi (bayt) bo'yicha

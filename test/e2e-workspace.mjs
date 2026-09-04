@@ -59,6 +59,7 @@ await page.click('#loginBtn');
 await page.waitForSelector('#screen-list:not([hidden])');
 await page.waitForFunction(() => document.querySelectorAll('#appTable tbody tr').length >= 50);
 check(true, 'application list shown after sign-in');
+check(await page.isHidden('#appAdd') && !(await page.$('#appTable tbody .adm')), 'no admin buttons for an ekspert');
 check((await page.textContent('#appCount')).includes('401'), 'count shows all applications: ' + await page.textContent('#appCount'));
 
 await page.fill('#appQ', '67159');

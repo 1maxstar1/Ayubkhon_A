@@ -35,7 +35,9 @@
       $('userForm').addEventListener('submit', function (e) { e.preventDefault(); self.addUser(); });
       $('wsQ').addEventListener('input', S.debounce(function () { self.renderWs(); }, 200));
       $('wsStatus').addEventListener('change', function () { self.renderWs(); });
-      $('appForm').addEventListener('submit', function (e) { e.preventDefault(); self.addApp(); });
+      $('appAddBtn').addEventListener('click', function () {
+        S.AppAdmin.openForm(function (number, msg) { $('appStat').textContent = msg; $('findQ').value = number; self.findApps(); });
+      });
       $('findForm').addEventListener('submit', function (e) { e.preventDefault(); self.findApps(); });
       if (S.pb.authStore.isValid) this.open();
     },
@@ -47,7 +49,6 @@
       if (!ok) return;
       this.loadHistory();
       this.loadWs();
-      this.loadFacets();
       this.loadUsers();
     },
 
@@ -99,63 +100,11 @@
       });
     },
 
-    wsLabel: function (w) {
-      var a = (w.expand && w.expand.application) || {};
-      return '№ ' + (a.number || '?') + (a.org_name ? ' — ' + a.org_name : '');
-    },
-
-    clearWs: function (w) {
-      var self = this;
-      if (!confirm('Ariza ' + this.wsLabel(w) + '\n\nBarcha smeta fayllari, narx tuzatishlari va eksportlar o\'chiriladi. Ish boshidan boshlanadi. Davom etilsinmi?')) return;
-      S.pb.send('/api/admin/workspaces/' + w.id + '/clear', { method: 'POST' }).then(function (r) {
-        toast('Tozalandi: ' + self.wsLabel(w) + ' · tuzatishlar ' + r.corrections + ', eksportlar ' + r.exports);
-        self.loadWs();
-      }).catch(function (e) { toast('Tozalab bo\'lmadi: ' + S.pbErr(e), true); });
-    },
-
-    deleteWs: function (w) {
-      var self = this;
-      if (!confirm('Ariza ' + this.wsLabel(w) + '\n\nIsh maydoni butunlay o\'chiriladi (fayllar, tuzatishlar, eksportlar). Ariza reyestrda qoladi. Davom etilsinmi?')) return;
-      S.pb.send('/api/admin/workspaces/' + w.id, { method: 'DELETE' }).then(function () {
-        toast('O\'chirildi: ' + self.wsLabel(w));
-        self.loadWs();
-      }).catch(function (e) { toast('O\'chirib bo\'lmadi: ' + S.pbErr(e), true); });
-    },
+    appOf: function (w) { return (w.expand && w.expand.application) || {}; },
+    clearWs: function (w) { var self = this; S.AppAdmin.clearWs(w, this.appOf(w), function () { self.loadWs(); }); },
+    deleteWs: function (w) { var self = this; S.AppAdmin.deleteWs(w, this.appOf(w), function () { self.loadWs(); }); },
 
     /* ------------------------------------------------ manual application */
-    loadFacets: function () {
-      S.pb.send('/api/registry/facets', { method: 'GET' }).then(function (f) {
-        $('typeList').innerHTML = (f.expertise_type || []).map(function (x) { return '<option value="' + S.esc(x.v) + '">'; }).join('');
-        $('buyerList').innerHTML = (f.buyer_type || []).map(function (x) { return '<option value="' + S.esc(x.v) + '">'; }).join('');
-      }).catch(function () { /* datalists stay empty */ });
-    },
-
-    addApp: function () {
-      var self = this;
-      var v = function (id) { return $(id).value.trim(); };
-      var number = v('aNumber').replace(/\s+/g, '');
-      $('appErr').hidden = true; $('appStat').textContent = '';
-      if (!number) { $('appErr').textContent = 'Ariza raqami kerak'; $('appErr').hidden = false; return; }
-      // Only filled fields go up: the import hook leaves absent fields alone, so
-      // re-adding an existing number updates what was typed and keeps the rest.
-      var row = { number: number, raw: { 'Qo\'lda qo\'shdi': (S.me().name || S.me().email) + ', ' + new Date().toLocaleDateString('ru-RU') } };
-      var put = function (f, id, fn) { var x = v(id); if (x) row[f] = fn ? fn(x) : x; };
-      put('status', 'aStatus'); put('org_name', 'aOrg'); put('inn', 'aInn', function (x) { return x.replace(/\s+/g, ''); });
-      put('project_title', 'aTitle'); put('object_id', 'aObject'); put('expertise_type', 'aType'); put('buyer_type', 'aBuyer');
-      put('place', 'aPlace'); put('executor_name', 'aExec');
-      put('registered_at', 'aDate', function (x) { return new Date(x + 'T00:00:00Z').toISOString(); });
-      if (v('aCost')) { row.cost_vat = +v('aCost'); row.cost = Math.round(+v('aCost') / 1.12); row.currency = 'Узбекский сум'; }
-      if (!row.status) row.status = 'Qo\'lda qo\'shilgan';
-      // Same path as the registry upload: contragent by INN, update if the number exists.
-      S.pb.send('/api/registry/import', { method: 'POST', body: { rows: [row] } }).then(function (r) {
-        $('appStat').textContent = r.updated ? 'Ariza № ' + number + ' mavjud edi — ma\'lumotlari yangilandi' : 'Ariza № ' + number + ' qo\'shildi';
-        toast($('appStat').textContent);
-        ['aNumber', 'aDate', 'aStatus', 'aCost', 'aOrg', 'aInn', 'aObject', 'aTitle', 'aType', 'aBuyer', 'aPlace', 'aExec'].forEach(function (id) { $(id).value = ''; });
-        $('findQ').value = number;
-        self.findApps();
-      }).catch(function (e) { $('appErr').textContent = 'Qo\'shib bo\'lmadi: ' + S.pbErr(e); $('appErr').hidden = false; });
-    },
-
     findApps: function () {
       var self = this;
       var q = $('findQ').value.trim();
@@ -193,15 +142,7 @@
 
     deleteApp: function (a, hasWs) {
       var self = this;
-      var msg = 'Ariza № ' + a.number + (a.org_name ? ' — ' + a.org_name : '') + '\n\nReyestrdan o\'chiriladi' +
-        (hasWs ? ', ish maydoni, fayllar, tuzatishlar va eksportlar bilan birga' : '') +
-        '. Keyingi reyestr yuklashda (agar hisobotda bo\'lsa) qayta paydo bo\'ladi. Davom etilsinmi?';
-      if (!confirm(msg)) return;
-      S.pb.send('/api/admin/applications/' + a.id, { method: 'DELETE' }).then(function () {
-        toast('Ariza № ' + a.number + ' o\'chirildi');
-        self.findApps();
-        self.loadWs();
-      }).catch(function (e) { toast('O\'chirib bo\'lmadi: ' + S.pbErr(e), true); });
+      S.AppAdmin.deleteApp(a, hasWs, function () { self.findApps(); self.loadWs(); });
     },
 
     /* --------------------------------------------------------- registry */

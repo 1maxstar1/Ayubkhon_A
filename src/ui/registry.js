@@ -42,6 +42,9 @@
       $('appMin').addEventListener('input', money);
       $('appMax').addEventListener('input', money);
       $('appClear').addEventListener('click', function () { self.clearFilters(); });
+      $('appAdd').addEventListener('click', function () {
+        S.AppAdmin.openForm(function (number) { $('appQ').value = number; self.q = number; self.reload(); });
+      });
       $('appRegion').innerHTML += S.REGIONS.map(function (r) { return '<option value="' + r[0] + '">' + S.esc(r[1]) + '</option>'; }).join('');
       var y = new Date().getFullYear();
       for (var i = y; i >= y - 6; i--) $('appYear').innerHTML += '<option value="' + i + '">' + i + '</option>';
@@ -63,6 +66,7 @@
       // the file / export controls only make sense inside a workspace.
       document.body.classList.add('nows');   // before measuring: hides the file buttons, so the bar is one row
       this.fit();
+      $('appAdd').hidden = !S.isAdmin();
       $('screen-list').hidden = false;
       if (!this.fitBound) { this.fitBound = true; window.addEventListener('resize', this.fit); }
       this.loadFacets();
@@ -138,7 +142,7 @@
     render: function () {
       var self = this;
       var tb = $('appTable').querySelector('tbody');
-      var shown = 0;
+      var shown = 0, admin = S.isAdmin();
       tb.innerHTML = this.items.map(function (a, i) {
         var w = self.ws[a.id];
         var st = w ? w.status : 'none';
@@ -159,7 +163,12 @@
           '<td class="num">' + (a.cost_vat ? S.money(a.cost_vat) : '') + (a.currency && !/сум/i.test(a.currency) ? ' ' + S.esc(a.currency) : '') + '</td>' +
           '<td>' + S.esc(a.status) + '</td>' +
           '<td>' + work + '</td>' +
-          '<td><button class="btn sm ' + (w ? 'ok' : 'cyan') + '" data-act="open">' + (w ? 'Davom etish' : 'Ochish') + '</button></td></tr>';
+          '<td class="act"><button class="btn sm ' + (w ? 'ok' : 'cyan') + '" data-act="open">' + (w ? 'Davom etish' : 'Ochish') + '</button>' +
+          (admin ? '<div class="adm">' +
+            (w ? '<button class="btn xs" data-act="clear" title="Fayllar, tuzatishlar va eksportlarni o\'chirib, boshidan boshlash">Tozalash</button>' +
+              '<button class="btn xs danger" data-act="delws" title="Ish maydonini o\'chirish (ariza qoladi)">Ishni o\'chirish</button>' : '') +
+            '<button class="btn xs danger" data-act="delapp" title="Arizani reyestrdan o\'chirish">✕ Ariza</button></div>' : '') +
+          '</td></tr>';
       }).join('');
       $('appCount').textContent = shown + ' / ' + (this.total || 0) + ' ariza';
       tb.querySelectorAll('button[data-act=open]').forEach(function (b) {
@@ -167,6 +176,15 @@
       });
       tb.querySelectorAll('button[data-act=card]').forEach(function (b) {
         b.addEventListener('click', function () { self.card(self.items[+b.closest('tr').dataset.i]); });
+      });
+      tb.querySelectorAll('.adm button').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var a = self.items[+b.closest('tr').dataset.i], w = self.ws[a.id];
+          var done = function () { self.reload(); };
+          if (b.dataset.act === 'clear') S.AppAdmin.clearWs(w, a, done);
+          else if (b.dataset.act === 'delws') S.AppAdmin.deleteWs(w, a, done);
+          else S.AppAdmin.deleteApp(a, !!w, done);
+        });
       });
     },
 

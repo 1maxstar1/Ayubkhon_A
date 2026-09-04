@@ -19,6 +19,7 @@
   color-scheme:light;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}   /* .btn sets display, so the attribute needs priority */
 html,body{height:100%}
 body{
   margin:0;background:var(--bg);color:var(--ink);
@@ -48,6 +49,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .btn.danger{background:var(--pink);border-color:var(--pink2);color:var(--pinktx)}
 .btn.danger:hover:not(:disabled){background:#ffb0ba}
 .btn.sm{height:28px;padding:0 10px;font-size:12px;border-radius:6px}
+.btn.xs{height:23px;padding:0 7px;font-size:11px;border-radius:5px;box-shadow:none}
 .btn.wide{width:100%;height:38px;margin-top:6px}
 .btn.file{position:relative;overflow:hidden}
 .btn.file input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
@@ -251,6 +253,13 @@ form.grid .foot{grid-column:1 / -1;display:flex;gap:8px;align-items:center}
 .tbl.apps tr:hover td{background:var(--accent-w)}
 .tbl.apps small{display:block;color:var(--mute);font-size:10.5px}
 .listfoot{padding:12px;text-align:center}
+.tbl.apps td.act{text-align:right;white-space:nowrap}
+.tbl.apps .adm{display:flex;gap:4px;justify-content:flex-end;margin-top:5px}
+.card .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px 10px}
+.card .grid label{margin:0}
+.card .grid label.w2{grid-column:span 2}
+.card .grid label.w4{grid-column:1 / -1}
+.card .grid input{font-size:13px;padding:6px 8px}
 .card .lead{white-space:pre-line}
 
 /* ------------------------------------------------------------------ hints */
@@ -329,29 +338,10 @@ ul.files .mute{color:var(--mute)}
 
   <section class="panel">
     <h2>Arizani qo'lda qo'shish</h2>
-    <p class="lead">Reyestrda hali yo'q ariza uchun. Raqam mavjud bo'lsa, uning ma'lumotlari yangilanadi; keyingi reyestr
-      yuklashda ham shu raqam bo'yicha yangilanadi. Kontragent STIR bo'yicha topiladi yoki yaratiladi.</p>
-    <form class="grid" id="appForm" autocomplete="off">
-      <label>Ariza raqami *<input type="text" id="aNumber" required inputmode="numeric" placeholder="67155"></label>
-      <label>Ro'yxatga olingan sana<input type="date" id="aDate"></label>
-      <label>Holat<input type="text" id="aStatus" placeholder="Qo'lda qo'shilgan"></label>
-      <label>Summa (НДС bilan), so'm<input type="number" id="aCost" min="0" step="1"></label>
-      <label class="w2">Tashkilot (kontragent)<input type="text" id="aOrg" placeholder="«…» MChJ"></label>
-      <label>STIR (ИНН)<input type="text" id="aInn" inputmode="numeric" placeholder="200000000"></label>
-      <label>Obyekt ID<input type="text" id="aObject"></label>
-      <label class="w4">Loyiha nomi<input type="text" id="aTitle"></label>
-      <label class="w2">Ekspertiza turi<input type="text" id="aType" list="typeList"></label>
-      <label class="w2">Buyurtmachi / loyiha turi<input type="text" id="aBuyer" list="buyerList"></label>
-      <label class="w2">Joy (viloyat / shahar)<input type="text" id="aPlace"></label>
-      <label class="w2">Mas'ul ijrochi<input type="text" id="aExec"></label>
-      <datalist id="typeList"></datalist>
-      <datalist id="buyerList"></datalist>
-      <div class="foot">
-        <button class="btn primary" type="submit"><span class="ic">＋</span> Arizani qo'shish</button>
-        <p class="err" id="appErr" hidden></p>
-        <span class="stat" id="appStat"></span>
-      </div>
-    </form>
+    <p class="lead">Reyestrda hali yo'q ariza uchun. Raqam mavjud bo'lsa, faqat to'ldirilgan maydonlar yangilanadi; keyingi
+      reyestr yuklashda ham shu raqam bo'yicha yangilanadi. Xuddi shu amallar arizalar ro'yxatida ham bor (admin uchun).</p>
+    <button class="btn primary" type="button" id="appAddBtn"><span class="ic">＋</span> Arizani qo'shish</button>
+    <span class="stat" id="appStat"></span>
     <h3>Arizani topish va o'chirish</h3>
     <form class="inline" id="findForm" autocomplete="off">
       <input type="search" id="findQ" placeholder="Ariza raqami yoki kontragent…" spellcheck="false">
@@ -413,6 +403,8 @@ ul.files .mute{color:var(--mute)}
       </span>
       <button class="btn sm" id="appClear" type="button" title="Barcha filtrlarni tozalash">✕ Filtrlar</button>
       <span class="count" id="appCount"></span>
+      <div class="grow"></div>
+      <button class="btn sm primary" id="appAdd" type="button" hidden title="Reyestrda yo'q arizani qo'lda qo'shish"><span class="ic">＋</span> Ariza qo'shish</button>
     </div>
     <div class="listscroll">
       <table class="tbl apps" id="appTable">
@@ -449,6 +441,34 @@ ul.files .mute{color:var(--mute)}
     <ul class="files" id="cardFiles"></ul>
     <div class="card-foot"><button class="btn primary" id="cardOpen">Ochish</button></div>
   </div>
+</div>
+
+<div class="screen" id="screen-appform" hidden>
+  <form class="card wide" id="appForm" autocomplete="off">
+    <div class="card-head"><h2>Arizani qo'lda qo'shish</h2><button class="link" type="button" id="appFormClose">×</button></div>
+    <p class="lead">Reyestrda hali yo'q ariza uchun. Raqam mavjud bo'lsa, faqat to'ldirilgan maydonlar yangilanadi. Kontragent STIR bo'yicha topiladi yoki yaratiladi.</p>
+    <div class="grid">
+      <label>Ariza raqami *<input type="text" id="aNumber" required inputmode="numeric" placeholder="67155"></label>
+      <label>Ro'yxatga olingan sana<input type="date" id="aDate"></label>
+      <label>Holat<input type="text" id="aStatus" placeholder="Qo'lda qo'shilgan"></label>
+      <label>Summa (НДС bilan), so'm<input type="number" id="aCost" min="0" step="1"></label>
+      <label class="w2">Tashkilot (kontragent)<input type="text" id="aOrg" placeholder="«…» MChJ"></label>
+      <label>STIR (ИНН)<input type="text" id="aInn" inputmode="numeric" placeholder="200000000"></label>
+      <label>Obyekt ID<input type="text" id="aObject"></label>
+      <label class="w4">Loyiha nomi<input type="text" id="aTitle"></label>
+      <label class="w2">Ekspertiza turi<input type="text" id="aType" list="typeList"></label>
+      <label class="w2">Buyurtmachi / loyiha turi<input type="text" id="aBuyer" list="buyerList"></label>
+      <label class="w2">Joy (viloyat / shahar)<input type="text" id="aPlace"></label>
+      <label class="w2">Mas'ul ijrochi<input type="text" id="aExec"></label>
+      <datalist id="typeList"></datalist>
+      <datalist id="buyerList"></datalist>
+    </div>
+    <p class="err" id="appErr" hidden></p>
+    <div class="card-foot">
+      <button class="btn" type="button" id="appFormCancel">Bekor qilish</button>
+      <button class="btn primary" type="submit"><span class="ic">＋</span> Saqlash</button>
+    </div>
+  </form>
 </div>
 
 <div id="toast" class="toast"></div>
@@ -914,6 +934,122 @@ if (typeof self !== 'undefined') self.S = S;
 
 ;
 /*
+ * Admin actions on applications and workspaces, shared by the application
+ * list (index.html) and the admin page: the manual "add application" form,
+ * clear / delete a workspace, delete an application. All go through the
+ * admin endpoints in server/pb_hooks/admin.pb.js.
+ */
+(function (S) {
+  'use strict';
+  if (!S.pb) return;
+
+  function $(id) { return document.getElementById(id); }
+  function toast(msg, err) {
+    if (window.app && window.app.toast) { window.app.toast(msg, err); return; }
+    var t = $('toast');
+    if (!t) return;
+    t.textContent = msg; t.className = 'toast on' + (err ? ' err' : '');
+    clearTimeout(toast.h);
+    toast.h = setTimeout(function () { t.className = 'toast'; }, err ? 6000 : 3000);
+  }
+
+  var FIELDS = ['aNumber', 'aDate', 'aStatus', 'aCost', 'aOrg', 'aInn', 'aObject', 'aTitle', 'aType', 'aBuyer', 'aPlace', 'aExec'];
+
+  var AppAdmin = {
+    onDone: null,
+
+    init: function () {
+      var self = this;
+      var f = $('appForm');
+      if (!f) return;
+      f.addEventListener('submit', function (e) { e.preventDefault(); self.save(); });
+      $('appFormClose').addEventListener('click', function () { self.closeForm(); });
+      $('appFormCancel').addEventListener('click', function () { self.closeForm(); });
+      $('screen-appform').addEventListener('click', function (e) { if (e.target === this) self.closeForm(); });
+    },
+
+    /** Label used in confirmations: «№ 67155 — Org». */
+    label: function (a) { return '№ ' + (a.number || '?') + (a.org_name ? ' — ' + a.org_name : ''); },
+
+    /* ---------------------------------------------------------- form */
+    openForm: function (onDone) {
+      this.onDone = onDone || null;
+      FIELDS.forEach(function (id) { $(id).value = ''; });
+      $('appErr').hidden = true;
+      $('screen-appform').hidden = false;
+      $('aNumber').focus();
+      S.pb.send('/api/registry/facets', { method: 'GET' }).then(function (f) {
+        $('typeList').innerHTML = (f.expertise_type || []).map(function (x) { return '<option value="' + S.esc(x.v) + '">'; }).join('');
+        $('buyerList').innerHTML = (f.buyer_type || []).map(function (x) { return '<option value="' + S.esc(x.v) + '">'; }).join('');
+      }).catch(function () { /* datalists stay empty */ });
+    },
+    closeForm: function () { $('screen-appform').hidden = true; },
+
+    save: function () {
+      var self = this;
+      var v = function (id) { return $(id).value.trim(); };
+      var number = v('aNumber').replace(/\s+/g, '');
+      $('appErr').hidden = true;
+      if (!number) { $('appErr').textContent = 'Ariza raqami kerak'; $('appErr').hidden = false; return; }
+      // Only filled fields go up: the import hook leaves absent fields alone, so
+      // re-adding an existing number updates what was typed and keeps the rest.
+      var row = { number: number, raw: { 'Qo\'lda qo\'shdi': (S.me().name || S.me().email) + ', ' + new Date().toLocaleDateString('ru-RU') } };
+      var put = function (f, id, fn) { var x = v(id); if (x) row[f] = fn ? fn(x) : x; };
+      put('status', 'aStatus'); put('org_name', 'aOrg'); put('inn', 'aInn', function (x) { return x.replace(/\s+/g, ''); });
+      put('project_title', 'aTitle'); put('object_id', 'aObject'); put('expertise_type', 'aType'); put('buyer_type', 'aBuyer');
+      put('place', 'aPlace'); put('executor_name', 'aExec');
+      put('registered_at', 'aDate', function (x) { return new Date(x + 'T00:00:00Z').toISOString(); });
+      if (v('aCost')) { row.cost_vat = +v('aCost'); row.cost = Math.round(+v('aCost') / 1.12); row.currency = 'Узбекский сум'; }
+      if (!row.status) row.status = 'Qo\'lda qo\'shilgan';
+      if (!row.registered_at) row.registered_at = new Date().toISOString();
+      // Same path as the registry upload: contragent by INN, update if the number exists.
+      S.pb.send('/api/registry/import', { method: 'POST', body: { rows: [row] } }).then(function (r) {
+        var msg = r.updated ? 'Ariza № ' + number + ' mavjud edi — ma\'lumotlari yangilandi' : 'Ariza № ' + number + ' qo\'shildi';
+        toast(msg);
+        self.closeForm();
+        if (self.onDone) self.onDone(number, msg);
+      }).catch(function (e) { $('appErr').textContent = 'Saqlab bo\'lmadi: ' + S.pbErr(e); $('appErr').hidden = false; });
+    },
+
+    /* ------------------------------------------------------- actions */
+    /** @param w workspace record; a — its application (for the label) */
+    clearWs: function (w, a, onDone) {
+      if (!confirm('Ariza ' + this.label(a) + '\n\nBarcha smeta fayllari, narx tuzatishlari va eksportlar o\'chiriladi. Ish boshidan boshlanadi (viloyat qoladi). Davom etilsinmi?')) return;
+      var self = this;
+      S.pb.send('/api/admin/workspaces/' + w.id + '/clear', { method: 'POST' }).then(function (r) {
+        toast('Tozalandi: ' + self.label(a) + ' · tuzatishlar ' + r.corrections + ', eksportlar ' + r.exports);
+        if (onDone) onDone();
+      }).catch(function (e) { toast('Tozalab bo\'lmadi: ' + S.pbErr(e), true); });
+    },
+
+    deleteWs: function (w, a, onDone) {
+      if (!confirm('Ariza ' + this.label(a) + '\n\nIsh maydoni butunlay o\'chiriladi (fayllar, tuzatishlar, eksportlar). Ariza reyestrda qoladi va qayta ochilishi mumkin. Davom etilsinmi?')) return;
+      var self = this;
+      S.pb.send('/api/admin/workspaces/' + w.id, { method: 'DELETE' }).then(function () {
+        toast('Ish maydoni o\'chirildi: ' + self.label(a));
+        if (onDone) onDone();
+      }).catch(function (e) { toast('O\'chirib bo\'lmadi: ' + S.pbErr(e), true); });
+    },
+
+    deleteApp: function (a, hasWs, onDone) {
+      var msg = 'Ariza ' + this.label(a) + '\n\nReyestrdan o\'chiriladi' +
+        (hasWs ? ', ish maydoni, fayllar, tuzatishlar va eksportlar bilan birga' : '') +
+        '. Keyingi reyestr yuklashda (hisobotda bo\'lsa) qayta paydo bo\'ladi. Davom etilsinmi?';
+      if (!confirm(msg)) return;
+      S.pb.send('/api/admin/applications/' + a.id, { method: 'DELETE' }).then(function () {
+        toast('Ariza № ' + a.number + ' o\'chirildi');
+        if (onDone) onDone();
+      }).catch(function (e) { toast('O\'chirib bo\'lmadi: ' + S.pbErr(e), true); });
+    }
+  };
+
+  S.AppAdmin = AppAdmin;
+  document.addEventListener('DOMContentLoaded', function () { AppAdmin.init(); });
+  if (document.readyState !== 'loading') AppAdmin.init();
+})(S);
+
+;
+/*
  * Admin page: registry upload (parsed in the browser, upserted by the
  * /api/registry/import hook), workspace clean-up, manual applications and
  * user management.
@@ -950,7 +1086,9 @@ if (typeof self !== 'undefined') self.S = S;
       $('userForm').addEventListener('submit', function (e) { e.preventDefault(); self.addUser(); });
       $('wsQ').addEventListener('input', S.debounce(function () { self.renderWs(); }, 200));
       $('wsStatus').addEventListener('change', function () { self.renderWs(); });
-      $('appForm').addEventListener('submit', function (e) { e.preventDefault(); self.addApp(); });
+      $('appAddBtn').addEventListener('click', function () {
+        S.AppAdmin.openForm(function (number, msg) { $('appStat').textContent = msg; $('findQ').value = number; self.findApps(); });
+      });
       $('findForm').addEventListener('submit', function (e) { e.preventDefault(); self.findApps(); });
       if (S.pb.authStore.isValid) this.open();
     },
@@ -962,7 +1100,6 @@ if (typeof self !== 'undefined') self.S = S;
       if (!ok) return;
       this.loadHistory();
       this.loadWs();
-      this.loadFacets();
       this.loadUsers();
     },
 
@@ -1014,63 +1151,11 @@ if (typeof self !== 'undefined') self.S = S;
       });
     },
 
-    wsLabel: function (w) {
-      var a = (w.expand && w.expand.application) || {};
-      return '№ ' + (a.number || '?') + (a.org_name ? ' — ' + a.org_name : '');
-    },
-
-    clearWs: function (w) {
-      var self = this;
-      if (!confirm('Ariza ' + this.wsLabel(w) + '\n\nBarcha smeta fayllari, narx tuzatishlari va eksportlar o\'chiriladi. Ish boshidan boshlanadi. Davom etilsinmi?')) return;
-      S.pb.send('/api/admin/workspaces/' + w.id + '/clear', { method: 'POST' }).then(function (r) {
-        toast('Tozalandi: ' + self.wsLabel(w) + ' · tuzatishlar ' + r.corrections + ', eksportlar ' + r.exports);
-        self.loadWs();
-      }).catch(function (e) { toast('Tozalab bo\'lmadi: ' + S.pbErr(e), true); });
-    },
-
-    deleteWs: function (w) {
-      var self = this;
-      if (!confirm('Ariza ' + this.wsLabel(w) + '\n\nIsh maydoni butunlay o\'chiriladi (fayllar, tuzatishlar, eksportlar). Ariza reyestrda qoladi. Davom etilsinmi?')) return;
-      S.pb.send('/api/admin/workspaces/' + w.id, { method: 'DELETE' }).then(function () {
-        toast('O\'chirildi: ' + self.wsLabel(w));
-        self.loadWs();
-      }).catch(function (e) { toast('O\'chirib bo\'lmadi: ' + S.pbErr(e), true); });
-    },
+    appOf: function (w) { return (w.expand && w.expand.application) || {}; },
+    clearWs: function (w) { var self = this; S.AppAdmin.clearWs(w, this.appOf(w), function () { self.loadWs(); }); },
+    deleteWs: function (w) { var self = this; S.AppAdmin.deleteWs(w, this.appOf(w), function () { self.loadWs(); }); },
 
     /* ------------------------------------------------ manual application */
-    loadFacets: function () {
-      S.pb.send('/api/registry/facets', { method: 'GET' }).then(function (f) {
-        $('typeList').innerHTML = (f.expertise_type || []).map(function (x) { return '<option value="' + S.esc(x.v) + '">'; }).join('');
-        $('buyerList').innerHTML = (f.buyer_type || []).map(function (x) { return '<option value="' + S.esc(x.v) + '">'; }).join('');
-      }).catch(function () { /* datalists stay empty */ });
-    },
-
-    addApp: function () {
-      var self = this;
-      var v = function (id) { return $(id).value.trim(); };
-      var number = v('aNumber').replace(/\s+/g, '');
-      $('appErr').hidden = true; $('appStat').textContent = '';
-      if (!number) { $('appErr').textContent = 'Ariza raqami kerak'; $('appErr').hidden = false; return; }
-      // Only filled fields go up: the import hook leaves absent fields alone, so
-      // re-adding an existing number updates what was typed and keeps the rest.
-      var row = { number: number, raw: { 'Qo\'lda qo\'shdi': (S.me().name || S.me().email) + ', ' + new Date().toLocaleDateString('ru-RU') } };
-      var put = function (f, id, fn) { var x = v(id); if (x) row[f] = fn ? fn(x) : x; };
-      put('status', 'aStatus'); put('org_name', 'aOrg'); put('inn', 'aInn', function (x) { return x.replace(/\s+/g, ''); });
-      put('project_title', 'aTitle'); put('object_id', 'aObject'); put('expertise_type', 'aType'); put('buyer_type', 'aBuyer');
-      put('place', 'aPlace'); put('executor_name', 'aExec');
-      put('registered_at', 'aDate', function (x) { return new Date(x + 'T00:00:00Z').toISOString(); });
-      if (v('aCost')) { row.cost_vat = +v('aCost'); row.cost = Math.round(+v('aCost') / 1.12); row.currency = 'Узбекский сум'; }
-      if (!row.status) row.status = 'Qo\'lda qo\'shilgan';
-      // Same path as the registry upload: contragent by INN, update if the number exists.
-      S.pb.send('/api/registry/import', { method: 'POST', body: { rows: [row] } }).then(function (r) {
-        $('appStat').textContent = r.updated ? 'Ariza № ' + number + ' mavjud edi — ma\'lumotlari yangilandi' : 'Ariza № ' + number + ' qo\'shildi';
-        toast($('appStat').textContent);
-        ['aNumber', 'aDate', 'aStatus', 'aCost', 'aOrg', 'aInn', 'aObject', 'aTitle', 'aType', 'aBuyer', 'aPlace', 'aExec'].forEach(function (id) { $(id).value = ''; });
-        $('findQ').value = number;
-        self.findApps();
-      }).catch(function (e) { $('appErr').textContent = 'Qo\'shib bo\'lmadi: ' + S.pbErr(e); $('appErr').hidden = false; });
-    },
-
     findApps: function () {
       var self = this;
       var q = $('findQ').value.trim();
@@ -1108,15 +1193,7 @@ if (typeof self !== 'undefined') self.S = S;
 
     deleteApp: function (a, hasWs) {
       var self = this;
-      var msg = 'Ariza № ' + a.number + (a.org_name ? ' — ' + a.org_name : '') + '\n\nReyestrdan o\'chiriladi' +
-        (hasWs ? ', ish maydoni, fayllar, tuzatishlar va eksportlar bilan birga' : '') +
-        '. Keyingi reyestr yuklashda (agar hisobotda bo\'lsa) qayta paydo bo\'ladi. Davom etilsinmi?';
-      if (!confirm(msg)) return;
-      S.pb.send('/api/admin/applications/' + a.id, { method: 'DELETE' }).then(function () {
-        toast('Ariza № ' + a.number + ' o\'chirildi');
-        self.findApps();
-        self.loadWs();
-      }).catch(function (e) { toast('O\'chirib bo\'lmadi: ' + S.pbErr(e), true); });
+      S.AppAdmin.deleteApp(a, hasWs, function () { self.findApps(); self.loadWs(); });
     },
 
     /* --------------------------------------------------------- registry */

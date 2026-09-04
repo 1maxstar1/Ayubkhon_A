@@ -52,7 +52,9 @@ OUT=$(mktemp)
 CODE=$(curl -sS $R -o "$OUT" -w '%{http_code}' -X PATCH "$BASE/api/settings" -H "Authorization: $TOKEN" -H 'content-type: application/json' -d "$BODY")
 [ "$CODE" = 200 ] || { echo "configure: settings PATCH failed ($CODE)"; cat "$OUT"; rm -f "$OUT"; exit 1; }
 rm -f "$OUT"
-if [ "$SMTP_ON" = true ]; then S="SMTP $SMTP_HOST"; else S="SMTP YO'Q — kirish kodlari yuborilmaydi"; fi
+if [ "$SMTP_ON" = true ]; then S="SMTP $SMTP_HOST"
+elif [ -n "$BREVO_API_KEY" ]; then S="xat Brevo API orqali (SMTP o'chiq)"
+else S="SMTP YO'Q — kirish kodlari yuborilmaydi"; fi
 echo "sozlamalar qo'llandi: $APP_URL · $S · zaxira har kuni 03:00 (7 nusxa) · rate limit yoqiq"
 
 if [ -n "$TEST_EMAIL" ]; then

@@ -19,12 +19,26 @@ const SINK = 8108;
 
 execSync('sh test/pb-smoke.sh', { cwd: root, stdio: 'ignore' });
 
-// Brevo stand-in: records what the hook posts.
+// Stands in for both delivery paths: Brevo's API on /v3/smtp/email and the
+// Apps Script relay on /exec — including the 302 to its output URL, which is
+// how Apps Script really answers a POST.
 const sent = [];
+const relayed = [];
 const sink = createServer((req, res) => {
   let body = '';
   req.on('data', (c) => { body += c; });
   req.on('end', () => {
+    if (req.url.startsWith('/echo')) {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end('{"ok":true,"left":97}');
+      return;
+    }
+    if (req.url.startsWith('/exec')) {
+      relayed.push({ headers: req.headers, body: JSON.parse(body) });
+      res.writeHead(302, { location: `http://127.0.0.1:${SINK}/echo` });
+      res.end();
+      return;
+    }
     sent.push({ headers: req.headers, body: JSON.parse(body) });
     res.writeHead(201, { 'content-type': 'application/json' });
     res.end('{"messageId":"<test@sink>"}');
@@ -102,6 +116,41 @@ await fetch(BASE + '/api/collections/users/request-otp', {
 const both = await waitForMine(2);
 check(both.length === 2 && both[1].body.subject !== msg.subject, 'each code gets its own subject (no Gmail thread collapsing)');
 
-server.kill(); sink.close();
+server.kill();
+
+/* --------------------------------------------- the Gmail relay path ------ */
+// Same server, restarted with GMAIL_RELAY_URL: the relay must win over Brevo.
+const relayServer = spawn('sh', ['server/run.sh'], {
+  cwd: root,
+  env: {
+    ...process.env, PB_DATA_DIR: 'pb_data_test', PB_HTTP: `127.0.0.1:${PORT}`, PB_DEV: '0',
+    BREVO_API_KEY: 'test-key', BREVO_API_URL: `http://127.0.0.1:${SINK}/v3/smtp/email`,
+    GMAIL_RELAY_URL: `http://127.0.0.1:${SINK}/exec`, GMAIL_RELAY_SECRET: 'shh'
+  },
+  stdio: 'ignore'
+});
+process.on('exit', () => relayServer.kill());
+for (let i = 0; i < 20; i++) {
+  try { if ((await fetch(BASE + '/api/health')).ok) break; } catch (e) { /* not up yet */ }
+  await new Promise((r) => setTimeout(r, 500));
+}
+const beforeBrevo = sent.length;
+await fetch(BASE + '/api/collections/users/request-otp', {
+  method: 'POST', headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ email: 'test@example.com' })
+});
+for (let i = 0; i < 40 && !relayed.length; i++) await new Promise((r) => setTimeout(r, 250));
+check(relayed.length === 1, 'the relay received the message (POST survived the 302)');
+const r = relayed[0] && relayed[0].body;
+if (r) {
+  check(r.secret === 'shh', 'the relay call carries the shared secret');
+  check(r.to === 'test@example.com', 'recipient passed as a plain address list');
+  check(/^Код для входа: \d{8}/.test(r.subject), 'subject with the code reaches the relay: ' + r.subject);
+  check(r.html.includes('Код действует 30 минут'), 'html body reaches the relay');
+  check(r.fromName === 'Таблица сопоставления №2', 'sender name reaches the relay');
+}
+check(sent.length === beforeBrevo, 'Brevo is not used while the relay is configured');
+
+relayServer.kill(); sink.close();
 console.log(fail ? `FAILED (${fail})` : 'mail-otp OK');
 process.exit(fail ? 1 : 0);

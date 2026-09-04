@@ -53,7 +53,8 @@ CODE=$(curl -sS $R -o "$OUT" -w '%{http_code}' -X PATCH "$BASE/api/settings" -H 
 [ "$CODE" = 200 ] || { echo "configure: settings PATCH failed ($CODE)"; cat "$OUT"; rm -f "$OUT"; exit 1; }
 rm -f "$OUT"
 if [ "$SMTP_ON" = true ]; then S="SMTP $SMTP_HOST"
-elif [ -n "$BREVO_API_KEY" ]; then S="xat Brevo API orqali (SMTP o'chiq)"
+elif [ -n "$GMAIL_RELAY_URL" ]; then S="xat Gmail relay orqali (bir necha soniyada yetadi)"
+elif [ -n "$BREVO_API_KEY" ]; then S="xat Brevo API orqali — 15-20 daqiqa kechikishi mumkin"
 else S="SMTP YO'Q — kirish kodlari yuborilmaydi"; fi
 echo "sozlamalar qo'llandi: $APP_URL · $S · zaxira har kuni 03:00 (7 nusxa) · rate limit yoqiq"
 

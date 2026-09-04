@@ -37,12 +37,39 @@ manzillarni chiqaradi. **Qayta ishga tushirish = yangilash** — `pb_data` va
    va Gmail xatlarni bitta suhbatga yig'ib qo'ymaydi. Kod **30 daqiqa** amal
    qiladi (Brevo → Gmail yo'li 15–20 daqiqa kechikishi mumkin), so'rov brauzerda
    saqlanadi — sahifani yopib, xat kelganda qaytib kirish mumkin.
-   **Kechikishni kamaytirish:** Brevo hozir `…@NNNNNN.brevosend.com` umumiy
-   subdomenidan yuboradi, Gmail bunday xatlarni sekin qabul qiladi. O'z
-   domeningizni tasdiqlang (Brevo → Senders, Domains & Dedicated IPs → Domains →
-   Add a domain → DNS ga 3 ta yozuv: DKIM, DMARC, brevo-code) va `.env` dagi
-   `SENDER_ADDRESS` ni `noreply@domen.uz` ga o'zgartiring — xat bir necha
-   soniyada yetib boradi.
+   **Brevo sekin bo'lsa** (bepul hisob `…@NNNNNN.brevosend.com` umumiy
+   domenidan yuboradi, Gmail bunday xatni 15–20 daqiqa navbatda ushlab turadi) —
+   quyidagi «Gmail relay» ga o'ting yoki Brevo'da o'z domeningizni tasdiqlang
+   (Senders, Domains & Dedicated IPs → Domains → Add a domain → DNS ga DKIM,
+   DMARC va tasdiqlash yozuvlari), keyin `SENDER_ADDRESS` ni `noreply@domen.uz`
+   qiling.
+
+### Gmail relay — kod bir necha soniyada keladi (DNS kerak emas)
+
+Xatni Gmail'ning o'zi yuboradi: Google DKIM bilan imzolaydi, shuning uchun
+kechikish bo'lmaydi. Kunlik chegara — 100 ta oluvchi, bu 5–10 xodim uchun
+yetarli. Faqat bir marta sozlanadi:
+
+1. `script.google.com` → **New project**. Chapdagi `Code.gs` ichidagi hamma
+   narsani o'chirib, `server/deploy/gmail-relay.gs` faylining matnini
+   qo'ying.
+2. Birinchi qatordagi `SECRET` ni uzun tasodifiy satrga almashtiring (masalan
+   Terminalda: `openssl rand -hex 16`). Saqlang (⌘S).
+3. O'ng yuqorida **Deploy → New deployment** → ⚙️ **Web app**:
+   * **Execute as:** Me (o'z pochtangiz)
+   * **Who has access:** Anyone
+   → **Deploy**. Google ruxsat so'raydi: **Authorize access** → hisobingizni
+   tanlang → «Google hasn't verified this app» chiqsa **Advanced** → **Go to …
+   (unsafe)** → **Allow**. (Bu sizning o'z skriptingiz, shuning uchun xavfsiz.)
+4. Chiqqan **Web app URL** ni (`https://script.google.com/macros/s/…/exec`)
+   nusxalang va serverga yozing:
+   ```sh
+   sh server/deploy/gmail-relay.sh root@SERVER_IP 'https://script.google.com/macros/s/…/exec' 'SECRET'
+   ```
+   Skript `.env` ni yangilaydi, xizmatni qayta ishga tushiradi va sinov xatini
+   yuboradi — u bir necha soniyada kelishi kerak.
+
+Brevo'ga qaytish: `sh server/deploy/gmail-relay.sh root@SERVER_IP off`.
    **Kod kelmay qolsa:** `sh server/deploy/mail-check.sh root@SERVER_IP` —
    kalit bormi, xizmat ishlayaptimi, jurnaldagi Brevo xatolari va bitta sinov
    xatining natijasi chiqadi. Brevo'da (app.brevo.com → Transactional → Logs)
@@ -88,7 +115,9 @@ sh /opt/taqqoslash/server/deploy/configure.sh   # .env ni qayta qo'llash
 | `serve.sh` | server (systemd) | IP bo'lsa http:80, domen bo'lsa http+https |
 | `pocketbase.service` | server | systemd birligi |
 | `smtp.sh` | Mac | portni tekshirish, SMTP ni `.env` ga yozish, sinov xati |
-| `mail-api.sh` | Mac | SMTP bloklangan bo'lsa: Brevo API kaliti, sinov xati |
+| `gmail-relay.gs` | Google Apps Script | xatni Gmail o'zi yuboradi (tez yo'l) |
+| `gmail-relay.sh` | Mac | relay manzili va sirini `.env` ga yozadi, sinov xati |
+| `mail-api.sh` | Mac | zaxira yo'l: Brevo API kaliti, sinov xati |
 | `mail-check.sh` | Mac | kod kelmasa: holat, jurnal, sinov xati bir buyruqda |
 | `users.sh` | Mac | xodim hisoblarini qo'shish |
 | `pull-backup.sh` | Mac | yangi zaxira olib, yuklab olish |

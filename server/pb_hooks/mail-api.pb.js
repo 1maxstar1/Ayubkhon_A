@@ -31,5 +31,8 @@ onMailerSend((e) => {
   if (res.statusCode >= 300) {
     throw new Error("Brevo " + res.statusCode + ": " + res.raw);
   }
+  // Visible in journalctl / the dashboard log: proof the API accepted the message.
+  $app.logger().info("mail via Brevo", "to", to.map((a) => a.email).join(","), "subject", m.subject,
+    "messageId", (res.json && res.json.messageId) || "");
   // delivered — e.next() is deliberately not called, so SMTP is skipped
 });

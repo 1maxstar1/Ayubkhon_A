@@ -11,4 +11,4 @@ ssh "$TARGET" "cd /opt/taqqoslash/server && . ./.env && \
   echo '--- hook';      ls -l pb_hooks/mail-api.pb.js; \
   echo '--- last mail / OTP log lines'; journalctl -u pocketbase --no-pager -n 400 | grep -iE 'brevo|mail|otp|smtp|error' | tail -25; \
   echo '--- test e-mail'; TEST_EMAIL=\"\${TO:-\$PB_ADMIN_EMAIL}\" sh deploy/configure.sh 2>&1 | tail -3; \
-  echo '--- log right after the test'; sleep 2; journalctl -u pocketbase --no-pager -n 40 | grep -iE 'brevo|mail|error' | tail -8; echo '(bo\'sh bo\'lsa: deploy/push.sh dan keyin qayta ishga tushiring)'"
+  echo '--- log right after the test'; sleep 2; journalctl -u pocketbase --no-pager -n 40 | grep -iE 'brevo|mail|error' | tail -8"

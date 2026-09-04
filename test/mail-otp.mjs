@@ -83,7 +83,7 @@ check(!!code, 'the eight-digit code is in the subject: ' + msg.subject);
 check(msg.subject.includes('Код для входа'), 'subject is Russian');
 check(msg.subject.includes('Таблица сопоставления'), 'subject carries the application name');
 check(!!code && msg.htmlContent.includes(code), 'the same code is in the body');
-check(/Код действует 5 минут/.test(msg.htmlContent), 'body is Russian');
+check(/Код действует 30 минут/.test(msg.htmlContent), 'body is Russian');
 check(msg.sender && msg.sender.email === 'noreply@example.com', 'sender address comes from the settings');
 check(first[0].headers['api-key'] === 'test-key', 'the hook sends the API key header');
 

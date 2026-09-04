@@ -209,6 +209,9 @@ sh server/run.sh                                                              # 
 * Ishlab chiqishda (`PB_DEV=1`, `run.sh` sukut bo'yicha) kod emailga
   yuborilmaydi — `server/pb_data/dev-otp.txt` ga yoziladi. Serverda SMTP
   PocketBase panelida (Settings → Mail) sozlanadi.
+* Kirish kodi **xat mavzusida** keladi va **30 daqiqa** amal qiladi; so'rov
+  brauzerda saqlanadi, shuning uchun xat kechiksa ham sahifani yopib qaytish
+  mumkin (`src/ui/auth.js`, `users.otp` sxemada).
 
 **Oqim.** Admin har kuni reyestrni yuklaydi (ariza raqami bo'yicha
 qo'shiladi/yangilanadi, hech narsa o'chirilmaydi). Arizalar ro'yxati

@@ -1,13 +1,14 @@
 <div class="screen" id="screen-login" hidden>
   <form class="card" id="loginForm" autocomplete="off">
     <h2>Таблица сопоставления №2</h2>
-    <p class="lead" id="loginMsg">Введите рабочую электронную почту. Одноразовый код придёт на неё.</p>
+    <p class="lead" id="loginMsg">Введите рабочую электронную почту. Одноразовый код придёт на неё — он будет в теме письма.</p>
     <label>Электронная почта
       <input type="email" id="loginEmail" required autocomplete="email" spellcheck="false" placeholder="imya@organizaciya.uz"></label>
     <div id="codeBox" hidden>
       <label>8-значный код из письма
         <input type="text" id="loginCode" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="one-time-code"></label>
-      <p class="hint">Код действует 5 минут. Не пришёл — <button type="button" class="link" id="resendBtn">отправить снова</button>.</p>
+      <p class="hint" id="codeHint">Код в теме письма, действует 30 минут.</p>
+      <p class="hint">Не пришёл — <button type="button" class="link" id="resendBtn">отправить снова</button>.</p>
     </div>
     <p class="err" id="loginErr" hidden></p>
     <button class="btn primary wide" id="loginBtn" type="submit">Отправить код</button>

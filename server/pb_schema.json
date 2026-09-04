@@ -93,11 +93,11 @@
       "manageRule": "@request.auth.role = \"admin\"",
       "otp": {
         "enabled": true,
-        "duration": 300,
+        "duration": 1800,
         "length": 8,
         "emailTemplate": {
           "subject": "Код для входа: {OTP} — {APP_NAME}",
-          "body": "<p>Здравствуйте!</p>\n<p>Код для входа в «{APP_NAME}»:</p>\n<p style=\"font-size:26px;font-weight:700;letter-spacing:4px\">{OTP}</p>\n<p>Код действует 5 минут. Введите его на странице входа.</p>\n<p><i>Если вы не запрашивали код, просто проигнорируйте это письмо.</i></p>\n"
+          "body": "<p>Здравствуйте!</p>\n<p>Код для входа в «{APP_NAME}»:</p>\n<p style=\"font-size:26px;font-weight:700;letter-spacing:4px\">{OTP}</p>\n<p>Код действует 30 минут. Введите его на странице входа.</p>\n<p><i>Если вы не запрашивали код, просто проигнорируйте это письмо.</i></p>\n"
         }
       },
       "authToken": {

@@ -34,7 +34,15 @@ manzillarni chiqaradi. **Qayta ishga tushirish = yangilash** — `pb_data` va
    yozib qo'ying — ochilsa, kalitni o'chirib SMTP ga qaytish mumkin.
    Kirish kodi **xat mavzusida** turadi («Код для входа: 12345678 — Таблица
    сопоставления №2»), shuning uchun uni pochtani ochmasdan ham o'qish mumkin
-   va Gmail xatlarni bitta suhbatga yig'ib qo'ymaydi.
+   va Gmail xatlarni bitta suhbatga yig'ib qo'ymaydi. Kod **30 daqiqa** amal
+   qiladi (Brevo → Gmail yo'li 15–20 daqiqa kechikishi mumkin), so'rov brauzerda
+   saqlanadi — sahifani yopib, xat kelganda qaytib kirish mumkin.
+   **Kechikishni kamaytirish:** Brevo hozir `…@NNNNNN.brevosend.com` umumiy
+   subdomenidan yuboradi, Gmail bunday xatlarni sekin qabul qiladi. O'z
+   domeningizni tasdiqlang (Brevo → Senders, Domains & Dedicated IPs → Domains →
+   Add a domain → DNS ga 3 ta yozuv: DKIM, DMARC, brevo-code) va `.env` dagi
+   `SENDER_ADDRESS` ni `noreply@domen.uz` ga o'zgartiring — xat bir necha
+   soniyada yetib boradi.
    **Kod kelmay qolsa:** `sh server/deploy/mail-check.sh root@SERVER_IP` —
    kalit bormi, xizmat ishlayaptimi, jurnaldagi Brevo xatolari va bitta sinov
    xatining natijasi chiqadi. Brevo'da (app.brevo.com → Transactional → Logs)

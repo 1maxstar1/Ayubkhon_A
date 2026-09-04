@@ -44,9 +44,18 @@ await page.fill('#loginCode', '00000000');
 await page.click('#loginBtn');
 await page.waitForSelector('#loginErr:not([hidden])');
 check((await page.textContent('#loginErr')).includes('Неверный'), 'wrong code is rejected with a message');
+// The letter can take 15-20 minutes: the request must survive leaving the page.
+await page.reload();
+await page.waitForSelector('#codeBox:not([hidden])', { timeout: 10000 });
+check((await page.inputValue('#loginEmail')) === 'test@example.com', 'a pending code request survives a reload');
+check((await page.textContent('#codeHint')).includes('30 минут'), 'hint says how long the code lives');
+// Asking again keeps the earlier code usable — several letters may be in flight.
+await page.click('#resendBtn');
+await new Promise((r) => setTimeout(r, 800));
 await page.fill('#loginCode', code);
 await page.click('#loginBtn');
 await page.waitForSelector('#who', { timeout: 10000 });
+check(await page.evaluate(() => !localStorage.getItem('smeta-taqqoslash/otp')), 'the pending request is cleared after sign-in');
 check(await page.isHidden('#screen-login'), 'login screen hidden after sign-in');
 check((await page.textContent('#who')) === 'Test Ekspert', 'header shows the user name');
 check(!(await page.isVisible('#userBox a[href$="admin.html"]')), 'no admin link for an ekspert');

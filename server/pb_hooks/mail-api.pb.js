@@ -10,7 +10,8 @@ onMailerSend((e) => {
     return;
   }
   const m = e.message;
-  const to = (m.to || []).map((a) => ({ email: a.address, name: a.name || "" }));
+  // Brevo rejects an empty "name"; send it only when the address carries one.
+  const to = (m.to || []).map((a) => (a.name ? { email: a.address, name: a.name } : { email: a.address }));
   const body = {
     sender: { email: m.from.address, name: m.from.name || "Taqqoslash jadvali" },
     to: to,

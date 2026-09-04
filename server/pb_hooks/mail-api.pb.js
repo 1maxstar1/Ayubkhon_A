@@ -14,7 +14,7 @@ onMailerSend((e) => {
   const to = (m.to || []).map((a) => (a.name ? { email: a.address, name: a.name } : { email: a.address }));
   // Brevo wants htmlContent and/or a NON-empty textContent — never an empty string.
   const body = {
-    sender: { email: m.from.address, name: m.from.name || "Taqqoslash jadvali" },
+    sender: { email: m.from.address, name: m.from.name || "Таблица сопоставления №2" },
     to: to,
     subject: m.subject,
   };

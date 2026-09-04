@@ -32,6 +32,9 @@ manzillarni chiqaradi. **Qayta ishga tushirish = yangilash** — `pb_data` va
    u bo'sh bo'lsa PocketBase odatdagidek SMTP ishlatadi (`pb_hooks/mail-api.pb.js`).
    Parallel ravishda provayderga «откройте исходящие порты 465 и 587» deb
    yozib qo'ying — ochilsa, kalitni o'chirib SMTP ga qaytish mumkin.
+   Kirish kodi **xat mavzusida** turadi («Код для входа: 12345678 — Таблица
+   сопоставления №2»), shuning uchun uni pochtani ochmasdan ham o'qish mumkin
+   va Gmail xatlarni bitta suhbatga yig'ib qo'ymaydi.
    **Kod kelmay qolsa:** `sh server/deploy/mail-check.sh root@SERVER_IP` —
    kalit bormi, xizmat ishlayaptimi, jurnaldagi Brevo xatolari va bitta sinov
    xatining natijasi chiqadi. Brevo'da (app.brevo.com → Transactional → Logs)

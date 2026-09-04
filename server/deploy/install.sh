@@ -37,6 +37,8 @@ if [ -n "$PB_DOMAIN" ]; then
 elif ! grep -q '^PB_DOMAIN=.' .env; then
   sed -i "s|^APP_URL=.*|APP_URL=http://$IP|" .env
 fi
+# the sender name used to be Latin; keep existing custom values, refresh the old default
+sed -i 's|^SENDER_NAME="Taqqoslash jadvali"|SENDER_NAME="Таблица сопоставления №2"|' .env
 . ./.env
 
 # 3. superuser + collections (setup.sh runs its own temporary instance)

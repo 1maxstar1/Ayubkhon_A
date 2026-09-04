@@ -21,9 +21,9 @@ esc() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
 BODY=$(cat <<JSON
 {
   "meta": {
-    "appName": "Taqqoslash jadvali",
+    "appName": "Таблица сопоставления №2",
     "appURL": "$(esc "$APP_URL")",
-    "senderName": "$(esc "${SENDER_NAME:-Taqqoslash jadvali}")",
+    "senderName": "$(esc "${SENDER_NAME:-Таблица сопоставления №2}")",
     "senderAddress": "$(esc "${SENDER_ADDRESS:-${SMTP_USER:-noreply@example.com}}")"
   },
   "smtp": {

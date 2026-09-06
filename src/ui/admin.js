@@ -225,16 +225,35 @@
     },
 
     loadHistory: function () {
+      var self = this;
       var tb = $('regHistory').querySelector('tbody');
       S.pb.collection('registry_imports').getList(1, 20, { sort: '-created', expand: 'by' }).then(function (r) {
         tb.innerHTML = r.items.map(function (x) {
           var by = x.expand && x.expand.by;
           var url = x.file ? S.pb.files.getURL(x, x.file) : '';
-          return '<tr><td>' + when(x.created) + '</td><td>' + S.esc(by ? (by.name || by.email) : '') +
+          return '<tr data-id="' + x.id + '"><td>' + when(x.created) + '</td><td>' + S.esc(by ? (by.name || by.email) : '') +
             '</td><td>' + (x.rows || 0) + '</td><td>' + (x.rows_added || 0) + '</td><td>' + (x.rows_updated || 0) +
-            '</td><td>' + (url ? '<a href="' + url + '">' + S.esc(x.file) + '</a>' : '') + '</td></tr>';
-        }).join('') || '<tr><td colspan="6" class="mute">Загрузок ещё не было</td></tr>';
+            '</td><td>' + (url ? '<a href="' + url + '">' + S.esc(x.file) + '</a>' : '') +
+            '</td><td class="act"><button class="btn xs danger" data-act="delimp" title="Удалить запись истории (заявки останутся)">✕</button></td></tr>';
+        }).join('') || '<tr><td colspan="7" class="mute">Загрузок ещё не было</td></tr>';
+        tb.querySelectorAll('button[data-act=delimp]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            var tr = b.closest('tr');
+            var x = r.items.find(function (i) { return i.id === tr.dataset.id; });
+            self.deleteImport(x);
+          });
+        });
       }).catch(function (e) { toast(S.pbErr(e), true); });
+    },
+
+    /** Removes one line of the upload log with its stored file; applications stay. */
+    deleteImport: function (x) {
+      var self = this;
+      if (!confirm('Удалить запись загрузки от ' + when(x.created) + '?\n\nУдалится только строка истории вместе с сохранённым файлом. Заявки, которые были загружены, останутся в реестре.')) return;
+      S.pb.collection('registry_imports').delete(x.id).then(function () {
+        toast('Запись истории удалена');
+        self.loadHistory();
+      }).catch(function (e) { toast('Не удалось удалить: ' + S.pbErr(e), true); });
     },
 
     /* ------------------------------------------------------------ users */

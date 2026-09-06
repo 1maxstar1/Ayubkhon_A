@@ -84,6 +84,21 @@ Brevo'ga qaytish: `sh server/deploy/gmail-relay.sh root@SERVER_IP off`.
    ```
    Sertifikat Let's Encrypt'dan avtomatik olinadi (80 va 443 ochiq bo'lishi kerak).
 
+## Noldan boshlash (bazani tozalash)
+
+Reyestr va butun ish tarixini o'chirib, toza boshlash kerak bo'lsa:
+
+```sh
+sh server/deploy/reset-data.sh root@SERVER_IP YES
+```
+
+Avval zaxira olinadi (`pb_data/backups/`), keyin arizalar, kontragentlar, ish
+maydonlari, narx tuzatishlari, eksportlar va yuklashlar tarixi fayllari bilan
+birga o'chiriladi. **Foydalanuvchilar, parollar, pochta sozlamalari qoladi.**
+Oxirida har bir jadvalda nechta yozuv qolgani ko'rsatiladi (hammasi 0 bo'lishi
+kerak, `users` dan tashqari). Shundan keyin admin sahifasidan reyestrni qaytadan
+yuklaysiz.
+
 ## Zaxira
 
 PocketBase har kuni 03:00 da `pb_data/backups/` ga zaxira oladi (7 nusxa
@@ -120,6 +135,7 @@ sh /opt/taqqoslash/server/deploy/configure.sh   # .env ni qayta qo'llash
 | `mail-api.sh` | Mac | zaxira yo'l: Brevo API kaliti, sinov xati |
 | `mail-check.sh` | Mac | kod kelmasa: holat, jurnal, sinov xati bir buyruqda |
 | `users.sh` | Mac | xodim hisoblarini qo'shish |
+| `reset-data.sh` | Mac | bazani noldan boshlash (foydalanuvchilar qoladi) |
 | `pull-backup.sh` | Mac | yangi zaxira olib, yuklab olish |
 | `env.example` | — | `.env` shabloni |
 

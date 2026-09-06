@@ -191,3 +191,31 @@ routerAdd("POST", "/api/admin/imports/{id}/revert", (e) => {
   $app.logger().info("registry upload reverted", "import", id, "deleted", String(plain.length), "kept", String(worked.length));
   return e.json(200, { source: source, deleted: plain.length, kept: worked.length });
 }, $apis.requireAuth());
+
+// Start over: removes the registry and every trace of work, keeps the accounts,
+// the settings and the mail configuration. Guarded by an explicit confirmation
+// word so it cannot be triggered by a stray request.
+routerAdd("POST", "/api/admin/reset", (e) => {
+  const { requireAdmin } = require(`${__hooks}/lib/admin.js`);
+  requireAdmin(e);
+  const body = e.requestInfo().body || {};
+  if (String(body.confirm || "") !== "СТЕРЕТЬ") {
+    throw new BadRequestError("confirm must be СТЕРЕТЬ");
+  }
+  const counts = {};
+  // Collections with stored files go through the records API so the files go too.
+  for (const name of ["exports", "corrections", "workspaces", "registry_imports"]) {
+    const rows = $app.findRecordsByFilter(name, "id != ''", "", 0, 0, {});
+    for (const r of rows) $app.delete(r);
+    counts[name] = rows.length;
+  }
+  // The bulk tables hold no files: one statement each.
+  for (const table of ["applications", "contragents"]) {
+    const n = arrayOf(new DynamicModel({ c: 0 }));
+    $app.db().newQuery("SELECT COUNT(*) AS c FROM " + table).all(n);
+    counts[table] = n.length ? n[0].c : 0;
+    $app.db().newQuery("DELETE FROM " + table).execute();
+  }
+  $app.logger().warn("database reset by admin", "counts", JSON.stringify(counts));
+  return e.json(200, { cleared: counts });
+}, $apis.requireAuth());

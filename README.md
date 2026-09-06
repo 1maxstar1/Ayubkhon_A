@@ -256,7 +256,7 @@ sh test/pb-smoke.sh            # server: sxema, OTP kirish, token muddati, huquq
 node test/registry.cjs         # reyestr parser (fixture, 400 qator)
 sh test/registry-import.sh     # import hook: ikki marta yuklash, huquqlar
 sh test/admin-api.sh           # admin hooklari: facets, tozalash, o'chirish, huquqlar
-node test/dedupe.mjs           # bitta raqam — bitta yozuv: qayta yuklash, fayldagi takror, tuzatish
+node test/dedupe.mjs           # bitta raqam — bitta yozuv: qayta yuklash, takror, tuzatish, bekor qilish, tozalash
 node test/mail-otp.mjs         # kirish xati: kod mavzuda, ruscha matn, Gmail relay va Brevo yo'llari
 node test/e2e-auth.mjs         # brauzer: kirish, noto'g'ri kod, qulf
 node test/e2e-admin.mjs        # brauzer: reyestr, ish maydonlari, qo'lda ariza, foydalanuvchilar

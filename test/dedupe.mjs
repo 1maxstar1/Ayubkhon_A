@@ -145,6 +145,22 @@ check((await count('applications', "number='990102'")) === 0, 'the untouched app
 check((await count('applications', "number='990101'")) === 1, 'the one with work stays');
 check((await count('registry_imports', `id='${imp.id}'`)) === 0, 'the history line went with it');
 
+/* --------------------------------------- starting over ------------------ */
+check((await count('applications')) > 0 && (await count('workspaces')) > 0, 'there is data to wipe');
+const noWord = await fetch(BASE + '/api/admin/reset', {
+  method: 'POST', headers: { 'content-type': 'application/json', Authorization: su }, body: JSON.stringify({ confirm: 'yes' })
+});
+check(noWord.status === 400, 'reset needs the confirmation word');
+const wiped = await api('/api/admin/reset', { method: 'POST', body: JSON.stringify({ confirm: 'СТЕРЕТЬ' }) }, su);
+check(!!wiped.cleared, 'reset answered with what it cleared: ' + JSON.stringify(wiped.cleared));
+for (const coll of ['applications', 'contragents', 'workspaces', 'corrections', 'exports', 'registry_imports']) {
+  check((await count(coll)) === 0, coll + ' is empty');
+}
+check((await count('users')) > 0, 'accounts survive the reset');
+// the registry can be built again right away
+const fresh = await api('/api/registry/import', { method: 'POST', body: JSON.stringify({ rows: rows.slice(0, 10) }) }, su);
+check(fresh.added === 10, 'a fresh registry import works after the reset');
+
 server.kill();
 console.log(fail ? `FAILED (${fail})` : 'dedupe OK');
 process.exit(fail ? 1 : 0);

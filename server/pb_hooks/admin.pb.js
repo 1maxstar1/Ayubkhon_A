@@ -77,3 +77,44 @@ routerAdd("GET", "/api/registry/facets", (e) => {
   }
   return e.json(200, out);
 }, $apis.requireAuth());
+
+// Safety net for databases created before applications carried a unique index
+// on `number`: collapse any application that exists more than once, keeping the
+// record work already points at, and moving workspaces, corrections and exports
+// of the extra copies onto it.
+routerAdd("POST", "/api/admin/dedupe", (e) => {
+  const { requireAdmin } = require(`${__hooks}/lib/admin.js`);
+  requireAdmin(e);
+  const dupes = arrayOf(new DynamicModel({ number: "", n: 0 }));
+  $app.db().newQuery("SELECT number, COUNT(*) AS n FROM applications GROUP BY number HAVING n > 1").all(dupes);
+  let groups = 0, removed = 0, skipped = 0;
+  for (const d of dupes) {
+    const list = $app.findRecordsByFilter("applications", "number = {:n}", "-imported_at", 0, 0, { n: d.number });
+    if (list.length < 2) continue;
+    groups++;
+    let keep = list[0];
+    for (const a of list) {
+      if ($app.findRecordsByFilter("workspaces", "application = {:id}", "", 1, 0, { id: a.id }).length) { keep = a; break; }
+    }
+    for (const a of list) {
+      if (a.id === keep.id) continue;
+      try {
+        $app.runInTransaction((tx) => {
+          for (const coll of ["workspaces", "corrections", "exports"]) {
+            for (const r of tx.findRecordsByFilter(coll, "application = {:id}", "", 0, 0, { id: a.id })) {
+              r.set("application", keep.id);
+              tx.save(r);
+            }
+          }
+          tx.delete(a);
+        });
+        removed++;
+      } catch (err) {
+        // e.g. the kept application already has a workspace: never orphan work
+        skipped++;
+        $app.logger().warn("dedupe: kept a copy", "number", d.number, "id", a.id, "error", String(err));
+      }
+    }
+  }
+  return e.json(200, { groups: groups, removed: removed, skipped: skipped });
+}, $apis.requireAuth());

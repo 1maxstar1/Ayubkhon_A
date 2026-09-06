@@ -26,7 +26,7 @@
 
   var Registry = {
     page: 1, items: [], ws: {}, q: '', work: '', region: '', year: '', type: '', buyer: '', status: '', min: '', max: '',
-    facets: null,
+    facets: null, seq: 0,
 
     init: function () {
       var self = this;
@@ -107,6 +107,10 @@
 
     load: function () {
       var self = this;
+      // Filters and the search box can leave an older request in flight; its
+      // answer must not append rows the newer one already put in the list.
+      var seq = ++this.seq;
+      $('appMore').disabled = true;
       var opts = { sort: '-registered_at,-number', expand: 'contragent' };
       var parts = [], params = {};
       if (this.q) { parts.push('(number ~ {:q} || org_name ~ {:q} || project_title ~ {:q} || inn ~ {:q} || object_id ~ {:q})'); params.q = this.q; }
@@ -125,16 +129,27 @@
         S.pb.collection('applications').getList(this.page, PAGE, opts),
         this.page === 1 ? S.pb.collection('workspaces').getFullList({ expand: 'updated_by', fields: 'id,application,status,region,updated,changed,files,collectionId,collectionName,expand.updated_by.name,expand.updated_by.email' }) : null
       ]).then(function (res) {
+        if (seq !== self.seq) return;              // a newer request already answered
         var list = res[0];
         if (res[1]) {
           self.ws = {};
           res[1].forEach(function (w) { self.ws[w.application] = w; });
         }
-        self.items = self.items.concat(list.items);
+        // One application = one row, whatever arrives twice.
+        var seen = {};
+        self.items.forEach(function (a) { seen[a.id] = 1; });
+        list.items.forEach(function (a) {
+          if (seen[a.id]) return;
+          seen[a.id] = 1;
+          self.items.push(a);
+        });
         self.total = list.totalItems;
         $('appMore').hidden = self.items.length >= list.totalItems;
+        $('appMore').disabled = false;
         self.render();
       }).catch(function (e) {
+        if (seq !== self.seq) return;
+        $('appMore').disabled = false;
         $('appCount').textContent = S.pbErr(e);
       });
     },

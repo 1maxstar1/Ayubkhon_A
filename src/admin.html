@@ -22,11 +22,12 @@
   <section class="panel">
     <h2>Реестр заявок</h2>
     <p class="lead">Отчёт, выгруженный с control.expertcenter.uz (<code>.xls</code>). Строки сопоставляются по номеру заявки:
-      новые добавляются, существующие обновляются. Ничего не удаляется.</p>
+      новые добавляются, существующие обновляются — та же заявка второй раз не появится. Ничего не удаляется.</p>
     <label class="btn file primary">
       <input type="file" id="regFile" accept=".xls,.xlsx">
       <span class="ic">↑</span> Загрузить файл реестра
     </label>
+    <button class="btn" type="button" id="dedupeBtn" title="Проверить, нет ли в базе заявок с одинаковым номером">Проверить дубликаты</button>
     <div class="progress" id="regProgress" hidden><div class="bar-fill" id="regBar"></div><span id="regText"></span></div>
     <p class="err" id="regErr" hidden></p>
     <div class="stat" id="regStat"></div>

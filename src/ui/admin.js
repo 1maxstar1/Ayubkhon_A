@@ -39,6 +39,7 @@
         S.AppAdmin.openForm(function (number, msg) { $('appStat').textContent = msg; $('findQ').value = number; self.findApps(); });
       });
       $('findForm').addEventListener('submit', function (e) { e.preventDefault(); self.findApps(); });
+      $('dedupeBtn').addEventListener('click', function () { self.dedupe(); });
       if (S.pb.authStore.isValid) this.open();
     },
 
@@ -103,6 +104,21 @@
     appOf: function (w) { return (w.expand && w.expand.application) || {}; },
     clearWs: function (w) { var self = this; S.AppAdmin.clearWs(w, this.appOf(w), function () { self.loadWs(); }); },
     deleteWs: function (w) { var self = this; S.AppAdmin.deleteWs(w, this.appOf(w), function () { self.loadWs(); }); },
+
+    /** Collapse applications that exist more than once (one number = one record). */
+    dedupe: function () {
+      var self = this, btn = $('dedupeBtn');
+      btn.disabled = true;
+      S.pb.send('/api/admin/dedupe', { method: 'POST' }).then(function (r) {
+        $('regStat').textContent = r.groups
+          ? 'Дубликаты: номеров ' + r.groups + ', удалено записей ' + r.removed +
+            (r.skipped ? ', оставлено (есть работа) ' + r.skipped : '')
+          : 'Дубликатов нет — каждый номер заявки встречается один раз';
+        toast($('regStat').textContent);
+        if (r.removed) self.loadWs();
+      }).catch(function (e) { toast('Проверка не удалась: ' + S.pbErr(e), true); })
+        .finally(function () { btn.disabled = false; });
+    },
 
     /* ------------------------------------------------ manual application */
     findApps: function () {
@@ -175,13 +191,14 @@
 
     send: function (rows, file) {
       var self = this;
-      var total = { added: 0, updated: 0, contragents: 0 };
+      var total = { added: 0, updated: 0, contragents: 0, duplicates: 0 };
       var i = 0;
       function step() {
         if (i >= rows.length) return Promise.resolve();
         var part = rows.slice(i, i + CHUNK);
         return S.pb.send('/api/registry/import', { method: 'POST', body: { rows: part } }).then(function (r) {
           total.added += r.added; total.updated += r.updated; total.contragents += r.contragents;
+          total.duplicates += r.duplicates || 0;
           i += part.length;
           self.progress(i, rows.length, i + ' / ' + rows.length + ' строк');
           return step();
@@ -197,8 +214,11 @@
         return S.pb.collection('registry_imports').create(fd);
       }).then(function () {
         $('regProgress').hidden = true;
-        $('regStat').textContent = 'Прочитано ' + rows.length + ' строк · добавлено ' + total.added +
-          ' · обновлено ' + total.updated + ' · новых контрагентов ' + total.contragents;
+        // Says plainly that a second upload of the same registry adds nothing.
+        $('regStat').textContent = 'Прочитано ' + rows.length + ' строк · новых заявок ' + total.added +
+          ' · уже были в базе, обновлено ' + total.updated +
+          (total.duplicates ? ' · повторов номера в самом файле ' + total.duplicates : '') +
+          ' · новых контрагентов ' + total.contragents;
         toast('Реестр обновлён');
         self.loadHistory();
       });

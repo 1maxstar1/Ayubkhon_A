@@ -8,7 +8,17 @@ routerAdd("POST", "/api/registry/import", (e) => {
     throw new ForbiddenError("Faqat administrator");
   }
   const body = e.requestInfo().body || {};
-  const rows = Array.isArray(body.rows) ? body.rows : [];
+  const raw = Array.isArray(body.rows) ? body.rows : [];
+  // One application number = one record. A registry export can repeat a number;
+  // the later row wins, because it carries the newer state of the application.
+  const byNumber = new Map();
+  for (const row of raw) {
+    const n = String(row.number || "").trim();
+    if (!n) continue;
+    byNumber.set(n, row);
+  }
+  const rows = Array.from(byNumber.values());
+  const duplicates = raw.length - rows.length;
   const FIELDS = ["status", "registered_at", "paid_at", "org_name", "inn", "expert", "coexpert",
     "expertise_type", "buyer_type", "project_title", "object_id", "cost", "cost_vat", "currency",
     "place", "branch", "executor_name", "executor_email", "executor_phone", "raw"];
@@ -55,5 +65,8 @@ routerAdd("POST", "/api/registry/import", (e) => {
     }
   });
 
-  return e.json(200, { added: added, updated: updated, contragents: contragents, rows: rows.length });
+  return e.json(200, {
+    added: added, updated: updated, contragents: contragents,
+    rows: raw.length, duplicates: duplicates
+  });
 }, $apis.requireAuth());

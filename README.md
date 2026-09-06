@@ -213,8 +213,13 @@ sh server/run.sh                                                              # 
   brauzerda saqlanadi, shuning uchun xat kechiksa ham sahifani yopib qaytish
   mumkin (`src/ui/auth.js`, `users.otp` sxemada).
 
-**Oqim.** Admin har kuni reyestrni yuklaydi (ariza raqami bo'yicha
-qo'shiladi/yangilanadi, hech narsa o'chirilmaydi). Arizalar ro'yxati
+**Oqim.** Admin har hafta reyestrni yuklaydi. **Bitta ariza raqami — bitta
+yozuv**: fayl ichida raqam takrorlansa oxirgi qatori olinadi, bazada allaqachon
+bor ariza esa qayta qo'shilmaydi, faqat yangilanadi (`applications.number` da
+UNIQUE indeks). Natijada «новых заявок N · уже были в базе, обновлено M» deb
+ko'rsatiladi. Eski bazada nusxa qolgan bo'lsa, admin sahifasidagi «Проверить
+дубликаты» tugmasi ularni birlashtiradi (ish, tuzatish va eksportlar saqlanib
+qoladigan yozuvga ko'chiriladi) — `POST /api/admin/dedupe`. Arizalar ro'yxati
 hisobotning sariq ustunlari bo'yicha filtrlanadi: raqam / tashkilot / STIR /
 loyiha nomi / obyekt ID (qidiruv), ekspertiza turi, buyurtmachi turi, holat,
 summa oralig'i (`/api/registry/facets` — ustunlarning takrorlanmas qiymatlari).
@@ -244,6 +249,7 @@ sh test/pb-smoke.sh            # server: sxema, OTP kirish, token muddati, huquq
 node test/registry.cjs         # reyestr parser (fixture, 400 qator)
 sh test/registry-import.sh     # import hook: ikki marta yuklash, huquqlar
 sh test/admin-api.sh           # admin hooklari: facets, tozalash, o'chirish, huquqlar
+node test/dedupe.mjs           # bitta raqam — bitta yozuv: qayta yuklash, fayldagi takror, tuzatish
 node test/mail-otp.mjs         # kirish xati: kod mavzuda, ruscha matn, Gmail relay va Brevo yo'llari
 node test/e2e-auth.mjs         # brauzer: kirish, noto'g'ri kod, qulf
 node test/e2e-admin.mjs        # brauzer: reyestr, ish maydonlari, qo'lda ariza, foydalanuvchilar

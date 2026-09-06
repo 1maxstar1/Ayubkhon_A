@@ -70,13 +70,25 @@ const hist = await page.textContent('#regHistory tbody tr');
 check(hist.includes('Boss') && /400400\s*0/.test(hist.replace(/\s+/g, '')), 'history row: ' + hist.replace(/\s+/g, ' ').trim());
 check(hist.includes('registry'), 'history links the uploaded file');
 
-// the history line can be removed without touching the imported applications
-const before = (await (await fetch(BASE + '/api/collections/applications/records?perPage=1', { headers: { Authorization: su } })).json()).totalItems;
+// the upload can be undone from the history table: its applications go with it
+const apps = async () => (await (await fetch(BASE + '/api/collections/applications/records?perPage=1', { headers: { Authorization: su } })).json()).totalItems;
+const before = await apps();
+page.once('dialog', (d) => d.accept());
+await page.click('#regHistory tbody button[data-act=revert]');
+await page.waitForFunction(() => /Загрузка отменена/.test(document.getElementById('regStat').textContent), null, { timeout: 60000 });
+check(/удалено заявок 400/.test(await page.textContent('#regStat')), 'undo reports what it removed: ' + await page.textContent('#regStat'));
+check((await apps()) === before - 400, 'the 400 applications of that upload are gone');
+await page.waitForFunction(() => /Загрузок ещё не было/.test(document.querySelector('#regHistory tbody').textContent));
+
+// upload it again, then remove only the history line — applications stay
+await page.setInputFiles('#regFile', join(root, 'test/fixtures/registry-sample.xls'));
+await page.waitForFunction(() => document.getElementById('regStat').textContent.includes('строк'), null, { timeout: 60000 });
+await page.waitForFunction(() => document.querySelectorAll('#regHistory tbody tr[data-id]').length === 1);
+const back = await apps();
 page.once('dialog', (d) => d.accept());
 await page.click('#regHistory tbody button[data-act=delimp]');
 await page.waitForFunction(() => /Загрузок ещё не было/.test(document.querySelector('#regHistory tbody').textContent));
-const after = (await (await fetch(BASE + '/api/collections/applications/records?perPage=1', { headers: { Authorization: su } })).json()).totalItems;
-check(after === before, 'deleting a history line keeps every application: ' + after);
+check((await apps()) === back, 'deleting only the history line keeps every application: ' + back);
 
 await page.fill('#uEmail', 'new@example.com');
 await page.fill('#uName', 'Yangi Xodim');

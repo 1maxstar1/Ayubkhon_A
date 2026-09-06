@@ -219,7 +219,14 @@ bor ariza esa qayta qo'shilmaydi, faqat yangilanadi (`applications.number` da
 UNIQUE indeks). Natijada «новых заявок N · уже были в базе, обновлено M» deb
 ko'rsatiladi. Eski bazada nusxa qolgan bo'lsa, admin sahifasidagi «Проверить
 дубликаты» tugmasi ularni birlashtiradi (ish, tuzatish va eksportlar saqlanib
-qoladigan yozuvga ko'chiriladi) — `POST /api/admin/dedupe`. Arizalar ro'yxati
+qoladigan yozuvga ko'chiriladi) — `POST /api/admin/dedupe`.
+Yuklashlar tarixidagi har bir qatorda ikki amal bor: **«✕ строку»** — faqat
+jurnal yozuvi o'chadi, arizalar qoladi; **«Отменить загрузку»** — o'sha yuklash
+qo'shgan arizalar ham o'chadi (xodim ish boshlagan arizalar tegilmaydi), avval
+nechta o'chishi ko'rsatiladi — `POST /api/admin/imports/{id}/revert`. Har bir
+yuklash o'zi yaratgan ariza raqamlarini `registry_imports.created_numbers` da
+saqlaydi; bu maydon paydo bo'lishidan oldingi yuklashlar uchun yuklash vaqtida
+yaratilgan arizalar olinadi. Arizalar ro'yxati
 hisobotning sariq ustunlari bo'yicha filtrlanadi: raqam / tashkilot / STIR /
 loyiha nomi / obyekt ID (qidiruv), ekspertiza turi, buyurtmachi turi, holat,
 summa oralig'i (`/api/registry/facets` — ustunlarning takrorlanmas qiymatlari).

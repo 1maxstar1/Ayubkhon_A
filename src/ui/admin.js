@@ -105,6 +105,31 @@
     clearWs: function (w) { var self = this; S.AppAdmin.clearWs(w, this.appOf(w), function () { self.loadWs(); }); },
     deleteWs: function (w) { var self = this; S.AppAdmin.deleteWs(w, this.appOf(w), function () { self.loadWs(); }); },
 
+    /** Undo an upload: its applications go, the ones already worked on stay. */
+    revertImport: function (x) {
+      var self = this;
+      var url = '/api/admin/imports/' + x.id + '/revert';
+      S.pb.send(url, { method: 'POST', body: { preview: true } }).then(function (p) {
+        if (!p.total) {
+          toast('Заявки этой загрузки не найдены — можно удалить только строку истории', true);
+          return;
+        }
+        var msg = 'Отменить загрузку от ' + when(x.created) + '?\n\n' +
+          'Будет удалено заявок: ' + p.deletable +
+          (p.kept ? '\nОстанутся (по ним уже есть работа): ' + p.kept : '') +
+          (p.source === 'by time' ? '\n\nЭта загрузка сделана до того, как программа стала запоминать свои заявки, поэтому берутся заявки, созданные во время неё.' : '') +
+          '\n\nСтрока истории тоже удалится. Продолжить?';
+        if (!confirm(msg)) return;
+        return S.pb.send(url, { method: 'POST', body: {} }).then(function (r) {
+          $('regStat').textContent = 'Загрузка отменена: удалено заявок ' + r.deleted +
+            (r.kept ? ', оставлено (есть работа) ' + r.kept : '');
+          toast($('regStat').textContent);
+          self.loadHistory();
+          self.loadWs();
+        });
+      }).catch(function (e) { toast('Не удалось отменить: ' + S.pbErr(e), true); });
+    },
+
     /** Collapse applications that exist more than once (one number = one record). */
     dedupe: function () {
       var self = this, btn = $('dedupeBtn');
@@ -192,6 +217,7 @@
     send: function (rows, file) {
       var self = this;
       var total = { added: 0, updated: 0, contragents: 0, duplicates: 0 };
+      var createdNumbers = [];
       var i = 0;
       function step() {
         if (i >= rows.length) return Promise.resolve();
@@ -199,6 +225,7 @@
         return S.pb.send('/api/registry/import', { method: 'POST', body: { rows: part } }).then(function (r) {
           total.added += r.added; total.updated += r.updated; total.contragents += r.contragents;
           total.duplicates += r.duplicates || 0;
+          if (r.createdNumbers) createdNumbers = createdNumbers.concat(r.createdNumbers);
           i += part.length;
           self.progress(i, rows.length, i + ' / ' + rows.length + ' строк');
           return step();
@@ -210,6 +237,8 @@
         fd.append('rows', rows.length);
         fd.append('rows_added', total.added);
         fd.append('rows_updated', total.updated);
+        // what this upload created, so it can be undone from the history table
+        fd.append('created_numbers', JSON.stringify(createdNumbers));
         fd.append('by', S.me().id);
         return S.pb.collection('registry_imports').create(fd);
       }).then(function () {
@@ -234,13 +263,14 @@
           return '<tr data-id="' + x.id + '"><td>' + when(x.created) + '</td><td>' + S.esc(by ? (by.name || by.email) : '') +
             '</td><td>' + (x.rows || 0) + '</td><td>' + (x.rows_added || 0) + '</td><td>' + (x.rows_updated || 0) +
             '</td><td>' + (url ? '<a href="' + url + '">' + S.esc(x.file) + '</a>' : '') +
-            '</td><td class="act"><button class="btn xs danger" data-act="delimp" title="Удалить запись истории (заявки останутся)">✕</button></td></tr>';
+            '</td><td class="act"><button class="btn xs" data-act="delimp" title="Удалить только строку истории, заявки останутся">✕ строку</button>' +
+            '<button class="btn xs danger" data-act="revert" title="Удалить заявки, добавленные этой загрузкой, вместе со строкой истории">Отменить загрузку</button></td></tr>';
         }).join('') || '<tr><td colspan="7" class="mute">Загрузок ещё не было</td></tr>';
-        tb.querySelectorAll('button[data-act=delimp]').forEach(function (b) {
+        tb.querySelectorAll('.act button').forEach(function (b) {
           b.addEventListener('click', function () {
             var tr = b.closest('tr');
             var x = r.items.find(function (i) { return i.id === tr.dataset.id; });
-            self.deleteImport(x);
+            if (b.dataset.act === 'revert') self.revertImport(x); else self.deleteImport(x);
           });
         });
       }).catch(function (e) { toast(S.pbErr(e), true); });

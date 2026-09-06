@@ -23,6 +23,7 @@ routerAdd("POST", "/api/registry/import", (e) => {
     "expertise_type", "buyer_type", "project_title", "object_id", "cost", "cost_vat", "currency",
     "place", "branch", "executor_name", "executor_email", "executor_phone", "raw"];
   let added = 0, updated = 0, contragents = 0;
+  const createdNumbers = [];
   const now = new Date().toISOString();
 
   $app.runInTransaction((tx) => {
@@ -61,12 +62,12 @@ routerAdd("POST", "/api/registry/import", (e) => {
       if (contragentId) a.set("contragent", contragentId);   // a row without INN keeps the old link
       a.set("imported_at", now);
       tx.save(a);
-      if (isNew) added++; else updated++;
+      if (isNew) { added++; createdNumbers.push(number); } else updated++;
     }
   });
 
   return e.json(200, {
     added: added, updated: updated, contragents: contragents,
-    rows: raw.length, duplicates: duplicates
+    rows: raw.length, duplicates: duplicates, createdNumbers: createdNumbers
   });
 }, $apis.requireAuth());

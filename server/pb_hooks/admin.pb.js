@@ -118,3 +118,76 @@ routerAdd("POST", "/api/admin/dedupe", (e) => {
   }
   return e.json(200, { groups: groups, removed: removed, skipped: skipped });
 }, $apis.requireAuth());
+
+// Undo a registry upload: removes the applications that upload created, keeps
+// any an expert has already worked on, then drops the history line itself.
+// {preview: true} only counts, so the admin sees the number before confirming.
+// Uploads made before the app recorded its numbers fall back to the records
+// created while that upload was running.
+routerAdd("POST", "/api/admin/imports/{id}/revert", (e) => {
+  const { requireAdmin } = require(`${__hooks}/lib/admin.js`);
+  requireAdmin(e);
+  const id = e.request.pathValue("id");
+  const preview = !!(e.requestInfo().body || {}).preview;
+  const imp = $app.findRecordById("registry_imports", id);
+
+  // A json field comes back as raw JSON bytes, which look like an array of
+  // byte values to JS — toString() turns them into the text to parse.
+  let numbers = [];
+  let source = "recorded";
+  const stored = imp.get("created_numbers");
+  if (stored != null) {
+    let text = "";
+    try { text = toString(stored); } catch (_) { text = ""; }
+    if (text) {
+      try {
+        const parsed = JSON.parse(text);
+        if (Array.isArray(parsed)) numbers = parsed.map((n) => String(n));
+      } catch (_) { numbers = []; }
+    }
+  }
+  // Plain SQL, not a record filter: an upload can carry tens of thousands of
+  // numbers, far past the length a filter expression may have.
+  const ids = [];
+  if (numbers.length) {
+    for (let i = 0; i < numbers.length; i += 200) {
+      const chunk = numbers.slice(i, i + 200);
+      const params = {};
+      const marks = chunk.map((v, k) => { params["n" + k] = String(v); return "{:n" + k + "}"; });
+      const found = arrayOf(new DynamicModel({ id: "" }));
+      $app.db().newQuery("SELECT id FROM applications WHERE number IN (" + marks.join(",") + ")").bind(params).all(found);
+      for (const r of found) ids.push(r.id);
+    }
+  } else {
+    // Legacy upload: the applications born while it ran, one hour back at most.
+    source = "by time";
+    const rows = arrayOf(new DynamicModel({ id: "" }));
+    $app.db().newQuery(
+      "SELECT id FROM applications WHERE created <= {:end} AND created >= datetime({:end}, '-60 minutes')"
+    ).bind({ end: imp.get("created") }).all(rows);
+    for (const r of rows) ids.push(r.id);
+  }
+
+  // One query for every application an expert has opened, instead of one per row.
+  const busy = {};
+  const opened = arrayOf(new DynamicModel({ application: "" }));
+  $app.db().newQuery("SELECT DISTINCT application FROM workspaces").all(opened);
+  for (const w of opened) busy[w.application] = true;
+  const worked = [], plain = [];
+  for (const appId of ids) (busy[appId] ? worked : plain).push(appId);
+  if (preview) {
+    return e.json(200, { source: source, deletable: plain.length, kept: worked.length, total: ids.length });
+  }
+
+  $app.runInTransaction((tx) => {
+    for (let i = 0; i < plain.length; i += 200) {
+      const chunk = plain.slice(i, i + 200);
+      const params = {};
+      const marks = chunk.map((v, k) => { params["p" + k] = v; return "{:p" + k + "}"; });
+      tx.db().newQuery("DELETE FROM applications WHERE id IN (" + marks.join(",") + ")").bind(params).execute();
+    }
+    tx.delete(imp);
+  });
+  $app.logger().info("registry upload reverted", "import", id, "deleted", String(plain.length), "kept", String(worked.length));
+  return e.json(200, { source: source, deleted: plain.length, kept: worked.length });
+}, $apis.requireAuth());

@@ -121,6 +121,30 @@ check(movedCorr.application === app.id, 'the correction moved onto the surviving
 const again = await api('/api/admin/dedupe', { method: 'POST' }, su);
 check(again.groups === 0 && again.removed === 0, 'a clean database reports nothing to repair');
 
+/* --------------------------------------- undoing an upload -------------- */
+// A fresh upload of two applications; one of them gets opened for work.
+const undoRows = [
+  { number: '990101', org_name: 'Отменяемая 1', project_title: 'A' },
+  { number: '990102', org_name: 'Отменяемая 2', project_title: 'B' }
+];
+const undo = await api('/api/registry/import', { method: 'POST', body: JSON.stringify({ rows: undoRows }) }, su);
+check(undo.added === 2 && undo.createdNumbers.length === 2, 'the import reports the numbers it created');
+const worked = (await api(`/api/collections/applications/records?filter=${encodeURIComponent("number='990101'")}`, {}, su)).items[0];
+await api('/api/collections/workspaces/records', {
+  method: 'POST', body: JSON.stringify({ application: worked.id, region: 'buxoro', status: 'in_progress', opened_by: me.id, updated_by: me.id })
+}, su);
+const imp = await api('/api/collections/registry_imports/records', {
+  method: 'POST', body: JSON.stringify({ rows: 2, rows_added: 2, rows_updated: 0, by: me.id, created_numbers: undo.createdNumbers })
+}, su);
+const preview = await api(`/api/admin/imports/${imp.id}/revert`, { method: 'POST', body: JSON.stringify({ preview: true }) }, su);
+check(preview.deletable === 1 && preview.kept === 1, `preview: ${preview.deletable} to delete, ${preview.kept} kept`);
+check((await count('registry_imports', `id='${imp.id}'`)) === 1, 'preview changes nothing');
+const done = await api(`/api/admin/imports/${imp.id}/revert`, { method: 'POST', body: JSON.stringify({}) }, su);
+check(done.deleted === 1 && done.kept === 1, 'revert removed the untouched application only');
+check((await count('applications', "number='990102'")) === 0, 'the untouched application is gone');
+check((await count('applications', "number='990101'")) === 1, 'the one with work stays');
+check((await count('registry_imports', `id='${imp.id}'`)) === 0, 'the history line went with it');
+
 server.kill();
 console.log(fail ? `FAILED (${fail})` : 'dedupe OK');
 process.exit(fail ? 1 : 0);

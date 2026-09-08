@@ -15,24 +15,17 @@
   function shortName(f) { return f.replace(/_[a-z0-9]{10}(\.[a-z]+)$/i, '$1'); }
 
   /**
-   * Files are private, so their links need a short-lived token that has to be
-   * asked for. The list is drawn at once with the names and no addresses, and
-   * the addresses are filled in when the token arrives — a link that cannot be
-   * signed says so rather than leading nowhere.
+   * Files are private, so their links need a short-lived token. The list is
+   * drawn at once with the names and no addresses; S.fileLink fills each one
+   * in when the token arrives and signs it again on the way out, because a
+   * card can stay open for longer than a token lives.
    */
   function sign(box, record, only) {
     var links = box.querySelectorAll('a[data-name]');
     for (var i = 0; i < links.length; i++) {
       var a = links[i];
       if (only && a.getAttribute('data-rec') !== only) continue;
-      (function (el) {
-        S.fileURL(record, el.getAttribute('data-name')).then(function (u) {
-          el.href = u;
-        }).catch(function () {
-          el.removeAttribute('href');
-          el.title = 'Ссылка недоступна — обновите страницу';
-        });
-      })(a);
+      S.fileLink(a, record, a.getAttribute('data-name'));
     }
   }
 

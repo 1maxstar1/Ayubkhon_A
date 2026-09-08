@@ -183,7 +183,7 @@ tuzoq ham tekshiriladi: `«Отключить»` **2 ms** da javob beradi (osili
 qolmaydi), oddiy tahrir (ismni o'zgartirish) esa sessiyaga tegmaydi, va boshqa
 ekspertlar buni sezmaydi.
 
-### [ ] 2.7 Fayl havolasi chizilganda imzolanadi, bosilganda emas (tugallanmagan)
+### [x] 2.7 Fayl havolasi chizilganda imzolanadi, bosilganda emas
 
 `src/ui/registry.js:23`, `src/ui/admin.js` — **medium**, mening tuzatishimdagi kamchilik
 
@@ -191,6 +191,15 @@ Fayllarni `protected: true` qilib, token bilan berish to'g'ri edi — lekin men
 tokenni `href` ichiga **chizish paytida** yozib qo'ydim. Tekshiruvchi token
 umrini o'lchadi: **180 soniya**. Ya'ni ariza kartochkasi besh daqiqa ochiq
 tursa, havola tushuntirishsiz `404` beradi.
+
+**Bajarildi.** `S.fileLink(el, record, name)` — manzil avvalgidek chizilganda
+to'ldiriladi (havola havolaga o'xshab tursin), lekin **bosilganda qaytadan
+imzolanadi**. Uchala joy ham (ariza kartochkasidagi smetalar, eksportlar,
+admin sahifasidagi reyestr fayli) shu bitta funksiyadan foydalanadi.
+
+`test/e2e-workspace.mjs` da isbot: kartochkadagi havolaning manzili
+**ataylab buziladi** (`token=dead`), keyin bosiladi — serverga ketgan so'rov
+buzilgan manzil emas, yangi imzolangani bo'ladi.
 
 ---
 

@@ -233,6 +233,22 @@ await page.waitForSelector('#screen-card:not([hidden])');
 await page.waitForFunction(() => document.querySelectorAll('#cardExports li a').length === 1);
 check((await page.textContent('#cardFields')).includes('67159') === false && (await page.textContent('#cardTitle')).includes('67159'), 'card opens for the application');
 check((await page.$$eval('#cardFiles li a', (a) => a.length)) === 2, 'card lists the two uploaded smeta files');
+
+/*
+ * A file token lives three minutes; a card stays open for as long as somebody
+ * is reading it. So the address is signed again when the link is pressed,
+ * rather than followed as it was baked in when the card was drawn. Proved by
+ * poisoning the address that is there and watching what is actually requested.
+ */
+const asked = [];
+page.on('request', (r) => { if (/\/api\/files\//.test(r.url())) asked.push(r.url()); });
+await page.$eval('#cardFiles li a', (a) => { a.href = a.href.replace(/token=[^&]*/, 'token=dead'); });
+await page.click('#cardFiles li a');
+await page.waitForFunction(() => true);
+await new Promise((r) => setTimeout(r, 1500));
+check(asked.length > 0, `pressing the link asks the server for the file (${asked.length})`);
+check(asked.every((u) => !/token=dead/.test(u)),
+  'and not with the address that was put there when the card was drawn');
 check((await page.textContent('#cardWork')).includes('Завершена'), 'card shows the work status');
 await page.click('#cardClose');
 await page.selectOption('#appRegion', 'fargona');

@@ -285,12 +285,12 @@
             '<button class="btn xs danger" data-act="revert" title="Удалить заявки, добавленные этой загрузкой, вместе со строкой истории">Отменить загрузку</button></td></tr>';
         }).join('') || '<tr><td colspan="7" class="mute">Загрузок ещё не было</td></tr>';
         // The uploaded registry is private, so its link needs a short-lived
-        // token; the row is drawn at once and the address filled in after.
+        // token; the row is drawn at once, the address filled in after, and
+        // signed again on the way out — the page outlives the token.
         tb.querySelectorAll('a[data-file]').forEach(function (a) {
           var x = r.items.find(function (i) { return i.id === a.dataset.file; });
           if (!x) return;
-          S.fileURL(x, x.file).then(function (u) { a.href = u; })
-            .catch(function () { a.title = 'Ссылка недоступна — обновите страницу'; });
+          S.fileLink(a, x, x.file);
         });
         tb.querySelectorAll('.act button').forEach(function (b) {
           b.addEventListener('click', function () {

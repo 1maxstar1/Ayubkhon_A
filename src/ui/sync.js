@@ -9,6 +9,7 @@
   if (!S.pb) return;
 
   var SAVE_MS = 1500;
+  var CORRECT_MS = 700;                 // quiet time before a typed price is written
   var XLSX_RE = /\.xlsx?$|\.xlsm$/i;
   // Stamped into the saved state. 2 = resource keys built by the name key that
   // repairs half-switched keyboard layouts; anything older is lifted onto it
@@ -28,16 +29,22 @@
 
   var Sync = {
     ws: null, app: null, files: {}, corr: {}, q: Promise.resolve(), loading: false, dirty: false,
+    pend: {}, ct: 0,        // prices typed but not yet written; see correctSoon()
 
     init: function () {
       var self = this;
       var P = S.App.prototype;
       wrap(P, 'rebuild', function () { self.touch(); });
       wrap(P, 'saveOpts', function () { self.touch(); });
-      wrap(P, 'setPrice', function (key, value) { self.touch(); self.correct(key, value); });
+      wrap(P, 'setPrice', function (key, value) { self.touch(); self.correctSoon(key, value); });
       wrap(P, 'setPrices', function (map) {
         self.touch();
-        Object.keys(map).forEach(function (k) { self.correct(k, map[k]); });
+        Object.keys(map).forEach(function (k) { self.correctSoon(k, map[k]); });
+      });
+      // Leaving the field is the moment the number is finished being typed.
+      ['priceScroll', 'sheetScroll'].forEach(function (id) {
+        var sc = $(id);
+        if (sc) sc.addEventListener('focusout', function () { self.flush(); });
       });
       wrap(P, 'addFiles', function (files) { self.upload(files); });
       wrap(P, 'onParsed', function () { if (self.loading && this.pending <= 0) self.restore(); });
@@ -49,7 +56,10 @@
       };
       $('projects').addEventListener('input', function () { self.touch(); });
       $('reportMode').addEventListener('change', function () { self.touch(); });
-      window.addEventListener('beforeunload', function () { if (self.dirty) self.saveNow(); });
+      window.addEventListener('beforeunload', function () {
+        self.flush();
+        if (self.dirty) self.saveNow();
+      });
     },
 
     /* ------------------------------------------------------------- open */
@@ -242,6 +252,7 @@
     saveNow: function () {
       var self = this, app = A();
       if (!this.ws || this.loading) return Promise.resolve();
+      this.flush();
       clearTimeout(this.t);
       var st = this.state();
       var live = {};
@@ -302,6 +313,32 @@
     },
 
     /* ------------------------------------------------------ corrections */
+
+    /**
+     * A price field fires on every keystroke, so «120000» used to be five
+     * separate writes to the server, four of them recording a number nobody
+     * meant — 1, 12, 120, 1200. The last value for each resource is kept here
+     * and written once the typing stops, or the moment the field is left.
+     *
+     * Nothing may leave without going through here first: flush() is called
+     * before every save and before the workspace is closed.
+     */
+    correctSoon: function (key, value) {
+      var self = this;
+      if (!this.ws || this.loading) return;
+      this.pend[key] = value;
+      clearTimeout(this.ct);
+      this.ct = setTimeout(function () { self.flush(); }, CORRECT_MS);
+    },
+
+    flush: function () {
+      var self = this, waiting = this.pend;
+      clearTimeout(this.ct);
+      this.ct = 0;
+      this.pend = {};
+      Object.keys(waiting).forEach(function (k) { self.correct(k, waiting[k]); });
+    },
+
     correct: function (key, value) {
       var self = this, app = A();
       if (!this.ws || this.loading || !app.model) return;
@@ -403,6 +440,7 @@
      */
     close: function (force) {
       var self = this, app = A();
+      this.flush();
       var done = this.dirty ? this.saveNow() : this.q;
       return Promise.resolve(done).catch(function (e) {
         if (!force) {

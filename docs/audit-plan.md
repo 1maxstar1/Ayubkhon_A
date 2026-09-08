@@ -230,15 +230,21 @@ javobi ikkinchisining ustiga tushadi.
 o'zgargan bo'lsa, javobni tashlab yuborish (`registry.js` dagi `seq` naqshi
 allaqachon shu uchun ishlatilgan).
 
-### [ ] 2.3 Har bir tugma bosilishi serverga yozuv yuboradi
+### [x] 2.3 Har bir tugma bosilishi serverga yozuv yuboradi
 
 `src/ui/sync.js:37`
 
 Narx maydoniga `120000` yozish — beshta alohida server yozuvi, va oraliq
 qiymatlar (`1`, `12`, `120`…) ham saqlanadi.
 
-**Tuzatish:** `correct()` ni `debounce` bilan o'rash (600 ms), va maydondan
-chiqishda darhol yozish.
+**Bajarildi.** Terilgan qiymat 700 ms jim turgandan keyin yoziladi, maydondan
+chiqilganda esa darhol. Hech narsa yo'lda qolmaydi: `flush()` har bir
+saqlashdan oldin, ish maydonini yopishdan oldin va sahifa yopilishida
+chaqiriladi.
+
+`test/e2e-workspace.mjs` buni **o'lchaydi**: raqamlar terilayotganda serverga
+`0` ta yozuv, terish tugagach `1` ta. Ilgari har bir raqam alohida yozuv edi va
+ularning to'rttasi hech kim nazarda tutmagan sonni saqlardi (1, 12, 120, 1200).
 
 ### [x] 2.4 Ish maydonidan chiqishda muvaffaqiyatsiz saqlash jimgina yo'qolardi
 

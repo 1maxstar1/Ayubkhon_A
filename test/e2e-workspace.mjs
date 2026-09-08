@@ -135,8 +135,29 @@ await page.click('#export');
 await page.waitForFunction(() => document.getElementById('toast').textContent.includes('сохранён на сервере'), null, { timeout: 60000 });
 check((await count('exports')) === 1, 'export stored in exports');
 
+// Typing a price fires on every keystroke, and each one used to be its own
+// write — «120000» meant five, four of them recording a number nobody meant.
+// They are gathered and written once the typing stops.
+let corrWrites = 0;
+page.on('request', (r) => {
+  if (/\/api\/collections\/corrections\/records/.test(r.url()) && r.method() !== 'GET') corrWrites++;
+});
+await page.evaluate((k) => {
+  const r = app.model.resources.find((x) => x.key === k);
+  const target = Math.round(r.price * 1.2);
+  // one digit at a time, the way a person types
+  const digits = String(target).split('');
+  let typed = '';
+  for (const d of digits) { typed += d; app.setPrice(k, Number(typed)); }
+}, first.key);
+check(corrWrites === 0, `nothing is written while the digits are still arriving (${corrWrites})`);
+await page.evaluate(() => S.Sync.flush());
+await page.evaluate(() => S.Sync.q);
+check(corrWrites === 1, `and one write when the typing stops (${corrWrites})`);
+
 // reset the price -> correction removed
 await page.evaluate((k) => { const r = app.model.resources.find((x) => x.key === k); app.setPrice(k, r.price); }, first.key);
+await page.evaluate(() => S.Sync.flush());
 await page.evaluate(() => S.Sync.q);
 check((await count('corrections')) === 0, 'resetting the price removes the correction');
 

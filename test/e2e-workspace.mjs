@@ -163,6 +163,19 @@ check(true, 'region filter works on the list');
 await page.selectOption('#appRegion', '');
 check(await page.evaluate(() => app.projects.length === 0 && !S.Sync.ws), 'app cleared after closing the workspace');
 
+/* ------------------------------------------------- files are not public ---- */
+// The uploaded estimates hang on a record id that every signed-in expert can
+// see in the list. Without a token that would be enough to download somebody
+// else's file from anywhere.
+const wsRec = (await api('/api/collections/workspaces/records?perPage=1', {}, su)).items[0];
+check(!!(wsRec && wsRec.files && wsRec.files.length), 'the workspace has its uploaded files');
+const bareUrl = `${BASE}/api/files/${wsRec.collectionId}/${wsRec.id}/${wsRec.files[0]}`;
+const bare = await fetch(bareUrl);
+check(bare.status === 403 || bare.status === 404, `the file URL alone is refused (${bare.status})`);
+const fileTok = (await api('/api/files/token', { method: 'POST' }, su)).token;
+const signed = await fetch(`${bareUrl}?token=${fileTok}`);
+check(signed.ok, `and works with a token (${signed.status})`);
+
 /* ---------------------------------------------- signing out leaves the work */
 // A workspace belongs to whoever opened it, and this program is used on shared
 // office computers. Open one, sign out, sign in as somebody else: the second

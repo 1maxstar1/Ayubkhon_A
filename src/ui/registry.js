@@ -11,6 +11,31 @@
   var PAGE = 50;
 
   function $(id) { return document.getElementById(id); }
+  /** «smeta_a1b2c3d4e5.xlsx» -> «smeta.xlsx»: the suffix PocketBase adds. */
+  function shortName(f) { return f.replace(/_[a-z0-9]{10}(\.[a-z]+)$/i, '$1'); }
+
+  /**
+   * Files are private, so their links need a short-lived token that has to be
+   * asked for. The list is drawn at once with the names and no addresses, and
+   * the addresses are filled in when the token arrives — a link that cannot be
+   * signed says so rather than leading nowhere.
+   */
+  function sign(box, record, only) {
+    var links = box.querySelectorAll('a[data-name]');
+    for (var i = 0; i < links.length; i++) {
+      var a = links[i];
+      if (only && a.getAttribute('data-rec') !== only) continue;
+      (function (el) {
+        S.fileURL(record, el.getAttribute('data-name')).then(function (u) {
+          el.href = u;
+        }).catch(function () {
+          el.removeAttribute('href');
+          el.title = 'Ссылка недоступна — обновите страницу';
+        });
+      })(a);
+    }
+  }
+
   function day(d) {
     if (!d) return '';
     var x = new Date(d);
@@ -229,8 +254,9 @@
         (who ? ' · последний: ' + who + ', ' + ago(w.updated) : '') + (w.changed ? ' · изменено цен: ' + w.changed : '');
       $('cardExports').innerHTML = '<li class="mute">загрузка…</li>';
       $('cardFiles').innerHTML = w && w.files && w.files.length
-        ? w.files.map(function (f) { return '<li><a href="' + S.pb.files.getURL(w, f) + '">' + S.esc(f.replace(/_[a-z0-9]{10}(\.[a-z]+)$/i, '$1')) + '</a></li>'; }).join('')
+        ? w.files.map(function (f) { return '<li><a data-name="' + S.esc(f) + '">' + S.esc(shortName(f)) + '</a></li>'; }).join('')
         : '<li class="mute">нет</li>';
+      if (w && w.files && w.files.length) sign($('cardFiles'), w);
       $('cardOpen').onclick = function () { $('screen-card').hidden = true; self.open(a); };
       $('cardOpen').textContent = w ? 'Продолжить' : 'Открыть';
       $('screen-card').hidden = false;
@@ -238,9 +264,10 @@
         .then(function (list) {
           $('cardExports').innerHTML = list.length ? list.map(function (x) {
             var by = x.expand && x.expand.by;
-            return '<li><a href="' + S.pb.files.getURL(x, x.file) + '">' + S.esc(x.file.replace(/_[a-z0-9]{10}(\.[a-z]+)$/i, '$1')) + '</a>' +
+            return '<li><a data-name="' + S.esc(x.file) + '" data-rec="' + S.esc(x.id) + '">' + S.esc(shortName(x.file)) + '</a>' +
               '<small>' + day(x.created) + (by ? ' · ' + S.esc(by.name || by.email) : '') + (x.mode ? ' · ' + S.esc(x.mode) : '') + '</small></li>';
           }).join('') : '<li class="mute">экспортов ещё нет</li>';
+          list.forEach(function (x) { sign($('cardExports'), x, x.id); });
         }).catch(function (e) { $('cardExports').innerHTML = '<li class="mute">' + S.esc(S.pbErr(e)) + '</li>'; });
     },
 

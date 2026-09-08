@@ -83,7 +83,7 @@
       if (!wanted.length) { this.restore(); return; }
       app.busy(true, 'Получение файлов с сервера…');
       Promise.all(wanted.map(function (f) {
-        return fetch(S.pb.files.getURL(w, f.id)).then(function (r) {
+        return S.fileURL(w, f.id).then(function (u) { return fetch(u); }).then(function (r) {
           if (!r.ok) throw new Error(f.name + ': ' + r.status);
           return r.blob();
         }).then(function (b) { return new File([b], f.name, { type: b.type }); });

@@ -19,6 +19,35 @@
     return !!(S.pb.authStore.isSuperuser || (me && me.role === 'admin'));
   };
 
+  /*
+   * Uploaded estimates and exported comparison documents are private: the
+   * record ids they hang on are visible to every signed-in expert, and a file
+   * URL that needs nothing else would hand them to anybody who saw one. The
+   * file fields are therefore protected, and a short-lived token has to be
+   * asked for.
+   *
+   * One token serves every file on screen. It is kept for a minute — well
+   * inside PocketBase's own two — and asked for again after that, so a card
+   * left open does not end up with links that quietly stopped working.
+   */
+  var tok = null, tokAt = 0;
+  var TOKEN_MS = 60 * 1000;
+  S.fileToken = function () {
+    var now = Date.now();
+    if (tok && now - tokAt < TOKEN_MS) return tok;
+    tokAt = now;
+    tok = S.pb.files.getToken().catch(function (e) {
+      tok = null;                       // a failure must not be cached
+      throw e;
+    });
+    return tok;
+  };
+  /** The URL to download `name` from `record`, once a token has been fetched. */
+  S.fileURL = function (record, name) {
+    return S.fileToken().then(function (t) { return S.pb.files.getURL(record, name, { token: t }); });
+  };
+  document.addEventListener('auth:signedout', function () { tok = null; tokAt = 0; });
+
   /** Human-readable (Uzbek) message for a failed request. */
   S.pbErr = function (e) {
     if (!e) return 'Неизвестная ошибка';

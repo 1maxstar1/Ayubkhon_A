@@ -277,13 +277,21 @@
       S.pb.collection('registry_imports').getList(1, 20, { sort: '-created', expand: 'by' }).then(function (r) {
         tb.innerHTML = r.items.map(function (x) {
           var by = x.expand && x.expand.by;
-          var url = x.file ? S.pb.files.getURL(x, x.file) : '';
+
           return '<tr data-id="' + x.id + '"><td>' + when(x.created) + '</td><td>' + S.esc(by ? (by.name || by.email) : '') +
             '</td><td>' + (x.rows || 0) + '</td><td>' + (x.rows_added || 0) + '</td><td>' + (x.rows_updated || 0) +
-            '</td><td>' + (url ? '<a href="' + url + '">' + S.esc(x.file) + '</a>' : '') +
+            '</td><td>' + (x.file ? '<a data-file="' + S.esc(x.id) + '">' + S.esc(x.file) + '</a>' : '') +
             '</td><td class="act"><button class="btn xs" data-act="delimp" title="Удалить только строку истории, заявки останутся">✕ строку</button>' +
             '<button class="btn xs danger" data-act="revert" title="Удалить заявки, добавленные этой загрузкой, вместе со строкой истории">Отменить загрузку</button></td></tr>';
         }).join('') || '<tr><td colspan="7" class="mute">Загрузок ещё не было</td></tr>';
+        // The uploaded registry is private, so its link needs a short-lived
+        // token; the row is drawn at once and the address filled in after.
+        tb.querySelectorAll('a[data-file]').forEach(function (a) {
+          var x = r.items.find(function (i) { return i.id === a.dataset.file; });
+          if (!x) return;
+          S.fileURL(x, x.file).then(function (u) { a.href = u; })
+            .catch(function () { a.title = 'Ссылка недоступна — обновите страницу'; });
+        });
         tb.querySelectorAll('.act button').forEach(function (b) {
           b.addEventListener('click', function () {
             var tr = b.closest('tr');

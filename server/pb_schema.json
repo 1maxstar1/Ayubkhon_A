@@ -328,7 +328,8 @@
             "application/vnd.ms-excel",
             "application/zip",
             "application/octet-stream"
-          ]
+          ],
+          "protected": true
         },
         {
           "name": "state",
@@ -541,7 +542,8 @@
             "application/vnd.ms-excel",
             "application/zip",
             "application/octet-stream"
-          ]
+          ],
+          "protected": true
         },
         {
           "name": "mode",
@@ -586,7 +588,8 @@
           "type": "file",
           "maxSelect": 1,
           "maxSize": 104857600,
-          "mimeTypes": []
+          "mimeTypes": [],
+          "protected": true
         },
         {
           "name": "rows",

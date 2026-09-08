@@ -134,7 +134,7 @@ yopiladi — kech qulflashdan ko'ra oxirgi bir necha soniyani yo'qotgan afzal.
 fayllar va narxlar tozalanadi, ish maydoni serverda qoladi, keyingi kirgan
 odam reyestrga tushadi.
 
-### [ ] 1.5 Yuklangan va eksport qilingan fayllar himoyasiz
+### [x] 1.5 Yuklangan va eksport qilingan fayllar himoyasiz
 
 `server/pb_schema.json` — `workspaces.files`, `exports.file`,
 `registry_imports.file`
@@ -148,6 +148,19 @@ esa faylni qisqa muddatli token bilan olsin (`pb.files.getURL(..., {token})`).
 
 **Xavf:** `sync.js` va `registry.js` dagi yuklab olish yo'llari o'zgaradi —
 `e2e-workspace` va `e2e-hints` testlari buni qamrab oladi.
+
+*Bajarildi.* Uchala fayl maydoni `protected: true`. Mijoz uchun
+`S.fileToken()` / `S.fileURL()` qo'shildi (`src/lib/pb.js`): bitta token
+ekrandagi barcha fayllarga yetadi, bir daqiqa saqlanadi (PocketBase'ning o'z
+ikki daqiqasi ichida), chiqishda tozalanadi. Ariza kartochkasi va admin
+sahifasidagi havolalar avval nomsiz chiziladi, manzil token kelgach
+to'ldiriladi; token olinmasa havola «недоступна» bo'lib qoladi, bo'sh joyga
+olib bormaydi.
+
+*Bu xatoni tasodifan isbotlab ham qo'ydim:* sxemani mijozdan oldin
+o'zgartirganimda `e2e-workspace` aynan fayl yuklab olishda 120 soniya kutib
+yiqildi — ya'ni himoya haqiqatan ishlaydi va ikkalasi birga o'zgarishi shart.
+Test endi buni qulflaydi: tokensiz manzil `404`, token bilan `200`.
 
 ### [ ] 1.6 O'chirilgan hisob sessiyasi darhol tugamaydi
 

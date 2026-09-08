@@ -53,7 +53,7 @@ O'lchangani: kitobdan 25 ta narx yuklandi, belgi «✓», to'rt soniya kutildi,
 «‹ Заявки» bosildi, ariza qayta ochildi — **1 ta o'zgargan narx**. Qolgan
 24 tasi yo'q.
 
-### [ ] 2.3 «Применить %» tuzatishlarning 97 % ini 429 bilan yo'qotadi
+### [x] 2.3 «Применить %» tuzatishlarning 97 % ini 429 bilan yo'qotadi
 
 `src/ui/sync.js:386`, `src/ui/prices.js:132` — **high**
 
@@ -70,6 +70,32 @@ yo'qoladi.
 
 Yonidagi ikkinchi muammo: holat saqlash (`saveNow`) shu navbatning oxirida
 turadi, ya'ni 1161 ta yozuv tugamaguncha boshqa hech narsa saqlanmaydi.
+
+**Bajarildi — yangi hook: `POST /api/corrections/bulk`.** Sahifa endi kutayotgan
+narxlarning **hammasini bitta so'rovda** yuboradi. Bu marshrut `*:create`
+qoidasiga emas, `/api/` qoidasiga (10 soniyada 400) tushadi, ya'ni cheklovga
+tegmaydi — cheklovni pasaytirish ham, ko'tarish ham kerak emas. 1161 ta so'rov
+o'rniga bitta bo'lgani uchun navbat ham bloklanmaydi.
+
+Yon foyda: mintaqa, ariza, kontragent va **muallif** endi so'rovdan emas, ish
+maydoni yozuvidan va tokendan olinadi; qidiruv kalitlari esa serverda,
+sahifa quriladigan **o'sha `lib/nlp.js`** bilan hisoblanadi — ikki tomon
+bir-biridan uzoqlashib keta olmaydi.
+
+`test/corrections-bulk.mjs` (yangi) cheklovni **haqiqiy raqamlar bilan yoqadi**
+(`server/deploy/configure.sh` dagidek) va ikkalasini o'lchaydi:
+
+| Qanday | Natija |
+|---|---|
+| har bir resursga bitta `create` (avvalgidek) | **40 yozildi, 20 tasi 429** |
+| hammasi bitta so'rovda (hozir) | **300 tasidan 300 tasi, 176 ms** |
+
+`test/e2e-workspace.mjs` da brauzerda: «Применить %» → **1101 ta resursdan
+1101 tasi yozildi, 2 ta so'rovda** (1000 talik bo'laklar), «Сбросить» →
+hammasi bitta so'rovda o'chirildi.
+
+Shu bilan `create-rate-limit-drops-bulk-prices` va `create-limit-shared-per-ip`
+topilmalari ham yopiladi: cheklov o'z joyida qoladi, unga urilinmaydi.
 
 ---
 

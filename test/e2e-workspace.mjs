@@ -137,10 +137,10 @@ check((await count('exports')) === 1, 'export stored in exports');
 
 // Typing a price fires on every keystroke, and each one used to be its own
 // write — «120000» meant five, four of them recording a number nobody meant.
-// They are gathered and written once the typing stops.
+// They are gathered and written once the typing stops, in one request.
 let corrWrites = 0;
 page.on('request', (r) => {
-  if (/\/api\/collections\/corrections\/records/.test(r.url()) && r.method() !== 'GET') corrWrites++;
+  if (/\/api\/corrections\/bulk/.test(r.url())) corrWrites++;
 });
 await page.evaluate((k) => {
   const r = app.model.resources.find((x) => x.key === k);
@@ -160,6 +160,33 @@ await page.evaluate((k) => { const r = app.model.resources.find((x) => x.key ===
 await page.evaluate(() => S.Sync.flush());
 await page.evaluate(() => S.Sync.q);
 check((await count('corrections')) === 0, 'resetting the price removes the correction');
+
+// «Применить процент» changes every visible resource in one gesture. That used
+// to be one HTTP create per resource — on the deployed server, forty written
+// and the rest refused with 429 and dropped. It is one request now, and the
+// count below is the whole estimate, not forty of it.
+// A resource priced at zero in the estimate stays at zero — ten per cent off
+// nothing is nothing — so it is not a change and gets no correction.
+const all = await page.evaluate(() =>
+  app.model.resources.filter((r) => !S.near(r.price, Math.round(r.price * 0.9))).length);
+corrWrites = 0;
+page.once('dialog', (d) => d.accept('-10'));
+await page.click('#pctBtn');
+await page.evaluate(() => S.Sync.flush());
+await page.evaluate(() => S.Sync.q);
+check((await count('corrections')) === all, `every resource the percentage moved is recorded (${await count('corrections')} of ${all})`);
+check(corrWrites === Math.ceil(all / 1000), `in ${corrWrites} request(s), not ${all}`);
+const pct = (await api(`/api/collections/corrections/records?perPage=1&filter=${encodeURIComponent(`res_key='${first.key}'`)}`, {}, su)).items[0];
+check(pct && Math.abs(pct.market_price - Math.round(first.price * 0.9)) <= 1, 'and the price stored is the one applied');
+
+// «Сбросить» puts every resource back on its own estimate price, which means
+// removing every correction — also one request.
+corrWrites = 0;
+await page.click('#resetBtn');
+await page.evaluate(() => S.Sync.flush());
+await page.evaluate(() => S.Sync.q);
+check((await count('corrections')) === 0, 'resetting them all removes every correction');
+check(corrWrites === 1, `in one request (${corrWrites})`);
 
 // finish and go back to the list
 await page.click('#wsDone');

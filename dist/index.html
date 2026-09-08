@@ -5466,6 +5466,8 @@ if (typeof self !== 'undefined') self.S = S;
 
   var SAVE_MS = 1500;
   var CORRECT_MS = 700;                 // quiet time before a typed price is written
+  var BULK = 1000;                      // corrections per request; the server caps it at 3000
+  var RETRY_MS = 10000;                 // before trying a refused batch again
   var XLSX_RE = /\.xlsx?$|\.xlsm$/i;
   // Stamped into the saved state. 2 = resource keys built by the name key that
   // repairs half-switched keyboard layouts; anything older is lifted onto it
@@ -5812,44 +5814,81 @@ if (typeof self !== 'undefined') self.S = S;
       this.ct = setTimeout(function () { self.flush(); }, CORRECT_MS);
     },
 
+    /**
+     * Everything waiting is written in one request.
+     *
+     * «Применить процент» changes every resource of an estimate at once — a
+     * thousand of them is ordinary. One record at a time that was a thousand
+     * HTTP creates, and the deployed server allows forty per five seconds from
+     * one address, which a whole office shares: forty were written and the rest
+     * came back 429 and were thrown away, announced by one toast overwritten a
+     * thousand times. The estimate was still priced correctly on screen and in
+     * the exported document — the workspace state carries the prices — but the
+     * price memory the next project's hints are built from kept almost none of
+     * it.
+     *
+     * What goes in the request is only what actually changes: a price equal to
+     * the estimate's own removes its correction, a price already recorded is
+     * left alone. Everything about who and where is filled in by the server.
+     */
     flush: function () {
-      var self = this, waiting = this.pend;
+      var self = this, app = A(), waiting = this.pend;
       clearTimeout(this.ct);
       this.ct = 0;
       this.pend = {};
-      Object.keys(waiting).forEach(function (k) { self.correct(k, waiting[k]); });
+      var keys = Object.keys(waiting);
+      if (!keys.length) return;
+      if (!this.ws || this.loading || !app.model) return;
+
+      var by = {}, rs = app.model.resources;
+      for (var i = 0; i < rs.length; i++) by[rs[i].key] = rs[i];
+      var set = [], del = [], marks = {};
+      keys.forEach(function (k) {
+        var rec = by[k], value = waiting[k], cur = self.corr[k];
+        if (!rec) return;
+        if (value == null || S.near(rec.price, value)) {      // back to the estimate's own price
+          if (cur) { delete self.corr[k]; del.push(k); }
+          return;
+        }
+        if (cur && S.near(cur.market, value)) return;          // already recorded
+        set.push({
+          res_key: k, name: rec.name, unit: rec.unit || '',
+          smeta_price: rec.price, market_price: value, note: app.opts.noteText || ''
+        });
+        marks[k] = value;
+      });
+      if (!set.length && !del.length) return;
+
+      // The server refuses more than 3000 in one request; a project big enough
+      // to reach that is sent in pieces rather than refused.
+      var ws = this.ws, parts = [], n = 0;
+      for (n = 0; n < set.length; n += BULK) parts.push({ set: set.slice(n, n + BULK), del: [] });
+      if (!parts.length) parts.push({ set: [], del: [] });
+      parts[0].del = del;
+      parts.forEach(function (part) { self.sendBulk(ws, part, marks, waiting); });
     },
 
-    correct: function (key, value) {
+    sendBulk: function (ws, part, marks, waiting) {
       var self = this, app = A();
-      if (!this.ws || this.loading || !app.model) return;
-      var rec = null, rs = app.model.resources;
-      for (var i = 0; i < rs.length; i++) if (rs[i].key === key) { rec = rs[i]; break; }
-      if (!rec) return;
-      var changed = value != null && !S.near(rec.price, value);
-      var ws = this.ws, a = this.app;
       this.enqueue(function () {
-        var cur = self.corr[key];
-        if (!changed) {
-          if (!cur) return;
-          delete self.corr[key];
-          return S.pb.collection('corrections').delete(cur.id).catch(function (e) { if (e.status !== 404) throw e; });
-        }
-        if (cur && S.near(cur.market, value)) return;
-        var patch = { market_price: value, note: app.opts.noteText || '', by: S.me().id };
-        if (cur) {
-          return S.pb.collection('corrections').update(cur.id, patch).then(function (r) { self.corr[key] = { id: r.id, market: value }; });
-        }
-        var data = Object.assign({
-          workspace: ws.id, application: a.id, contragent: a.contragent || '', region: ws.region,
-          res_key: key, name: rec.name, name_key: S.nameKey(rec.name), unit: rec.unit || '',
-          unit_key: S.unitKey(rec.unit || ''),
-          // the cross-project lookup key: one alphabet, no separators, digits intact
-          match_key: S.matchKey(rec.name), match_unit_key: S.matchUnitKey(rec.unit || ''),
-          smeta_price: rec.price
-        }, patch);
-        return S.pb.collection('corrections').create(data).then(function (r) { self.corr[key] = { id: r.id, market: value }; });
-      }).catch(function (e) { app.toast('Правка не сохранена: ' + S.pbErr(e), true); });
+        return S.pb.send('/api/corrections/bulk', {
+          method: 'POST', body: { workspace: ws.id, set: part.set, del: part.del }
+        }).then(function (r) {
+          part.set.forEach(function (row) {
+            var k = row.res_key;
+            self.corr[k] = { id: (r.ids && r.ids[k]) || (self.corr[k] && self.corr[k].id), market: marks[k] };
+          });
+        });
+      }).catch(function (e) {
+        // Nothing is dropped: what did not go out waits for the next attempt,
+        // and it is said once, with a count, rather than once per resource.
+        part.set.forEach(function (row) { if (self.pend[row.res_key] === undefined) self.pend[row.res_key] = waiting[row.res_key]; });
+        part.del.forEach(function (k) { if (self.pend[k] === undefined) self.pend[k] = waiting[k]; });
+        clearTimeout(self.ct);
+        self.ct = setTimeout(function () { self.flush(); }, RETRY_MS);
+        app.toast('Правки не сохранены (' + (part.set.length + part.del.length) + '): ' +
+          S.pbErr(e) + ' — повтор через ' + (RETRY_MS / 1000) + ' секунд', true);
+      });
     },
 
     /* ---------------------------------------------------------- exports */

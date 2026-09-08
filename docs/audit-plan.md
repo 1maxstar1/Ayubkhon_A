@@ -194,15 +194,24 @@ qiymatlar (`1`, `12`, `120`…) ham saqlanadi.
 **Tuzatish:** `correct()` ni `debounce` bilan o'rash (600 ms), va maydondan
 chiqishda darhol yozish.
 
-### [ ] 2.4 Bir marta muvaffaqiyatsiz saqlash butunlay yo'qoladi
+### [x] 2.4 Ish maydonidan chiqishda muvaffaqiyatsiz saqlash jimgina yo'qolardi
 
 `src/ui/sync.js:260`
 
-**Tuzatish:** saqlash muvaffaqiyatsiz bo'lsa `dirty` bayrog'i tiklansin,
-keyingi urinishda qayta yuborilsin; ish maydonidan chiqishda saqlanmagan
-o'zgarish borligi haqida ogohlantirish.
+*Topilma qisman noto'g'ri edi.* Oddiy saqlash allaqachon qayta urinadi:
+`catch` da `dirty` tiklanadi va 15 soniyadan keyin yana yuboriladi. Haqiqiy
+kamchilik **chiqish yo'lida** edi — `close()` oxirgi saqlash natijasini
+kutardi-yu, muvaffaqiyatsizligini e'tiborsiz qoldirardi. Ish maydoni
+tozalangach 15 soniyalik qayta urinish `if (!this.ws) return` ga tushardi,
+ya'ni «повтор через 15 секунд» degan xabar yolg'on chiqardi.
 
-### [ ] 2.5 Bitta muvaffaqiyatsiz so'rov narx eslatmalarini o'chiradi
+**Bajarildi.** Endi navbat (`enqueue`) buzilmaydi, lekin chaqiruvchiga
+urinishning o'z va'dasi qaytariladi. «Ro'yxatga qaytish» tugmasi saqlash
+muvaffaqiyatsiz bo'lsa ish maydonini **yopmaydi** va sababini aytadi. Tizimdan
+chiqish esa `close(true)` bilan baribir yopadi — birovning ishi ochiq qolgan
+qulflangan ekran bir daqiqalik yozuvdan ko'ra yomonroq.
+
+### [x] 2.5 Bitta muvaffaqiyatsiz so'rov narx eslatmalarini o'chiradi
 
 `src/ui/hints.js:120`
 
@@ -210,8 +219,9 @@ Kalitlar so'rovdan **oldin** «olingan» deb belgilanadi, shuning uchun tarmoq
 xatosidan keyin o'sha resurslar uchun eslatmalar butun sessiya davomida
 ko'rinmaydi.
 
-**Tuzatish:** belgilashni javob kelgandan keyinga ko'chirish; xatoda belgini
-olib tashlash.
+**Bajarildi.** Kalitlar endi javob kelgandan keyin belgilanadi — ikkala
+bosqichda ham (aniq moslik va o'xshash nomlar). Tarmoq xatosidan keyin
+keyingi qayta qurishda yana urinib ko'riladi. `test/e2e-hints.mjs` o'tdi.
 
 ---
 

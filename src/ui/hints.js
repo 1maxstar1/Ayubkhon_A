@@ -117,7 +117,9 @@
       });
       var list = Object.keys(want);
       if (!list.length) { this.loadSimilar(); return; }
-      list.forEach(function (k) { self.fetched[k] = 1; });
+      // Marked as fetched only once the answer is in. Marking them here meant a
+      // single network hiccup left those resources without hints for the rest
+      // of the session, with nothing on screen to say why.
 
       var got = 0, fresh = {};
       Promise.all(chunk(list).map(function (ch) {
@@ -134,6 +136,7 @@
           });
         });
       })).then(function () {
+        list.forEach(function (k) { self.fetched[k] = 1; });
         // rank first, publish after: a half-loaded map would show unsorted tags
         Object.keys(fresh).forEach(function (mk) { self.map[mk] = rank((self.map[mk] || []).concat(fresh[mk])); });
         if (got) {
@@ -167,7 +170,6 @@
       });
       var list = Object.keys(want);
       if (!list.length) { this.rankSimilar(open); return; }
-      list.forEach(function (p) { self.prefixed[p] = 1; });
 
       Promise.all(chunk(list).map(function (ch) {
         var params = { w: ws.id, r: ws.region };
@@ -177,6 +179,7 @@
           sort: '-updated', expand: 'application,contragent,by'
         }).then(function (res) { return res.items; });
       })).then(function (lists) {
+        list.forEach(function (p) { self.prefixed[p] = 1; });
         var seen = {};
         self.pool.forEach(function (c) { seen[c.id] = 1; });
         lists.forEach(function (items) {

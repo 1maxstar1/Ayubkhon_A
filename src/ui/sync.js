@@ -263,13 +263,21 @@
           app.toast('Не сохранено: ' + S.pbErr(e) + ' — повтор через 15 секунд', true);
           clearTimeout(self.t);
           self.t = setTimeout(function () { if (self.dirty) self.saveNow(); }, 15000);
+          throw e;      // whoever is leaving the workspace needs to know it failed
         });
       });
     },
 
+    /**
+     * Saves run one after another. The queue itself must never break — a failed
+     * save is retried on a timer, not by stopping everything behind it — so the
+     * chain swallows the rejection, and the caller is handed the attempt's own
+     * promise, which does not.
+     */
     enqueue: function (fn) {
-      this.q = this.q.then(fn, fn);
-      return this.q;
+      var attempt = this.q.then(fn, fn);
+      this.q = attempt.catch(function () { /* the retry timer owns this */ });
+      return attempt;
     },
 
     /* ----------------------------------------------------------- files */
@@ -366,7 +374,9 @@
         (w.status === 'done'
           ? '<span class="done">завершена</span>'
           : '<button class="btn sm ok" id="wsDone" title="Отметить работу как завершённую">✓ Завершить</button>');
-      $('wsList').addEventListener('click', function () { self.close(); });
+      $('wsList').addEventListener('click', function () {
+        self.close().catch(function () { /* the toast already said why */ });
+      });
       var d = $('wsDone');
       if (d) d.addEventListener('click', function () { self.finish(); });
     },
@@ -382,11 +392,24 @@
       }).catch(function (e) { A().toast(S.pbErr(e), true); });
     },
 
-    /** Leave the workspace, saving first. Returns when it is really closed. */
-    close: function () {
+    /**
+     * Leave the workspace, saving first. Returns when it is really closed.
+     *
+     * If that last save fails there is nowhere left to retry from — the
+     * workspace is about to be forgotten — so by default the program stays
+     * where it is and says so, rather than dropping what was typed. Signing
+     * out passes `force`, because a locked screen that still holds somebody's
+     * work open is worse than a lost minute of typing.
+     */
+    close: function (force) {
       var self = this, app = A();
       var done = this.dirty ? this.saveNow() : this.q;
-      return Promise.resolve(done).then(function () {
+      return Promise.resolve(done).catch(function (e) {
+        if (!force) {
+          app.toast('Рабочая область не закрыта: последние изменения не сохранены (' + S.pbErr(e) + ')', true);
+          throw e;
+        }
+      }).then(function () {
         self.ws = null; self.app = null; self.files = {}; self.corr = {};
         self.loading = true;
         app.projects = []; app.prices = {}; app.looseBook = null; app.queue = [];

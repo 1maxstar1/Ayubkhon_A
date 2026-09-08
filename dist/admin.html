@@ -1732,7 +1732,7 @@ if (typeof self !== 'undefined') self.S = S;
     lock: function (msg) {
       var self = this;
       this.show(msg);
-      var leaving = (S.Sync && S.Sync.ws) ? S.Sync.close() : null;
+      var leaving = (S.Sync && S.Sync.ws) ? S.Sync.close(true) : null;
       var settled = Promise.resolve(leaving).catch(function (e) {
         console.error('sync: could not close the workspace on sign-out', e);
       });

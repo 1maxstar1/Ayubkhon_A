@@ -222,5 +222,26 @@ for (let i = 0; i < uniq.length; i++) {
 check(conflicts === 0, `${scored} pairs would be suggested, none with contradicting numbers`);
 check(scored > 20, `the suggestion pass finds something to offer (${scored} pairs)`);
 
+/*
+ * The three string functions the matcher leans on remember their answers —
+ * scoring one project against a region's history asks the same question about
+ * the same few hundred names tens of thousands of times. The table that
+ * remembers them has no prototype, so a resource named «constructor» is a key
+ * like any other rather than a function handed back as an answer.
+ */
+for (const odd of ['constructor', 'toString', '__proto__', 'hasOwnProperty', 'valueOf']) {
+  check(typeof S.matchKey(odd) === 'string' && S.matchKey(odd) === odd.toUpperCase().replace(/_/g, ''),
+    `«${odd}» is a name, not a method (${JSON.stringify(S.matchKey(odd))})`);
+  check(Array.isArray(S.tokens(odd)) && Array.isArray(S.numbers(odd)),
+    `and its words and numbers come back as lists`);
+}
+check(S.matchKey('') === '' && S.matchKey(null) === '', 'an empty name still keys to nothing');
+// Asked twice, answered the same — the memo must not hand back another name's answer.
+let stable = 0;
+for (const r of rows) {
+  if (S.matchKey(r.n) === S.matchKey(r.n) && S.tokens(r.n).join('\u0000') === S.tokens(r.n).join('\u0000')) stable++;
+}
+check(stable === rows.length, `every name answers the same the second time (${stable} of ${rows.length})`);
+
 console.log(fail ? `FAILED (${fail})` : 'normalize OK');
 process.exit(fail ? 1 : 0);

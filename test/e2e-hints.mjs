@@ -173,6 +173,40 @@ const near = await page.evaluate(() => {
 check(near.score >= 0.85 && near.best === 1,
   `a mistyped name still finds its resource (${near.score}, ${near.best} suggestion)`);
 check(near.sizes === 0, 'and two sizes of one part never do');
+
+/*
+ * Scoring a project's unmatched resources against a region's history is the
+ * expensive half of the hints. It used to be redone in full on every rebuild —
+ * ticking a project, ticking a street, reordering — because a resource that
+ * found nothing was never recorded as having found nothing. Measured on a real
+ * corpus at ~7.7 s of frozen tab per click. Counted here in calls rather than
+ * milliseconds, so the check says what it means: the second pass over the same
+ * pool must do no scoring at all.
+ */
+const scoring = await page.evaluate(() => {
+  const open = app.model.resources.filter((r) => !S.Hints.hasRow(r));
+  const real = S.bestMatches;
+  let calls = 0;
+  S.bestMatches = function () { calls++; return real.apply(null, arguments); };
+  S.Hints.sim = {}; S.Hints.simAt = {};
+  S.Hints.rankSimilar(open);
+  const first = calls; calls = 0;
+  S.Hints.rankSimilar(open);
+  const second = calls;
+  const widened = S.Hints.pool.length;
+  S.Hints.pool = S.Hints.pool.concat(S.Hints.pool.slice(0, 1));
+  S.Hints.rankSimilar(open);
+  const afterWiden = calls - second;
+  S.Hints.pool.length = widened;
+  S.bestMatches = real;
+  return { open: open.length, first, second, afterWiden };
+});
+check(scoring.first === scoring.open,
+  `every unmatched resource is scored once (${scoring.first} of ${scoring.open})`);
+check(scoring.second === 0, `and not again for the same pool (${scoring.second})`);
+check(scoring.afterWiden === scoring.open,
+  `but all of them again once the pool widens (${scoring.afterWiden})`);
+
 await closeApp();
 
 // D: other region -> nothing

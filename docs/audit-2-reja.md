@@ -134,7 +134,7 @@ ketishi, qaytgan qatorda popover o'qiydigan **hamma** maydon borligi, va olib
 kelingan ariza **butun yozuv emas**, ikki ustun ekanligi tekshiriladi
 (`number, org_name`).
 
-### [ ] 2.5 `rankSimilar` topilmagan resursni eslab qolmaydi
+### [x] 2.5 `rankSimilar` topilmagan resursni eslab qolmaydi
 
 `src/ui/hints.js:200` — **high**
 

@@ -82,22 +82,41 @@
     return out;
   }
 
-  var mkCache = {}, mkCount = 0;
+  /**
+   * A bounded memo for the string-in functions the matcher calls over and
+   * over. Scoring one project against a region's history asks the same
+   * questions about the same few hundred names tens of thousands of times.
+   *
+   * Emptied wholesale once it passes `cap`: a long session must not grow
+   * without bound, and a cold start costs one recomputation. The table has no
+   * prototype, so a resource named «constructor» is a key like any other.
+   *
+   * The cached value is handed back as it is, not copied — so nothing may
+   * modify what it gets. Nothing does: every caller of tokens() and numbers()
+   * only reads.
+   */
+  function memo(fn, cap) {
+    var cache = Object.create(null), n = 0;
+    return function (s) {
+      var raw = s == null ? '' : String(s);
+      var hit = cache[raw];
+      if (hit !== undefined) return hit;
+      var v = fn(raw);
+      if (n > cap) { cache = Object.create(null); n = 0; }
+      cache[raw] = v; n++;
+      return v;
+    };
+  }
+  var MEMO = 20000;
 
   /**
    * Cross-project lookup key: one script, no separators, numbers intact.
    * Returns '' for an empty name.
    */
-  function matchKey(name) {
-    var raw = name == null ? '' : String(name);
+  var matchKey = memo(function (raw) {
     if (!raw) return '';
-    var hit = mkCache[raw];
-    if (hit !== undefined) return hit;
-    var k = squeeze(translit(S.foldMarks(S.fold(raw.toUpperCase()))));
-    if (mkCount > 20000) { mkCache = {}; mkCount = 0; }   // a long session must not grow without bound
-    mkCache[raw] = k; mkCount++;
-    return k;
-  }
+    return squeeze(translit(S.foldMarks(S.fold(raw.toUpperCase()))));
+  }, MEMO);
 
   /* Units that name the same quantity. Applied to the alphabetic tail only, so
      a per-hundred price (100ШТ) never merges with a per-piece one (ШТ). */
@@ -133,7 +152,7 @@
   var APOS = /[`'\u2018\u2019\u02BB\u02BC\u00B4\u2032]/g;
 
   /** Words of a name, transliterated; digits stay glued to their word. */
-  function tokens(name) {
+  function tokensOf(name) {
     var t = translit(S.foldMarks(S.fold(String(name == null ? '' : name).replace(APOS, '').toUpperCase())));
     var out = [], cur = '';
     for (var i = 0; i < t.length; i++) {
@@ -145,6 +164,7 @@
     if (cur) out.push(cur);
     return out;
   }
+  var tokens = memo(tokensOf, MEMO);
 
   /* Numbers that identify a standard rather than the thing itself. «ЛЮК
      ЧУГУННЫЙ ГОСТ 3634-79» and «ЛЮК ЧУГУННЫЙ» are one hatch; the year of the
@@ -166,8 +186,8 @@
    * point, and Roman grade markers as R-prefixed entries so they can never be
    * confused with a size.
    */
-  function numbers(name) {
-    var raw = String(name == null ? '' : name).toUpperCase();
+  function numbersOf(name) {
+    var raw = String(name).toUpperCase();
     var out = [], m;
     ROMAN_RE.lastIndex = 0;
     while ((m = ROMAN_RE.exec(raw))) {
@@ -192,6 +212,7 @@
     }
     return out;
   }
+  var numbers = memo(numbersOf, MEMO);
 
   /**
    * How the numbers of two names relate:

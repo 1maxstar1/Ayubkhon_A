@@ -52,7 +52,7 @@
   function mkOf(r) { return r && (r.mk || S.matchPair(r.name, r.unit || '')); }
 
   var Hints = {
-    map: {}, sim: {}, fetched: {}, prefixed: {}, pool: [], busy: false,
+    map: {}, sim: {}, simAt: {}, fetched: {}, prefixed: {}, pool: [], busy: false,
 
     init: function () {
       var self = this;
@@ -93,7 +93,7 @@
     },
 
     reset: function () {
-      this.map = {}; this.sim = {}; this.fetched = {}; this.prefixed = {}; this.pool = [];
+      this.map = {}; this.sim = {}; this.simAt = {}; this.fetched = {}; this.prefixed = {}; this.pool = [];
       this.hide();
     },
 
@@ -216,11 +216,19 @@
       var cands = this.pool.map(function (c) { return { name: c.name, unit: c.unit || '', rec: c }; });
       var idf = S.idfOf(cands.map(function (c) { return c.name; }));
       var found = 0;
+      var pool = this.pool.length;
       open.forEach(function (r) {
         var mk = mkOf(r);
-        if (self.sim[mk]) return;
+        // A resource that found nothing is remembered as having found nothing.
+        // Otherwise every rebuild — a project checkbox, a street checkbox, a
+        // reorder — re-scored the same thousand unmatched resources against
+        // the same pool and found nothing again: measured at 7.7 seconds of
+        // frozen tab per click. The pool's size is remembered with it, so when
+        // another workbook widens it they are all scored afresh.
+        if (self.sim[mk] && self.simAt[mk] === pool) return;
         var best = S.bestMatches(r.name, r.unit || '', cands, { idf: idf, min: SIM_MIN, limit: SIM_SHOW });
-        if (!best.length) return;
+        self.simAt[mk] = pool;
+        if (!best.length) { self.sim[mk] = []; return; }
         self.sim[mk] = best.map(function (b) {
           var h = hintOf(b.item.rec);
           h.score = b.score;

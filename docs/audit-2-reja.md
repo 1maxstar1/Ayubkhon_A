@@ -21,7 +21,7 @@ alohida commit, har biridan keyin testlar.
 To'rtta yangi test fayli qo'shildi — `test/upload-order.mjs`,
 `test/corrections-bulk.mjs`, `test/disable-user.mjs`, `test/install.mjs` —
 va mavjudlariga 30 dan ortiq yangi tekshiruv. Yakuniy holat:
-**26 ta testdan 26 tasi o'tdi**.
+**24 ta testdan 24 tasi o'tdi**.
 
 Uchta tuzatish uchun test **avval** yozildi va xatoni takrorlashi ko'rsatildi,
 keyin tuzatildi:
@@ -436,7 +436,7 @@ zaxira olingandan keyin bant yo'qoladi va jimgina qator paydo bo'ladi.
 Har bir band alohida commit. Har bir banddan keyin:
 
 ```sh
-sh test/all.sh reestr.xls smeta1.xlsx smeta2.xlsx     # 26 ok, 0 fail
+sh test/all.sh reestr.xls smeta1.xlsx smeta2.xlsx     # 24 ok, 0 fail
 ```
 
 Ma'lumotga tegadigan har bir tuzatish uchun avval uni takrorlaydigan **test

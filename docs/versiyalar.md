@@ -9,12 +9,13 @@ Bu hujjat ikki savolga javob beradi:
 
 ---
 
-## A. Ikki versiya
+## A. Uch versiya
 
 | Versiya | Nima | Commit |
 |---|---|---|
 | **v1.0** | NLP qatlamidan **oldingi** dastur. Reyestr, ish maydonlari, aniq nom bo'yicha narx eslatmalari, viloyat — regex bilan. | `7718eb41c9c3888019c6c18711cd96b8da64e3f7` |
 | **v2.0** | Resursni ikki alifboda tanish, o'xshash nomlar bo'yicha narx taklifi, bo'limni nomdan aniqlash, viloyatni gazetteer bilan aniqlash. | `e0acf169821b61429afe314df6191e4527467272` |
+| **v2.1** | Ikki to'liq tekshiruvning tuzatishlari: narxlarni bitta so'rovda yozish, o'chirilgan hisobning sessiyasini tugatish, fayl havolasini bosilganda imzolash, zaxira sog'ligi banti, eslatmalarni tezlashtirish. Yangi imkoniyat qo'shilmagan — o'zgarishlar tuzatish. | `TO'LDIRILADI` |
 
 Versiya — bu shunchaki **commit**. Git har bir o'zgarishni saqlaydi, shuning
 uchun «eski versiya» hech qayerga yo'qolmaydi: u tarixda turadi va istalgan
@@ -22,12 +23,13 @@ vaqtda qaytariladi.
 
 ### Qaysi versiya ishlayotganini bilish
 
-Dastur sarlavhasida, nomdan keyin kichik yorliq bor: **`v2.0.0`**. Admin
+Dastur sarlavhasida, nomdan keyin kichik yorliq bor: **`v2.1.0`**. Admin
 sahifasida ham shunday.
 
 Yorliq **v2.0 dan boshlab** qo'shilgan, shuning uchun:
 
-* yorliq bor va `v2.0.0` deb turibdi → yangi versiya ishlayapti;
+* yorliq `v2.1.0` deb turibdi → tekshiruv tuzatishlari bilan;
+* yorliq `v2.0.0` deb turibdi → tuzatishlardan oldingi versiya;
 * **yorliq umuman yo'q** → server v1.0 ga qaytarilgan.
 
 Server qaytarilgandan keyin brauzerni **Ctrl+Shift+R** bilan yangilang — aks
@@ -43,7 +45,8 @@ shundan keyin `v1.0` deb yozish `rollback.sh` da ishlaydi:
 git fetch origin
 git tag -a v1.0 7718eb41c9c3888019c6c18711cd96b8da64e3f7 -m "NLP qatlamidan oldingi versiya"
 git tag -a v2.0 e0acf169821b61429afe314df6191e4527467272 -m "Resurs, bo'lim va viloyatni tanish"
-git push origin v1.0 v2.0
+git tag -a v2.1 TO_LDIRILADI -m "Ikki tekshiruvning tuzatishlari"
+git push origin v1.0 v2.0 v2.1
 ```
 
 Tegsiz ham hammasi ishlaydi — `rollback.sh` ga commit raqamini bersangiz bo'ldi.

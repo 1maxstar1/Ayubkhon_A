@@ -35,6 +35,7 @@ run mail-otp         node test/mail-otp.mjs
 run match-keys       node test/match-keys.mjs
 run corrections-bulk node test/corrections-bulk.mjs
 run ownership        node test/ownership.mjs
+run disable-user     node test/disable-user.mjs
 [ -n "$S1" ] && run browser   node test/browser.mjs "$S1" "$S2"
 run e2e-auth         node test/e2e-auth.mjs
 run e2e-admin        node test/e2e-admin.mjs

@@ -1792,7 +1792,16 @@ if (typeof self !== 'undefined') self.S = S;
       if (now - this.last > IDLE_MS) { this.lock('4 часа без активности — программа заблокирована. Войдите снова.'); return; }
       if (now - this.lastRefresh > REFRESH_MS) {
         this.lastRefresh = now;
-        S.pb.collection('users').authRefresh().catch(function () { /* next tick decides */ });
+        S.pb.collection('users').authRefresh().catch(function (e) {
+          // Refusal is the only signal the page gets that the account has been
+          // turned off: the server ends the sessions the moment «Отключить» is
+          // pressed, but the token in the browser is still unexpired, so
+          // nothing else here would notice. Anything other than a refusal is a
+          // network hiccup — the next tick decides.
+          if (e && (e.status === 401 || e.status === 403)) {
+            self.lock('Доступ к программе закрыт. Обратитесь к администратору.');
+          }
+        });
       }
     },
     /**

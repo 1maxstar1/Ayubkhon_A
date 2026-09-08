@@ -151,7 +151,7 @@ keshlanmagan; keshlansa birinchi o'tish ham 8213 → 4887 ms ga tushadi.
 
 ## 3-daraja — xavfsizlik
 
-### [ ] 2.6 O'chirilgan foydalanuvchi sessiyasini saqlab qoladi (tugallanmagan)
+### [x] 2.6 O'chirilgan foydalanuvchi sessiyasini saqlab qoladi
 
 `server/pb_hooks/` — **medium**, mening tuzatishimdagi kamchilik
 
@@ -170,6 +170,18 @@ va tuzoqni ham: `onRecordAfterUpdateSuccess` + `$app.save` shakli so'rovni
 osib qo'yadi — o'lchangani «disable → 10 soniyada javob kelmadi», yozuv esa
 saqlangan. Ishlaydigan shakl: «disable → 200, 0.0032 s», keyin o'sha token
 bilan «0 ta ish maydoni», «tuzatish yozish → 400».
+
+**Bajarildi.** `server/pb_hooks/users.pb.js` — aynan o'sha ishlaydigan shakl.
+Sahifa tomoni ham: yangilash `401`/`403` bilan rad etilsa, ekran qulflanadi va
+sababi yoziladi — token muddati tugamagani uchun boshqa hech narsa buni
+sezmaydi.
+
+`test/disable-user.mjs` (yangi) **avval** yozildi va xatoni takrorladi. Hook
+o'chirilganda: «hamon 3 ta arizani ko'radi», «ish maydonini ochadi → 200»,
+«narx yozadi → 200» — **5 ta yiqilish**. Hook bilan hammasi o'tadi. Ichida
+tuzoq ham tekshiriladi: `«Отключить»` **2 ms** da javob beradi (osilib
+qolmaydi), oddiy tahrir (ismni o'zgartirish) esa sessiyaga tegmaydi, va boshqa
+ekspertlar buni sezmaydi.
 
 ### [ ] 2.7 Fayl havolasi chizilganda imzolanadi, bosilganda emas (tugallanmagan)
 

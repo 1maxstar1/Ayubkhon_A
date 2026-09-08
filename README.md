@@ -315,6 +315,7 @@ sh test/admin-api.sh           # admin hooklari: facets, tozalash, o'chirish, hu
 node test/corrections-bulk.mjs # narxlarni bitta so'rovda yozish: huquq, kalitlar, cheklov
 node test/dedupe.mjs           # bitta raqam — bitta yozuv: qayta yuklash, takror, tuzatish, bekor qilish, tozalash
 node test/mail-otp.mjs         # kirish xati: kod mavzuda, ruscha matn, Gmail relay va Brevo yo'llari
+node test/disable-user.mjs     # «Отключить» sessiyani ham tugatadi
 node test/e2e-auth.mjs         # brauzer: kirish, noto'g'ri kod, qulf
 node test/e2e-admin.mjs        # brauzer: reyestr, ish maydonlari, qo'lda ariza, foydalanuvchilar
 node test/e2e-workspace.mjs    # brauzer: ariza → viloyat → fayllar → narx → qayta ochish → eksport

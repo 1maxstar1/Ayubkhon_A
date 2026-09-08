@@ -8,7 +8,7 @@
 import { chromium } from 'playwright';
 import { launchOpts } from './chromium.mjs';
 import { spawn, execSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -187,6 +187,38 @@ await page.evaluate(() => S.Sync.flush());
 await page.evaluate(() => S.Sync.q);
 check((await count('corrections')) === 0, 'resetting them all removes every correction');
 check(corrWrites === 1, `in one request (${corrWrites})`);
+
+// A price book is how prices are carried from one project to the next. It used
+// to be written straight into the model, around the one method the server
+// build watches: the sheet updated, the save tick stayed green, and the whole
+// book was gone the moment the expert left the application.
+const bookRows = await page.evaluate(() => app.model.resources
+  .filter((r) => r.price > 1000).slice(0, 25)
+  .map((r) => ({ name: r.name, unit: r.unit, price: Math.round(r.price * 1.25), smeta: r.price })));
+const bookPath = join(root, 'test/.book.json');
+writeFileSync(bookPath, JSON.stringify(bookRows, null, 1));
+corrWrites = 0;
+await page.setInputFiles('#bookInput', bookPath);
+await page.waitForFunction(() => document.getElementById('toast').textContent.includes('Загружено цен: 25'), null, { timeout: 20000 });
+check(await page.evaluate(() => S.Sync.dirty || document.getElementById('wsSave').textContent === '●'),
+  'loading a book marks the workspace as changed');
+await page.waitForFunction(() => document.getElementById('wsSave').textContent === '✓' && !S.Sync.dirty, null, { timeout: 20000 });
+await page.evaluate(() => S.Sync.flush());
+await page.evaluate(() => S.Sync.q);
+check((await count('corrections')) === bookRows.length,
+  `the book's prices become corrections others can be shown (${await count('corrections')} of ${bookRows.length})`);
+check(corrWrites === 1, `written in one request (${corrWrites})`);
+const wBook = (await api('/api/collections/workspaces/records?perPage=1', {}, su)).items[0];
+check(wBook.changed === bookRows.length, `and the workspace records them as changed (${wBook.changed})`);
+check(Object.keys(wBook.state.prices2 || {}).length >= bookRows.length,
+  'the saved state carries the loaded prices');
+// Put the project back the way the later checks expect it.
+corrWrites = 0;
+await page.click('#resetBtn');
+await page.evaluate(() => S.Sync.flush());
+await page.evaluate(() => S.Sync.q);
+await page.waitForFunction(() => document.getElementById('wsSave').textContent === '✓' && !S.Sync.dirty, null, { timeout: 20000 });
+check((await count('corrections')) === 0, 'and clearing them afterwards leaves none');
 
 // finish and go back to the list
 await page.click('#wsDone');

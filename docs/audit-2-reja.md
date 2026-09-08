@@ -40,7 +40,7 @@ yuklashni bir taktda boshlaydi, keyin har bir nom ortidagi **baytlarni**
 yuklab olib solishtiradi. Tuzatishdan oldin: «ikkala nom bitta faylga olib
 boradi (one_phrbb8u5cn.xlsx / one_phrbb8u5cn.xlsx)». Keyin: har biri o'zinikiga.
 
-### [ ] 2.2 «Загрузить книгу цен» ish maydonini «o'zgargan» deb belgilamaydi
+### [x] 2.2 «Загрузить книгу цен» ish maydonini «o'zgargan» deb belgilamaydi
 
 `src/ui/app.js:845` — **high**
 
@@ -52,6 +52,17 @@ turadi) va `Sync.correct()` ishlamaydi (`corrections` yozuvlari yo'q).
 O'lchangani: kitobdan 25 ta narx yuklandi, belgi «✓», to'rt soniya kutildi,
 «‹ Заявки» bosildi, ariza qayta ochildi — **1 ta o'zgargan narx**. Qolgan
 24 tasi yo'q.
+
+**Bajarildi.** Yuklash endi `setPrices` orqali o'tadi — u modelga kerakli
+hamma narsani qiladi va aynan `sync.js` o'raydigan metod. Nomga bog'langan
+(«loose») yozuvlar ham xuddi `spreadLooseBook` dagidek qoidada xaritaga
+qo'shiladi: allaqachon narxlangan qator ustiga yozilmaydi.
+
+`test/e2e-workspace.mjs` da brauzerda tekshiriladi: 25 ta narxli kitob
+yuklanadi → ish maydoni «o'zgargan» bo'ladi → saqlanadi → serverda
+**25 ta `corrections`** paydo bo'ladi (bitta so'rovda) va `changed = 25`,
+saqlangan holatda esa narxlar turadi. Ilgari bularning hech biri
+bo'lmasdi.
 
 ### [x] 2.3 «Применить %» tuzatishlarning 97 % ini 429 bilan yo'qotadi
 

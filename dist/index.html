@@ -4716,13 +4716,22 @@ if (typeof self !== 'undefined') self.S = S;
         else loose[S.nameUnitKey(e.name, e.unit || '')] = p;
         n++;
       });
-      self.prices = Object.assign(self.prices, exact);
+      // Through setPrices, not around it. It does everything the model needs —
+      // apply, redraw, re-total — and it is the one method the server build
+      // watches, so a book loaded into a workspace is saved with it and its
+      // prices join the memory the next project's hints are drawn from.
+      // Written straight into `prices` instead, the workspace was never marked
+      // as changed: the tick stayed green over unsaved work and the whole book
+      // was gone on leaving.
       self.looseBook = Object.assign(self.looseBook || {}, loose);
-      self.spreadLooseBook();
-      if (self.model) S.applyPrices(self.model, self.prices);
-      self.prices_ui.apply();
-      self.ledger();
-      self.sheetList.refresh();
+      var toSet = Object.assign({}, exact);
+      if (self.model) {
+        self.model.resources.forEach(function (r) {          // spreadLooseBook, into the map
+          var p = self.looseBook[r.nk];
+          if (p != null && toSet[r.key] == null && self.prices[r.key] == null) toSet[r.key] = p;
+        });
+      }
+      self.setPrices(toSet);
       self.toast('Загружено цен: ' + n);
     };
     if (isJson) reader.readAsText(file); else reader.readAsArrayBuffer(file);

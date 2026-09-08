@@ -16,3 +16,4 @@ test/.log-*.txt
 test/all-results.txt
 server/pb_data_walk/
 server/.env
+test/.book.json

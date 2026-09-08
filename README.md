@@ -329,7 +329,9 @@ sh server/dev.sh        # binary + sxema + admin@example.com + namuna reyestr (4
 Bitta oyna yetadi: skript serverni ko'taradi, brauzerni ochadi va **kirish
 kodlarini shu oynada ko'rsatadi** (dev rejimida email yuborilmaydi). Kirish
 pochtasi `admin@example.com`. Admin sahifa `…/admin.html`, PocketBase paneli
-`…/_/` (parol `adminpass1234`, `PB_ADMIN_PASS` bilan o'zgartiriladi).
+`…/_/` (parol `adminpass1234` — `dev.sh` faqat `127.0.0.1` ga ulanadi, shuning
+uchun bu parol shu kompyuterdan tashqariga chiqmaydi; `PB_ADMIN_PASS` bilan
+o'zgartiriladi).
 To'xtatish — **Ctrl+C**. Ma'lumotlar `server/pb_data/` da, noldan boshlash uchun
 shu papkani o'chiring. Alohida kerak bo'lsa `sh server/otp.sh` oxirgi kodni
 chiqaradi.
@@ -351,6 +353,14 @@ PB_DEV=1 sh server/lan.sh     # yolg'iz sinash: kodlar shu oynada chiqadi
 
 `dev.sh` dan farqi: server `0.0.0.0` ga ulanadi, ya'ni bir tarmoqdagi boshqa
 kompyuterlar ham kira oladi, va skript xodimlar ochadigan manzilni ko'rsatadi.
+
+Baza paneli (`…/_/`) ham shu manzilda ochiladi, shuning uchun uning paroli
+**birinchi ishga tushirishda tasodifiy yaratiladi**, ekranda bir marta
+ko'rsatiladi va `server/.env` ga yoziladi (`chmod 600`). Keyingi ishga
+tushirishlarda o'sha parol ishlatiladi. Ilgari bu yerda repozitoriyada ochiq
+turgan `adminpass1234` ishlatilgan edi — agar `lan.sh` ni o'shanda ishlatgan
+bo'lsangiz, `server/.env` ni o'chirib skriptni qayta ishga tushiring, u yangi
+parol yaratadi.
 Kerak bo'ladi: kompyuter ish vaqtida yoqiq tursin (uyqu o'chirilgan), lokal IP
 o'zgarmasin (routerda DHCP rezervatsiya), tarmoqlararo ekranda `8090` port
 ochiq bo'lsin, va kirish kodlari uchun SMTP sozlangan bo'lsin (baza paneli →

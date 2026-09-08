@@ -45,7 +45,7 @@ ariza o'chirilishi taklif qilindi), tuzatishdan keyin `0`. Server endi maydon
 yozilmagan eski yozuvlar avvalgidek vaqt bo'yicha ishlaydi va bu ham test bilan
 qulflangan.
 
-### [ ] 1.2 Ofis tarmog'i rejimida superuser paroli repozitoriyada ochiq
+### [x] 1.2 Ofis tarmog'i rejimida superuser paroli repozitoriyada ochiq
 
 `server/lan.sh:10`
 
@@ -64,6 +64,13 @@ va `server/.env` ga yozish. Baza panelini (`/_/`) tashqi manzildan yopish.
 
 **Xavf:** allaqachon `lan.sh` bilan o'rnatgan bo'lsa, eski parol ishlashda
 davom etadi — hujjatda uni almashtirish aytiladi.
+
+*Bajarildi.* `lan.sh` endi birinchi ishga tushirishda tasodifiy parol yaratadi,
+uni ekranda bir marta ko'rsatadi va `server/.env` ga `chmod 600` bilan yozadi;
+keyingi ishga tushirishlarda o'shani o'qiydi. `server/.env` `.gitignore` ga
+qo'shildi (4.3 ham shu bilan bajarildi). VPS yo'li (`install.sh`) allaqachon
+tasodifiy parol yaratar ekan — tekshirildi. `dev.sh` faqat `127.0.0.1` ga
+ulanadi, shuning uchun undagi qulay parol qoldirildi va README'da shu izohlandi.
 
 ### [ ] 1.3 Har bir ekspert boshqasining ishini o'chira oladi
 
@@ -223,7 +230,7 @@ yuboradi) va undan oshsa aniq xato qaytarish.
 
 **Tuzatish:** `test/load.cjs` — bitta joyda, fayllar ro'yxati bilan.
 
-### [ ] 4.3 `server/.env` `.gitignore` da yo'q
+### [x] 4.3 `server/.env` `.gitignore` da yo'q
 
 Hozircha faqat `push.sh` dagi `--exclude` himoya qiladi.
 

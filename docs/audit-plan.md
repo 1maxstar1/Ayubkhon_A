@@ -89,7 +89,7 @@ o'zgartira/o'chira olsin. `corrections` uchun `workspace.opened_by` orqali,
 qoidada administrator istisnosi qoldiriladi va `e2e-workspace` testi buni
 tekshiradi.
 
-### [ ] 1.4 Tizimdan chiqish ish maydonini yopmaydi
+### [x] 1.4 Tizimdan chiqish ish maydonini yopmaydi
 
 `src/ui/auth.js:161`
 
@@ -106,6 +106,14 @@ modelni va narxlarni tozalash.
 
 **Xavf:** saqlanmagan o'zgarish yo'qolishi — chiqishdan oldin `saveNow()`
 chaqiriladi.
+
+*Bajarildi.* Tartib muhim: avval kirish ekrani ko'tariladi (ma'lumot
+ko'rinmasin), keyin ish maydoni saqlanib yopiladi (token hali amal qiladi),
+oxirida token tozalanadi. Saqlash 5 soniyada ulgurmasa ham sessiya baribir
+yopiladi — kech qulflashdan ko'ra oxirgi bir necha soniyani yo'qotgan afzal.
+`test/e2e-workspace.mjs` buni tekshiradi: chiqish → ish maydoni yopiladi,
+fayllar va narxlar tozalanadi, ish maydoni serverda qoladi, keyingi kirgan
+odam reyestrga tushadi.
 
 ### [ ] 1.5 Yuklangan va eksport qilingan fayllar himoyasiz
 

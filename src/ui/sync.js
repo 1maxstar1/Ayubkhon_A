@@ -382,10 +382,11 @@
       }).catch(function (e) { A().toast(S.pbErr(e), true); });
     },
 
+    /** Leave the workspace, saving first. Returns when it is really closed. */
     close: function () {
       var self = this, app = A();
       var done = this.dirty ? this.saveNow() : this.q;
-      Promise.resolve(done).then(function () {
+      return Promise.resolve(done).then(function () {
         self.ws = null; self.app = null; self.files = {}; self.corr = {};
         self.loading = true;
         app.projects = []; app.prices = {}; app.looseBook = null; app.queue = [];

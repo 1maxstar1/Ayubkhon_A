@@ -1565,6 +1565,7 @@ if (typeof self !== 'undefined') self.S = S;
 
   var IDLE_MS = 4 * 60 * 60 * 1000;     // lock after this much inactivity
   var REFRESH_MS = 20 * 60 * 1000;      // extend the token while the user is active
+  var LOCK_SAVE_MS = 5000;              // how long a sign-out waits for the last save
   var TICK_MS = 60 * 1000;
   // Mail can take 15-20 minutes to arrive, so the request outlives the page:
   // the pending otpId is kept here and matches users.otp.duration on the server.
@@ -1715,11 +1716,32 @@ if (typeof self !== 'undefined') self.S = S;
         S.pb.collection('users').authRefresh().catch(function () { /* next tick decides */ });
       }
     },
+    /**
+     * End the session — by the sign-out button, by the idle timer, or because
+     * the token expired.
+     *
+     * The workspace has to be left as part of this, and in this order. An open
+     * workspace belongs to whoever opened it, and the registry screen only
+     * appears when none is open; leaving one behind meant the next person to
+     * sign in on a shared computer landed inside the previous expert's work.
+     * The login screen goes up first so nothing is readable while the save
+     * finishes, and the token is only cleared afterwards, because saving needs
+     * it. If the save cannot finish quickly the session is cleared anyway —
+     * locking late is worse than losing the last few seconds of typing.
+     */
     lock: function (msg) {
-      this.forget();
-      S.pb.authStore.clear();
-      document.dispatchEvent(new CustomEvent('auth:signedout'));
+      var self = this;
       this.show(msg);
+      var leaving = (S.Sync && S.Sync.ws) ? S.Sync.close() : null;
+      var settled = Promise.resolve(leaving).catch(function (e) {
+        console.error('sync: could not close the workspace on sign-out', e);
+      });
+      Promise.race([settled, new Promise(function (r) { setTimeout(r, LOCK_SAVE_MS); })])
+        .then(function () {
+          self.forget();
+          S.pb.authStore.clear();
+          document.dispatchEvent(new CustomEvent('auth:signedout'));
+        });
     },
     signOut: function () { this.lock('Вы вышли из системы.'); },
 

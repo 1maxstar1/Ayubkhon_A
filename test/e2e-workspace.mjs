@@ -163,6 +163,36 @@ check(true, 'region filter works on the list');
 await page.selectOption('#appRegion', '');
 check(await page.evaluate(() => app.projects.length === 0 && !S.Sync.ws), 'app cleared after closing the workspace');
 
+/* ---------------------------------------------- signing out leaves the work */
+// A workspace belongs to whoever opened it, and this program is used on shared
+// office computers. Open one, sign out, sign in as somebody else: the second
+// person must arrive at the registry, not inside the first one's application.
+await page.click('#appTable tbody tr button[data-act=open]');
+await page.waitForSelector('#wsBox:not([hidden])');
+check(await page.evaluate(() => !!S.Sync.ws), 'a workspace is open again');
+const openedId = await page.evaluate(() => S.Sync.ws.id);
+
+await page.click('#signOut');
+await page.waitForSelector('#screen-login:not([hidden])');
+await page.waitForFunction(() => !S.Sync.ws, null, { timeout: 15000 });
+check(true, 'signing out closes the workspace');
+check(await page.evaluate(() => app.projects.length === 0 && Object.keys(app.prices).length === 0),
+  'and empties the files and prices it held');
+
+// Whatever was typed before signing out must still be on the server.
+const savedAfterSignOut = await api(`/api/collections/workspaces/records/${openedId}`, {}, su);
+check(!!savedAfterSignOut.id, 'the workspace itself is still on the server');
+
+await page.fill('#loginEmail', 'test@example.com');
+await page.click('#loginBtn');
+await page.waitForSelector('#codeBox:not([hidden])');
+await new Promise((r) => setTimeout(r, 700));
+const code2 = readFileSync(join(DATA, 'dev-otp.txt'), 'utf8').trim().split('\n').pop().match(/code=(\d+)/)[1];
+await page.fill('#loginCode', code2);
+await page.click('#loginBtn');
+await page.waitForSelector('#screen-list:not([hidden])', { timeout: 15000 });
+check(await page.evaluate(() => !S.Sync.ws), 'the next person to sign in lands on the registry, not in that workspace');
+
 await page.screenshot({ path: join(root, 'test/shot-list.png') });
 await browser.close();
 server.kill();

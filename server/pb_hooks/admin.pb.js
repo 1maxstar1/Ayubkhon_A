@@ -8,6 +8,8 @@
 //                                               application stays in the registry
 //   DELETE /api/admin/applications/{id}      -> application and its workspaces
 //   GET    /api/registry/facets              -> distinct values for the list filters
+//   POST   /api/admin/backfill-keys          -> match keys for corrections saved
+//                                               before the matching layer existed
 
 // Handlers run in isolated VMs, so shared helpers come from a module.
 
@@ -219,3 +221,27 @@ routerAdd("POST", "/api/admin/reset", (e) => {
   $app.logger().warn("database reset by admin", "counts", JSON.stringify(counts));
   return e.json(200, { cleared: counts });
 }, $apis.requireAuth());
+
+// Price hints look corrections up by their match key. Rows written before that
+// column existed carry an empty one and would never be found again, so they are
+// filled in — on demand from the admin page, and once at start-up so an
+// upgraded server heals itself without anybody having to remember.
+routerAdd("POST", "/api/admin/backfill-keys", (e) => {
+  const { requireAdmin, backfillKeys } = require(`${__hooks}/lib/admin.js`);
+  requireAdmin(e);
+  const filled = backfillKeys($app);
+  $app.logger().info("match keys backfilled", "rows", String(filled));
+  return e.json(200, { filled: filled });
+}, $apis.requireAuth());
+
+onBootstrap((e) => {
+  e.next();
+  try {
+    const { backfillKeys } = require(`${__hooks}/lib/admin.js`);
+    const filled = backfillKeys($app);
+    if (filled) $app.logger().info("match keys backfilled at start-up", "rows", String(filled));
+  } catch (err) {
+    // A fresh install has no corrections collection yet; nothing to heal.
+    $app.logger().warn("match key backfill skipped", "error", String(err));
+  }
+});

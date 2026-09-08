@@ -36,6 +36,15 @@
   function nameUnitKey(name, unit) {
     return S.nameKey(name) + SEP + S.unitKey(unit);
   }
+  /* The same two keys as they were built before the homoglyph repair landed.
+     Only a workspace saved by the older page is read through these — see
+     Sync.reindex(), which lifts the stored prices onto the live rows. */
+  function nameUnitKeyV1(name, unit) {
+    return S.nameKeyV1(name) + SEP + S.unitKeyV1(unit);
+  }
+  function resKeyV1(name, unit, price) {
+    return nameUnitKeyV1(name, unit) + SEP + priceKey(price);
+  }
   /** Smeta prices carry long binary-float tails; key on the rounded value. */
   function priceKey(p) {
     return String(Math.round((p || 0) * 1e6) / 1e6);
@@ -165,6 +174,8 @@
             if (!rec) {
               rec = {
                 key: key, nk: nameUnitKey(sr.nm, sr.unit),
+                // cross-project lookup key; absent when match.js is not loaded
+                mk: S.matchPair ? S.matchPair(sr.nm, sr.unit) : '',
                 name: sr.nm, unit: sr.unit, count: 0, qty: 0,
                 price: sp, market: mp, smetaSum: 0, marketSum: 0, projects: {},
                 variants: 1, siblings: [sp]
@@ -291,5 +302,7 @@
   S.spanStats = spanStats;
   S.resKey = resKey;
   S.nameUnitKey = nameUnitKey;
+  S.resKeyV1 = resKeyV1;
+  S.nameUnitKeyV1 = nameUnitKeyV1;
   S.marketColMap = makeMarketMap;
 })(S);

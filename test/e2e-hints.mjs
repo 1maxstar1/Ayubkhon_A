@@ -80,7 +80,7 @@ await openApp(A.number, 'fargona');
 const picked = await page.evaluate(() => {
   const rs = app.model.resources.filter((x) => x.price > 1000).slice(0, 2);
   rs.forEach((r) => app.setPrice(r.key, Math.round(r.price * 1.2)));
-  return rs.map((r) => ({ key: r.key, nk: r.nk, price: r.price, market: Math.round(r.price * 1.2) }));
+  return rs.map((r) => ({ key: r.key, nk: r.nk, mk: r.mk, name: r.name, price: r.price, market: Math.round(r.price * 1.2) }));
 });
 await page.evaluate(() => S.Sync.q);
 await page.waitForFunction(() => !S.Sync.dirty && document.getElementById('wsSave').textContent === '✓', null, { timeout: 15000 });
@@ -97,7 +97,7 @@ try {
   console.log(errors.join('\n'));
   throw e;
 }
-const hb = await page.evaluate((p) => p.map((x) => S.Hints.for(x.nk)), picked);
+const hb = await page.evaluate((p) => p.map((x) => S.Hints.for(x.mk)), picked);
 check(hb.every((h) => h.length === 1), 'one hint per resource in the same region');
 check(hb.every((h, i) => h[0].price === picked[i].market), 'hint price is the market price set in A');
 check(hb.every((h) => h[0].same === false), 'other contragent -> not marked as the same');
@@ -106,6 +106,7 @@ await page.selectOption('#filter', 'hint');
 await page.waitForFunction(() => document.querySelectorAll('#priceScroll .vrow').length === 2);
 check(true, 'filter «Eslatmasi borlar» lists exactly the two resources');
 check((await page.textContent('#priceCount')).includes('с подсказками 2'), 'status line counts hinted resources');
+check(await page.evaluate(() => Object.keys(S.Hints.map).every((k) => k.indexOf('\u241F') > 0)), 'hints are keyed by name and unit together');
 await page.click('#priceScroll .tagh');
 await page.waitForSelector('#hintPop:not([hidden])');
 check((await page.textContent('#hintPop')).includes(A.number), 'popover names the source application');
@@ -121,10 +122,33 @@ await closeApp();
 if (C) {
   await openApp(C.number, 'fargona');
   await page.waitForFunction(() => Object.keys(S.Hints.map).length > 0, null, { timeout: 20000 });
-  const hc = await page.evaluate((nk) => S.Hints.for(nk), picked[0].nk);
+  const hc = await page.evaluate((mk) => S.Hints.for(mk), picked[0].mk);
   check(hc.length === 2 && hc[0].same === true && hc[0].number === A.number, 'same contragent hint ranks first (' + hc.map((h) => h.number + (h.same ? '*' : '')).join(', ') + ')');
   await closeApp();
 }
+
+// The second tier: a name close to one already priced, offered with a score.
+await openApp(B.number);          // the region was chosen the first time round
+await page.waitForFunction(() => Object.keys(S.Hints.map).length > 0, null, { timeout: 20000 });
+const near = await page.evaluate(() => {
+  // A long name with one character dropped is the everyday typo. It must still
+  // find its resource, and «АНКЕР М5» must still never find «АНКЕР М8».
+  const names = app.model.resources.map((r) => r.name).filter((n) => n.length > 25);
+  const src = names.sort((a, b) => b.length - a.length)[0];
+  const cut = Math.floor(src.length / 2);
+  const typo = src.slice(0, cut) + src.slice(cut + 1);
+  const cands = [{ name: src, unit: '', price: 1000 }];
+  return {
+    src: src, typo: typo,
+    score: S.similarity(typo, src, S.idfOf([src])),
+    best: S.bestMatches(typo, '', cands).length,
+    sizes: S.similarity('АНКЕР М5', 'АНКЕР М8', {})
+  };
+});
+check(near.score >= 0.85 && near.best === 1,
+  `a mistyped name still finds its resource (${near.score}, ${near.best} suggestion)`);
+check(near.sizes === 0, 'and two sizes of one part never do');
+await closeApp();
 
 // D: other region -> nothing
 const D = rows.find((r) => r.inn && r.inn !== A.inn && r.number !== B.number && (!C || r.number !== C.number));

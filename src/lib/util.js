@@ -31,24 +31,7 @@ var S = (typeof S !== 'undefined' && S) || {};
     }).replace(CTRL, '');
   }
 
-  var NBSP = /[   ]/g;
-  var APOS = /[`‘’ʻʼ]/g;
-
-  /**
-   * Resource-name key. Prices are keyed by name so one edit propagates to every
-   * occurrence across every street and every sheet — the whole point of the
-   * "adjust once, apply everywhere" workflow.
-   */
-  function nameKey(s) {
-    return String(s == null ? '' : s)
-      .replace(NBSP, ' ')
-      .replace(APOS, "'")
-      .replace(/\s+/g, ' ')
-      .trim()
-      .toUpperCase();
-  }
-
-  function unitKey(s) { return nameKey(s).replace(/[.\-\s]/g, ''); }
+  var NBSP = /[   ]/g;
 
   /** Money-ish comparison: smeta numbers carry long binary-float tails. */
   function near(a, b) {
@@ -92,7 +75,7 @@ var S = (typeof S !== 'undefined' && S) || {};
   }
 
   S.col = col; S.colIndex = colIndex; S.esc = esc;
-  S.nameKey = nameKey; S.unitKey = unitKey; S.near = near; S.num = num;
+  S.near = near; S.num = num;
   S.money = money; S.price = price; S.qty = qty; S.debounce = debounce;
 })(S);
 if (typeof self !== 'undefined') self.S = S;

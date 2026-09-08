@@ -40,6 +40,7 @@
       });
       $('findForm').addEventListener('submit', function (e) { e.preventDefault(); self.findApps(); });
       $('dedupeBtn').addEventListener('click', function () { self.dedupe(); });
+      $('keysBtn').addEventListener('click', function () { self.backfillKeys(); });
       if (S.pb.authStore.isValid) this.open();
     },
 
@@ -142,6 +143,23 @@
         toast($('regStat').textContent);
         if (r.removed) self.loadWs();
       }).catch(function (e) { toast('Проверка не удалась: ' + S.pbErr(e), true); })
+        .finally(function () { btn.disabled = false; });
+    },
+
+    /**
+     * Price hints are looked up by a match key. Corrections saved before that
+     * key existed carry an empty one; this fills them in so old work starts
+     * suggesting prices again. Harmless to run twice.
+     */
+    backfillKeys: function () {
+      var btn = $('keysBtn');
+      btn.disabled = true;
+      S.pb.send('/api/admin/backfill-keys', { method: 'POST' }).then(function (r) {
+        $('regStat').textContent = r.filled
+          ? 'Ключи подсказок обновлены: правок ' + r.filled
+          : 'Все правки уже с ключами — обновлять нечего';
+        toast($('regStat').textContent);
+      }).catch(function (e) { toast('Не удалось обновить ключи: ' + S.pbErr(e), true); })
         .finally(function () { btn.disabled = false; });
     },
 

@@ -272,6 +272,15 @@ form.grid .foot{grid-column:1 / -1;display:flex;gap:8px;align-items:center}
 .hp-meta{color:var(--mute);font-size:11px;min-width:0}
 .hp-meta em{font-style:normal;color:var(--good);font-weight:600}
 .hp-meta small{display:block;font-size:10.5px}
+/* a guess, not a match: dimmer tag, its own band in the popover */
+.tagh.near{background:#fdf3e0;color:#8a5a10}
+.tagh.near:hover{background:#f9e6c6}
+.hp-sub{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:6px 10px;
+  border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);background:#fdf9f1;
+  font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#8a5a10}
+.hp-sub small{text-transform:none;letter-spacing:0;color:var(--mute);font-size:10.5px}
+.hp-row.near{background:#fffdf8}
+.hp-name{font-style:normal;color:var(--ink);font-weight:600}
 
 /* ------------------------------------------------------------ application card */
 .card.wide{max-width:720px;max-height:90vh;overflow:auto}

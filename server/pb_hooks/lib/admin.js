@@ -13,4 +13,32 @@ module.exports = {
     for (const r of rows) tx.delete(r);
     return rows.length;
   },
+
+  /**
+   * Fills match_key / match_unit_key on corrections saved before those columns
+   * existed. Without them a price correction written by the old page is
+   * invisible to the hint lookup, which searches by match key.
+   *
+   * Batched on purpose: a single transaction over the whole table would hold a
+   * write lock for as long as it takes. A name that normalises to nothing gets
+   * "-" so the same row is not picked up on every pass.
+   */
+  backfillKeys(app, cap) {
+    const N = require(`${__hooks}/lib/nlp.js`);
+    const limit = cap || 200000;
+    let done = 0;
+    for (let round = 0; round < 1000 && done < limit; round++) {
+      const rows = app.findRecordsByFilter("corrections", "match_key = ''", "", 500, 0, {});
+      if (!rows.length) break;
+      app.runInTransaction((tx) => {
+        for (const r of rows) {
+          r.set("match_key", N.matchKey(r.getString("name")) || "-");
+          r.set("match_unit_key", N.matchUnitKey(r.getString("unit")));
+          tx.save(r);
+        }
+      });
+      done += rows.length;
+    }
+    return done;
+  },
 };

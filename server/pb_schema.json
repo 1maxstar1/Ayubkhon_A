@@ -458,6 +458,14 @@
           "type": "text"
         },
         {
+          "name": "match_key",
+          "type": "text"
+        },
+        {
+          "name": "match_unit_key",
+          "type": "text"
+        },
+        {
           "name": "smeta_price",
           "type": "number"
         },
@@ -492,7 +500,8 @@
       "indexes": [
         "CREATE UNIQUE INDEX idx_corrections_ws_key ON corrections (workspace, res_key)",
         "CREATE INDEX idx_corrections_region_name ON corrections (region, name_key)",
-        "CREATE INDEX idx_corrections_contragent_name ON corrections (contragent, name_key)"
+        "CREATE INDEX idx_corrections_contragent_name ON corrections (contragent, name_key)",
+        "CREATE INDEX idx_corrections_region_match ON corrections (region, match_key)"
       ],
       "listRule": "@request.auth.id != \"\"",
       "viewRule": "@request.auth.id != \"\"",

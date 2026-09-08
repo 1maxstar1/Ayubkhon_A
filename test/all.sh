@@ -21,6 +21,7 @@ node build.mjs --serve >/dev/null
 echo "test                   sonuc  vaqt"
 echo "-----------------------------------"
 run build            node build.mjs
+run normalize        node test/normalize.cjs
 [ -n "$S1" ] && run pipeline  node test/pipeline.cjs "$S1" "$S2" --out test/out.xlsx
 run registry-parse   node test/registry.cjs
 run pb-smoke         sh test/pb-smoke.sh
@@ -28,6 +29,7 @@ run registry-import  sh test/registry-import.sh
 run admin-api        sh test/admin-api.sh
 run dedupe           node test/dedupe.mjs
 run mail-otp         node test/mail-otp.mjs
+run match-keys       node test/match-keys.mjs
 [ -n "$S1" ] && run browser   node test/browser.mjs "$S1" "$S2"
 run e2e-auth         node test/e2e-auth.mjs
 run e2e-admin        node test/e2e-admin.mjs

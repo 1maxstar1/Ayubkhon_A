@@ -168,7 +168,8 @@
         case 'same': return !isChanged(r);
         case 'zero': return !r.price;
         case 'multi': return r.variants > 1;
-        case 'hint': return !!(S.Hints && S.Hints.has(r.nk));
+        case 'hint': return !!(S.Hints && S.Hints.hasRow(r));
+        case 'near': return !!(S.Hints && S.Hints.nearRow(r));
         default: return true;
       }
     });
@@ -189,10 +190,12 @@
     var m = this.app.model;
     var total = m ? m.resources.length : 0;
     var changed = m ? m.resources.filter(isChanged).length : 0;
-    var hinted = m && S.Hints ? m.resources.filter(function (r) { return S.Hints.has(r.nk); }).length : 0;
+    var hinted = m && S.Hints ? m.resources.filter(function (r) { return S.Hints.hasRow(r); }).length : 0;
+    var near = m && S.Hints ? m.resources.filter(function (r) { return S.Hints.nearRow(r); }).length : 0;
     document.getElementById('priceCount').textContent =
       this.view.length + ' / ' + total + ' ресурсов · изменено ' + changed +
-      (hinted ? ' · с подсказками ' + hinted : '');
+      (hinted ? ' · с подсказками ' + hinted : '') +
+      (near ? ' · похожих ' + near : '');
   };
 
   Prices.prototype.renderRange = function (from, to) {

@@ -10,6 +10,10 @@
 
   var SAVE_MS = 1500;
   var XLSX_RE = /\.xlsx?$|\.xlsm$/i;
+  // Stamped into the saved state. 2 = resource keys built by the name key that
+  // repairs half-switched keyboard layouts; anything older is lifted onto it
+  // once, on the next open. Bump this whenever S.nameKey changes again.
+  var KEYS = 2;
 
   function $(id) { return document.getElementById(id); }
   function A() { return window.app; }
@@ -66,9 +70,11 @@
         app.toast((by.name || by.email) + ' только что работал(а) с этой заявкой — при одновременной работе побеждает последнее сохранение', true);
       }
 
+      this.corrList = [];
       S.pb.collection('corrections').getFullList({ filter: S.pb.filter('workspace = {:w}', { w: w.id }), fields: 'id,res_key,market_price' })
         .then(function (list) {
-          list.forEach(function (c) { self.corr[c.res_key] = { id: c.id, market: c.market_price }; });
+          self.corrList = list;
+          self.indexCorr();
         }).catch(function (e) { app.toast('Правки не загружены: ' + S.pbErr(e), true); });
 
       var st = w.state || {};
@@ -88,6 +94,49 @@
         app.toast('Не удалось получить файлы: ' + (e.message || e), true);
         self.restore();
       });
+    },
+
+    /**
+     * Prices are stored under a key built from the resource name, and the name
+     * key learned to repair half-switched keyboard layouts. A workspace saved
+     * by the older page therefore carries keys the live rows no longer answer
+     * to. This maps the old key of every live row onto its new one, so an
+     * upgrade never drops a price somebody already typed in.
+     *
+     * Only keys that no live row already owns are moved, so running it on
+     * an already-current workspace changes nothing.
+     */
+    keyMap: function () {
+      var app = A();
+      if (!app.model || !S.resKeyV1) return null;
+      var live = {}, map = null;
+      app.model.resources.forEach(function (r) { live[r.key] = 1; });
+      app.model.resources.forEach(function (r) {
+        var old = S.resKeyV1(r.name, r.unit || '', r.price == null ? 0 : r.price);
+        if (old === r.key || live[old]) return;
+        (map = map || {})[old] = r.key;
+      });
+      return map;
+    },
+
+    /** `map` keyed by resource key, rebuilt onto the keys the live rows use. */
+    reindex: function (map) {
+      var m = this.keyMap();
+      if (!m) return { map: map, moved: 0 };
+      var out = {}, moved = 0;
+      Object.keys(map).forEach(function (k) {
+        var to = m[k];
+        if (to && out[to] === undefined) { out[to] = map[k]; moved++; }
+        else out[k] = map[k];
+      });
+      return { map: out, moved: moved };
+    },
+
+    /** Server corrections, keyed the way the live rows are keyed. */
+    indexCorr: function () {
+      var raw = {};
+      (this.corrList || []).forEach(function (c) { raw[c.res_key] = { id: c.id, market: c.market_price }; });
+      this.corr = this.reindex(raw).map;
     },
 
     /** Apply the saved state to the freshly parsed projects, then go live. */
@@ -121,10 +170,17 @@
       if (st.mode) $('reportMode').value = st.mode;
       app.looseBook = st.looseBook || null;
       app.rebuild(); app.renderSide();
-      if (st.prices && Object.keys(st.prices).length) app.setPrices(st.prices);
+      if (st.prices && Object.keys(st.prices).length) {
+        var r = st.keys === KEYS ? { map: st.prices, moved: 0 } : this.reindex(st.prices);
+        app.setPrices(r.map);
+        if (r.moved) { this.dirty = true; app.toast('Цены перенесены на обновлённые названия ресурсов: ' + r.moved); }
+      }
+      this.indexCorr();
+      var remapped = this.dirty;
       this.loading = false; this.dirty = false;
       app.busy(false);
       this.renderBox();
+      if (remapped) this.touch();          // write the workspace back under the new keys
       if (app.projects.length) app.toast('Рабочая область восстановлена: файлов ' + app.projects.length);
     },
 
@@ -153,6 +209,7 @@
         looseBook: app.looseBook || null,
         opts: app.opts,
         mode: $('reportMode').value,
+        keys: KEYS,
         savedAt: new Date().toISOString()
       };
     },
@@ -235,7 +292,10 @@
         var data = Object.assign({
           workspace: ws.id, application: a.id, contragent: a.contragent || '', region: ws.region,
           res_key: key, name: rec.name, name_key: S.nameKey(rec.name), unit: rec.unit || '',
-          unit_key: S.unitKey(rec.unit || ''), smeta_price: rec.price
+          unit_key: S.unitKey(rec.unit || ''),
+          // the cross-project lookup key: one alphabet, no separators, digits intact
+          match_key: S.matchKey(rec.name), match_unit_key: S.matchUnitKey(rec.unit || ''),
+          smeta_price: rec.price
         }, patch);
         return S.pb.collection('corrections').create(data).then(function (r) { self.corr[key] = { id: r.id, market: value }; });
       }).catch(function (e) { app.toast('Правка не сохранена: ' + S.pbErr(e), true); });

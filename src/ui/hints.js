@@ -1,7 +1,17 @@
 /*
  * Price hints: what earlier projects in the same region paid for the same
- * resource (name + unit). Same-contragent entries come first; other regions
- * are never shown. Data comes from the `corrections` collection.
+ * resource. Same-contragent entries come first; other regions are never shown.
+ * Data comes from the `corrections` collection.
+ *
+ * Two tiers, because the same resource is rarely typed the same way twice:
+ *
+ *   exact    the match key agrees — one alphabet, no separators, digits
+ *            intact. «КАШТАН», «Kashtan» and «KАШТАН» all land here together.
+ *   similar  nothing matched exactly, so the closest names of the region are
+ *            offered with a score: «ТРОЙНИК ПОЛИЭТИЛЕНОВЫЕ Д-110ММ» for
+ *            «ТРОЙНИКИ ПОЛИЭТИЛЕНОВЫЙ Д-110ММ». Never automatic — the number
+ *            guard in S.similarity keeps «АНКЕР М5» away from «АНКЕР М8», and
+ *            the expert still has to press Применить.
  */
 (function (S) {
   'use strict';
@@ -10,6 +20,14 @@
   // PocketBase rejects filter expressions above ~3500 bytes (Cyrillic is two
   // bytes a letter), so chunks are cut by encoded size, not by key count.
   var CHUNK_BYTES = 2800;
+  // How much of the match key a similar name has to share before it is even
+  // fetched. Four characters keep «ТРОЙНИК»/«ТРОЙНИКИ» and «КОВЕР»/«КОВЕРА»
+  // together while leaving the index able to do the work.
+  var PREFIX = 4;
+  var SIM_PER_CHUNK = 400;      // newest rows per prefix query
+  var SIM_MIN = 0.62;           // below this two names are merely related
+  var SIM_SHOW = 4;             // suggestions offered per resource
+
   var enc = new TextEncoder();
   function bytes(s) { return enc.encode(s).length; }
 
@@ -19,9 +37,11 @@
     var x = new Date(d);
     return isNaN(x) ? '' : x.toLocaleDateString('ru-RU');
   }
+  /** The lookup key of a resource row, computed if the model predates match.js. */
+  function mkOf(r) { return r && (r.mk || S.matchPair(r.name, r.unit || '')); }
 
   var Hints = {
-    map: {}, fetched: {}, busy: false,
+    map: {}, sim: {}, fetched: {}, prefixed: {}, pool: [], busy: false,
 
     init: function () {
       var self = this;
@@ -55,13 +75,16 @@
           var inp = e.target;
           if (!inp.classList || !inp.classList.contains('pin')) return;
           var rec = self.recOf(inp.dataset.key);
-          if (rec && self.for(rec.nk).length) self.show(inp, rec.nk, rec.key);
+          if (rec && self.any(mkOf(rec))) self.show(inp, mkOf(rec), rec.key);
         });
         sc.addEventListener('scroll', function () { self.hide(); }, { passive: true });
       });
     },
 
-    reset: function () { this.map = {}; this.fetched = {}; this.hide(); },
+    reset: function () {
+      this.map = {}; this.sim = {}; this.fetched = {}; this.prefixed = {}; this.pool = [];
+      this.hide();
+    },
 
     recOf: function (key) {
       var m = A().model;
@@ -70,9 +93,16 @@
       return null;
     },
 
-    /** Hints for a name+unit key, best first. */
-    for: function (nk) { return this.map[nk] || []; },
-    has: function (nk) { return !!(this.map[nk] && this.map[nk].length); },
+    /** Hints whose match key is the resource's own, best first. */
+    for: function (mk) { return this.map[mk] || []; },
+    /** Close-but-not-equal names, best first. */
+    similar: function (mk) { return this.sim[mk] || []; },
+    has: function (mk) { return !!(this.map[mk] && this.map[mk].length); },
+    any: function (mk) { return this.for(mk).length + this.similar(mk).length > 0; },
+    /* The same two questions asked with a resource row in hand. */
+    hasRow: function (r) { return this.has(mkOf(r)); },
+    nearRow: function (r) { return !this.has(mkOf(r)) && this.similar(mkOf(r)).length > 0; },
+    anyRow: function (r) { return this.any(mkOf(r)); },
 
     loadSoon: S.debounce(function () { this.load(); }, 400),
 
@@ -80,50 +110,38 @@
       var self = this, app = A();
       var ws = S.Sync && S.Sync.ws;
       if (!ws || !app.model || S.Sync.loading) return;
-      var keys = {};
+      var want = {};
       app.model.resources.forEach(function (r) {
-        var nk = S.nameKey(r.name);
-        if (nk && !self.fetched[nk]) keys[nk] = 1;
+        var mk = S.matchKey(r.name);
+        if (mk && !self.fetched[mk]) want[mk] = 1;
       });
-      var list = Object.keys(keys);
-      if (!list.length) return;
+      var list = Object.keys(want);
+      if (!list.length) { this.loadSimilar(); return; }
       list.forEach(function (k) { self.fetched[k] = 1; });
-      var chunks = [], cur = [], size = 0;
-      list.forEach(function (k) {
-        var b = bytes(k) + 24;
-        if (cur.length && size + b > CHUNK_BYTES) { chunks.push(cur); cur = []; size = 0; }
-        cur.push(k); size += b;
-      });
-      if (cur.length) chunks.push(cur);
-      var mine = S.Sync.app && S.Sync.app.contragent;
+
       var got = 0, fresh = {};
-      Promise.all(chunks.map(function (ch) {
+      Promise.all(chunk(list).map(function (ch) {
         var params = { w: ws.id, r: ws.region };
-        var ors = ch.map(function (k, i) { params['k' + i] = k; return 'name_key = {:k' + i + '}'; }).join(' || ');
+        var ors = ch.map(function (k, i) { params['k' + i] = k; return 'match_key = {:k' + i + '}'; }).join(' || ');
         return S.pb.collection('corrections').getFullList({
           filter: S.pb.filter('region = {:r} && workspace != {:w} && (' + ors + ')', params),
           sort: '-updated', expand: 'application,contragent,by', batch: 500
         }).then(function (items) {
           items.forEach(function (c) {
-            var nk = S.nameUnitKey(c.name, c.unit || '');
-            var a = c.expand && c.expand.application, ct = c.expand && c.expand.contragent, by = c.expand && c.expand.by;
-            (fresh[nk] = fresh[nk] || []).push({
-              price: c.market_price, smeta: c.smeta_price, note: c.note, at: c.updated,
-              number: a ? a.number : '', contragent: ct ? ct.name : (a ? a.org_name : ''),
-              region: c.region, by: by ? (by.name || by.email) : '',
-              same: !!(mine && c.contragent === mine)
-            });
+            var h = hintOf(c);
+            (fresh[S.matchPair(c.name, c.unit || '')] = fresh[S.matchPair(c.name, c.unit || '')] || []).push(h);
             got++;
           });
         });
       })).then(function () {
         // rank first, publish after: a half-loaded map would show unsorted tags
-        Object.keys(fresh).forEach(function (nk) { self.map[nk] = rank((self.map[nk] || []).concat(fresh[nk])); });
+        Object.keys(fresh).forEach(function (mk) { self.map[mk] = rank((self.map[mk] || []).concat(fresh[mk])); });
         if (got) {
           app.prices_ui.apply();
           app.sheetList.refresh();
           app.toast('Подсказки цен из прежних проектов: ресурсов ' + Object.keys(self.map).length);
         }
+        self.loadSimilar();
       }).catch(function (e) {
         if (e && e.status === 0) return;      // page left / request aborted — nothing to report
         console.error('hints', e);
@@ -131,28 +149,98 @@
       });
     },
 
-    /* --------------------------------------------------------- popover */
-    show: function (anchor, nk, key) {
+    /**
+     * Second pass, for the resources nothing matched exactly. Only names that
+     * open the same way are fetched — the index does that part — and the
+     * ranking then happens here, where the whole name is available.
+     */
+    loadSimilar: function () {
       var self = this, app = A();
-      var hs = this.for(nk);
-      if (!hs.length) { this.hide(); return; }
+      var ws = S.Sync && S.Sync.ws;
+      if (!ws || !app.model || S.Sync.loading) return;
+      var open = app.model.resources.filter(function (r) { return !self.has(mkOf(r)); });
+      if (!open.length) return;
+      var want = {};
+      open.forEach(function (r) {
+        var p = S.matchKey(r.name).slice(0, PREFIX);
+        if (p.length === PREFIX && !self.prefixed[p]) want[p] = 1;
+      });
+      var list = Object.keys(want);
+      if (!list.length) { this.rankSimilar(open); return; }
+      list.forEach(function (p) { self.prefixed[p] = 1; });
+
+      Promise.all(chunk(list).map(function (ch) {
+        var params = { w: ws.id, r: ws.region };
+        var ors = ch.map(function (p, i) { params['p' + i] = p + '%'; return 'match_key ~ {:p' + i + '}'; }).join(' || ');
+        return S.pb.collection('corrections').getList(1, SIM_PER_CHUNK, {
+          filter: S.pb.filter('region = {:r} && workspace != {:w} && (' + ors + ')', params),
+          sort: '-updated', expand: 'application,contragent,by'
+        }).then(function (res) { return res.items; });
+      })).then(function (lists) {
+        var seen = {};
+        self.pool.forEach(function (c) { seen[c.id] = 1; });
+        lists.forEach(function (items) {
+          items.forEach(function (c) {
+            if (seen[c.id]) return;
+            seen[c.id] = 1;
+            self.pool.push(c);
+          });
+        });
+        self.rankSimilar(open);
+      }).catch(function (e) {
+        if (e && e.status === 0) return;
+        console.error('hints:similar', e);
+      });
+    },
+
+    /** Score the fetched neighbourhood against every unmatched resource. */
+    rankSimilar: function (open) {
+      var self = this, app = A();
+      if (!this.pool.length) return;
+      var cands = this.pool.map(function (c) { return { name: c.name, unit: c.unit || '', rec: c }; });
+      var idf = S.idfOf(cands.map(function (c) { return c.name; }));
+      var found = 0;
+      open.forEach(function (r) {
+        var mk = mkOf(r);
+        if (self.sim[mk]) return;
+        var best = S.bestMatches(r.name, r.unit || '', cands, { idf: idf, min: SIM_MIN, limit: SIM_SHOW });
+        if (!best.length) return;
+        self.sim[mk] = best.map(function (b) {
+          var h = hintOf(b.item.rec);
+          h.score = b.score;
+          h.name = b.item.name;
+          return h;
+        });
+        found++;
+      });
+      if (found) {
+        app.prices_ui.apply();
+        app.sheetList.refresh();
+        app.toast('Похожие ресурсы найдены: ' + found);
+      }
+    },
+
+    /* --------------------------------------------------------- popover */
+    show: function (anchor, mk, key) {
+      var self = this, app = A();
+      var hs = this.for(mk), ss = this.similar(mk);
+      if (!hs.length && !ss.length) { this.hide(); return; }
       var rec = this.recOf(key);
-      this.pop.innerHTML = '<div class="hp-head">Прежние проекты · ' + S.esc(S.regionLabel(S.Sync.ws.region)) +
-        '<button class="link" data-x>×</button></div>' +
-        hs.slice(0, 12).map(function (h, i) {
-          return '<div class="hp-row' + (h.same ? ' same' : '') + '">' +
-            '<b>' + S.price(h.price) + '</b>' +
-            '<span class="hp-meta">№ ' + S.esc(h.number) + ' · ' + S.esc(h.contragent) + ' · ' + day(h.at) +
-            (h.same ? ' <em>тот же контрагент</em>' : '') +
-            (h.count > 1 ? ' · ×' + h.count : '') +
-            (h.smeta != null && rec && !S.near(h.smeta, rec.price) ? '<small>сметная цена там: ' + S.price(h.smeta) + '</small>' : '') +
-            '</span>' +
-            '<button class="btn sm" data-i="' + i + '">Применить</button></div>';
-        }).join('');
+      var shown = hs.slice(0, 12);
+      var html = '<div class="hp-head">Прежние проекты · ' + S.esc(S.regionLabel(S.Sync.ws.region)) +
+        '<button class="link" data-x>×</button></div>';
+      html += shown.map(function (h, i) { return row(h, i, rec, false); }).join('');
+      if (ss.length) {
+        html += '<div class="hp-sub">Похожие ресурсы' +
+          '<small>цена другого ресурса — проверьте название</small></div>' +
+          ss.map(function (h, i) { return row(h, shown.length + i, rec, true); }).join('');
+      }
+      var all = shown.concat(ss);
+      this.pop.innerHTML = html;
       this.pop.querySelector('[data-x]').addEventListener('click', function () { self.hide(); });
       this.pop.querySelectorAll('button[data-i]').forEach(function (b) {
         b.addEventListener('click', function () {
-          var h = hs[+b.dataset.i];
+          var h = all[+b.dataset.i];
           app.setPrice(key, h.price);
           app.prices_ui.apply();
           app.sheetList.refresh();
@@ -172,13 +260,58 @@
 
     /** Tag markup for a resource row, '' when there is nothing to show. */
     tag: function (r) {
-      var hs = this.for(r.nk);
-      if (!hs.length) return '';
-      var best = hs[0];
-      return '<button class="tagh' + (best.same ? ' same' : '') + '" data-hk="' + S.esc(r.nk) + '" data-key="' + S.esc(r.key) +
-        '" title="Подсказки цен из прежних проектов">' + S.price(best.price) + (hs.length > 1 ? ' +' + (hs.length - 1) : '') + '</button>';
+      var mk = mkOf(r);
+      var hs = this.for(mk);
+      var ss = hs.length ? null : this.similar(mk);
+      var best = hs.length ? hs[0] : (ss && ss.length ? ss[0] : null);
+      if (!best) return '';
+      var more = hs.length ? hs.length - 1 : ss.length - 1;
+      var cls = hs.length ? (best.same ? ' same' : '') : ' near';
+      var title = hs.length ? 'Подсказки цен из прежних проектов'
+        : 'Похожий ресурс: ' + best.name + ' (' + Math.round(best.score * 100) + '%)';
+      return '<button class="tagh' + cls + '" data-hk="' + S.esc(mk) + '" data-key="' + S.esc(r.key) +
+        '" title="' + S.esc(title) + '">' + (hs.length ? '' : '≈') + S.price(best.price) +
+        (more > 0 ? ' +' + more : '') + '</button>';
     }
   };
+
+  /** One popover line. `near` rows also name the resource they came from. */
+  function row(h, i, rec, near) {
+    return '<div class="hp-row' + (h.same ? ' same' : '') + (near ? ' near' : '') + '">' +
+      '<b>' + S.price(h.price) + '</b>' +
+      '<span class="hp-meta">' +
+      (near ? '<em class="hp-name">' + S.esc(h.name) + '</em> · ' + Math.round(h.score * 100) + '%<br>' : '') +
+      '№ ' + S.esc(h.number) + ' · ' + S.esc(h.contragent) + ' · ' + day(h.at) +
+      (h.same ? ' <em>тот же контрагент</em>' : '') +
+      (h.count > 1 ? ' · ×' + h.count : '') +
+      (h.smeta != null && rec && !S.near(h.smeta, rec.price) ? '<small>сметная цена там: ' + S.price(h.smeta) + '</small>' : '') +
+      '</span>' +
+      '<button class="btn sm" data-i="' + i + '">Применить</button></div>';
+  }
+
+  /** A correction record as the popover wants it. */
+  function hintOf(c) {
+    var a = c.expand && c.expand.application, ct = c.expand && c.expand.contragent, by = c.expand && c.expand.by;
+    var mine = S.Sync.app && S.Sync.app.contragent;
+    return {
+      price: c.market_price, smeta: c.smeta_price, note: c.note, at: c.updated, name: c.name,
+      number: a ? a.number : '', contragent: ct ? ct.name : (a ? a.org_name : ''),
+      region: c.region, by: by ? (by.name || by.email) : '',
+      same: !!(mine && c.contragent === mine)
+    };
+  }
+
+  /** Split keys into filter-sized batches, measured in encoded bytes. */
+  function chunk(list) {
+    var chunks = [], cur = [], size = 0;
+    list.forEach(function (k) {
+      var b = bytes(k) + 24;
+      if (cur.length && size + b > CHUNK_BYTES) { chunks.push(cur); cur = []; size = 0; }
+      cur.push(k); size += b;
+    });
+    if (cur.length) chunks.push(cur);
+    return chunks;
+  }
 
   /** Same contragent first, newest first; identical prices from one source collapse. */
   function rank(list) {

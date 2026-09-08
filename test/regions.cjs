@@ -87,6 +87,27 @@ check(yangi.confidence < 0.6 && yangi.second,
 check(guess('Тошкент шаҳри Чилонзор тумани мактаб').region === 'toshkent_sh',
   'but «туман» alone never means the region — the city has twelve of its own');
 
+console.log('-- the Russian inflections say which Tashkent outright --');
+is('toshkent_vil', 'Ремонт школы в Ташкентской области');
+is('toshkent_vil', 'Строительство в Ташкентском районе');
+is('toshkent_sh', 'Реконструкция здания в Ташкенте');
+is('toshkent_sh', 'Строительство нового здания города Ташкента');
+is('respublika', 'Посольство Узбекистана в Москве');
+
+console.log('-- names left unclaimed on purpose --');
+// Measured over the whole registry: «Улугбек» is a person 92 times outside
+// Tashkent, «Олмазор» a mahalla in eleven regions, «Учтепа» a road node in
+// Jizzax and a mahalla in Yakkabog', «Беруний» a scientist, «Зарафшон» a river
+// and a neighbourhood everywhere along it. A name that misleads more often
+// than it helps is worse than no name.
+for (const [q, why] of [
+  ['Улуғбек номидаги мактаб', 'Ulugʻbek is a person'],
+  ['Олмазор МФЙ сув таъминоти', 'Olmazor is a mahalla in eleven regions'],
+  ['Учтепа тумани мактаби', 'Uchtepa is claimed by nobody'],
+  ['Beruniy tumani suv taʼminoti', 'Beruniy is a scientist'],
+  ['«Зарафшон» МФЙ кўчаси', 'Zarafshon is a river']
+]) check(guess(q).region === '', `${why}: «${q.slice(0, 34)}» is left unanswered`);
+
 console.log('-- and when nothing is named --');
 check(guess('Капитальный ремонт административного здания банка').region === '',
   'a title with no place in it gets no guess');
@@ -116,15 +137,15 @@ console.log(`   when it is confident: ${(rightSure / (rightSure + wrongSure) * 1
 console.log('   ' + Object.entries(missed).sort((a, b) => b[1] - a[1]).slice(0, 5)
   .map(([k, v]) => k + ' ×' + v).join(', '));
 
-check(right / (right + wrong) >= 0.88, 'at least 88% of the answers it gives are the registry\'s own');
-check(rightSure / (rightSure + wrongSure) >= 0.95, 'and at least 95% of the confident ones');
-check(right / rows.length >= 0.72, 'it answers, correctly, at least 72% of all the rows');
+check(right / (right + wrong) >= 0.90, 'at least 90% of the answers it gives are the registry\'s own');
+check(rightSure / (rightSure + wrongSure) >= 0.96, 'and at least 96% of the confident ones');
+check(right / rows.length >= 0.77, 'it answers, correctly, at least 77% of all the rows');
 
 // The two Tashkents are the only pair it is allowed to be unsure about, and
 // they are where the registry contradicts itself: «Янги Тошкент» is filed as
 // the city 28 times and as the region 27.
 const tashkentMix = (missed['toshkent_vil -> toshkent_sh'] || 0) + (missed['toshkent_sh -> toshkent_vil'] || 0);
-check(wrong - tashkentMix <= 60,
+check(wrong - tashkentMix <= 50,
   `outside the two Tashkents only ${wrong - tashkentMix} mistakes in ${rows.length} rows`);
 for (const [k, v] of Object.entries(missed)) {
   if (k.indexOf('toshkent') >= 0) continue;

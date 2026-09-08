@@ -9,6 +9,7 @@
   if (!S.pb) return;
 
   var PAGE = 50;
+  var WS_CHUNK = 100;      // application ids per workspace query; the filter is capped near 3.5 KB
 
   function $(id) { return document.getElementById(id); }
   /** «smeta_a1b2c3d4e5.xlsx» -> «smeta.xlsx»: the suffix PocketBase adds. */
@@ -153,20 +154,17 @@
        * fetched and the answer is about all of it.
        */
       var whole = !!(this.work || this.region);
+      var page = this.page;
       $('appCount').textContent = 'загрузка…';
-      Promise.all([
-        whole
-          ? S.pb.collection('applications').getFullList(Object.assign({ batch: 200 }, opts))
-            .then(function (items) { return { items: items, totalItems: items.length }; })
-          : S.pb.collection('applications').getList(this.page, PAGE, opts),
-        this.page === 1 ? S.pb.collection('workspaces').getFullList({ expand: 'updated_by', fields: 'id,application,status,region,updated,changed,files,collectionId,collectionName,expand.updated_by.name,expand.updated_by.email' }) : null
-      ]).then(function (res) {
-        if (seq !== self.seq) return;              // a newer request already answered
-        var list = res[0];
-        if (res[1]) {
-          self.ws = {};
-          res[1].forEach(function (w) { self.ws[w.application] = w; });
-        }
+      (whole
+        ? S.pb.collection('applications').getFullList(Object.assign({ batch: 200 }, opts))
+          .then(function (items) { return { items: items, totalItems: items.length }; })
+        : S.pb.collection('applications').getList(page, PAGE, opts)
+      ).then(function (list) {
+        if (seq !== self.seq) return null;         // a newer request already answered
+        return self.loadWork(list.items, page === 1).then(function () { return list; });
+      }).then(function (list) {
+        if (!list || seq !== self.seq) return;
         // One application = one row, whatever arrives twice.
         var seen = {};
         self.items.forEach(function (a) { seen[a.id] = 1; });
@@ -184,6 +182,34 @@
         $('appMore').disabled = false;
         $('appCount').textContent = S.pbErr(e);
       });
+    },
+
+    /**
+     * The state of the work — begun, finished, by whom, in which region —
+     * lives on the workspace, so the rows on screen need theirs.
+     *
+     * Only theirs: the whole `workspaces` table used to come down beside every
+     * first page, growing with the archive rather than with what is being
+     * looked at. A filter expression is capped at about 3.5 KB, so the ids go
+     * in groups.
+     */
+    loadWork: function (apps, fresh) {
+      var self = this;
+      if (fresh) this.ws = {};
+      var ids = apps.map(function (a) { return a.id; });
+      var groups = [];
+      for (var i = 0; i < ids.length; i += WS_CHUNK) groups.push(ids.slice(i, i + WS_CHUNK));
+      return Promise.all(groups.map(function (part) {
+        var params = {};
+        var ors = part.map(function (id, n) { params['a' + n] = id; return 'application = {:a' + n + '}'; }).join(' || ');
+        return S.pb.collection('workspaces').getFullList({
+          filter: S.pb.filter(ors, params),
+          expand: 'updated_by',
+          fields: 'id,application,status,region,updated,changed,files,collectionId,collectionName,expand.updated_by.name,expand.updated_by.email'
+        }).then(function (list) {
+          list.forEach(function (w) { self.ws[w.application] = w; });
+        });
+      }));
     },
 
     render: function () {

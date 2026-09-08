@@ -3193,8 +3193,9 @@ if (typeof self !== 'undefined') self.S = S;
       firstBody: firstBody,
       lastRow: last,
       nExtra: nExtra,
-      merges: ['B2:L2', 'A3:L4'],
-      autoFilter: 'A10:K' + Math.max(last, 11),
+      // Named by the layout above rather than written out as letters again.
+      merges: [S.col(R_NO) + '2:' + S.col(R_NOTE) + '2', S.col(R_IDX) + '3:' + S.col(R_NOTE) + '4'],
+      autoFilter: S.col(R_IDX) + '10:' + S.col(R_DIFF) + Math.max(last, 11),
       printTitles: '$6:$7',
       cols: reportCols(opts, nExtra),
       mode: opts.mode
@@ -3482,6 +3483,11 @@ if (typeof self !== 'undefined') self.S = S;
     return cols;
   }
 
+  /** «H8:H1048576», or «J8:K1048576» for a run of columns. */
+  function band(from, to) {
+    return S.col(from) + '8:' + S.col(to || from) + '1048576';
+  }
+
   /**
    * @param {object} model    result of S.assemble
    * @param {object} opts     {mode, stamp, docTitle, noteText, autoNote, sheetName, cfLimit}
@@ -3489,6 +3495,7 @@ if (typeof self !== 'undefined') self.S = S;
    */
   function build(model, opts) {
     opts = opts || {};
+    var RC = S.report.cols;
     var styles = new S.Styles();
     var dxf = styles.dxf(PINKTX, PINK);
     var limit = opts.cfLimit || 10000000;
@@ -3520,9 +3527,13 @@ if (typeof self !== 'undefined') self.S = S;
         printCentered: true,
         pageSetup: { scale: 75, orientation: 'landscape' },
         zoom: 70,
+        // The bands the conditional formatting paints are named by the report
+        // itself. Written as letters here, they were a second copy of a layout
+        // that lives in report.js as numbers, and nothing would have said so if
+        // a column moved.
         cf: [
-          { sqref: 'H8:H1048576 J8:K1048576', dxf: dxf, priority: 3, op: 'greaterThan', formula: limit },
-          { sqref: 'G8:G1048576 I8:I1048576', dxf: dxf, priority: 1, op: 'greaterThan', formula: 5000000 }
+          { sqref: band(RC.SUM) + ' ' + band(RC.MSUM, RC.DIFF), dxf: dxf, priority: 3, op: 'greaterThan', formula: limit },
+          { sqref: band(RC.PRICE) + ' ' + band(RC.MPRICE), dxf: dxf, priority: 1, op: 'greaterThan', formula: 5000000 }
         ]
       }));
     });
@@ -3562,6 +3573,14 @@ if (typeof self !== 'undefined') self.S = S;
   'use strict';
 
   var ROW = 26;
+  /*
+   * The row height is a measurement the virtualiser makes and the stylesheet
+   * has to obey: the scroll position is computed from it, so a `.vrow` of any
+   * other height leaves the rows drifting away from where the list thinks they
+   * are. It was written down twice — here and as `--row:26px` in app.css — and
+   * agreed only by luck. The stylesheet follows this number now.
+   */
+  document.documentElement.style.setProperty('--row', ROW + 'px');
 
   function VList(scroller, opts) {
     this.el = scroller;
@@ -3631,7 +3650,6 @@ if (typeof self !== 'undefined') self.S = S;
   function cssEscape(s) { return String(s).replace(/["\\]/g, '\\$&'); }
 
   S.VList = VList;
-  S.ROW_H = ROW;
 })(S);
 
 ;
@@ -5226,6 +5244,7 @@ if (typeof self !== 'undefined') self.S = S;
   if (!S.pb) return;
 
   var PAGE = 50;
+  var WS_CHUNK = 100;      // application ids per workspace query; the filter is capped near 3.5 KB
 
   function $(id) { return document.getElementById(id); }
   /** «smeta_a1b2c3d4e5.xlsx» -> «smeta.xlsx»: the suffix PocketBase adds. */
@@ -5370,20 +5389,17 @@ if (typeof self !== 'undefined') self.S = S;
        * fetched and the answer is about all of it.
        */
       var whole = !!(this.work || this.region);
+      var page = this.page;
       $('appCount').textContent = 'загрузка…';
-      Promise.all([
-        whole
-          ? S.pb.collection('applications').getFullList(Object.assign({ batch: 200 }, opts))
-            .then(function (items) { return { items: items, totalItems: items.length }; })
-          : S.pb.collection('applications').getList(this.page, PAGE, opts),
-        this.page === 1 ? S.pb.collection('workspaces').getFullList({ expand: 'updated_by', fields: 'id,application,status,region,updated,changed,files,collectionId,collectionName,expand.updated_by.name,expand.updated_by.email' }) : null
-      ]).then(function (res) {
-        if (seq !== self.seq) return;              // a newer request already answered
-        var list = res[0];
-        if (res[1]) {
-          self.ws = {};
-          res[1].forEach(function (w) { self.ws[w.application] = w; });
-        }
+      (whole
+        ? S.pb.collection('applications').getFullList(Object.assign({ batch: 200 }, opts))
+          .then(function (items) { return { items: items, totalItems: items.length }; })
+        : S.pb.collection('applications').getList(page, PAGE, opts)
+      ).then(function (list) {
+        if (seq !== self.seq) return null;         // a newer request already answered
+        return self.loadWork(list.items, page === 1).then(function () { return list; });
+      }).then(function (list) {
+        if (!list || seq !== self.seq) return;
         // One application = one row, whatever arrives twice.
         var seen = {};
         self.items.forEach(function (a) { seen[a.id] = 1; });
@@ -5401,6 +5417,34 @@ if (typeof self !== 'undefined') self.S = S;
         $('appMore').disabled = false;
         $('appCount').textContent = S.pbErr(e);
       });
+    },
+
+    /**
+     * The state of the work — begun, finished, by whom, in which region —
+     * lives on the workspace, so the rows on screen need theirs.
+     *
+     * Only theirs: the whole `workspaces` table used to come down beside every
+     * first page, growing with the archive rather than with what is being
+     * looked at. A filter expression is capped at about 3.5 KB, so the ids go
+     * in groups.
+     */
+    loadWork: function (apps, fresh) {
+      var self = this;
+      if (fresh) this.ws = {};
+      var ids = apps.map(function (a) { return a.id; });
+      var groups = [];
+      for (var i = 0; i < ids.length; i += WS_CHUNK) groups.push(ids.slice(i, i + WS_CHUNK));
+      return Promise.all(groups.map(function (part) {
+        var params = {};
+        var ors = part.map(function (id, n) { params['a' + n] = id; return 'application = {:a' + n + '}'; }).join(' || ');
+        return S.pb.collection('workspaces').getFullList({
+          filter: S.pb.filter(ors, params),
+          expand: 'updated_by',
+          fields: 'id,application,status,region,updated,changed,files,collectionId,collectionName,expand.updated_by.name,expand.updated_by.email'
+        }).then(function (list) {
+          list.forEach(function (w) { self.ws[w.application] = w; });
+        });
+      }));
     },
 
     render: function () {

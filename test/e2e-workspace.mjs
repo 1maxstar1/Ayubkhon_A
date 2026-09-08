@@ -46,6 +46,17 @@ page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
 page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push('console: ' + m.text()); });
 let fail = 0;
 const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) fail++; };
+
+/*
+ * The state of the work lives on the workspace, so the rows on screen need
+ * theirs — and only theirs. The whole `workspaces` table used to come down
+ * beside every first page of the registry, growing with the archive rather
+ * than with what is being looked at.
+ */
+const wsQueries = [];
+page.on('request', (r) => {
+  if (/\/api\/collections\/workspaces\/records\?/.test(r.url()) && r.method() === 'GET') wsQueries.push(r.url());
+});
 const count = async (coll, filter = '') => (await api(`/api/collections/${coll}/records?perPage=1&filter=${encodeURIComponent(filter)}`, {}, su)).totalItems;
 
 await page.goto(BASE + '/');
@@ -61,6 +72,8 @@ await page.waitForFunction(() => document.querySelectorAll('#appTable tbody tr')
 check(true, 'application list shown after sign-in');
 check(await page.isHidden('#appAdd') && !(await page.$('#appTable tbody .adm')), 'no admin buttons for an ekspert');
 check((await page.textContent('#appCount')).includes('401'), 'count shows all applications: ' + await page.textContent('#appCount'));
+check(wsQueries.length > 0 && wsQueries.every((u) => /filter=/.test(u)),
+  `the list asks only for the workspaces of the rows it is showing (${wsQueries.length} queries, all filtered)`);
 
 await page.fill('#appQ', '67159');
 await page.waitForFunction(() => document.querySelectorAll('#appTable tbody tr').length === 1);

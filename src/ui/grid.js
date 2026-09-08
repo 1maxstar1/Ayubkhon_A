@@ -11,6 +11,14 @@
   'use strict';
 
   var ROW = 26;
+  /*
+   * The row height is a measurement the virtualiser makes and the stylesheet
+   * has to obey: the scroll position is computed from it, so a `.vrow` of any
+   * other height leaves the rows drifting away from where the list thinks they
+   * are. It was written down twice — here and as `--row:26px` in app.css — and
+   * agreed only by luck. The stylesheet follows this number now.
+   */
+  document.documentElement.style.setProperty('--row', ROW + 'px');
 
   function VList(scroller, opts) {
     this.el = scroller;
@@ -80,5 +88,4 @@
   function cssEscape(s) { return String(s).replace(/["\\]/g, '\\$&'); }
 
   S.VList = VList;
-  S.ROW_H = ROW;
 })(S);

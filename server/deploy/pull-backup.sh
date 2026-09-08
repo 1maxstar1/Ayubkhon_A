@@ -5,11 +5,18 @@ set -e
 TARGET="$1"; DEST="${2:-$HOME/Backups/smeta}"
 [ -n "$TARGET" ] || { echo "usage: sh server/deploy/pull-backup.sh root@IP [dest]"; exit 1; }
 mkdir -p "$DEST"
+# Both halves are checked before anything is downloaded: this script used to
+# announce «saqlandi» over yesterday's backup when the sign-in returned nothing
+# and the new backup was refused — which is exactly the day you would be
+# running it.
 ssh "$TARGET" 'cd /opt/taqqoslash/server && . ./.env && \
-  if [ -n "$PB_DOMAIN" ]; then B="https://$PB_DOMAIN"; R="-k --resolve $PB_DOMAIN:443:127.0.0.1"; else B="http://127.0.0.1:80"; R=""; fi && \
+  if [ -n "$PB_DOMAIN" ]; then B="https://$PB_DOMAIN"; R="-k --resolve $PB_DOMAIN:443:127.0.0.1"; else B="http://127.0.0.1:80"; R=""; fi; \
   T=$(curl -sS $R -X POST "$B/api/collections/_superusers/auth-with-password" -H "content-type: application/json" \
-     -d "{\"identity\":\"$PB_ADMIN_EMAIL\",\"password\":\"$PB_ADMIN_PASS\"}" | sed -n "s/.*\"token\":\"\([^\"]*\)\".*/\1/p") && \
-  curl -sS $R -o /dev/null -w "yangi zaxira: HTTP %{http_code}\n" -X POST "$B/api/backups" -H "Authorization: $T" -H "content-type: application/json" -d "{}"'
+     -d "{\"identity\":\"$PB_ADMIN_EMAIL\",\"password\":\"$PB_ADMIN_PASS\"}" | sed -n "s/.*\"token\":\"\([^\"]*\)\".*/\1/p"); \
+  [ -n "$T" ] || { echo "superuser auth failed"; exit 1; }; \
+  C=$(curl -sS $R -o /dev/null -w "%{http_code}" -X POST "$B/api/backups" -H "Authorization: $T" -H "content-type: application/json" -d "{}"); \
+  echo "yangi zaxira: HTTP $C"; \
+  case "$C" in 2*) ;; *) echo "zaxira olinmadi — eski nusxa yuklab olinmaydi"; exit 1;; esac'
 LATEST=$(ssh "$TARGET" 'ls -t /opt/taqqoslash/server/pb_data/backups/*.zip | head -1')
 scp -q "$TARGET:$LATEST" "$DEST/"
 echo "saqlandi: $DEST/$(basename "$LATEST")"

@@ -169,6 +169,11 @@
     return cols;
   }
 
+  /** «H8:H1048576», or «J8:K1048576» for a run of columns. */
+  function band(from, to) {
+    return S.col(from) + '8:' + S.col(to || from) + '1048576';
+  }
+
   /**
    * @param {object} model    result of S.assemble
    * @param {object} opts     {mode, stamp, docTitle, noteText, autoNote, sheetName, cfLimit}
@@ -176,6 +181,7 @@
    */
   function build(model, opts) {
     opts = opts || {};
+    var RC = S.report.cols;
     var styles = new S.Styles();
     var dxf = styles.dxf(PINKTX, PINK);
     var limit = opts.cfLimit || 10000000;
@@ -207,9 +213,13 @@
         printCentered: true,
         pageSetup: { scale: 75, orientation: 'landscape' },
         zoom: 70,
+        // The bands the conditional formatting paints are named by the report
+        // itself. Written as letters here, they were a second copy of a layout
+        // that lives in report.js as numbers, and nothing would have said so if
+        // a column moved.
         cf: [
-          { sqref: 'H8:H1048576 J8:K1048576', dxf: dxf, priority: 3, op: 'greaterThan', formula: limit },
-          { sqref: 'G8:G1048576 I8:I1048576', dxf: dxf, priority: 1, op: 'greaterThan', formula: 5000000 }
+          { sqref: band(RC.SUM) + ' ' + band(RC.MSUM, RC.DIFF), dxf: dxf, priority: 3, op: 'greaterThan', formula: limit },
+          { sqref: band(RC.PRICE) + ' ' + band(RC.MPRICE), dxf: dxf, priority: 1, op: 'greaterThan', formula: 5000000 }
         ]
       }));
     });

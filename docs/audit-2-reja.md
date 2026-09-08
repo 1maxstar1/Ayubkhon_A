@@ -324,6 +324,81 @@ o'zi tiklaydi.
 
 ---
 
+---
+
+## Qo'shimcha — reja yozilgandan keyin qilinganlar
+
+Rejadagi 14 ta band tugagach, auditning qolgan «medium» topilmalari ham
+ko'rib chiqildi. Quyidagilar bajarildi.
+
+### [x] 3.1 Ro'yxat butun `workspaces` jadvalini har safar tortadi
+
+`src/ui/registry.js:153` — **medium**
+
+Har bir birinchi sahifa yonida butun jadval tushardi — arxiv bilan birga
+o'sadigan so'rov. Endi faqat **ekranda turgan qatorlarning** ish maydonlari
+so'raladi, id'lar 100 talik guruhlarda (filtr ifodasi ~3.5 KB da cheklangan).
+`test/e2e-workspace.mjs` da qo'riqchi: `workspaces` ro'yxat so'rovlarining
+**hammasi** `filter=` bilan ketishi tekshiriladi.
+
+### [x] 3.2 Hujjat ustunlari ikki joyda yozilgan
+
+`src/lib/export.js:211`, `src/lib/report.js:260` — **medium**
+
+Hisobot ustunlari `report.js` da **raqam**, `export.js` dagi shartli
+formatlash oralig'i esa **harf** edi; ustun siljisa, buni hech narsa
+aytmasdi. Endi ikkalasi ham `S.report.cols` dan olinadi — ilgari «o'lik»
+eksport bo'lgan.
+
+Tekshirildi: eksport qilingan hujjat **bayt-bayt bir xil** (faqat
+`docProps/core.xml` dagi vaqt tamg'asi farq qiladi). `test/pipeline.cjs`
+endi to'rtta oraliqni qulflab qo'yadi: `H8:H1048576 J8:K1048576`,
+`G8:G1048576 I8:I1048576`, `B2:L2,A3:L4`, `A10:K`.
+
+### [x] 3.3 Qator balandligi ikki joyda
+
+`src/ui/grid.js:13` — **medium**
+
+`26` — `grid.js` da, `--row:26px` — `app.css` da. Ular faqat tasodifan mos
+kelardi, holbuki virtualizator aylantirish o'rnini shu raqamdan hisoblaydi.
+Endi CSS o'zgaruvchisi `grid.js` dan qo'yiladi; o'lik `S.ROW_H` olib
+tashlandi.
+
+### [x] 3.4 `pull-backup.sh` eski zaxirani «saqlandi» deb qaytaradi
+
+`server/deploy/pull-backup.sh` — **medium**
+
+Bu skript besh nusxadan yagonasi bo'lib, bo'sh token tekshiruvini tushirib
+qoldirgan edi; yangi zaxira rad etilsa ham, kechagi nusxani yuklab olib
+«saqlandi» deb yozardi — aynan siz uni ishlatadigan kuni. Endi ikkala qadam
+ham tekshiriladi.
+
+### [x] 3.5 `setup.sh` muvaffaqiyatdan keyin `1` bilan chiqadi
+
+`server/setup.sh:13` — **medium**
+
+`EXIT` tuzog'ining o'z holati skriptning chiqish holatiga aylanadi, ya'ni
+allaqachon o'lgan vaqtinchalik serverni `kill` qilish muvaffaqiyatli
+sozlashni «yiqildi» deb ko'rsatardi — `install.sh` esa `set -e` ostida
+«collections imported» dan keyin darhol to'xtardi.
+
+### [x] 3.6 Hech narsa kuzatilmaydi
+
+`server/deploy/configure.sh:38` — **medium**
+
+Zaxira har kecha soat 3 da olinadi va hech kim qaramaydi. Zaxira katalogiga
+yozib bo'lmay qolgan server tashqaridan **mutlaqo sog'lom** ko'rinadi.
+
+Yangi `GET /api/admin/health` (faqat admin) oxirgi zaxirani va uning yoshini
+qaytaradi; admin sahifasining tepasida ikki kechadan eski yoki umuman yo'q
+bo'lsa **qizil bant** chiqadi, aks holda tarix ostida jimgina
+«Резервных копий: N, последняя …» yoziladi.
+
+`test/e2e-admin.mjs`: zaxirasiz serverda bant chiqadi, ekspert `403` oladi,
+zaxira olingandan keyin bant yo'qoladi va jimgina qator paydo bo'ladi.
+
+---
+
 ## Ishlash tartibi
 
 Har bir band alohida commit. Har bir banddan keyin:

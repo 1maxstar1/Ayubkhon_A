@@ -10,7 +10,11 @@ PORT="${PB_SETUP_PORT:-8091}"
 "$PB" superuser upsert "$PB_ADMIN_EMAIL" "$PB_ADMIN_PASS" --dir "${PB_DATA_DIR:-pb_data}"
 "$PB" serve --http "127.0.0.1:$PORT" --dir "${PB_DATA_DIR:-pb_data}" --hooksDir pb_hooks >/dev/null 2>&1 &
 PID=$!
-trap 'kill $PID 2>/dev/null' EXIT
+# The trap's own status is what the script exits with, so a `kill` that finds
+# the temporary server already gone used to make a successful setup report
+# failure — and install.sh, under `set -e`, stopped right after printing
+# «collections imported», with nothing saying what went wrong.
+trap 'kill $PID 2>/dev/null; true' EXIT
 for i in 1 2 3 4 5 6 7 8 9 10; do
   curl -sS -m 2 -o /dev/null "http://127.0.0.1:$PORT/api/health" && break || sleep 1
 done

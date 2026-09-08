@@ -257,8 +257,9 @@
       firstBody: firstBody,
       lastRow: last,
       nExtra: nExtra,
-      merges: ['B2:L2', 'A3:L4'],
-      autoFilter: 'A10:K' + Math.max(last, 11),
+      // Named by the layout above rather than written out as letters again.
+      merges: [S.col(R_NO) + '2:' + S.col(R_NOTE) + '2', S.col(R_IDX) + '3:' + S.col(R_NOTE) + '4'],
+      autoFilter: S.col(R_IDX) + '10:' + S.col(R_DIFF) + Math.max(last, 11),
       printTitles: '$6:$7',
       cols: reportCols(opts, nExtra),
       mode: opts.mode

@@ -57,10 +57,33 @@ await page.goto(BASE + '/admin.html');
 await signIn('test@example.com');
 check(await page.isVisible('#denied'), 'ekspert sees the access-denied note');
 check(await page.isHidden('#adminMain'), 'ekspert does not see the admin panels');
+const ekspertToken = await page.evaluate(() => S.pb.authStore.token);
 await page.click('#signOut');
 
 await signIn('boss@example.com');
 check(await page.isVisible('#adminMain'), 'admin sees the panels');
+
+/*
+ * The backup runs at three in the morning and nobody looks. A server whose
+ * backups directory has stopped being writable answers every request normally,
+ * and the failure is found on the day the copy is needed — which is the day
+ * the registry is being wiped and rebuilt.
+ */
+await page.waitForFunction(() => !document.getElementById('healthBanner').hidden, null, { timeout: 10000 });
+check((await page.textContent('#healthBanner')).includes('резервных копий нет'),
+  'a server with no backup at all says so, at the top of the admin page');
+const ekspertHealth = await fetch(BASE + '/api/admin/health', { headers: { Authorization: ekspertToken } });
+check(ekspertHealth.status === 403, `an ekspert may not ask (${ekspertHealth.status})`);
+const madeBackup = await fetch(BASE + '/api/backups', {
+  method: 'POST', headers: { 'content-type': 'application/json', Authorization: su }, body: '{}'
+});
+check(madeBackup.ok || madeBackup.status === 204, `a backup is taken (${madeBackup.status})`);
+await page.reload();
+await page.waitForSelector('#adminMain:not([hidden])');
+await page.waitForFunction(() => document.getElementById('healthNote').textContent !== '', null, { timeout: 10000 });
+check(await page.isHidden('#healthBanner'), 'and once there is one, the warning goes away');
+check(/Резервных копий: 1, последняя /.test(await page.textContent('#healthNote')),
+  'with a quiet line saying when it was made: ' + (await page.textContent('#healthNote')));
 await page.setInputFiles('#regFile', join(root, 'test/fixtures/registry-sample.xls'));
 await page.waitForFunction(() => document.getElementById('regStat').textContent.includes('строк'), null, { timeout: 60000 });
 const stat = await page.textContent('#regStat');

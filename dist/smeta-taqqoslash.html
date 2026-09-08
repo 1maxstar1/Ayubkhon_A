@@ -2674,8 +2674,9 @@ if (typeof self !== 'undefined') self.S = S;
       firstBody: firstBody,
       lastRow: last,
       nExtra: nExtra,
-      merges: ['B2:L2', 'A3:L4'],
-      autoFilter: 'A10:K' + Math.max(last, 11),
+      // Named by the layout above rather than written out as letters again.
+      merges: [S.col(R_NO) + '2:' + S.col(R_NOTE) + '2', S.col(R_IDX) + '3:' + S.col(R_NOTE) + '4'],
+      autoFilter: S.col(R_IDX) + '10:' + S.col(R_DIFF) + Math.max(last, 11),
       printTitles: '$6:$7',
       cols: reportCols(opts, nExtra),
       mode: opts.mode
@@ -2963,6 +2964,11 @@ if (typeof self !== 'undefined') self.S = S;
     return cols;
   }
 
+  /** «H8:H1048576», or «J8:K1048576» for a run of columns. */
+  function band(from, to) {
+    return S.col(from) + '8:' + S.col(to || from) + '1048576';
+  }
+
   /**
    * @param {object} model    result of S.assemble
    * @param {object} opts     {mode, stamp, docTitle, noteText, autoNote, sheetName, cfLimit}
@@ -2970,6 +2976,7 @@ if (typeof self !== 'undefined') self.S = S;
    */
   function build(model, opts) {
     opts = opts || {};
+    var RC = S.report.cols;
     var styles = new S.Styles();
     var dxf = styles.dxf(PINKTX, PINK);
     var limit = opts.cfLimit || 10000000;
@@ -3001,9 +3008,13 @@ if (typeof self !== 'undefined') self.S = S;
         printCentered: true,
         pageSetup: { scale: 75, orientation: 'landscape' },
         zoom: 70,
+        // The bands the conditional formatting paints are named by the report
+        // itself. Written as letters here, they were a second copy of a layout
+        // that lives in report.js as numbers, and nothing would have said so if
+        // a column moved.
         cf: [
-          { sqref: 'H8:H1048576 J8:K1048576', dxf: dxf, priority: 3, op: 'greaterThan', formula: limit },
-          { sqref: 'G8:G1048576 I8:I1048576', dxf: dxf, priority: 1, op: 'greaterThan', formula: 5000000 }
+          { sqref: band(RC.SUM) + ' ' + band(RC.MSUM, RC.DIFF), dxf: dxf, priority: 3, op: 'greaterThan', formula: limit },
+          { sqref: band(RC.PRICE) + ' ' + band(RC.MPRICE), dxf: dxf, priority: 1, op: 'greaterThan', formula: 5000000 }
         ]
       }));
     });
@@ -3043,6 +3054,14 @@ if (typeof self !== 'undefined') self.S = S;
   'use strict';
 
   var ROW = 26;
+  /*
+   * The row height is a measurement the virtualiser makes and the stylesheet
+   * has to obey: the scroll position is computed from it, so a `.vrow` of any
+   * other height leaves the rows drifting away from where the list thinks they
+   * are. It was written down twice — here and as `--row:26px` in app.css — and
+   * agreed only by luck. The stylesheet follows this number now.
+   */
+  document.documentElement.style.setProperty('--row', ROW + 'px');
 
   function VList(scroller, opts) {
     this.el = scroller;
@@ -3112,7 +3131,6 @@ if (typeof self !== 'undefined') self.S = S;
   function cssEscape(s) { return String(s).replace(/["\\]/g, '\\$&'); }
 
   S.VList = VList;
-  S.ROW_H = ROW;
 })(S);
 
 ;

@@ -57,3 +57,28 @@ const bytes = S.buildWorkbook(model, {
 });
 fs.writeFileSync(out, Buffer.from(bytes));
 console.log(`export(${mode}): ${(bytes.length / 1024).toFixed(0)} KB, ${Date.now() - t} ms -> ${out}`);
+
+/*
+ * The comparison document's layout is one thing said in one place. The report
+ * builds its rows from the column numbers in report.js; the ranges the pink
+ * conditional formatting paints, the merged title cells and the auto-filter
+ * used to be written out again as letters, in two files, with nothing to say
+ * so if a column ever moved. They are derived now — these are the letters they
+ * must still come out as, so the sample document keeps looking the way it
+ * looks.
+ */
+const rep = S.report.build(model, model.spans[0], { mode });
+const C = S.report.cols;
+const band = (from, to) => S.col(from) + '8:' + S.col(to || from) + '1048576';
+const layout = [
+  [band(C.SUM) + ' ' + band(C.MSUM, C.DIFF), 'H8:H1048576 J8:K1048576', 'the sums the pink rule watches'],
+  [band(C.PRICE) + ' ' + band(C.MPRICE), 'G8:G1048576 I8:I1048576', 'the unit prices it watches'],
+  [rep.merges.join(','), 'B2:L2,A3:L4', 'the merged title cells'],
+  [rep.autoFilter.replace(/\d+$/, ''), 'A10:K', 'the auto-filter']
+];
+let bad = 0;
+for (const [got, want, what] of layout) {
+  if (got !== want) { bad++; console.log(`FAIL ${what}: ${got}, expected ${want}`); }
+}
+console.log(bad ? `FAILED (${bad}) — the document layout moved` : `layout unchanged: ${layout.length} ranges`);
+if (bad) process.exit(1);

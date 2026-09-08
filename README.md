@@ -276,6 +276,12 @@ UNIQUE indeks). Natijada «новых заявок N · уже были в ба�
 ko'rsatiladi. Eski bazada nusxa qolgan bo'lsa, admin sahifasidagi «Проверить
 дубликаты» tugmasi ularni birlashtiradi (ish, tuzatish va eksportlar saqlanib
 qoladigan yozuvga ko'chiriladi) — `POST /api/admin/dedupe`.
+Admin sahifasining tepasida **sog'liq bandi** turadi: har kecha soat 3 da
+olinadigan zaxira ikki kechadan ortiq eskirsa yoki umuman bo'lmasa, qizil
+ogohlantirish chiqadi (`GET /api/admin/health`). Aks holda tarix ostida jimgina
+«Резервных копий: N, последняя …» deb yoziladi. Sababi oddiy: zaxira olinmay
+qolgan server tashqaridan mutlaqo sog'lom ko'rinadi, va buni odatda zaxira
+kerak bo'lgan kuni — reyestrni tozalash kuni — bilib qolinadi.
 Yuklashlar tarixidagi har bir qatorda ikki amal bor: **«✕ строку»** — faqat
 jurnal yozuvi o'chadi, arizalar qoladi; **«Отменить загрузку»** — o'sha yuklash
 qo'shgan arizalar ham o'chadi (xodim ish boshlagan arizalar tegilmaydi), avval

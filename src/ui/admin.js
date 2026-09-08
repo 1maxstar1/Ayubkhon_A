@@ -52,6 +52,26 @@
       this.loadHistory();
       this.loadWs();
       this.loadUsers();
+      this.loadHealth();
+    },
+
+    /* ----------------------------------------------------------- health */
+    /**
+     * The backup runs at three in the morning and nobody looks. A server whose
+     * backups directory has stopped being writable answers every request
+     * normally — the failure is discovered on the day the copy is needed,
+     * which is the day the registry is being wiped and rebuilt.
+     */
+    loadHealth: function () {
+      var banner = $('healthBanner'), note = $('healthNote');
+      S.pb.send('/api/admin/health', { method: 'GET' }).then(function (h) {
+        var b = h.backups || {};
+        note.textContent = b.count
+          ? 'Резервных копий: ' + b.count + ', последняя ' + when(b.at) + '.'
+          : '';
+        banner.hidden = !!h.ok;
+        if (!h.ok) banner.textContent = '⚠ ' + (h.why || []).join('; ') + '. Проверьте на сервере: pb_data/backups.';
+      }).catch(function () { banner.hidden = true; note.textContent = ''; });
     },
 
     /* ------------------------------------------------------- workspaces */

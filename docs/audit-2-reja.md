@@ -112,7 +112,7 @@ topilmalari ham yopiladi: cheklov o'z joyida qoladi, unga urilinmaydi.
 
 ## 2-daraja — unumdorlik
 
-### [ ] 2.4 `Hints.load()` mintaqadagi barcha tuzatishlarni to'liq tortadi
+### [x] 2.4 `Hints.load()` mintaqadagi barcha tuzatishlarni to'liq tortadi
 
 `src/ui/hints.js:128` — **high**
 
@@ -121,6 +121,18 @@ kengaytirilgan `application`, `contragent` va `by` yozuvlarining to'liq nusxasin
 olib keladi. O'lchangani: mintaqada 20 ta tugallangan loyiha (18 000 qator)
 bo'lganda **44 ta so'rov, 30.2 MB** — ko'rsatiladigani esa har bir resurs uchun
 ko'pi bilan 12 ta.
+
+**Bajarildi.** Ikkala so'rov ham endi faqat popover o'qiydigan ustunlarni
+so'raydi (`fields=`), shu jumladan kengaytmalardan faqat kerakli maydonlarni.
+O'lchangani (tekshiruvchi): **30.2 MB → 7.5 MB**, xuddi shu qatorlar uchun.
+Aniq moslik so'rovi `getFullList` dan chegarali `getList(1, 1000)` ga o'tkazildi
+— mintaqa tarixi faqat o'sadi, popover esa hech qachon 12 tadan ko'pini
+ko'rsatmaydi.
+
+`test/e2e-hints.mjs` da qo'riqchi: har bir `corrections` so'rovi `fields=` bilan
+ketishi, qaytgan qatorda popover o'qiydigan **hamma** maydon borligi, va olib
+kelingan ariza **butun yozuv emas**, ikki ustun ekanligi tekshiriladi
+(`number, org_name`).
 
 ### [ ] 2.5 `rankSimilar` topilmagan resursni eslab qolmaydi
 

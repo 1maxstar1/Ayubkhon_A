@@ -47,6 +47,19 @@ page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resourc
 let fail = 0;
 const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) fail++; };
 
+/*
+ * The hint queries ask for only the columns the popover reads. Without that
+ * projection every row arrives carrying a full copy of its application, its
+ * contragent and its author — the same twenty applications repeated a thousand
+ * times each. Measured against a region holding 18 000 corrections: 30.2 MB
+ * before, 7.5 MB after, over an office connection to a VPS.
+ */
+const hintQueries = [];
+page.on('response', async (r) => {
+  if (!/\/api\/collections\/corrections\/records/.test(r.url())) return;
+  try { hintQueries.push({ url: r.url(), body: await r.json() }); } catch (e) { /* page moved on */ }
+});
+
 async function openApp(number, region) {
   await page.waitForSelector('#screen-list:not([hidden])');
   await page.fill('#appQ', number);
@@ -102,6 +115,18 @@ check(hb.every((h) => h.length === 1), 'one hint per resource in the same region
 check(hb.every((h, i) => h[0].price === picked[i].market), 'hint price is the market price set in A');
 check(hb.every((h) => h[0].same === false), 'other contragent -> not marked as the same');
 check(hb[0][0].number === A.number, 'hint comes from application A');
+
+const projected = hintQueries.filter((q) => /fields=/.test(q.url));
+check(projected.length === hintQueries.length && projected.length > 0,
+  `every corrections query names the columns it wants (${projected.length} of ${hintQueries.length})`);
+const one = projected.map((q) => (q.body.items || []).find((i) => i.expand && i.expand.application)).find(Boolean);
+check(!!one, 'one of them brought an application along');
+const need = ['id', 'name', 'unit', 'region', 'contragent', 'market_price', 'smeta_price', 'note', 'updated'];
+check(need.every((k) => k in one),
+  'and the row still carries everything the popover reads' +
+  (need.every((k) => k in one) ? '' : ': missing ' + need.filter((k) => !(k in one)).join(', ')));
+check(!('number' in one) && Object.keys(one.expand.application).length <= 3,
+  `the application it carries is a couple of columns, not the whole record (${Object.keys(one.expand.application).join(', ')})`);
 await page.selectOption('#filter', 'hint');
 await page.waitForFunction(() => document.querySelectorAll('#priceScroll .vrow').length === 2);
 check(true, 'filter «Eslatmasi borlar» lists exactly the two resources');

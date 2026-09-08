@@ -10,7 +10,36 @@ Ustuvorlik tartibi bitta savol bilan aniqlangan: **eng ko'p zararni nima
 keltiradi?** Ma'lumot yo'qolishi birinchi, maxfiylik ikkinchi, ishonchsiz
 ishlash uchinchi, tozalash oxirida.
 
-Holat belgilari: `[ ]` bajarilmagan · `[x]` bajarilgan va testdan o'tgan.
+Holat belgilari: `[ ]` bajarilmagan · `[x]` bajarilgan va testdan o'tgan ·
+`[~]` o'lchov asosida rad etilgan yoki ataylab qisman qilingan.
+
+---
+
+## Yakun
+
+Reja tugadi. **12 ta band tuzatildi**, **3 tasi o'lchov asosida rad etildi yoki
+qisman qoldirildi** — har birining sababi o'z bandida yozilgan.
+
+Har bir xavfsizlik va ma'lumot tuzatishi uchun **avval xatoni takrorlaydigan
+test** yozildi, keyin tuzatildi. Ikkita yangi test fayli
+(`test/xlsx-guard.cjs`, `test/ownership.mjs`) va mavjudlariga 20 dan ortiq
+yangi tekshiruv qo'shildi. Yakuniy holat: **20 ta testdan 20 tasi o'tdi**.
+
+Eng qimmatli to'rt topilma — hech biri taxmin emas, hammasi takrorlab
+ko'rsatilgan:
+
+| Nima | Qanday isbotlandi |
+|---|---|
+| «Отменить загрузку» butun reyestrni o'chirardi | test 404 tadan **402** ta arizani o'chirishni ko'rsatdi |
+| Ofis tarmog'ida superuser paroli repozitoriyada ochiq edi | `lan.sh:10` va `0.0.0.0` bog'lanishi |
+| Chiqqandan keyin keyingi odam birinchisining ish maydoniga tushardi | brauzer testi bilan takrorlandi |
+| 1479 baytlik `.xlsx` ilovani muzlatardi | `rows.length = 900 000 001` |
+
+Auditning o'zi ham qattiq tekshiruvdan o'tdi: tekshiruvchi agentlar ikkita
+topilmani rad etdi va to'rttasining jiddiyligini pasaytirdi. Men esa uchtasini
+o'zgartirdim — biri (`3.1`) o'lchov bilan rad etildi, biri (`1.3`) dasturning
+ataylab qilingan xususiyatini buzgani uchun boshqacha hal qilindi, biri (`4.1`)
+sinab bo'lmaydigan joylashtiruv skriptlariga tegmaslik uchun qisman qoldirildi.
 
 ---
 

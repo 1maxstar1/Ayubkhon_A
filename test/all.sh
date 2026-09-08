@@ -37,6 +37,7 @@ run ownership        node test/ownership.mjs
 [ -n "$S1" ] && run browser   node test/browser.mjs "$S1" "$S2"
 run e2e-auth         node test/e2e-auth.mjs
 run e2e-admin        node test/e2e-admin.mjs
+run upload-order     node test/upload-order.mjs
 [ -n "$S1" ] && run e2e-workspace node test/e2e-workspace.mjs "$S1" "$S2"
 [ -n "$S1" ] && run e2e-hints     node test/e2e-hints.mjs "$S1"
 [ -n "$REG" ] && run e2e-fullregistry node test/e2e-fullregistry.mjs "$REG"

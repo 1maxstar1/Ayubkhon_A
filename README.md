@@ -317,6 +317,7 @@ node test/mail-otp.mjs         # kirish xati: kod mavzuda, ruscha matn, Gmail re
 node test/e2e-auth.mjs         # brauzer: kirish, noto'g'ri kod, qulf
 node test/e2e-admin.mjs        # brauzer: reyestr, ish maydonlari, qo'lda ariza, foydalanuvchilar
 node test/e2e-workspace.mjs    # brauzer: ariza → viloyat → fayllar → narx → qayta ochish → eksport
+node test/upload-order.mjs     # brauzer: ketma-ket ikki fayl — har biri o'z manziliga tushadi
 node test/e2e-hints.mjs        # brauzer: eslatmalar (viloyat, kontragent)
 ```
 

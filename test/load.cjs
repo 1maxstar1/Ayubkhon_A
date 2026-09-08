@@ -83,7 +83,9 @@ function load(...names) {
     vm.runInContext(fs.readFileSync(path.join(ROOT, rel), 'utf8'), ctx, { filename: rel });
   }
   // fflate and SheetJS are vendor globals rather than part of S; a test that
-  // builds a workbook by hand needs them, so they ride along on S.
+  // builds a workbook by hand needs them, so they ride along on S. A test may
+  // want only the vendor bundles, and then nothing has created S yet.
+  if (!ctx.S) ctx.S = {};
   if (ctx.fflate) ctx.S.__fflate = ctx.fflate;
   if (ctx.XLSX) ctx.S.__XLSX = ctx.XLSX;
   return ctx.S;

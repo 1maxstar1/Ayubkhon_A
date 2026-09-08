@@ -5770,10 +5770,20 @@ if (typeof self !== 'undefined') self.S = S;
       if (!files.length) return;
       var fd = new FormData();
       files.forEach(function (f) { fd.append('files+', f); });
-      var before = (this.ws.files || []).length;
+      /*
+       * Which stored file belongs to which estimate is worked out by comparing
+       * the workspace's file list before and after — and «before» has to be
+       * read here, inside the queue, at the moment the request actually runs.
+       * Read at the moment the files were dropped in instead, two uploads
+       * started in the same breath both measured the same «before», and the
+       * second one claimed the first one's file: the workspace reopened with
+       * one estimate twice and the other one's content gone.
+       */
       this.enqueue(function () {
+        var had = {};
+        (self.ws.files || []).forEach(function (n) { had[n] = 1; });
         return S.pb.collection('workspaces').update(self.ws.id, fd).then(function (w) {
-          var added = w.files.slice(before);
+          var added = (w.files || []).filter(function (n) { return !had[n]; });
           files.forEach(function (f, i) { if (added[i]) self.files[f.name] = added[i]; });
           self.ws.files = w.files;
           self.touch();

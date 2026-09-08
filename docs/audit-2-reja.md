@@ -6,10 +6,42 @@ alohida agentlar tomonidan **rad etishga urinib** tekshirildi. 65 ta tasdiqlanga
 topilmadan bir qismi allaqachon tuzatilgan bandlar edi; qolganlari shu yerda.
 
 Ikkitasi — **mening o'z tuzatishimdagi kamchilik**. Ular ham shu ro'yxatda,
-boshqalar bilan bir xil qatorda: 2.7 va 2.8.
+boshqalar bilan bir xil qatorda: 2.6 va 2.7.
 
 Holat belgilari: `[ ]` bajarilmagan · `[x]` bajarilgan va testdan o'tgan ·
 `[~]` o'lchov asosida rad etilgan yoki ataylab qisman qilingan.
+
+---
+
+## Yakun
+
+Reja tugadi: **14 ta band + qo'shimcha 6 tasi = 20 ta tuzatish**, har biri
+alohida commit, har biridan keyin testlar.
+
+To'rtta yangi test fayli qo'shildi — `test/upload-order.mjs`,
+`test/corrections-bulk.mjs`, `test/disable-user.mjs`, `test/install.mjs` —
+va mavjudlariga 30 dan ortiq yangi tekshiruv. Yakuniy holat:
+**26 ta testdan 26 tasi o'tdi**.
+
+Uchta tuzatish uchun test **avval** yozildi va xatoni takrorlashi ko'rsatildi,
+keyin tuzatildi:
+
+| Nima | Tuzatishdan oldin test nima dedi |
+|---|---|
+| Ikkinchi smeta birinchisining fayliga bog'lanardi | «ikkala nom bitta faylga olib boradi» |
+| O'chirilgan ekspert ishlashda davom etardi | 5 ta yiqilish: arizalarni o'qidi, narx yozdi |
+| Yiqilgan `install.sh` portni band qilib qoldirardi | «vaqtinchalik nusxa qolib ketdi» |
+
+Eng qimmatli ikki o'lchov:
+
+| | avval | hozir |
+|---|---|---|
+| «Применить %» 300 resursga (haqiqiy cheklov bilan) | 40 yozildi, 20 tasi **429** | **300 tasidan 300 tasi**, 176 ms |
+| 903 ta nomni bir-biriga qarshi baholash | 5555 ms | **3149 ms**, natijalar bir xil |
+
+Ikkita band mening o'z birinchi bosqich tuzatishimdagi kamchilik edi (2.6 va
+2.7) — ular ham boshqalar bilan bir xil qatorda, bir xil intizom bilan
+tuzatildi.
 
 ---
 
@@ -404,7 +436,7 @@ zaxira olingandan keyin bant yo'qoladi va jimgina qator paydo bo'ladi.
 Har bir band alohida commit. Har bir banddan keyin:
 
 ```sh
-sh test/all.sh reestr.xls smeta1.xlsx smeta2.xlsx     # 20 ok, 0 fail
+sh test/all.sh reestr.xls smeta1.xlsx smeta2.xlsx     # 26 ok, 0 fail
 ```
 
 Ma'lumotga tegadigan har bir tuzatish uchun avval uni takrorlaydigan **test

@@ -5,7 +5,8 @@ tayyorlash vositasi. To'liq tavsif — `README.md` da. Keyingi bosqich
 (ko'p foydalanuvchi, PocketBase, narx xotirasi) talablari — `docs/2-bosqich-reja.md`,
 bosqichma-bosqich kodlash ko'rsatmasi — `docs/2-bosqich-kod-rejasi.md`.
 Versiyalar, orqaga qaytish va NLP jadvallarini o'lchov bilan o'zgartirish —
-`docs/versiyalar.md`.
+`docs/versiyalar.md`. Ikkita to'liq tekshiruv va ularning natijalari —
+`docs/audit-plan.md` (birinchi) va `docs/audit-2-reja.md` (ikkinchi).
 
 ## Muloqot tili
 

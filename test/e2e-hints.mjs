@@ -183,6 +183,9 @@ check(near.sizes === 0, 'and two sizes of one part never do');
  * milliseconds, so the check says what it means: the second pass over the same
  * pool must do no scoring at all.
  */
+// The neighbourhood is fetched in the background after the exact matches, so
+// wait until there is something to score before counting the scoring.
+await page.waitForFunction(() => S.Hints.pool.length > 0, null, { timeout: 20000 });
 const scoring = await page.evaluate(() => {
   const open = app.model.resources.filter((r) => !S.Hints.hasRow(r));
   const real = S.bestMatches;

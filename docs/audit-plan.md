@@ -15,6 +15,11 @@ Holat belgilari: `[ ]` bajarilmagan · `[x]` bajarilgan va testdan o'tgan ·
 
 ---
 
+> Bu birinchi tekshiruv. Undan keyin repozitoriya yana bir bor to'liq
+> tekshirildi — ikkinchi bosqich va uning natijalari: `docs/audit-2-reja.md`.
+> O'sha tekshiruv shu yerdagi ikkita tuzatishda kamchilik topdi (1.5 va 1.6);
+> ular ikkinchi rejaning 2.7 va 2.6 bandlarida tugatilgan.
+
 ## Yakun
 
 Reja tugadi. **12 ta band tuzatildi**, **3 tasi o'lchov asosida rad etildi yoki

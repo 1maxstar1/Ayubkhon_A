@@ -213,11 +213,19 @@ routerAdd("POST", "/api/admin/reset", (e) => {
     throw new BadRequestError("confirm must be СТЕРЕТЬ");
   }
   const counts = {};
-  // Collections with stored files go through the records API so the files go too.
+  // Collections with stored files go through the records API so the files go
+  // too. A page at a time: asking for every correction of a busy year at once
+  // means holding all of them in memory before deleting the first.
+  const PAGE = 500;
   for (const name of ["exports", "corrections", "workspaces", "registry_imports"]) {
-    const rows = $app.findRecordsByFilter(name, "id != ''", "", 0, 0, {});
-    for (const r of rows) $app.delete(r);
-    counts[name] = rows.length;
+    let gone = 0;
+    for (let round = 0; round < 20000; round++) {
+      const rows = $app.findRecordsByFilter(name, "id != ''", "", PAGE, 0, {});
+      if (!rows.length) break;
+      for (const r of rows) $app.delete(r);
+      gone += rows.length;
+    }
+    counts[name] = gone;
   }
   // The bulk tables hold no files: one statement each.
   for (const table of ["applications", "contragents"]) {

@@ -284,29 +284,43 @@ keyingi qayta qurishda yana urinib ko'riladi. `test/e2e-hints.mjs` o'tdi.
 
 ## 3-daraja — unumdorlik
 
-### [ ] 3.1 Ariza ro'yxati barcha ish maydonlari holatini tortadi
+### [~] 3.1 Ariza ro'yxati barcha ish maydonlari holatini tortadi — **rad etildi**
 
-`src/ui/registry.js:130`
+`src/ui/registry.js:154`
 
-`getFullList` da `fields` ro'yxati bor, lekin `state` maydoni serverdan
-baribir kelmaydi — bu tasdiqlanishi kerak. O'lchov: bitta ish maydoni holati
-1161 resursda **150 KB**.
+**O'lchandi, da'vo tasdiqlanmadi.** Har biri 73 KB holatga ega 50 ta ish
+maydoni yaratib, sahifa yuboradigan so'rovni aynan takrorladim:
 
-**Tuzatish:** ro'yxat uchun kerakli maydonlarnigina so'rash; ish maydonlari
-sonini sahifalash.
+| So'rov | Hajm | `state` bormi |
+|---|---|---|
+| Sahifa qanday so'rasa (`fields=…`) | **14 916 bayt** | yo'q |
+| `fields=` bo'lmasa | 3 703 366 bayt | ha |
 
-### [ ] 3.2 `/api/admin/reset` hamma yozuvni xotiraga yuklaydi
+`fields` ro'yxati o'z ishini qilyapti — 248 barobar farq. Holat bloklari
+tortilmaydi.
+
+*Qolgan haqiqiy kamchilik ancha tor:* `getFullList` ish maydonlarini
+sahifalamaydi. Bugungi hajmda (o'nlab-yuzlab ish maydoni) bu 15 KB, ya'ni
+muammo emas. Minglab ish maydoniga yetganda ekrandagi arizalarga tegishli
+ish maydonlarinigina so'rash kerak bo'ladi — lekin bu ro'yxat mantig'ini
+o'zgartiradi va bugun asoslanmagan xavf. Yozib qo'yildi, qilinmadi.
+
+### [x] 3.2 `/api/admin/reset` hamma yozuvni xotiraga yuklaydi
 
 `server/pb_hooks/admin.pb.js:210`
 
-**Tuzatish:** fayl saqlaydigan jadvallarni bo'lak-bo'lak o'chirish.
+**Bajarildi.** Fayl saqlaydigan to'rt jadval endi 500 tadan o'chiriladi —
+band yilning barcha tuzatishlarini birinchisini o'chirishdan oldin xotirada
+ushlab turish shart emas. `test/dedupe.mjs` o'tdi (u to'liq tozalashni
+tekshiradi).
 
-### [ ] 3.3 Reyestr importi butun so'rovni bitta tranzaksiyada bajaradi
+### [x] 3.3 Reyestr importi butun so'rovni bitta tranzaksiyada bajaradi
 
 `server/pb_hooks/registry.pb.js:29`
 
-**Tuzatish:** so'rovdagi qatorlar soniga yuqori chegara qo'yish (mijoz 500 tadan
-yuboradi) va undan oshsa aniq xato qaytarish.
+**Bajarildi.** Bitta so'rovda 2000 tadan ko'p qator bo'lsa aniq `400`
+qaytariladi. Mijoz 500 tadan yuboradi, ya'ni normal ish yo'liga tegmaydi.
+`test/registry-import.sh` 2500 qator yuboradi va `400` kutadi.
 
 ---
 

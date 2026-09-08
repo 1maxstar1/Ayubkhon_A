@@ -33,4 +33,14 @@ UT=$(curl -sS -X POST "$BASE/api/collections/users/auth-with-otp" -H 'content-ty
 F=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$BASE/api/registry/import" -H "Authorization: $UT" -H 'content-type: application/json' -d '{"rows":[{"number":"1"}]}')
 [ "$F" = 403 ] || { echo "FAIL: ekspert could import ($F)"; exit 1; }
 echo "ekspert import -> 403"
+# One request may not carry an unbounded registry: the page sends 500 at a time,
+# and a request far past that is refused rather than held open for minutes.
+BIG=$(node -e '
+const rows=[];for(let i=0;i<2500;i++)rows.push({number:"9"+String(i).padStart(6,"0"),org_name:"X"});
+process.stdout.write(JSON.stringify({rows}));')
+CODE=$(printf '%s' "$BIG" | curl -sS -o /dev/null -w '%{http_code}' -X POST "$BASE/api/registry/import" \
+  -H "Authorization: $SU" -H 'content-type: application/json' --data-binary @-)
+[ "$CODE" = 400 ] || { echo "FAIL: 2500 rows in one request should be refused, got $CODE"; exit 1; }
+echo "oversized import refused ($CODE)"
+
 echo "registry-import OK"

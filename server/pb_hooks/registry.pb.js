@@ -9,6 +9,13 @@ routerAdd("POST", "/api/registry/import", (e) => {
   }
   const body = e.requestInfo().body || {};
   const raw = Array.isArray(body.rows) ? body.rows : [];
+  // The page sends the registry in chunks of 500, and every row of a chunk is
+  // written in one transaction. A request far larger than that is either a
+  // mistake or something to be refused rather than held open for minutes.
+  const MAX_ROWS = 2000;
+  if (raw.length > MAX_ROWS) {
+    throw new BadRequestError("too many rows in one request: " + raw.length + " (max " + MAX_ROWS + ")");
+  }
   // One application number = one record. A registry export can repeat a number;
   // the later row wins, because it carries the newer state of the application.
   const byNumber = new Map();

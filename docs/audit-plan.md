@@ -149,6 +149,30 @@ esa faylni qisqa muddatli token bilan olsin (`pb.files.getURL(..., {token})`).
 **Xavf:** `sync.js` va `registry.js` dagi yuklab olish yo'llari o'zgaradi —
 `e2e-workspace` va `e2e-hints` testlari buni qamrab oladi.
 
+### [ ] 1.6 O'chirilgan hisob sessiyasi darhol tugamaydi
+
+`server/pb_schema.json` — `users.authRule = "active = true"`
+
+Administrator ekspertni «Отключить» qilganda uning **hozirgi** tokeni amal
+qilishda davom etadi. `authRule` faqat kirishda va token yangilanganda
+tekshiriladi, `auth.js` esa tokenni **20 daqiqada** bir yangilaydi.
+
+**Tuzatish:** yangilash oralig'ini qisqartirish (masalan 5 daqiqa) yoki
+`active` o'zgarganda o'sha foydalanuvchining tokenlarini bekor qilish
+(PocketBase'da `tokenKey` ni yangilash orqali).
+
+### [ ] 1.7 Uchta kod «uchib yurganda» bitta xato raqam kirishni bloklaydi
+
+`src/ui/auth.js` — `TRIES`
+
+Kod kechikib kelgani uchun dastur oxirgi bir nechta so'rovni ketma-ket sinaydi.
+Har bir noto'g'ri urinish PocketBase'ning urinishlar hisobiga tushadi, ya'ni
+bitta xato terilgan raqam bir necha «xato urinish» bo'lib yoziladi va hisob
+vaqtincha bloklanadi.
+
+**Tuzatish:** kod uzunligi to'g'ri kelgan `otpId` lardan faqat **eng
+yangisini** sinash, qolganini foydalanuvchi «yana yuborish» bosgandagina.
+
 ---
 
 ## 2-daraja — ishonchsiz ishlash

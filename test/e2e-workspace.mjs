@@ -117,6 +117,56 @@ check(after.projects === before.projects && after.rows === before.rows && after.
 check(after.price === Math.round(first.price * 1.1) && after.changed === 1, 'changed price restored');
 check((await count('corrections')) === 1, 'restore did not duplicate corrections');
 
+/*
+ * Two views that used to go stale when the model changed under them: the
+ * sheet's search box kept its text while its filter was silently dropped, and
+ * the report preview kept counting rows an unticked street had taken away.
+ */
+await page.click('.tab[data-pane="sheet"]');
+await page.fill('#q2', 'БЕТОН');
+await page.waitForFunction(() => app.sheetView.length !== app.sheetRows.length, null, { timeout: 10000 });
+const before2 = await page.evaluate(() => ({ rows: app.sheetView.length, all: app.sheetRows.length }));
+check(before2.rows > 0 && before2.rows < before2.all,
+  `the sheet search narrows the table (${before2.rows} of ${before2.all})`);
+await page.click('.tab[data-pane="report"]');
+// «Только изменённые цены» is one resource here, so its length says nothing
+// about which streets are in; the full copy is the mode that does.
+await page.selectOption('#reportMode', 'full');
+const lineCount = (t) => +String(t).split(' ')[0];
+const rep1 = lineCount(await page.textContent('#reportCount'));
+const proj1 = await page.evaluate(() => document.getElementById('reportProject').selectedOptions[0].textContent);
+
+await page.click('#projects .proj:first-child li input[data-act=obj-on]');     // one street off
+await page.waitForFunction((n) => app.sheetRows.length !== n, before2.all, { timeout: 15000 });
+const kept = await page.evaluate(() => ({
+  q: document.getElementById('q2').value, rows: app.sheetView.length, all: app.sheetRows.length
+}));
+check(kept.q === 'БЕТОН' && kept.rows < kept.all,
+  `the search box still means what it says (${kept.rows} of ${kept.all})`);
+check(kept.rows === before2.rows || kept.rows < before2.rows,
+  'and it did not quietly widen back to everything');
+const rep2 = lineCount(await page.textContent('#reportCount'));
+check(rep2 < rep1, `the report preview follows the model (${rep1} -> ${rep2} строк)`);
+
+// The selector names a project, not a position: reordering must not swap what
+// it points at while the rows on screen stay where they were.
+await page.selectOption('#reportProject', { index: 1 });
+const picked = await page.evaluate(() => document.getElementById('reportProject').selectedOptions[0].textContent);
+check(picked !== proj1, `a second project can be chosen (${picked})`);
+await page.click('#projects .proj:first-child button[data-act=pdown]');
+await page.waitForFunction(() => true);
+const still = await page.evaluate(() => document.getElementById('reportProject').selectedOptions[0].textContent);
+check(still === picked, `and it still names it after a reorder (${still})`);
+await page.click('#projects .proj:last-child button[data-act=pup]');          // order back
+
+await page.selectOption('#reportMode', 'changed');                           // as it was
+await page.click('#projects .proj:first-child li input[data-act=obj-on]');    // street back on
+await page.click('.tab[data-pane="sheet"]');
+await page.fill('#q2', '');
+await page.click('.tab[data-pane="prices"]');
+await page.waitForFunction((n) => app.sheetRows.length === n, before2.all, { timeout: 15000 });
+await page.waitForFunction(() => document.getElementById('wsSave').textContent === '✓' && !S.Sync.dirty, null, { timeout: 20000 });
+
 // remove one project -> its file leaves the server too
 await page.click('#projects .proj:last-child button[data-act=del]');
 await page.waitForFunction(() => !S.Sync.dirty && document.getElementById('wsSave').textContent === '✓', null, { timeout: 15000 });

@@ -4369,11 +4369,19 @@ if (typeof self !== 'undefined') self.S = S;
     }
     this.indexRanges();
     this.sheetRows = this.model ? this.model.rows : [];
-    this.sheetView = this.sheetRows;
-    this.sheetList.setCount(this.sheetView.length);
+    // The search box keeps its text across a rebuild, so it has to keep its
+    // filter too. It used to be dropped silently: type «БЕТОН», untick a
+    // street, and the box still read «БЕТОН» while the table showed all 5831
+    // remaining rows and the counter agreed with the table.
+    this.applySheetFilter();
     this.prices_ui.apply();
     this.fillJump();
     this.fillReportProjects();
+    // The preview is a view of the model and goes stale with it. Rebuilt only
+    // by the tab and the two selects, it kept counting rows an unticked street
+    // had taken away — «660 строк · 637 ресурсов» over a document that had 657
+    // and 634.
+    if (document.getElementById('pane-report').classList.contains('on')) this.buildReportPreview();
     this.ledger();
     this._buildMs = Math.round(performance.now() - t0);
     document.getElementById('sheetCount').textContent =
@@ -4617,13 +4625,28 @@ if (typeof self !== 'undefined') self.S = S;
 
   /* ------------------------------------------------------ report preview */
 
+  /**
+   * Keyed by the project, not by its position. The ▲/▼ buttons reorder the
+   * spans, and a selector keyed by position then quietly named a different
+   * project while the rows on screen were still the previous one's.
+   */
   App.prototype.fillReportProjects = function () {
     var sel = document.getElementById('reportProject');
     var cur = sel.value;
-    sel.innerHTML = (this.model ? this.model.spans : []).map(function (s, i) {
-      return '<option value="' + i + '">' + S.esc(s.project.name) + '</option>';
+    sel.innerHTML = (this.model ? this.model.spans : []).map(function (s) {
+      return '<option value="' + S.esc(s.project.file) + '">' + S.esc(s.project.name) + '</option>';
     }).join('');
-    if (cur && sel.querySelector('option[value="' + cur + '"]')) sel.value = cur;
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === cur) { sel.value = cur; break; }
+    }
+  };
+
+  /** The span the report preview and the single-project export are about. */
+  App.prototype.reportSpan = function () {
+    var want = document.getElementById('reportProject').value;
+    var spans = (this.model && this.model.spans) || [];
+    for (var i = 0; i < spans.length; i++) if (spans[i].project.file === want) return spans[i];
+    return null;
   };
 
   App.prototype.reportOpts = function () {
@@ -4644,15 +4667,15 @@ if (typeof self !== 'undefined') self.S = S;
   App.prototype.buildReportPreview = function () {
     document.getElementById('modeHint').textContent =
       'Режим: ' + modeLabel() + ' — меняется вверху, в файл Excel попадает то же';
-    var i = +document.getElementById('reportProject').value;
-    if (!this.model || !this.model.spans[i]) {
+    var span = this.reportSpan();
+    if (!span) {
       this.reportRows = [];
       this.reportList.setCount(0);
       document.getElementById('reportCount').textContent = '';
       return;
     }
     var t0 = performance.now();
-    var rep = S.report.build(this.model, this.model.spans[i], this.reportOpts());
+    var rep = S.report.build(this.model, span, this.reportOpts());
     this.reportRows = rep.rows;
     this.reportList.setCount(rep.rows.length);
     var items = rep.rows.filter(function (r) { return r.kind === 'item'; }).length;

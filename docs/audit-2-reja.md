@@ -248,20 +248,35 @@ ikkinchisining `create` so'rovi `400` bilan yiqiladi va **tiklash tarmog'i yo'q*
 — `self.corr[key]` hech qachon to'ldirilmaydi, ya'ni shu sessiyada bu resurs
 uchun narx boshqa yozilmaydi.
 
-### [ ] 2.11 «Вид отчёта» modeli o'zgarganda yangilanmaydi
+### [x] 2.11 «Вид отчёта» modeli o'zgarganda yangilanmaydi
 
 `src/ui/app.js:439` — **medium**
 
 `rebuild()` `buildReportPreview()` ni chaqirmaydi. O'lchangani: ko'chani
 o'chirgandan keyin ham «660 строк · 637 ресурсов», haqiqati «657 · 634».
 
-### [ ] 2.12 «Сводная таблица» qidiruvi har bir `rebuild()` da jimgina tashlanadi
+**Bajarildi.** `rebuild()` oxirida — agar «Вид отчёта» varag'i ochiq bo'lsa —
+ko'rinish qayta quriladi. Bundan tashqari loyiha tanlagichi endi **o'rin
+raqami bilan emas, loyihaning o'zi bilan** kalitlanadi: ▲/▼ tugmalari
+tartibni o'zgartirganda tanlagich boshqa loyihani nomlab qolmaydi.
+
+`test/e2e-workspace.mjs`: «Полная копия» rejimida ko'chani o'chiramiz —
+**2490 → 2415 qator**. Keyin ikkinchi loyiha tanlanadi, tartib o'zgartiriladi
+— tanlagich hamon o'sha loyihani nomlaydi.
+
+### [x] 2.12 «Сводная таблица» qidiruvi har bir `rebuild()` da jimgina tashlanadi
 
 `src/ui/app.js:453` — **medium**
 
 Qidiruv maydonida matn turadi, lekin `sheetView` hammasiga qaytariladi.
 O'lchangani: «БЕТОН» → 260 qator; ko'chani o'chirdik → maydonda hamon «БЕТОН»,
 jadvalda esa 5831 qator.
+
+**Bajarildi.** `rebuild()` `sheetView` ni hammasiga qaytarish o'rniga
+`applySheetFilter()` ni chaqiradi.
+
+`test/e2e-workspace.mjs`: «БЕТОН» → **6220 tadan 260 tasi**; ko'chani
+o'chirgandan keyin → **6145 tadan 260 tasi**, maydonda hamon «БЕТОН».
 
 ### [ ] 2.13 «Работа: в работе» faqat yuklangan sahifada ishlaydi
 

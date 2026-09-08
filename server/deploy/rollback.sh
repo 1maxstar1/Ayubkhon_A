@@ -21,6 +21,7 @@ if [ -z "$TARGET" ]; then
   echo
   echo "mavjud versiyalar:"
   git tag -n1 | sed 's/^/  /'
+  echo "(ro'yxat bo'sh bo'lsa — docs/versiyalar.md dagi commit raqamini bering)"
   exit 1
 fi
 if [ -z "$TAG" ]; then
@@ -30,8 +31,11 @@ if [ -z "$TAG" ]; then
   echo "  sh server/deploy/rollback.sh $TARGET v1.0"
   exit 1
 fi
-git rev-parse -q --verify "refs/tags/$TAG" >/dev/null || {
-  echo "«$TAG» degan versiya yo'q. Mavjudlari:"; git tag -n1 | sed 's/^/  /'; exit 1; }
+# a tag, a branch or a plain commit hash — all three work here, because the
+# tags live only on the machine that made them until somebody pushes them
+git rev-parse -q --verify "$TAG^{commit}" >/dev/null || {
+  echo "«$TAG» topilmadi. Mavjud teglar:"; git tag -n1 | sed 's/^/  /'
+  echo "Versiya raqamlari va commit'lari: docs/versiyalar.md"; exit 1; }
 command -v node >/dev/null || { echo "node kerak (brew install node)"; exit 1; }
 
 echo "--- 1/3  serverda zaxira nusxa"

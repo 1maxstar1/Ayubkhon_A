@@ -207,7 +207,8 @@ src/
     app.js            ulanish
 test/
   pipeline.cjs        brauzersiz to'liq o'tkazish (node)
-  normalize.cjs       ikki kalit va o'xshashlik, haqiqiy 896 nom ustida
+  fixtures.cjs        o'lchov ma'lumotini haqiqiy hujjatlardan qayta yasash
+  normalize.cjs       ikki kalit va o'xshashlik, haqiqiy 903 nom ustida
   sections.cjs        bo'lim klassifikatori, 2085 belgilangan resurs
   regions.cjs         viloyat klassifikatori, 1247 belgilangan ariza
   browser.mjs         haqiqiy brauzerda uchidan-uchiga test
@@ -225,6 +226,23 @@ node build.mjs --watch               # ishlab chiqish paytida
 node test/pipeline.cjs a.xlsx b.xlsx --out out.xlsx   # yadro testi
 npm i -D playwright && node test/browser.mjs a.xlsx b.xlsx
 ```
+
+## Versiyalar va orqaga qaytish
+
+Sahifa sarlavhasida versiya raqami turadi (`v2.0.0`). Yangi versiyani
+chiqarishdan oldin zaxira oling, chiqargandan keyin bir necha kun haqiqiy ish
+bilan sinang; biror narsa noto'g'ri bo'lsa — bitta buyruq bilan qayting:
+
+```sh
+sh test/all.sh reestr.xls a.xlsx b.xlsx      # avval testlar
+sh server/deploy/pull-backup.sh root@IP      # zaxira
+sh server/deploy/push.sh root@IP             # chiqarish
+sh server/deploy/rollback.sh root@IP v1.0    # kerak bo'lsa — qaytish
+```
+
+Ma'lumot ikkala yo'nalishda ham saqlanadi: ish maydoni narxlarni ikkala
+kalitda yozadi. Batafsil, shuningdek NLP jadvallarini o'zingiz o'zgartirish
+tartibi — `docs/versiyalar.md`.
 
 ## Server rejimi (2-bosqich)
 

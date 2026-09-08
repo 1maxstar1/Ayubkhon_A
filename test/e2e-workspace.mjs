@@ -372,6 +372,48 @@ check(seq.afterFirst === seq.start + 1 && seq.afterSecond === seq.start + 2,
 check(seq.afterClose === seq.afterSecond + 1,
   'and leaving takes one too, so nothing still arriving can land');
 
+/* ------------------------------------ filtering by work, past the first page */
+/*
+ * «Работа» and «Регион» are the two filters the server cannot answer — they
+ * live on the workspace, not on the application. They used to be applied over
+ * the pages fetched so far, so work on anything older than the newest fifty
+ * was simply invisible: the table showed nothing and the counter read
+ * «0 / 401 заявок», which reads as «nothing is in progress».
+ */
+const page1 = (await api('/api/collections/applications/records?perPage=50&sort=-registered_at,-number', {}, su)).items.map((a) => a.id);
+const far = (await api('/api/collections/applications/records?perPage=1&page=201&sort=-registered_at,-number', {}, su)).items[0];
+check(!page1.includes(far.id), `application № ${far.number} is well past the first page`);
+const meId = (await api(`/api/collections/users/records?filter=${encodeURIComponent("email='test@example.com'")}`, {}, su)).items[0].id;
+await api('/api/collections/workspaces/records', {
+  method: 'POST',
+  body: JSON.stringify({ application: far.id, region: 'andijon', status: 'in_progress', opened_by: meId, updated_by: meId })
+}, su);
+
+await page.reload();
+await page.waitForSelector('#screen-list:not([hidden])');
+await page.waitForFunction(() => document.querySelectorAll('#appTable tbody tr').length >= 50);
+const shownFor = async (sel, val, want) => {
+  await page.selectOption(sel, val);
+  try {
+    await page.waitForFunction((n) => document.querySelectorAll('#appTable tbody tr').length === n, want, { timeout: 15000 });
+  } catch (e) { /* the check below reports what was actually there */ }
+  return page.$$eval('#appTable tbody tr', (r) => r.length);
+};
+const inWork = await shownFor('#appWork', 'in_progress', 1);
+check(inWork === 1, `«В работе» finds the one that is, wherever it sits in the registry (${inWork})`);
+check((await page.textContent('#appTable tbody tr')).includes(far.number), 'and it is that application');
+const done = await shownFor('#appWork', 'done', 1);
+check(done === 1, `«Завершена» finds the finished one (${done})`);
+// «Не начата» is the complement, so it answers about the whole registry too.
+const totalApps = (await api('/api/collections/applications/records?perPage=1', {}, su)).totalItems;
+const notStarted = await shownFor('#appWork', 'none', totalApps - 2);
+check(notStarted === totalApps - 2,
+  `«Не начата» counts every application nobody has opened (${notStarted} of ${totalApps})`);
+await page.selectOption('#appWork', '');
+const andijon = await shownFor('#appRegion', 'andijon', 1);
+check(andijon === 1, `and the region filter reaches it too (${andijon})`);
+await page.selectOption('#appRegion', '');
+
 await page.screenshot({ path: join(root, 'test/shot-list.png') });
 await browser.close();
 server.kill();

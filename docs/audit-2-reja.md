@@ -278,13 +278,23 @@ jadvalda esa 5831 qator.
 `test/e2e-workspace.mjs`: «БЕТОН» → **6220 tadan 260 tasi**; ko'chani
 o'chirgandan keyin → **6145 tadan 260 tasi**, maydonda hamon «БЕТОН».
 
-### [ ] 2.13 «Работа: в работе» faqat yuklangan sahifada ishlaydi
+### [x] 2.13 «Работа: в работе» faqat yuklangan sahifada ishlaydi
 
 `src/ui/registry.js:164` — **medium**
 
 Ikkala mijoz tomonidagi filtr `render()` ichida, `this.items` ustida ishlaydi —
 u esa faqat olingan sahifalarni saqlaydi. O'lchangani: 70 ta ariza, 4 tasi ishda
 (ikkinchi sahifada) → **0 qator**, hisoblagichda «0 / 70».
+
+**Bajarildi.** Bu ikki filtr serverda yo'q — ular arizada emas, ish maydonida
+yashaydi. Shuning uchun ulardan biri yoqilganda **butun ro'yxat** (server
+filtrlari qo'llangan holda) olinadi va javob hammasi haqida bo'ladi;
+«Показать ещё» esa yashiriladi, chunki ko'rsatiladigan boshqa narsa yo'q.
+
+`test/e2e-workspace.mjs`: 401 ta arizali reyestrda **201-o'rindagi** arizaga
+ish maydoni ochiladi (birinchi sahifada yo'qligi alohida tekshiriladi), keyin:
+«В работе» → **1**, va aynan o'sha ariza; «Завершена» → **1**; «Не начата» →
+**401 tadan 399 tasi**; «Андижанская область» → **1**.
 
 ### [x] 2.14 Qulf taymeri kiritilayotgan kirish kodini o'chiradi
 

@@ -49,8 +49,8 @@
     init: function () {
       var self = this;
       $('appQ').addEventListener('input', S.debounce(function () { self.q = $('appQ').value.trim(); self.reload(); }, 250));
-      $('appWork').addEventListener('change', function () { self.work = this.value; self.render(); });
-      $('appRegion').addEventListener('change', function () { self.region = this.value; self.render(); });
+      $('appWork').addEventListener('change', function () { self.work = this.value; self.reload(); });
+      $('appRegion').addEventListener('change', function () { self.region = this.value; self.reload(); });
       $('appYear').addEventListener('change', function () { self.year = this.value; self.reload(); });
       // filters on the registry's highlighted columns — all server-side
       $('appType').addEventListener('change', function () { self.type = this.value; self.reload(); });
@@ -142,9 +142,23 @@
       if (this.min !== '' && !isNaN(+this.min)) { parts.push('cost_vat >= {:lo}'); params.lo = +this.min; }
       if (this.max !== '' && !isNaN(+this.max)) { parts.push('cost_vat <= {:hi}'); params.hi = +this.max; }
       if (parts.length) opts.filter = S.pb.filter(parts.join(' && '), params);
+      /*
+       * «Работа» and «Регион» are the two filters the server cannot answer:
+       * they live on the workspace, not on the application. They used to be
+       * applied inside render(), over the pages fetched so far — so choosing
+       * «В работе» on a registry of 401 applications showed nothing at all
+       * whenever the work was on an application older than the newest fifty,
+       * and the counter read «0 / 401 заявок», which reads as «nothing is in
+       * progress». When one of them is on, the whole server-filtered list is
+       * fetched and the answer is about all of it.
+       */
+      var whole = !!(this.work || this.region);
       $('appCount').textContent = 'загрузка…';
       Promise.all([
-        S.pb.collection('applications').getList(this.page, PAGE, opts),
+        whole
+          ? S.pb.collection('applications').getFullList(Object.assign({ batch: 200 }, opts))
+            .then(function (items) { return { items: items, totalItems: items.length }; })
+          : S.pb.collection('applications').getList(this.page, PAGE, opts),
         this.page === 1 ? S.pb.collection('workspaces').getFullList({ expand: 'updated_by', fields: 'id,application,status,region,updated,changed,files,collectionId,collectionName,expand.updated_by.name,expand.updated_by.email' }) : null
       ]).then(function (res) {
         if (seq !== self.seq) return;              // a newer request already answered
@@ -162,7 +176,7 @@
           self.items.push(a);
         });
         self.total = list.totalItems;
-        $('appMore').hidden = self.items.length >= list.totalItems;
+        $('appMore').hidden = whole || self.items.length >= list.totalItems;
         $('appMore').disabled = false;
         self.render();
       }).catch(function (e) {

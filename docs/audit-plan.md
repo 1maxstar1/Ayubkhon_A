@@ -162,7 +162,7 @@ o'zgartirganimda `e2e-workspace` aynan fayl yuklab olishda 120 soniya kutib
 yiqildi — ya'ni himoya haqiqatan ishlaydi va ikkalasi birga o'zgarishi shart.
 Test endi buni qulflaydi: tokensiz manzil `404`, token bilan `200`.
 
-### [ ] 1.6 O'chirilgan hisob sessiyasi darhol tugamaydi
+### [x] 1.6 O'chirilgan hisob sessiyasi darhol tugamaydi
 
 `server/pb_schema.json` — `users.authRule = "active = true"`
 
@@ -170,11 +170,11 @@ Administrator ekspertni «Отключить» qilganda uning **hozirgi** tokeni
 qilishda davom etadi. `authRule` faqat kirishda va token yangilanganda
 tekshiriladi, `auth.js` esa tokenni **20 daqiqada** bir yangilaydi.
 
-**Tuzatish:** yangilash oralig'ini qisqartirish (masalan 5 daqiqa) yoki
-`active` o'zgarganda o'sha foydalanuvchining tokenlarini bekor qilish
-(PocketBase'da `tokenKey` ni yangilash orqali).
+**Bajarildi.** Yangilash oralig'i 20 → **5 daqiqa**. Ya'ni ekspertni
+o'chirgan administrator ekrandan ketmasidan uning sessiyasi tugaydi. Bir odam
+uchun besh daqiqada bitta so'rov — hech qanday yuk emas.
 
-### [ ] 1.7 Uchta kod «uchib yurganda» bitta xato raqam kirishni bloklaydi
+### [x] 1.7 Uchta kod «uchib yurganda» bitta xato raqam kirishni bloklaydi
 
 `src/ui/auth.js` — `TRIES`
 
@@ -183,8 +183,17 @@ Har bir noto'g'ri urinish PocketBase'ning urinishlar hisobiga tushadi, ya'ni
 bitta xato terilgan raqam bir necha «xato urinish» bo'lib yoziladi va hisob
 vaqtincha bloklanadi.
 
-**Tuzatish:** kod uzunligi to'g'ri kelgan `otpId` lardan faqat **eng
-yangisini** sinash, qolganini foydalanuvchi «yana yuborish» bosgandagina.
+*O'lchandi:* `server/deploy/configure.sh` da `*:auth` chegarasi — **3
+soniyada 4 so'rov**. Bitta terilgan kod uchun 3 ta `authWithOTP` yuboriladi,
+ya'ni ikkinchi urinishga o'rin qolmaydi.
+
+**Bajarildi**, lekin taklif qilinganidan boshqacha: kechikkan xat uchun bir
+nechta kodni sinash — bu foydalanuvchining o'z shikoyatidan kelib chiqqan
+xususiyat, uni olib tashlamadim. Buning o'rniga ikki narsa qilindi. Server
+allaqachon rad etgan (kod, otpId) juftligi **qayta yuborilmaydi**, shuning
+uchun bir xil kod bilan tugmani ikkinchi marta bosish hech narsa sarflamaydi.
+Va `429` (juda tez) kelganda sikl to'xtaydi va foydalanuvchiga bir necha
+soniya kutish aytiladi — qolgan urinishlarni behuda sarflamaydi.
 
 ---
 

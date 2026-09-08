@@ -7,7 +7,13 @@
   if (!S.pb) return;
 
   var IDLE_MS = 4 * 60 * 60 * 1000;     // lock after this much inactivity
-  var REFRESH_MS = 20 * 60 * 1000;      // extend the token while the user is active
+  // How often the token is renewed while somebody is working. It is also how
+  // long a session outlives the account behind it: «Отключить» is enforced by
+  // the collection's own rule (active = true), which is only consulted when a
+  // token is issued or renewed. Five minutes is short enough that switching an
+  // expert off takes effect while the administrator is still looking at the
+  // screen, and one request per person per five minutes costs nothing.
+  var REFRESH_MS = 5 * 60 * 1000;
   var LOCK_SAVE_MS = 5000;              // how long a sign-out waits for the last save
   var TICK_MS = 60 * 1000;
   // Mail can take 15-20 minutes to arrive, so the request outlives the page:
@@ -20,6 +26,7 @@
     last: Date.now(),
     lastRefresh: Date.now(),
     timer: null,
+    refused: {},        // "otpId|code" pairs the server has already turned down
 
     init: function () {
       var self = this;
@@ -78,7 +85,10 @@
       p.list.push({ id: id, at: Date.now() });
       try { localStorage.setItem(PEND, JSON.stringify(p)); } catch (e) { /* private mode */ }
     },
-    forget: function () { try { localStorage.removeItem(PEND); } catch (e) { /* private mode */ } },
+    forget: function () {
+      this.refused = {};
+      try { localStorage.removeItem(PEND); } catch (e) { /* private mode */ }
+    },
     error: function (text) {
       var el = document.getElementById('loginErr');
       el.textContent = text; el.hidden = !text;
@@ -110,7 +120,17 @@
 
     /**
      * A delayed letter means several codes can be in flight, and the one the
-     * user types may belong to an earlier request — so try the newest few.
+     * user types may belong to an earlier request — so try the newest few,
+     * newest first.
+     *
+     * Each of those is a sign-in attempt as far as the server is concerned,
+     * and it allows four every three seconds. Three ids tried for one typed
+     * code therefore left room for barely one more attempt, so a single
+     * mistyped digit could lock somebody out of their own program. Two things
+     * keep that from happening: a pair already refused is never sent again, so
+     * pressing the button twice with the same code costs nothing, and a
+     * refusal for being too quick stops the loop instead of spending what is
+     * left of the allowance.
      */
     verify: function () {
       var self = this;
@@ -129,13 +149,21 @@
           self.error('Неверный код или срок его действия истёк');
           return;
         }
-        S.pb.collection('users').authWithOTP(ids[i++].id, code).then(function () {
+        var id = ids[i++].id, pair = id + '|' + code;
+        if (self.refused[pair]) { next(); return; }        // already answered, do not ask again
+        S.pb.collection('users').authWithOTP(id, code).then(function () {
+          self.refused = {};
           self.forget();
           btn.disabled = false;
           self.hide();
           self.start();
         }).catch(function (e) {
-          if (e && e.status === 400) { next(); return; }   // maybe an earlier request matches
+          if (e && e.status === 429) {
+            btn.disabled = false;
+            self.error('Слишком много попыток подряд — подождите несколько секунд');
+            return;
+          }
+          if (e && e.status === 400) { self.refused[pair] = 1; next(); return; }   // maybe an earlier request matches
           btn.disabled = false;
           self.error('Не удалось войти: ' + S.pbErr(e));
         });

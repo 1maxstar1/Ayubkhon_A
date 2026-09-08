@@ -119,7 +119,7 @@ esa faylni qisqa muddatli token bilan olsin (`pb.files.getURL(..., {token})`).
 
 ## 2-daraja — ishonchsiz ishlash
 
-### [ ] 2.1 Zararli yoki buzuq `.xlsx` brauzerni muzlatadi
+### [x] 2.1 Zararli yoki buzuq `.xlsx` brauzerni muzlatadi
 
 `src/lib/xlsx-read.js:82`, `src/lib/smeta.js:120,131`
 
@@ -133,6 +133,11 @@ qoldiriladi.
 
 **Xavf:** yo'q — haqiqiy hujjatlarda bunday indeks bo'lmaydi; `pipeline` va
 `browser` testlari haqiqiy kitoblarda ishlaydi.
+
+*Bajarildi.* Yangi `test/xlsx-guard.cjs` xotirada zararli kitoblar yasaydi.
+Tuzatishdan oldin: `rows.length = 900 000 001`, `maxCol = 8 353 082 582`.
+Keyin: ikkalasi ham Excel chegarasida, haqiqiy kitoblar esa avvalgidek
+(6220 qator, 1161 resurs, 55 ms).
 
 ### [ ] 2.2 Ikkita arizani ketma-ket ochish holatlarni aralashtiradi
 

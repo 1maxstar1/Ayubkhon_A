@@ -22,6 +22,7 @@ echo "test                   sonuc  vaqt"
 echo "-----------------------------------"
 run build            node build.mjs
 run normalize        node test/normalize.cjs
+run xlsx-guard       node test/xlsx-guard.cjs
 run sections         node test/sections.cjs
 run regions          node test/regions.cjs
 [ -n "$S1" ] && run pipeline  node test/pipeline.cjs "$S1" "$S2" --out test/out.xlsx

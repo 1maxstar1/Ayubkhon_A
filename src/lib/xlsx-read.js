@@ -66,6 +66,14 @@
    * Parse one worksheet.
    * @returns {{rows: Array<Array<?{v:*,f:?string}>>, maxCol:number, cols:Array, merges:Array<string>}}
    */
+  /* A row and column number are read straight out of the file and used as array
+     indices, so they are the one thing in a workbook that can hurt the reader
+     before anybody looks at it: «r="900000000"» costs a billion empty slots,
+     and a seven-letter column reference eight billion. These are the limits
+     Excel itself works to, so no honest file is turned away by them. */
+  var MAX_ROW = 1048576;
+  var MAX_COL = 16384;
+
   function parseSheet(xml, sst) {
     var rows = [], maxCol = 0;
 
@@ -80,7 +88,7 @@
       var inner = rm[3];
       var ra = attrs(rowAttr);
       var r = +ra.r;
-      if (!r) continue;
+      if (!r || r > MAX_ROW) continue;
       if (!inner) { continue; }
       var cells = rows[r] || (rows[r] = []);
       cellRe.lastIndex = 0;
@@ -89,7 +97,7 @@
         var ca = attrs(cm[1] !== undefined ? cm[1] : cm[2]);
         var body = cm[3] || '';
         var ci = ca.r ? refCol(ca.r) : 0;
-        if (!ci) continue;
+        if (!ci || ci > MAX_COL) continue;
         if (ci > maxCol) maxCol = ci;
 
         var f = null;

@@ -1189,7 +1189,8 @@ if (typeof self !== 'undefined') self.S = S;
    * district of Namangan and also the start of a hundred ordinary words.
    */
   var NAME = {
-    respublika: 'OBSHCHERESPUBLIKANSK OBSHERESPUBLIKANSK UMUMRESPUBLIKA RESPUBLIKANSK RESPUBLIKAMIZ',
+    respublika: 'OBSHCHERESPUBLIKANSK OBSHERESPUBLIKANSK UMUMRESPUBLIKA RESPUBLIKANSK RESPUBLIKAMIZ ' +
+      'ELCHIXONA ELCHIXONASI POSOLSTV',
     andijon: 'ANDIJ ANDIZH',
     buxoro: 'BUXOR BUXAR BUHOR BUKHAR',
     fargona: 'FARGON FERGAN FARGHON FERGHAN',
@@ -1208,18 +1209,19 @@ if (typeof self !== 'undefined') self.S = S;
 
   var PLACE = {
     andijon: 'ASAKA XONOBOD HONOBOD QORASUV KARASU SHAHRIXON SHAHRIHON BALIQCHI BULOQBOSHI IZBOSKAN ' +
-      'JALAQUDUQ ZHALAKUDUK XOJAOBOD HOJAOBOD QORGONTEPA KURGANTEPA MARHAMAT MARXAMAT OLTINKOL ' +
-      'PAXTAOBOD ULUGNOR QOSHTEPA',
+      'JALAQUDUQ ZHALAKUDUK DZHALAKUDUK XOJAOBOD HOJAOBOD XODZHAABAD QORGONTEPA KURGONTEPA ' +
+      'KURGANTEPA MARHAMAT MARXAMAT OLTINKOL ALTINKUL PAXTAOBOD ULUGNOR SHAXRIXON IZBASKAN',
     buxoro: 'KOGON KAGAN GIJDUVON GIZHDUVAN JONDOR ZHONDOR OLOT ALAT PESHKU ROMITAN SHOFIRKON ' +
       'QORAKOL KARAKUL QOROVULBOZOR KARAULBAZAR VOBKENT VABKENT',
     fargona: 'MARGILON MARGILAN QOQON KOKAND QUVASOY KUVASAY RISHTON RISHTAN BESHARIQ BUVAYDA ' +
-      'DANGARA FURQAT OLTIARIQ ALTYARIK TOSHLOQ UCHKOPRIK YOZYOVON BAGDOD QOSHTEPA QUVA KUVA SOX',
+      'DANGARA FURQAT OLTIARIQ ALTYARIK TOSHLOQ UCHKOPRIK YOZYOVON EZEVON YAZYAVAN BAGDOD BOGDOD ' +
+      'QOSHTEPA QUVA KUVA SOX QAQIR',
     jizzax: 'GALLAOROL GALLYAARAL ZOMIN ZAAMIN ZARBDOR ZAFAROBOD PAXTAKOR PAKHTAKOR BAXMAL BAHMAL ' +
       'FORISH ARNASOY DOSTLIK MIRZACHOL SHAROFRASHIDOV',
     xorazm: 'URGANCH URGENCH XIVA HIVA BOGOT GURLAN XONQA HONKA HAZORASP GAZORASP SHOVOT ' +
       'YANGIARIQ YANGIBOZOR QOSHKOPIR TUPROQQAL',
     namangan: 'CHUST CHORTOQ CHARTAK KOSONSOY KASANSAY MINGBULOQ TORAQORGON TURAKURGAN UCHQORGON ' +
-      'UCHKURGAN UYCHI YANGIQORGON YANGIKURGAN DAVLATOBOD NORIN POP',
+      'UCHKURGAN UYCHI YANGIQORGON YANGIKURGAN DAVLATOBOD NORIN NARIN POP CHODAK TOSHBULOQ',
     navoiy: 'ZARAFSH KARMANA QIZILTEPA KIZILTEPA KONIMEX XATIRCHI HATIRCHI NAVBAHOR NUROTA NURATA ' +
       'TOMDI UCHQUDUQ UCHKUDUK GAZGAN',
     qashqadaryo: 'QARSHI KARSHI SHAHRISABZ SHAXRISABZ KITOB KITAB KOSON KASAN KASBI CHIROQCHI ' +
@@ -1235,7 +1237,8 @@ if (typeof self !== 'undefined') self.S = S;
     toshkent_vil: 'NURAFSHON ANGREN BEKOBOD BEKABAD CHIRCHI OLMALIQ ALMALIK OHANGARON AXANGARAN ' +
       'AHANGARON YANGIYOL YANGIYUL GAZALKENT PARKENT PISKENT ZANGIOTA BOSTONLIQ BOSTANLIK ' +
       'CHINOZ CHINAZ QIBRAY KIBRAY OQQORGON AKKURGAN KELES QUYICHIRCHIQ ORTACHIRCHIQ ' +
-      'YUQORICHIRCHIQ NURAFSHAN TOYTEPA TUYTEPA',
+      'YUQORICHIRCHIQ YUKORICHIRCHIK ORTACHIRCHIK URTACHIRCHIK QUYICHIRCHIQ KUYICHIRCHIK ' +
+      'NURAFSHAN TOYTEPA TUYTEPA BOKA BUKA CHORVOQ CHIMGAN XUMSON PSKENT',
     qoraqalpogiston: 'NUKUS AMUDARYO BERUNIY BIRUNI CHIMBOY CHIMBAY ELLIKQAL ELLIKKAL KEGEYLI ' +
       'MOYNOQ MUYNAK QANLIKOL KANLIKUL QONGIROT KUNGRAD QORAOZAK KARAUZYAK SHUMANAY ' +
       'TAXTAKOPIR TAKHTAKUPIR TORTKOL TURTKUL XOJAYLI HODJEYLI TAXIATOSH TAKHIATASH',
@@ -1263,8 +1266,15 @@ if (typeof self !== 'undefined') self.S = S;
   };
 
   /* Words that put a bare «Ташкент» on one side of the line or the other. */
-  var CITY_MARK = /(?:^|[^A-Z])(SHAHRI|SHAHAR|SHAHRIDAGI|SHAHRIDA|SHAHRIN|SHAXAR|SHAXRI|GOROD|GORODA|GORODE|GORODSK)/;
-  var AREA_MARK = /(?:^|[^A-Z])(VILOYAT|VILAYAT|OBLAST|OBLASTN|OBLASTI|TUMAN|TUMANI|TUMANIDA|RAYON|RAYONA|RAYONI)/;
+  /*
+   * What settles a bare «Тошкент», and it is the word right next to it.
+   * Measured on the 389 applications that stated one of the two Tashkents:
+   * «Тошкент шаҳри» is the city 131 times against 5, «Тошкент вилояти» the
+   * region 83 against 1 — but «туман» decides nothing, because the city has
+   * twelve tumans of its own and 116 of the 216 city rows use the word.
+   */
+  var CITY_MARK = /^(SH|SHAHAR|SHAHRI|SHAHRIDA|SHAHRIDAGI|SHAHRINING|SHAHRINI|SHAXAR|SHAXRI|SHAXRIDA|GOROD|GORODA|GORODE|GORODSK)/;
+  var AREA_MARK = /^(VILOYAT|VILOYATI|VILOYATIDA|VILOYATINING|VILAYAT|OBLAST|OBLASTI|OBLASTN)/;
   var TASHKENT = /^(TOSHKENT|TASHKENT|TOSHKEND|TASHKEND)/;
 
   /* Entries shorter than this must match a whole word rather than a prefix. */
@@ -1299,8 +1309,12 @@ if (typeof self !== 'undefined') self.S = S;
     if (!text) { return; }
     var toks = S.tokens(text);
     if (!toks.length) return;
-    var idx = index(), i, j, joined = toks.join(' ');
-    var cityMark = CITY_MARK.test(joined), areaMark = AREA_MARK.test(joined);
+    var idx = index(), i, j;
+    // «вилояти» / «области» anywhere in the text is the one region signal that
+    // holds at a distance: of the applications that stated the city, three in
+    // two hundred contain it.
+    var areaAnywhere = false;
+    for (i = 0; i < toks.length; i++) if (AREA_MARK.test(toks[i])) { areaAnywhere = true; break; }
     var bare = [], tashDistrict = false;
 
     for (i = 0; i < toks.length; i++) {
@@ -1339,8 +1353,18 @@ if (typeof self !== 'undefined') self.S = S;
     // likelier of the two: it is where most of the registry's work is.
     for (var b = 0; b < bare.length && !tashDistrict; b++) {
       var at = bare[b], word = toks[at], prev = toks[at - 1] || '', next = toks[at + 1] || '';
-      var cityHere = cityMark || CITY_MARK.test(' ' + next) || prev === 'G' || prev === 'GOR';
-      var areaHere = areaMark || AREA_MARK.test(' ' + next);
+      // «Янги Тошкент» is the new city going up on the edge of the capital, and
+      // the registry cannot make its own mind up about it: 28 applications file
+      // it as the city and 27 as the region. Nothing in the text can settle
+      // that, so it is deliberately left unsettled — «shahri» after it means
+      // nothing here.
+      if (prev === 'YANGI' || prev === 'NOVIY' || prev === 'NOVOGO') {
+        bump('toshkent_sh', 1.1 * weight, 'YANGI ' + word);
+        bump('toshkent_vil', 1 * weight, 'YANGI ' + word);
+        continue;
+      }
+      var cityHere = CITY_MARK.test(next) || prev === 'G' || prev === 'GOR' || prev === 'GOROD';
+      var areaHere = AREA_MARK.test(next) || (!cityHere && areaAnywhere);
       if (cityHere && !areaHere) bump('toshkent_sh', 4 * weight, word + ' ' + next);
       else if (areaHere && !cityHere) bump('toshkent_vil', 4 * weight, word + ' ' + next);
       // Neither said. In the registry a bare «Тошкент» is the city 23 times and

@@ -79,6 +79,13 @@ is('toshkent_vil', 'Ангрен шаҳрида янги подстанция қ
 const bare = guess('Тошкент автомобиль йўлининг 27-32 км қисмини реконструкция қилиш');
 check(bare.confidence < 0.6 && bare.second,
   `a bare «Тошкент» is not answered with confidence (${bare.confidence}, also offers ${bare.second})`);
+// The registry files «Янги Тошкент» as the city 28 times and as the region 27,
+// so the program must not pretend to know which.
+const yangi = guess('«Yangi Toshkent shahrining birinchi bosqich hududida maktab qurish');
+check(yangi.confidence < 0.6 && yangi.second,
+  `«Янги Тошкент» is left unsettled (${yangi.confidence}, also offers ${yangi.second})`);
+check(guess('Тошкент шаҳри Чилонзор тумани мактаб').region === 'toshkent_sh',
+  'but «туман» alone never means the region — the city has twelve of its own');
 
 console.log('-- and when nothing is named --');
 check(guess('Капитальный ремонт административного здания банка').region === '',
@@ -110,7 +117,7 @@ console.log('   ' + Object.entries(missed).sort((a, b) => b[1] - a[1]).slice(0, 
   .map(([k, v]) => k + ' ×' + v).join(', '));
 
 check(right / (right + wrong) >= 0.88, 'at least 88% of the answers it gives are the registry\'s own');
-check(rightSure / (rightSure + wrongSure) >= 0.92, 'and at least 92% of the confident ones');
+check(rightSure / (rightSure + wrongSure) >= 0.95, 'and at least 95% of the confident ones');
 check(right / rows.length >= 0.72, 'it answers, correctly, at least 72% of all the rows');
 
 // The two Tashkents are the only pair it is allowed to be unsure about, and

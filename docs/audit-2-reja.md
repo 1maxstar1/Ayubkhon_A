@@ -239,7 +239,7 @@ o'lchayapti.
 
 Shu bilan `deploy-scripts-have-no-tests` topilmasi ham qisman yopiladi.
 
-### [ ] 2.10 Unikal indeks poygasidan keyin tuzatish boshqa yozilmaydi
+### [x] 2.10 Unikal indeks poygasidan keyin tuzatish boshqa yozilmaydi
 
 `src/ui/sync.js:333` — **medium**
 
@@ -247,6 +247,16 @@ Shu bilan `deploy-scripts-have-no-tests` topilmasi ham qisman yopiladi.
 ikkinchisining `create` so'rovi `400` bilan yiqiladi va **tiklash tarmog'i yo'q**
 — `self.corr[key]` hech qachon to'ldirilmaydi, ya'ni shu sessiyada bu resurs
 uchun narx boshqa yozilmaydi.
+
+**2.3 bilan birga yopildi.** Yangi `bulk` hooki mijozning «bor/yo'q» tasavvuriga
+tayanmaydi: mavjud qatorlarni **so'rov paytida serverning o'zi** o'qiydi va
+bor bo'lsa yangilaydi, yo'q bo'lsa yaratadi. Ya'ni «yaratish» va «yangilash»
+tarmoqlari mijozda umuman qolmadi.
+
+`test/corrections-bulk.mjs` da aynan topilmadagi holat: bitta ekspert
+`ЦЕМЕНТ М400` narxini to'g'ridan-to'g'ri yozadi, ikkinchisi esa buni bilmagan
+holda o'sha resursni yuboradi — **200**, qator bitta bo'lib qoladi, narx
+yangisi, va sahifaga qaysi qator uning ixtiyorida ekani aytiladi.
 
 ### [x] 2.11 «Вид отчёта» modeli o'zgarganda yangilanmaydi
 

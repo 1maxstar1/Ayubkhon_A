@@ -144,6 +144,35 @@ const upd = (await api(`/api/collections/corrections/records?filter=${
   encodeURIComponent(`workspace='${ws.id}' && res_key='k2'`)}`, {}, su)).items[0];
 check(upd.market_price === 99999, 'and the new price is the one stored');
 
+/* ----------------------------------- a row the page does not know it has */
+/*
+ * Two experts may work on one application — the program says so, and
+ * test/ownership.mjs locks it in. A's price for ЦЕМЕНТ lands first; B, whose
+ * picture of the corrections was taken when they opened the application, then
+ * prices the same resource. Written record by record that was a create, and
+ * the unique (workspace, res_key) index refused it with no branch to recover
+ * from: for the rest of B's session that resource could not be priced at all.
+ */
+const theirs = await api('/api/collections/corrections/records', {
+  method: 'POST',
+  body: JSON.stringify({
+    workspace: ws.id, res_key: 'shared', name: 'ЦЕМЕНТ М400', unit: 'ТН',
+    smeta_price: 900000, market_price: 950000
+  })
+}, su);
+const mine = await raw('/api/corrections/bulk', {
+  workspace: ws.id,
+  set: [{ res_key: 'shared', name: 'ЦЕМЕНТ М400', unit: 'ТН', smeta_price: 900000, market_price: 1000000 }]
+}, tok);
+check(mine.status === 200, `a second expert pricing the same resource is accepted (${mine.status})`);
+check(await pb.count('corrections', `workspace='${ws.id}' && res_key='shared'`) === 1,
+  'and there is still one row for it, not a refused create');
+const shared = (await api(`/api/collections/corrections/records?filter=${
+  encodeURIComponent(`workspace='${ws.id}' && res_key='shared'`)}`, {}, su)).items[0];
+check(shared.id === theirs.id && shared.market_price === 1000000,
+  'it is the row that was already there, carrying the newer price');
+check(mine.body.ids.shared === theirs.id, 'and the page is told which row it now holds');
+
 /* ------------------------------------------------------------- and removing */
 const gone = await raw('/api/corrections/bulk', { workspace: ws.id, set: [], del: ['k2', 'k3', 'nosuchkey'] }, tok);
 check(gone.body.deleted === 2, `only the two that existed are removed (${gone.body.deleted})`);

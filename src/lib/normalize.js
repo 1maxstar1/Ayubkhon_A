@@ -54,6 +54,25 @@ var S = (typeof S !== 'undefined' && S) || {};
     });
   }
 
+  /**
+   * Type codes are read by shape, not by sound. «Н-35» and «H-35» are one
+   * profile, «ВА47-100» and «BA47-100» one circuit breaker — whoever typed
+   * them just had the wrong layout on, and no majority inside the word can
+   * say so, because the digits carry no script. So every whitespace-separated
+   * chunk that contains a digit is pushed wholly into Cyrillic, where the
+   * transliteration then lands both spellings on the same letters.
+   *
+   * Words without a digit are left to fold(), which can weigh their letters.
+   */
+  var CHUNK = /[^\s]+/g;
+  function foldMarks(up) {
+    if (!/\d/.test(up)) return up;
+    return up.replace(CHUNK, function (w) {
+      if (!/\d/.test(w) || !/[A-Z]/.test(w)) return w;
+      return w.replace(LATIN, function (c) { return L2C[c] || c; });
+    });
+  }
+
   var nkCache = {}, nkCount = 0;
 
   /**
@@ -71,8 +90,12 @@ var S = (typeof S !== 'undefined' && S) || {};
     var raw = String(s == null ? '' : s);
     var hit = nkCache[raw];
     if (hit !== undefined) return hit;
+    // Ё for Е is optional Russian spelling; Ъ for Ь is the everyday typo in
+    // «ГРУЗОПОДЪЕМНОСТЬЮ». No Russian word is told from another by Ъ against Ь,
+    // while Ь against nothing does tell УГОЛ from УГОЛЬ — so Ь is never dropped.
     var k = fold(raw.replace(NBSP, ' ').replace(APOS, "'").toUpperCase())
       .replace(/Ё/g, 'Е')
+      .replace(/Ъ/g, 'Ь')
       .replace(/[^A-ZА-ЯЎҚҒҲҮҢӨӘҺ0-9]+/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
@@ -96,7 +119,7 @@ var S = (typeof S !== 'undefined' && S) || {};
   function unitKeyV1(s) { return nameKeyV1(s).replace(/[.\-\s]/g, ''); }
 
 
-  S.fold = fold;
+  S.fold = fold; S.foldMarks = foldMarks;
   S.nameKey = nameKey; S.unitKey = unitKey;
   S.nameKeyV1 = nameKeyV1; S.unitKeyV1 = unitKeyV1;
 })(S);

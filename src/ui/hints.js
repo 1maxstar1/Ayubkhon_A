@@ -21,9 +21,9 @@
   // bytes a letter), so chunks are cut by encoded size, not by key count.
   var CHUNK_BYTES = 2800;
   // How much of the match key a similar name has to share before it is even
-  // fetched. Four characters keep «ТРОЙНИК»/«ТРОЙНИКИ» and «КОВЕР»/«КОВЕРА»
-  // together while leaving the index able to do the work.
-  var PREFIX = 4;
+  // fetched. Three characters keep «ТРОЙНИК»/«ТРОЙНИКИ» together and still reach
+  // «ОМIСRОN» from «OMICRON», whose fourth letter is where they diverge.
+  var PREFIX = 3;
   var SIM_PER_CHUNK = 400;      // newest rows per prefix query
   var SIM_MIN = 0.62;           // below this two names are merely related
   var SIM_SHOW = 4;             // suggestions offered per resource

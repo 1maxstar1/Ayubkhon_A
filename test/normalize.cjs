@@ -74,10 +74,40 @@ mkSame('АРМАТУРА АIII', 'АРМАТУРА А-III');
 mkSame('ГРУЗОПОДЪЕМНОСТЬ', 'ГРУЗОПОДЬЕМНОСТЬ');    // the misspelling with a soft sign
 mkSame('УДЛИНИТЕЛЬ Д-1/2" 12ММ', 'УДЛИНИТЕЛЬ Д1/2 12ММ');
 mkSame('ТРУБА Д-110Х6,3ММ', 'ТРУБА Д-110Х6.3ММ');  // a comma is a decimal point
+mkSame('ПРОФНАСТИЛЬ H-35-1000', 'ПРОФНАСТИЛЬ Н-35-1000');   // a type code is read by shape
+mkSame('АВТОМАТ ВА47-100', 'АВТОМАТ BA47-100');
+mkSame('ТРУБА Д-110×6,3ММ', 'ТРУБА Д-110Х6,3ММ');           // × and Х are one sign
 console.log('-- match key: digits still hold --');
 mkDiff('АНКЕР М5', 'АНКЕР М8');
 mkDiff('ЗНАК 4.1.1', 'ЗНАК 4.11');
 mkDiff('ДО 5 Т', 'ДО 8 Т');
+// Dropping a separator between two digits would MAKE a number nobody wrote,
+// and «1, 5» would be offered the price of «15» as an exact match.
+mkDiff('ПРОВОД 1, 5 ММ2', 'ПРОВОД 15 ММ2');
+mkDiff('СТАЛЬ ЛИСТОВАЯ 08', 'СТАЛЬ ЛИСТОВАЯ 8');            // a grade is not a thickness
+
+console.log('-- grades written in Roman are numbers too --');
+check(S.numberRelation('СТАЛЬ КЛАССА А-I ДИАМ 6 ММ', 'СТАЛЬ КЛАССА А-III ДИАМ 6 ММ') === 'conflict',
+  'А-I and А-III are different steel');
+check(S.similarity('СТАЛЬ КЛАССА А-I ДИАМ 6 ММ', 'СТАЛЬ КЛАССА А-III ДИАМ 6 ММ', {}) === 0,
+  'and one is never suggested for the other');
+check(S.numberRelation('ДОСКИ СОРТА II', 'ДОСКИ СОРТА III') === 'conflict', 'sort II is not sort III');
+check(S.numberRelation('АРМАТУРА АIII', 'АРМАТУРА А-III') === 'same', 'but АIII and А-III are one grade');
+check(S.numbers('OMICRON 5').join() === '5', 'the I of a Latin word is not a numeral');
+check(S.numbers('PIPE TECHNOLOGIES 63').join() === '63', 'nor the I of PIPE');
+check(S.numbers('ТИП-1 IP65').join() === '1,65', 'nor the I of IP65');
+
+console.log('-- a standard is not a size --');
+check(S.numberRelation('ЛЮК ЧУГУННЫЙ ЛЕГКИЙ ГОСТ 3634-79', 'ЛЮК ЧУГУННЫЙ ЛЕГКИЙ') === 'same',
+  'the year of a ГОСТ does not make two hatches different');
+check(S.similarity('ЛЮК ЧУГУННЫЙ ЛЕГКИЙ ГОСТ 3634-79', 'ЛЮК ЧУГУННЫЙ ЛЕГКИЙ', {}) >= 0.6,
+  'so the hatch still finds its price');
+
+console.log('-- the order of a dimension is part of it --');
+check(S.numberRelation('КАБЕЛЬ СЕЧ.3Х16ММ2', 'КАБЕЛЬ СЕЧ.16Х3ММ2') === 'extra',
+  '3Х16 and 16Х3 are not the same cable');
+check(S.similarity('КАБЕЛЬ СЕЧ.3Х16ММ2', 'КАБЕЛЬ СЕЧ.16Х3ММ2', {}) < 0.62,
+  'and neither is suggested for the other');
 
 console.log('-- units: the same quantity, another spelling --');
 const uSame = (a, b) => check(S.matchUnitKey(a) === S.matchUnitKey(b),
@@ -161,7 +191,17 @@ for (const [label, fn] of [['nameKey', S.nameKey], ['matchKey', S.matchKey]]) {
     (unsafe.length ? ' -> ' + show(unsafe[0]) : ''));
   check(merged.length > 0, `${label}: it does merge something (${merged.length} groups)`);
 }
-// The identity key must not merge more than the match key does.
+// The invariant that keeps the two keys honest: whatever the identity key
+// merges, the match key merges too. If that ever breaks, one of them drifted.
+var coarsening = true, drift = null;
+for (var gi = 0; gi < names.length && coarsening; gi++) {
+  for (var gj = gi + 1; gj < names.length; gj++) {
+    if (S.nameKey(names[gi]) !== S.nameKey(names[gj])) continue;
+    if (S.matchKey(names[gi]) === S.matchKey(names[gj])) continue;
+    coarsening = false; drift = [names[gi], names[gj]]; break;
+  }
+}
+check(coarsening, 'the match key merges everything the identity key merges' + (drift ? ' -> ' + show(drift) : ''));
 check(group(S.nameKey).length <= group(S.matchKey).length,
   'the identity key is the more careful of the two');
 

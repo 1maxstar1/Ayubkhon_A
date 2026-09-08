@@ -30,6 +30,32 @@
   function pctOf(r) { return r.smetaSum ? econOf(r) / r.smetaSum * 100 : 0; }
   function isChanged(r) { return !S.near(r.smetaSum, r.marketSum); }
 
+  var SEC_RU = {
+    labor: 'затраты труда',
+    machines: 'машины и механизмы',
+    materials: 'материалы и конструкции',
+    equipment: 'оборудование'
+  };
+  /**
+   * The row sits under one band of the estimate but its name reads like
+   * another. Only a confident disagreement is worth showing, and never the
+   * материалы/оборудование one — the workbooks themselves do not agree where
+   * that line runs.
+   */
+  function secWarn(r) {
+    if (!S.sections || !r.section || r.section === 'other') return null;
+    var g = S.sections.classify(r.name, r.unit);
+    if (!g.section || g.confidence < 0.75) return null;
+    if (S.sections.band(g.section) === S.sections.band(r.section)) return null;
+    return g;
+  }
+  function secTag(r) {
+    var g = secWarn(r);
+    if (!g) return '';
+    return '<button class="tags" title="' + S.esc('В смете это «' + (SEC_RU[r.section] || r.section) +
+      '», но по названию похоже на «' + (SEC_RU[g.section] || g.section) + '»') + '">⚠ раздел</button>';
+  }
+
   function Prices(app) {
     this.app = app;
     this.view = [];
@@ -170,6 +196,7 @@
         case 'multi': return r.variants > 1;
         case 'hint': return !!(S.Hints && S.Hints.hasRow(r));
         case 'near': return !!(S.Hints && S.Hints.nearRow(r));
+        case 'wrongsec': return !!secWarn(r);
         default: return true;
       }
     });
@@ -192,10 +219,12 @@
     var changed = m ? m.resources.filter(isChanged).length : 0;
     var hinted = m && S.Hints ? m.resources.filter(function (r) { return S.Hints.hasRow(r); }).length : 0;
     var near = m && S.Hints ? m.resources.filter(function (r) { return S.Hints.nearRow(r); }).length : 0;
+    var mis = m ? m.resources.filter(secWarn).length : 0;
     document.getElementById('priceCount').textContent =
       this.view.length + ' / ' + total + ' ресурсов · изменено ' + changed +
       (hinted ? ' · с подсказками ' + hinted : '') +
-      (near ? ' · похожих ' + near : '');
+      (near ? ' · похожих ' + near : '') +
+      (mis ? ' · не тот раздел ' + mis : '');
   };
 
   Prices.prototype.renderRange = function (from, to) {
@@ -210,10 +239,11 @@
       var multi = many ? '<button class="tagm" data-nm="' + S.esc(r.name) + '" title="' +
         S.esc(multiHint(r)) + '">' + r.variants + ' цены</button>' : '';
       var hint = S.Hints ? S.Hints.tag(r) : '';
+      var sec = secTag(r);
       out.push(
         '<div class="vrow' + (changed ? ' chg' : '') + (many ? ' many' : '') + '">' +
         cell(COLS[0], i + 1) +
-        '<div class="c" style="' + width(COLS[1]) + '" title="' + S.esc(r.name) + '">' + S.esc(r.name) + multi + hint + '</div>' +
+        '<div class="c" style="' + width(COLS[1]) + '" title="' + S.esc(r.name) + '">' + S.esc(r.name) + multi + hint + sec + '</div>' +
         cell(COLS[2], S.esc(r.unit)) +
         cell(COLS[3], r.count) +
         cell(COLS[4], S.qty(r.qty)) +

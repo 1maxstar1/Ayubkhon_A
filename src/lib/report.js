@@ -41,6 +41,19 @@
   };
   var SECTION_ORDER = ['labor', 'machines', 'materials', 'equipment', 'other'];
 
+  /**
+   * A sheet without section bands leaves every one of its rows unlabelled, and
+   * they all end up under «БОШҚА РЕСУРСЛАР» in the comparison table. When the
+   * name says plainly what the row is — machine-hours, a bulldozer, a tonne of
+   * cement — put it where it belongs instead. Only a confident reading counts;
+   * an unsure one stays in the other bucket, where it is at least visible.
+   */
+  function guessSection(r) {
+    if (!S.sections) return 'other';
+    var g = S.sections.classify(r.nm, r.unit);
+    return g.section && g.confidence >= 0.6 ? g.section : 'other';
+  }
+
   /** Лист1 column -> report column. */
   function colMap(nExtra) {
     return function (c) {
@@ -165,7 +178,7 @@
       if (r.kind !== 'item') continue;
       var changed = !S.near(r.price, r.market);
       if (onlyChanged && !changed) continue;
-      var sec = groups[r.section] ? r.section : 'other';
+      var sec = groups[r.section] ? r.section : guessSection(r);
       var g = groups[sec];
       // "One line when name and price are the same; every line when the name
       // repeats with a different price."

@@ -12,6 +12,9 @@ const vm = require('vm');
 const ROOT = path.join(__dirname, '..');
 const FILES = [
   'src/vendor/fflate.umd.js',
+  'src/lib/normalize.js',
+  'src/lib/match.js',
+  'src/lib/sections.js',
   'src/lib/util.js',
   'src/lib/formula.js',
   'src/lib/xlsx-read.js',

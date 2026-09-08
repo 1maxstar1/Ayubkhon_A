@@ -281,6 +281,9 @@ form.grid .foot{grid-column:1 / -1;display:flex;gap:8px;align-items:center}
 .hp-sub small{text-transform:none;letter-spacing:0;color:var(--mute);font-size:10.5px}
 .hp-row.near{background:#fffdf8}
 .hp-name{font-style:normal;color:var(--ink);font-weight:600}
+/* the row is filed under one band of the estimate but reads like another */
+.tags{display:inline-block;background:#fdecea;color:#8a2019;border:0;border-radius:3px;padding:1px 6px;
+  font-size:10px;margin-left:6px;cursor:help;font-family:inherit;white-space:nowrap}
 
 /* ------------------------------------------------------------ application card */
 .card.wide{max-width:720px;max-height:90vh;overflow:auto}

@@ -17,7 +17,7 @@ const ctx = vm.createContext({ console, Date, Math, JSON, String, Number, Array,
   parseFloat, parseInt, Uint8Array, Int32Array, Uint16Array, Float64Array, DataView, ArrayBuffer, Map, Set, Symbol,
   TextDecoder, TextEncoder, Buffer });
 ctx.self = ctx; ctx.window = ctx; ctx.global = ctx;
-for (const f of ['src/vendor/xlsx.full.min.js', 'src/lib/util.js', 'src/lib/registry-parse.js']) {
+for (const f of ['src/vendor/xlsx.full.min.js', 'src/lib/normalize.js', 'src/lib/util.js', 'src/lib/registry-parse.js']) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
 }
 

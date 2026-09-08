@@ -176,12 +176,13 @@
                 key: key, nk: nameUnitKey(sr.nm, sr.unit),
                 // cross-project lookup key; absent when match.js is not loaded
                 mk: S.matchPair ? S.matchPair(sr.nm, sr.unit) : '',
-                name: sr.nm, unit: sr.unit, count: 0, qty: 0,
+                name: sr.nm, unit: sr.unit, section: sr.section || '', count: 0, qty: 0,
                 price: sp, market: mp, smetaSum: 0, marketSum: 0, projects: {},
                 variants: 1, siblings: [sp]
               };
               resMap.set(key, rec);
             }
+            if (!rec.section && sr.section) rec.section = sr.section;
             rec.count++;
             rec.qty += sr.qty || 0;
             rec.smetaSum += (sr.qty || 0) * sp;

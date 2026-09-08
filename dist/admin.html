@@ -287,6 +287,9 @@ form.grid .foot{grid-column:1 / -1;display:flex;gap:8px;align-items:center}
 .hp-sub small{text-transform:none;letter-spacing:0;color:var(--mute);font-size:10.5px}
 .hp-row.near{background:#fffdf8}
 .hp-name{font-style:normal;color:var(--ink);font-weight:600}
+/* the row is filed under one band of the estimate but reads like another */
+.tags{display:inline-block;background:#fdecea;color:#8a2019;border:0;border-radius:3px;padding:1px 6px;
+  font-size:10px;margin-left:6px;cursor:help;font-family:inherit;white-space:nowrap}
 
 /* ------------------------------------------------------------ application card */
 .card.wide{max-width:720px;max-height:90vh;overflow:auto}
@@ -570,6 +573,25 @@ var S = (typeof S !== 'undefined' && S) || {};
     });
   }
 
+  /**
+   * Type codes are read by shape, not by sound. «Н-35» and «H-35» are one
+   * profile, «ВА47-100» and «BA47-100» one circuit breaker — whoever typed
+   * them just had the wrong layout on, and no majority inside the word can
+   * say so, because the digits carry no script. So every whitespace-separated
+   * chunk that contains a digit is pushed wholly into Cyrillic, where the
+   * transliteration then lands both spellings on the same letters.
+   *
+   * Words without a digit are left to fold(), which can weigh their letters.
+   */
+  var CHUNK = /[^\s]+/g;
+  function foldMarks(up) {
+    if (!/\d/.test(up)) return up;
+    return up.replace(CHUNK, function (w) {
+      if (!/\d/.test(w) || !/[A-Z]/.test(w)) return w;
+      return w.replace(LATIN, function (c) { return L2C[c] || c; });
+    });
+  }
+
   var nkCache = {}, nkCount = 0;
 
   /**
@@ -587,8 +609,12 @@ var S = (typeof S !== 'undefined' && S) || {};
     var raw = String(s == null ? '' : s);
     var hit = nkCache[raw];
     if (hit !== undefined) return hit;
+    // Ё for Е is optional Russian spelling; Ъ for Ь is the everyday typo in
+    // «ГРУЗОПОДЪЕМНОСТЬЮ». No Russian word is told from another by Ъ against Ь,
+    // while Ь against nothing does tell УГОЛ from УГОЛЬ — so Ь is never dropped.
     var k = fold(raw.replace(NBSP, ' ').replace(APOS, "'").toUpperCase())
       .replace(/Ё/g, 'Е')
+      .replace(/Ъ/g, 'Ь')
       .replace(/[^A-ZА-ЯЎҚҒҲҮҢӨӘҺ0-9]+/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
@@ -612,7 +638,7 @@ var S = (typeof S !== 'undefined' && S) || {};
   function unitKeyV1(s) { return nameKeyV1(s).replace(/[.\-\s]/g, ''); }
 
 
-  S.fold = fold;
+  S.fold = fold; S.foldMarks = foldMarks;
   S.nameKey = nameKey; S.unitKey = unitKey;
   S.nameKeyV1 = nameKeyV1; S.unitKeyV1 = unitKeyV1;
 })(S);
@@ -665,21 +691,40 @@ if (typeof self !== 'undefined') self.S = S;
     });
   }
 
+  function isDigit(ch) { return ch >= '0' && ch <= '9'; }
+  function isKept(ch) { return (ch >= 'A' && ch <= 'Z') || isDigit(ch); }
+
   /**
-   * Digits and the separators between them are the meaning; every other
-   * separator is noise. «ДИАМ. 16 ММ» = «ДИАМ.16 ММ», but 4.1.1 stays apart
-   * from 4.11 and 6,3 mm equals 6.3 mm.
+   * Separators between digits carry meaning; every other separator is noise.
+   * «ДИАМ. 16 ММ» equals «ДИАМ.16 ММ», 6,3 equals 6.3, and 110×6,3 equals
+   * 110Х6,3 — but 4.1.1 must stay apart from 4.11.
+   *
+   * The rule that makes this safe: a separator is only ever dropped between two
+   * letters, or between a letter and a digit. Between two digits it always
+   * leaves something behind — the decimal point, the multiplication sign, or a
+   * plain boundary — because dropping it would MAKE a number that nobody wrote.
+   * «ПРОВОД 1, 5 ММ2» is not «ПРОВОД 15 ММ2», and before this rule existed the
+   * two keyed identically and one was offered as the other's exact price.
    */
   function squeeze(s) {
-    var out = '';
-    for (var i = 0; i < s.length; i++) {
-      var ch = s.charAt(i);
-      if (ch === '.' || ch === ',') {
-        var p = s.charAt(i - 1), n = s.charAt(i + 1);
-        if (p >= '0' && p <= '9' && n >= '0' && n <= '9') out += '.';
-        continue;
+    var out = '', i, ch;
+    for (i = 0; i < s.length; i++) {
+      ch = s.charAt(i);
+      if (isKept(ch)) { out += ch; continue; }
+      var prev = out.charAt(out.length - 1);
+      if (!isDigit(prev)) continue;                  // nothing to protect
+      // what is the next character that would be kept?
+      var j = i, nxt = '';
+      while (j < s.length) {
+        var c = s.charAt(j);
+        if (isKept(c)) { nxt = c; break; }
+        j++;
       }
-      if ((ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9')) out += ch;
+      if (!isDigit(nxt)) continue;                   // digit then letter: safe to drop
+      if (ch === '.' || ch === ',') out += '.';      // 6,3 and 6.3 are one number
+      else if (ch === '\u00D7' || ch === '*') out += 'X';   // 110×6,3 is 110Х6,3
+      else out += '_';                               // «1, 5» keeps its gap
+      i = j - 1;
     }
     return out;
   }
@@ -695,7 +740,7 @@ if (typeof self !== 'undefined') self.S = S;
     if (!raw) return '';
     var hit = mkCache[raw];
     if (hit !== undefined) return hit;
-    var k = squeeze(translit(S.fold(raw.toUpperCase())));
+    var k = squeeze(translit(S.foldMarks(S.fold(raw.toUpperCase()))));
     if (mkCount > 20000) { mkCache = {}; mkCount = 0; }   // a long session must not grow without bound
     mkCache[raw] = k; mkCount++;
     return k;
@@ -732,7 +777,7 @@ if (typeof self !== 'undefined') self.S = S;
 
   /** Words of a name, transliterated; digits stay glued to their word. */
   function tokens(name) {
-    var t = translit(S.fold(String(name == null ? '' : name).toUpperCase()));
+    var t = translit(S.foldMarks(S.fold(String(name == null ? '' : name).toUpperCase())));
     var out = [], cur = '';
     for (var i = 0; i < t.length; i++) {
       var ch = t.charAt(i);
@@ -744,30 +789,68 @@ if (typeof self !== 'undefined') self.S = S;
     return out;
   }
 
+  /* Numbers that identify a standard rather than the thing itself. «ЛЮК
+     ЧУГУННЫЙ ГОСТ 3634-79» and «ЛЮК ЧУГУННЫЙ» are one hatch; the year of the
+     standard must not make them look like different sizes. */
+  var STD = /\b(?:GOST|TU|OST|SNIP|SHNK|SHNQ|DIN|ISO|ASTM)\s*[N\u2116]?\s*\d[\d.\-\u2013]*/g;
+
+  /* Grades and sorts are written in Roman: А-I, А-III, СОРТ II, Вр-I. To a
+     digit-only guard those are all the same name, so «АРМАТУРА А-I» would be
+     offered the price of «АРМАТУРА А-III». They are read off the raw text,
+     before transliteration, where Cyrillic И and Х are still their own
+     characters and a Latin I really is a numeral. */
+  var ROMAN = { I: 1, II: 1, III: 1, IV: 1, V: 1, VI: 1, VII: 1, VIII: 1, IX: 1 };
+  var ROMAN_RE = /[IVX]+/g;
+  var LAT_OR_DIGIT = /[A-Z0-9]/;
+
   /**
-   * Every number in a name, normalised — the part that may never be guessed.
-   * A comma between digits is a decimal point here, as it is on the sheet:
-   * «Д-110Х6,3ММ» and «Д-110Х6.3ММ» are one pipe.
+   * Every quantity in a name, in the order written — the part that may never
+   * be guessed. Arabic numbers, with a comma between digits read as a decimal
+   * point, and Roman grade markers as R-prefixed entries so they can never be
+   * confused with a size.
    */
   function numbers(name) {
-    var t = translit(String(name == null ? '' : name)).replace(/(\d),(?=\d)/g, '$1.');
-    var m = t.match(/\d+(?:\.\d+)*/g);
-    if (!m) return [];
-    for (var i = 0; i < m.length; i++) {
-      if (m[i].indexOf('.') >= 0) m[i] = m[i].replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+    var raw = String(name == null ? '' : name).toUpperCase();
+    var out = [], m;
+    ROMAN_RE.lastIndex = 0;
+    while ((m = ROMAN_RE.exec(raw))) {
+      if (!ROMAN[m[0]]) continue;
+      var before = raw.charAt(m.index - 1), after = raw.charAt(m.index + m[0].length);
+      if (LAT_OR_DIGIT.test(before) || LAT_OR_DIGIT.test(after)) continue;   // part of a Latin word
+      out.push('R' + m[0]);
     }
-    return m.sort();
+    var t = translit(raw).replace(/(\d),(?=\d)/g, '$1.').replace(STD, ' ');
+    var nums = t.match(/\d+(?:\.\d+)*/g) || [];
+    for (var i = 0; i < nums.length; i++) {
+      var n = nums[i];
+      // one dot is a decimal point; two or more is a list, «25.32.40», and
+      // 4.1.1 is three numbers, which is what keeps it apart from 4.11
+      if ((n.split('.').length - 1) > 1) {
+        var parts = n.split('.');
+        for (var j = 0; j < parts.length; j++) if (parts[j]) out.push(parts[j]);
+        continue;
+      }
+      if (n.indexOf('.') >= 0) n = n.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+      out.push(n);
+    }
+    return out;
   }
 
   /**
    * How the numbers of two names relate:
-   *   'same'     identical multisets — «АНКЕР М5» and «Анкер M5»;
-   *   'extra'    one side only adds numbers — «КАШТАН» and «КАШТАН 3М»;
-   *   'conflict' each side carries a number the other does not — «М5» vs «М8».
+   *   'same'     the same quantities in the same order — «АНКЕР М5» and «Анкер M5»;
+   *   'extra'    one side only adds quantities, or writes the same ones in
+   *              another order — «КАШТАН» and «КАШТАН 3М», «3Х16» and «16Х3»;
+   *   'conflict' each side carries a quantity the other does not — «М5» vs «М8».
    * A conflict is fatal: those are different resources, however alike they read.
    */
   function numberRelation(a, b) {
     var x = numbers(a), y = numbers(b), i;
+    if (x.length === y.length) {
+      var ordered = true;
+      for (i = 0; i < x.length; i++) if (x[i] !== y[i]) { ordered = false; break; }
+      if (ordered) return 'same';
+    }
     var cx = {}, cy = {};
     for (i = 0; i < x.length; i++) cx[x[i]] = (cx[x[i]] || 0) + 1;
     for (i = 0; i < y.length; i++) cy[y[i]] = (cy[y[i]] || 0) + 1;
@@ -775,7 +858,7 @@ if (typeof self !== 'undefined') self.S = S;
     for (k in cx) if ((cy[k] || 0) < cx[k]) aOnly = true;
     for (k in cy) if ((cx[k] || 0) < cy[k]) bOnly = true;
     if (aOnly && bOnly) return 'conflict';
-    return aOnly || bOnly ? 'extra' : 'same';
+    return 'extra';   // an added quantity, or the same ones reordered
   }
 
   function sameNumbers(a, b) { return numberRelation(a, b) === 'same'; }

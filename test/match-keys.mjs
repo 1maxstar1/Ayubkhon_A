@@ -13,59 +13,26 @@
  *
  *   node test/match-keys.mjs
  */
-import { spawn, execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { readFileSync, copyFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { copyFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { startServer, DATA, ROOT as root } from './server.mjs';
 
-const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const PORT = 8111, BASE = `http://127.0.0.1:${PORT}`;
-const DATA = join(root, 'server/pb_data_test');
-
-execSync('node build.mjs --serve', { cwd: root, stdio: 'ignore' });
-execSync('sh test/pb-smoke.sh', { cwd: root, stdio: 'ignore' });
-execSync('node test/registry.cjs --json server/pb_data_test/rows.json', { cwd: root, stdio: 'ignore' });
+const pb = await startServer({ port: PORT, registry: true, build: true });
+const { api, count } = pb;
+let su = pb.su;
 
 // The page's own copy of the matching layer, loaded the way the hooks load it.
 const cjs = join(DATA, 'nlp-under-test.cjs');
 copyFileSync(join(root, 'server/pb_hooks/lib/nlp.js'), cjs);
 const S = createRequire(import.meta.url)(cjs);
 
-let server = start();
-function start() {
-  const s = spawn('sh', ['server/run.sh'], {
-    cwd: root,
-    env: { ...process.env, PB_DATA_DIR: 'pb_data_test', PB_HTTP: `127.0.0.1:${PORT}`, PB_DEV: '1' },
-    stdio: 'ignore'
-  });
-  process.on('exit', () => s.kill());
-  return s;
-}
-async function waitUp() {
-  for (let i = 0; i < 20; i++) {
-    try { if ((await fetch(BASE + '/api/health')).ok) return; } catch (e) { /* not up yet */ }
-    await new Promise((r) => setTimeout(r, 500));
-  }
-}
-await waitUp();
-
 let fail = 0;
 const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) fail++; };
-const api = async (path, opts = {}, token) => {
-  const r = await fetch(BASE + path, {
-    ...opts,
-    headers: { 'content-type': 'application/json', ...(token ? { Authorization: token } : {}), ...(opts.headers || {}) }
-  });
-  return r.json();
-};
-const auth = async () => (await api('/api/collections/_superusers/auth-with-password', {
-  method: 'POST', body: JSON.stringify({ identity: 'admin@example.com', password: 'adminpass1234' })
-})).token;
-let su = await auth();
 
 /* ---------------------------------------- a workspace to hang corrections on */
-const rows = JSON.parse(readFileSync(join(DATA, 'rows.json'), 'utf8')).slice(0, 3);
+const rows = pb.rows().slice(0, 3);
 await api('/api/registry/import', { method: 'POST', body: JSON.stringify({ rows }) }, su);
 const appOf = async (number) =>
   (await api(`/api/collections/applications/records?filter=${encodeURIComponent(`number='${number}'`)}`, {}, su)).items[0];
@@ -125,14 +92,7 @@ check(scored.length === 1 && scored[0].score >= 0.8,
 const old = await correction(ws1, a1, 'ЛИПА МЕЛКОЛИСТНАЯ', 'ШТ', 88000, { match_key: '', match_unit_key: '' });
 check(old.match_key === '', 'seeded a correction the way the old page saved it');
 
-const ekspertOtp = (await api('/api/collections/users/request-otp', {
-  method: 'POST', body: JSON.stringify({ email: 'test@example.com' })
-})).otpId;
-await new Promise((r) => setTimeout(r, 600));
-const code = readFileSync(join(DATA, 'dev-otp.txt'), 'utf8').trim().split('\n').pop().match(/code=(\d+)/)[1];
-const tok = (await api('/api/collections/users/auth-with-otp', {
-  method: 'POST', body: JSON.stringify({ otpId: ekspertOtp, password: code })
-})).token;
+const tok = await pb.signIn('test@example.com');
 const denied = await fetch(BASE + '/api/admin/backfill-keys', { method: 'POST', headers: { Authorization: tok } });
 check(denied.status === 403, 'an ekspert may not run the backfill');
 
@@ -149,14 +109,11 @@ check(again.filled === 0, 'running it a second time changes nothing');
 
 /* ---------------------------------------- and it heals itself on start-up */
 const old2 = await correction(ws2, a2, 'СИРЕНЬ ОБЫКНОВЕННАЯ', 'ШТ', 54000, { match_key: '', match_unit_key: '' });
-server.kill();
-await new Promise((r) => setTimeout(r, 700));
-server = start();
-await waitUp();
-su = await auth();
+await pb.restart();
+su = pb.su;
 const booted = await api(`/api/collections/corrections/records/${old2.id}`, {}, su);
 check(booted.match_key === S.matchKey('СИРЕНЬ ОБЫКНОВЕННАЯ'), 'a restart fills in what an upgrade left empty');
 
-server.kill();
+pb.stop();
 console.log(fail ? `FAILED (${fail})` : 'match-keys OK');
 process.exit(fail ? 1 : 0);

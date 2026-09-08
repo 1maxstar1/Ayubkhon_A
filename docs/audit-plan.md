@@ -326,17 +326,34 @@ qaytariladi. Mijoz 500 tadan yuboradi, ya'ni normal ish yo'liga tegmaydi.
 
 ## 4-daraja — takrorlanish va tozalash
 
-### [ ] 4.1 Superuser autentifikatsiyasi 21 ta skriptda takrorlangan
+### [~] 4.1 Superuser autentifikatsiyasi 21 ta skriptda takrorlangan — qisman
 
 `server/*.sh`, `server/deploy/*.sh`, `test/*.sh`, `test/*.mjs`
 
-**Tuzatish:** bitta `server/deploy/lib.sh` (yoki `test/lib.sh`) ga chiqarish.
+**Bajarilgan qismi:** `test/server.mjs` yaratildi — serverni ko'tarish, sog'lomlik
+kutish, `api()`, superuser kirishi, kod bilan kirish, qayta ishga tushirish.
+Uchta test (`dedupe`, `match-keys`, `ownership`) unga o'tkazildi va o'tdi.
+Nusxalar bir-biridan farq qilib qolgan edi — biri `204` javobni JSON deb
+o'qishga urinardi — ya'ni test o'zi tekshirayotgan narsaga aloqasi yo'q sababga
+ko'ra yiqilishi mumkin edi.
 
-### [ ] 4.2 `vm` yuklovchi 6 ta test harnessida takrorlangan
+**Ataylab qilinmagan qismi:** `server/deploy/*.sh` dagi takror. Bu skriptlar
+faqat haqiqiy serverda ishlaydi va men ularni bu yerda sinay olmayman. Tartib
+uchun sinab bo'lmaydigan joylashtiruv skriptlarini o'zgartirish — yomon
+almashuv. Yozib qo'yildi.
+
+### [x] 4.2 `vm` yuklovchi 6 ta test harnessida takrorlangan
 
 `test/*.cjs`
 
-**Tuzatish:** `test/load.cjs` — bitta joyda, fayllar ro'yxati bilan.
+**Bajarildi.** `test/load.cjs` — qisqa nomlar bilan (`load('normalize','match')`)
+va tayyor to'plamlar (`load.CORE`, `load.PIPELINE`, `load.REGISTRY`). Oltala
+harness unga o'tkazildi. Fayl tartibi endi bitta joyda va `build.mjs` bilan bir
+xil — ilgari har bir nusxada boshqacha edi, ya'ni test kerakli faylni
+yuklamagani uchun «o'tib ketishi» mumkin edi.
+
+Tekshirildi: `test/fixtures.cjs` o'lchov ma'lumotini **bayt-bayt bir xil**
+qayta yaratdi.
 
 ### [x] 4.3 `server/.env` `.gitignore` da yo'q
 

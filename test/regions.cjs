@@ -15,16 +15,10 @@
  *   node test/regions.cjs
  */
 const fs = require('node:fs');
-const vm = require('node:vm');
 const path = require('node:path');
+const { load, ROOT: root } = require('./load.cjs');
 
-const root = path.dirname(__dirname);
-const ctx = { console };
-vm.createContext(ctx);
-for (const f of ['src/lib/normalize.js', 'src/lib/match.js', 'src/lib/regions.js']) {
-  vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
-}
-const S = ctx.S;
+const S = load('normalize', 'match', 'regions');
 
 let fail = 0;
 const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) fail++; };

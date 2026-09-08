@@ -14,42 +14,17 @@
  *
  *   node test/ownership.mjs
  */
-import { spawn, execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { startServer, DATA } from './server.mjs';
 
-const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const PORT = 8112, BASE = `http://127.0.0.1:${PORT}`;
-const DATA = join(root, 'server/pb_data_test');
-
-execSync('node build.mjs --serve', { cwd: root, stdio: 'ignore' });
-execSync('sh test/pb-smoke.sh', { cwd: root, stdio: 'ignore' });
-execSync('node test/registry.cjs --json server/pb_data_test/rows.json', { cwd: root, stdio: 'ignore' });
-
-const server = spawn('sh', ['server/run.sh'], {
-  cwd: root, env: { ...process.env, PB_DATA_DIR: 'pb_data_test', PB_HTTP: `127.0.0.1:${PORT}`, PB_DEV: '1' }, stdio: 'ignore'
-});
-process.on('exit', () => server.kill());
-for (let i = 0; i < 20; i++) {
-  try { if ((await fetch(BASE + '/api/health')).ok) break; } catch (e) { /* not up yet */ }
-  await new Promise((r) => setTimeout(r, 500));
-}
+const pb = await startServer({ port: 8112, registry: true, build: true });
+const { api, count } = pb;
+const su = pb.su;
 
 let fail = 0;
 const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) fail++; };
-const api = async (path, opts = {}, token) => {
-  const r = await fetch(BASE + path, {
-    ...opts, headers: { 'content-type': 'application/json', ...(token ? { Authorization: token } : {}), ...(opts.headers || {}) }
-  });
-  return r.status === 204 ? {} : r.json();
-};
-const su = (await api('/api/collections/_superusers/auth-with-password', {
-  method: 'POST', body: JSON.stringify({ identity: 'admin@example.com', password: 'adminpass1234' })
-})).token;
 
 /* two experts, and one application each of them may open */
-const rows = JSON.parse(readFileSync(join(DATA, 'rows.json'), 'utf8')).slice(0, 2);
+const rows = pb.rows().slice(0, 2);
 await api('/api/registry/import', { method: 'POST', body: JSON.stringify({ rows }) }, su);
 const appOf = async (n) => (await api(`/api/collections/applications/records?filter=${encodeURIComponent(`number='${n}'`)}`, {}, su)).items[0];
 const a1 = await appOf(rows[0].number);
@@ -61,15 +36,8 @@ const bob = await api('/api/collections/users/records', {
 }, su);
 check(!!bob.id && !!alice.id, 'two experts exist');
 
-async function signIn(email) {
-  const otpId = (await api('/api/collections/users/request-otp', { method: 'POST', body: JSON.stringify({ email }) })).otpId;
-  await new Promise((r) => setTimeout(r, 600));
-  const code = readFileSync(join(DATA, 'dev-otp.txt'), 'utf8').trim().split('\n')
-    .filter((l) => l.includes(' ' + email + ' ')).pop().match(/code=(\d+)/)[1];
-  return (await api('/api/collections/users/auth-with-otp', { method: 'POST', body: JSON.stringify({ otpId, password: code }) })).token;
-}
-const aliceTok = await signIn('test@example.com');
-const bobTok = await signIn('bob@example.com');
+const aliceTok = await pb.signIn('test@example.com');
+const bobTok = await pb.signIn('bob@example.com');
 check(!!aliceTok && !!bobTok, 'both can sign in');
 
 /* ------------------------------------------- a workspace signs its opener */
@@ -120,6 +88,6 @@ const suWs = await api('/api/collections/workspaces/records', {
 }, su);
 check(suWs.opened_by === bob.id, 'a superuser can still open a workspace on somebody else\'s behalf');
 
-server.kill();
+pb.stop();
 console.log(fail ? `FAILED (${fail})` : 'ownership OK');
 process.exit(fail ? 1 : 0);

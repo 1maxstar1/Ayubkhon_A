@@ -15,24 +15,10 @@
  *   node test/xlsx-guard.cjs
  */
 'use strict';
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
+const { load } = require('./load.cjs');
 
-const ROOT = path.dirname(__dirname);
-const ctx = vm.createContext({
-  console, TextDecoder, TextEncoder, Intl, Date, Math, JSON, Map, Set, Uint8Array,
-  isFinite, parseFloat, parseInt, Array, Object, String, Number, RegExp, Error
-});
-ctx.self = ctx;
-ctx.window = ctx;
-for (const f of ['src/vendor/fflate.umd.js', 'src/lib/normalize.js', 'src/lib/match.js',
-  'src/lib/sections.js', 'src/lib/util.js', 'src/lib/formula.js', 'src/lib/xlsx-read.js',
-  'src/lib/smeta.js']) {
-  vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
-}
-const S = ctx.S;
-const fflate = ctx.fflate;
+const S = load('fflate', 'normalize', 'match', 'sections', 'util', 'formula', 'xlsx-read', 'smeta');
+const fflate = S.__fflate;
 
 let fail = 0;
 const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) fail++; };

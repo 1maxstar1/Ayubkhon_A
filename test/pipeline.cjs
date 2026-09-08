@@ -7,32 +7,9 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const vm = require('vm');
+const { load, ROOT } = require('./load.cjs');
 
-const ROOT = path.join(__dirname, '..');
-const FILES = [
-  'src/vendor/fflate.umd.js',
-  'src/lib/normalize.js',
-  'src/lib/match.js',
-  'src/lib/sections.js',
-  'src/lib/util.js',
-  'src/lib/formula.js',
-  'src/lib/xlsx-read.js',
-  'src/lib/xlsx-write.js',
-  'src/lib/smeta.js',
-  'src/lib/assemble.js',
-  'src/lib/report.js',
-  'src/lib/export.js',
-];
-
-const ctx = vm.createContext({
-  console, TextDecoder, TextEncoder, Intl, Date, Math, JSON, Map, Set, Uint8Array,
-  isFinite, parseFloat, parseInt, Array, Object, String, Number, RegExp, Error,
-});
-ctx.self = ctx;
-ctx.window = ctx;
-for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
-const S = ctx.S;
+const S = load(load.PIPELINE);
 
 const args = process.argv.slice(2);
 const outIdx = args.indexOf('--out');

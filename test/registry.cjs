@@ -5,24 +5,15 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const vm = require('vm');
-const ROOT = path.join(__dirname, '..');
+const { load, ROOT } = require('./load.cjs');
 const args = process.argv.slice(2);
 const jsonOut = args.includes('--json') ? args[args.indexOf('--json') + 1] : null;
 const file = args.find((a) => /\.xlsx?$/i.test(a)) || path.join(ROOT, 'test/fixtures/registry-sample.xls');
 
-// No `module`/`exports` in the context, so the SheetJS UMD wrapper defines the
-// XLSX global exactly as it does in the browser.
-const ctx = vm.createContext({ console, Date, Math, JSON, String, Number, Array, Object, RegExp, Error, isNaN, isFinite,
-  parseFloat, parseInt, Uint8Array, Int32Array, Uint16Array, Float64Array, DataView, ArrayBuffer, Map, Set, Symbol,
-  TextDecoder, TextEncoder, Buffer });
-ctx.self = ctx; ctx.window = ctx; ctx.global = ctx;
-for (const f of ['src/vendor/xlsx.full.min.js', 'src/lib/normalize.js', 'src/lib/util.js', 'src/lib/registry-parse.js']) {
-  vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
-}
+const S = load(load.REGISTRY);
 
 const t0 = Date.now();
-const res = ctx.S.parseRegistry(fs.readFileSync(file));
+const res = S.parseRegistry(fs.readFileSync(file));
 console.log(`${path.basename(file)}: ${res.rows.length} rows, ${res.skipped} skipped, ${res.headers.length} columns, ${Date.now() - t0} ms`);
 if (jsonOut) { fs.writeFileSync(jsonOut, JSON.stringify(res.rows)); console.log('wrote', jsonOut); }
 

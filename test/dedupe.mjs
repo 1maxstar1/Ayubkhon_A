@@ -7,50 +7,19 @@
  *
  *   node test/dedupe.mjs
  */
-import { spawn, execSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
+import { startServer, DATA, ROOT as root } from './server.mjs';
 
-const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const PORT = 8109, BASE = `http://127.0.0.1:${PORT}`;
-const DATA = join(root, 'server/pb_data_test');
-
-execSync('sh test/pb-smoke.sh', { cwd: root, stdio: 'ignore' });
-execSync('node test/registry.cjs --json server/pb_data_test/rows.json', { cwd: root, stdio: 'ignore' });
-
-let server = start();
-function start() {
-  const s = spawn('sh', ['server/run.sh'], {
-    cwd: root, env: { ...process.env, PB_DATA_DIR: 'pb_data_test', PB_HTTP: `127.0.0.1:${PORT}`, PB_DEV: '1' }, stdio: 'ignore'
-  });
-  process.on('exit', () => s.kill());
-  return s;
-}
-async function waitUp() {
-  for (let i = 0; i < 20; i++) {
-    try { if ((await fetch(BASE + '/api/health')).ok) return; } catch (e) { /* not up yet */ }
-    await new Promise((r) => setTimeout(r, 500));
-  }
-}
-await waitUp();
+const pb = await startServer({ port: PORT, registry: true });
+const { api, count } = pb;
+let su = pb.su;
 
 let fail = 0;
 const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) fail++; };
-const api = async (path, opts = {}, token) => {
-  const r = await fetch(BASE + path, {
-    ...opts, headers: { 'content-type': 'application/json', ...(token ? { Authorization: token } : {}), ...(opts.headers || {}) }
-  });
-  return r.json();
-};
-let su = (await api('/api/collections/_superusers/auth-with-password', {
-  method: 'POST', body: JSON.stringify({ identity: 'admin@example.com', password: 'adminpass1234' })
-})).token;
-const count = async (coll, filter = '') =>
-  (await api(`/api/collections/${coll}/records?perPage=1&filter=${encodeURIComponent(filter)}`, {}, su)).totalItems;
 
-const rows = JSON.parse(readFileSync(join(DATA, 'rows.json'), 'utf8'));
+const rows = pb.rows();
 
 /* --------------------------------------- the weekly re-upload ----------- */
 const first = await api('/api/registry/import', { method: 'POST', body: JSON.stringify({ rows }) }, su);
@@ -77,8 +46,6 @@ check(kept.project_title === 'Новое название', 'the later row wins 
 
 /* --------------------------------------- repairing an old database ------ */
 // Seed what an install without the unique index could hold: the same number twice.
-server.kill();
-await new Promise((r) => setTimeout(r, 700));
 const db = new DatabaseSync(join(DATA, 'data.db'));
 const app = db.prepare("SELECT * FROM applications WHERE number = '990001'").get();
 const cols = db.prepare('PRAGMA table_info(applications)').all().map((c) => c.name);
@@ -89,11 +56,8 @@ db.prepare(`INSERT INTO applications (${cols.map((c) => `"${c}"`).join(',')}) VA
 check(db.prepare("SELECT COUNT(*) c FROM applications WHERE number='990001'").get().c === 2, 'seeded a duplicate row');
 db.close();
 
-server = start();
-await waitUp();
-su = (await api('/api/collections/_superusers/auth-with-password', {
-  method: 'POST', body: JSON.stringify({ identity: 'admin@example.com', password: 'adminpass1234' })
-})).token;
+await pb.restart();
+su = pb.su;
 const me = (await api(`/api/collections/users/records?filter=${encodeURIComponent("email='test@example.com'")}`, {}, su)).items[0];
 // work sits on the original, a price correction on the copy
 const ws = await api('/api/collections/workspaces/records', {
@@ -104,10 +68,7 @@ const corr = await api('/api/collections/corrections/records', {
 }, su);
 check(!!ws.id && !!corr.id, 'seeded a workspace on one copy and a correction on the other');
 
-const ekspert = (await api('/api/collections/users/request-otp', { method: 'POST', body: JSON.stringify({ email: 'test@example.com' }) })).otpId;
-await new Promise((r) => setTimeout(r, 600));
-const code = readFileSync(join(DATA, 'dev-otp.txt'), 'utf8').trim().split('\n').pop().match(/code=(\d+)/)[1];
-const tok = (await api('/api/collections/users/auth-with-otp', { method: 'POST', body: JSON.stringify({ otpId: ekspert, password: code }) })).token;
+const tok = await pb.signIn('test@example.com');
 const denied = await fetch(BASE + '/api/admin/dedupe', { method: 'POST', headers: { Authorization: tok } });
 check(denied.status === 403, 'an ekspert may not run the repair');
 
@@ -192,6 +153,6 @@ check((await count('users')) > 0, 'accounts survive the reset');
 const fresh = await api('/api/registry/import', { method: 'POST', body: JSON.stringify({ rows: rows.slice(0, 10) }) }, su);
 check(fresh.added === 10, 'a fresh registry import works after the reset');
 
-server.kill();
+pb.stop();
 console.log(fail ? `FAILED (${fail})` : 'dedupe OK');
 process.exit(fail ? 1 : 0);

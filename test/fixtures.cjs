@@ -27,21 +27,9 @@
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
+const { load, ROOT } = require('./load.cjs');
 
-const ROOT = path.join(__dirname, '..');
 const OUT = path.join(ROOT, 'test/fixtures');
-
-function load(files) {
-  const ctx = vm.createContext({
-    console, TextDecoder, TextEncoder, Intl, Date, Math, JSON, Map, Set, Uint8Array,
-    isFinite, parseFloat, parseInt, Array, Object, String, Number, RegExp, Error
-  });
-  ctx.self = ctx;
-  ctx.window = ctx;
-  for (const f of files) vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
-  return ctx.S;
-}
 
 const argv = process.argv.slice(2);
 function group(flag) {
@@ -60,10 +48,7 @@ if (!smeta.length && !registry.length) {
 
 /* ------------------------------------------------- names and their sections */
 if (smeta.length) {
-  const S = load([
-    'src/vendor/fflate.umd.js', 'src/lib/normalize.js', 'src/lib/match.js', 'src/lib/util.js',
-    'src/lib/formula.js', 'src/lib/xlsx-read.js', 'src/lib/smeta.js'
-  ]);
+  const S = load('fflate', 'normalize', 'match', 'util', 'formula', 'xlsx-read', 'smeta');
 
   const names = [], sections = [];
   const seenName = new Set(), seenSection = new Set();
@@ -102,7 +87,7 @@ if (smeta.length) {
 
 /* ------------------------------------------------ applications and regions */
 if (registry.length) {
-  const S = load(['src/vendor/xlsx.full.min.js', 'src/lib/normalize.js', 'src/lib/util.js', 'src/lib/registry-parse.js']);
+  const S = load(load.REGISTRY);
   // The Russian labels the registry writes in its «place» column, and the key
   // each one stands for. This is the only place the two vocabularies meet.
   const LABEL = {

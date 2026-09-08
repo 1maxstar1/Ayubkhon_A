@@ -257,9 +257,13 @@ if (typeof self !== 'undefined') self.S = S;
 
   /* ------------------------------------------------------------ similarity */
 
+  /* The Uzbek apostrophe is a letter, not a separator: G‘allaorol, O‘zbekiston
+     and Farg‘ona are one word each, and splitting them there loses the name. */
+  var APOS = /[`'\u2018\u2019\u02BB\u02BC\u00B4\u2032]/g;
+
   /** Words of a name, transliterated; digits stay glued to their word. */
   function tokens(name) {
-    var t = translit(S.foldMarks(S.fold(String(name == null ? '' : name).toUpperCase())));
+    var t = translit(S.foldMarks(S.fold(String(name == null ? '' : name).replace(APOS, '').toUpperCase())));
     var out = [], cur = '';
     for (var i = 0; i < t.length; i++) {
       var ch = t.charAt(i);

@@ -260,10 +260,17 @@
       $('regionTitle').textContent = 'Заявка № ' + a.number;
       $('regionLead').textContent = (c ? c.name : a.org_name) + (a.inn ? ' · ИНН ' + a.inn : '') +
         (a.project_title ? '\n' + a.project_title : '');
-      var sug = S.suggestRegion(a);
-      $('regionSel').value = sug;
-      $('regionHint').textContent = sug ? 'Предложение: ' + S.regionLabel(sug) + ' — определено по тексту заявки, проверьте.' :
-        'Регион в тексте заявки не найден — выберите сами.';
+      // The guess comes with a score and the word that produced it, so a weak
+      // one reads as weak and the expert can see what the program went by.
+      var g = S.regionOf(a);
+      $('regionSel').value = g.region;
+      $('regionHint').textContent = !g.region
+        ? 'Регион в тексте заявки не найден — выберите сами.'
+        : 'Предложение: ' + S.regionLabel(g.region) +
+          (g.evidence ? ' — по слову «' + g.evidence + '»' : '') +
+          (g.second && g.confidence < 0.6
+            ? '. В тексте упоминается также ' + S.regionLabel(g.second) + ' — проверьте.'
+            : '. Проверьте.');
       $('regionErr').hidden = true;
       this.hide();
       $('screen-region').hidden = false;

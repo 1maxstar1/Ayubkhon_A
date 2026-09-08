@@ -23,6 +23,7 @@ echo "-----------------------------------"
 run build            node build.mjs
 run normalize        node test/normalize.cjs
 run sections         node test/sections.cjs
+run regions          node test/regions.cjs
 [ -n "$S1" ] && run pipeline  node test/pipeline.cjs "$S1" "$S2" --out test/out.xlsx
 run registry-parse   node test/registry.cjs
 run pb-smoke         sh test/pb-smoke.sh

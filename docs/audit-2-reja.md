@@ -205,7 +205,7 @@ buzilgan manzil emas, yangi imzolangani bo'ladi.
 
 ## 4-daraja — ekspluatatsiya va aniqlik
 
-### [ ] 2.8 `reset-data.sh` o'z zaxirasi olinmasa ham bazani o'chiradi
+### [x] 2.8 `reset-data.sh` o'z zaxirasi olinmasa ham bazani o'chiradi
 
 `server/deploy/reset-data.sh:22` — **high**
 
@@ -213,13 +213,31 @@ Ikki qadam `;` bilan ulangan, HTTP kodi chop etiladi, lekin tekshirilmaydi.
 `set -e` faqat mahalliy skriptda; masofaviy qism bitta `sh -c` satri.
 Zaxira `400` qaytarsa ham tozalash davom etadi.
 
-### [ ] 2.9 Muvaffaqiyatsiz `install.sh` xizmatni o'chirilgan holda qoldiradi
+**Bajarildi.** Kod endi o'qiladi va **tekshiriladi**: 2xx bo'lmasa,
+«zaxira olinmadi — tozalash bekor qilindi» deb chiqadi va `exit 1` qiladi.
+
+### [x] 2.9 Muvaffaqiyatsiz `install.sh` xizmatni o'chirilgan holda qoldiradi
 
 `server/deploy/install.sh:52` — **high**
 
 19-qatorda `systemctl stop pocketbase`, qayta ishga tushirish esa faqat
 muvaffaqiyat tarmog'ida (63-qatordagi `else` ichida). Oddiy relizning
 o'rtasida yiqilish butun ofisni ishsiz qoldiradi va buni hech narsa aytmaydi.
+
+**Bajarildi.** Vaqtinchalik nusxa ishga tushirilgandan keyin darhol `trap`
+qo'yiladi: qaysi qadamda yiqilsa ham vaqtinchalik nusxa o'ldiriladi **va
+xizmat qaytadan ishga tushiriladi**. Test rejimida (`NO_SYSTEMD=1`) vaqtinchalik
+nusxa ataylab qoldirilishi kerak — o'sha tarmoqda `trap - EXIT`.
+
+`test/install.mjs` (yangi) — birinchi joylashtiruv skripti testi. `server/`
+ning bir martalik nusxasida haqiqiy `install.sh` ishga tushiriladi: toza
+o'rnatish o'tadi, `.env` yaratiladi va parol **generatsiya qilingan** bo'ladi,
+instansiya javob beradi. Keyin `configure.sh` ataylab yiqitiladi: skript
+`exit 1` qiladi **va portni band qilib turgan nusxa qolmaydi**. `trap` ni
+olib tashlab tekshirdim — test yiqiladi, ya'ni u haqiqatan shu narsani
+o'lchayapti.
+
+Shu bilan `deploy-scripts-have-no-tests` topilmasi ham qisman yopiladi.
 
 ### [ ] 2.10 Unikal indeks poygasidan keyin tuzatish boshqa yozilmaydi
 

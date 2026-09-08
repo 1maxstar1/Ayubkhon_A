@@ -309,6 +309,7 @@ Testlar:
 
 ```sh
 sh test/pb-smoke.sh            # server: sxema, OTP kirish, token muddati, huquqlar
+node test/install.mjs          # joylashtiruv skripti: toza o'rnatish va yiqilgandan keyin tozalash
 node test/registry.cjs         # reyestr parser (fixture, 400 qator)
 sh test/registry-import.sh     # import hook: ikki marta yuklash, huquqlar
 sh test/admin-api.sh           # admin hooklari: facets, tozalash, o'chirish, huquqlar

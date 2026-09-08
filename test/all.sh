@@ -28,6 +28,7 @@ run regions          node test/regions.cjs
 [ -n "$S1" ] && run pipeline  node test/pipeline.cjs "$S1" "$S2" --out test/out.xlsx
 run registry-parse   node test/registry.cjs
 run pb-smoke         sh test/pb-smoke.sh
+run install          node test/install.mjs
 run registry-import  sh test/registry-import.sh
 run admin-api        sh test/admin-api.sh
 run dedupe           node test/dedupe.mjs

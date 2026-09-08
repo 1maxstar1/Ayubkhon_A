@@ -51,6 +51,12 @@ rm -f pb_data/dev-otp.txt
 if [ "$TEST" = 1 ]; then TMP_PORT="${PB_TEST_PORT:-8120}"; fi
 PB_DEV=0 "$PB" serve --http="127.0.0.1:$TMP_PORT" --dir=pb_data --hooksDir=pb_hooks --publicDir=pb_public >pb_data/serve.log 2>&1 &
 TMP_PID=$!
+# Every failure from here used to leave the site down. The service is stopped
+# at the top and only started again on the success path, so a routine release
+# that fell over in setup.sh or configure.sh left the whole office unable to
+# work, with nothing in the output saying so — and a root-owned PocketBase
+# still holding the setup port and writing to the live pb_data.
+trap 'kill $TMP_PID 2>/dev/null; [ "$TEST" = 1 ] || systemctl start pocketbase 2>/dev/null || true' EXIT
 BASE="http://127.0.0.1:$TMP_PORT"
 for i in $(seq 1 30); do [ "$(curl -sS -m 2 -o /dev/null -w '%{http_code}' "$BASE/api/health" 2>/dev/null)" = 200 ] && break || sleep 1; done
 PB_LOCAL_URL="$BASE" sh deploy/configure.sh
@@ -61,6 +67,7 @@ curl -sS -o /dev/null -X POST "$BASE/api/collections/users/records" -H "Authoriz
 
 # 5. the real service
 if [ "$TEST" = 1 ]; then
+  trap - EXIT                                # this one is meant to stay up
   echo $TMP_PID > pb_data/serve.pid          # left running for the test harness
 else
   kill $TMP_PID 2>/dev/null; sleep 1

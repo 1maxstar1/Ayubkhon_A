@@ -72,22 +72,41 @@ qo'shildi (4.3 ham shu bilan bajarildi). VPS yo'li (`install.sh`) allaqachon
 tasodifiy parol yaratar ekan — tekshirildi. `dev.sh` faqat `127.0.0.1` ga
 ulanadi, shuning uchun undagi qulay parol qoldirildi va README'da shu izohlandi.
 
-### [ ] 1.3 Har bir ekspert boshqasining ishini o'chira oladi
+### [x] 1.3 Kim nima qilgani — mijozdan kelardi
 
-`server/pb_schema.json` — `corrections` va `workspaces`
+*Boshlang'ich topilma qayta baholandi.* Audit «har bir ekspert boshqasining
+ishini o'chira oladi» degan edi va yechim sifatida egalik qoidasini taklif
+qilgan edi. Kodni o'qib chiqib **bu yechim rad etildi**: dastur ikki
+ekspertning bitta arizada ishlashini ataylab qo'llab-quvvatlaydi va bu haqda
+foydalanuvchiga o'zi aytadi — «при одновременной работе побеждает последнее
+сохранение» (`src/ui/sync.js:70`). Egalik qoidasi shu ishlab turgan tartibni
+buzardi.
 
-`corrections` da `update` va `delete` qoidasi `@request.auth.id != ""`, ya'ni
-tizimga kirgan **har qanday** foydalanuvchi. `workspaces` da ham `update`
-shunday. Ya'ni bir ekspert boshqasining narx tuzatishlarini o'zgartirishi yoki
-o'chirishi mumkin, va bu hech qayerda qayd etilmaydi.
+Haqiqiy muammo boshqa joyda edi: **kim nima qilgani** (`opened_by`,
+`updated_by`, `by`) brauzerdan kelardi va hech kim tekshirmasdi. Ya'ni ekspert
+o'z o'zgartirgan narxini hamkasbi nomiga yozib qo'yishi mumkin edi, va «kim
+oxirgi ishlagan» ogohlantirishi noto'g'ri odamni ko'rsatishi mumkin edi. Bu
+yozuvlar — kim nimani narxlagani haqidagi yagona hisobot; har kim yoza
+oladigan hisobot esa hisobot emas.
 
-**Tuzatish:** yozuvni faqat uni yaratgan ekspert yoki administrator
-o'zgartira/o'chira olsin. `corrections` uchun `workspace.opened_by` orqali,
-`workspaces` uchun `opened_by` orqali.
+`server/pb_hooks/ownership.pb.js` (yangi), `server/pb_hooks/lib/ownership.js`
 
-**Xavf:** ikki ekspert bitta arizani navbat bilan olib borishi mumkin edi —
-qoidada administrator istisnosi qoldiriladi va `e2e-workspace` testi buni
-tekshiradi.
+**Bajarildi.** Server endi bu maydonlarni o'zi qo'yadi — so'rovda nima
+kelganidan qat'i nazar. Kim nima qila olishi **o'zgarmadi**: har bir ekspert
+har qanday arizani ochadi, ikkitasi bitta ustida ishlashi mumkin, oxirgi
+saqlash yutadi. Faqat yozuvga kimning nomi tushishi o'zgardi.
+
+Superuser'lar tegilmaydi: o'rnatgich, testlar va texnik xizmat endpoint'lari
+boshqa odam nomidan yozuv yaratadi va ularning o'z foydalanuvchi yozuvi yo'q.
+
+`test/ownership.mjs` (yangi) ikkalasini ham tekshiradi: Alisa Bobning ID'sini
+yuborsa ham yozuv Alisaga yoziladi, va shu bilan birga Bob o'sha ish maydonini
+saqlay oladi, unga tuzatish qo'sha oladi, ochuvchi esa Alisa bo'lib qoladi.
+
+*Eslatma:* `users.listRule` har bir ekspertga barcha e-mail manzillarini
+ko'rsatadi. Bu ataylab qoldirildi — `sync.js` va `hints.js` «kim ishlagan»
+degan joyda ism bo'lmasa e-mail ko'rsatadi. Ismlar to'ldirilsa, keyinchalik
+yopish mumkin.
 
 ### [x] 1.4 Tizimdan chiqish ish maydonini yopmaydi
 

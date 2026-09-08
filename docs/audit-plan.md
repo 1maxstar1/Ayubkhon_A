@@ -219,16 +219,21 @@ Tuzatishdan oldin: `rows.length = 900 000 001`, `maxCol = 8 353 082 582`.
 Keyin: ikkalasi ham Excel chegarasida, haqiqiy kitoblar esa avvalgidek
 (6220 qator, 1161 resurs, 55 ms).
 
-### [ ] 2.2 Ikkita arizani ketma-ket ochish holatlarni aralashtiradi
+### [x] 2.2 Ikkita arizani ketma-ket ochish holatlarni aralashtiradi
 
 `src/ui/sync.js:56`
 
 Birinchi ariza fayllari hali yuklanayotganda ikkinchisini ochish — birinchisining
 javobi ikkinchisining ustiga tushadi.
 
-**Tuzatish:** ochish ketma-ketligiga raqam berish; javob kelganda raqam
-o'zgargan bo'lsa, javobni tashlab yuborish (`registry.js` dagi `seq` naqshi
-allaqachon shu uchun ishlatilgan).
+**Bajarildi.** Har bir `open()` o'z raqamini oladi; kechikkan javob — na
+tuzatishlar ro'yxati, na fayllar — raqam o'zgargan bo'lsa hech narsaga
+tegmaydi. Ish maydonini yopish ham raqamni oshiradi, ya'ni yo'lda qolgan
+javob bo'sh ekranga tushmaydi.
+
+Test mexanizmni to'g'ridan-to'g'ri tekshiradi (haqiqiy tarmoq poygasini
+qo'zg'atmasdan): ketma-ket ikki ochish 4 → 5 → 6, yopish esa yana bittaga
+oshiradi.
 
 ### [x] 2.3 Har bir tugma bosilishi serverga yozuv yuboradi
 

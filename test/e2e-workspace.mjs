@@ -227,6 +227,26 @@ await page.click('#loginBtn');
 await page.waitForSelector('#screen-list:not([hidden])', { timeout: 15000 });
 check(await page.evaluate(() => !S.Sync.ws), 'the next person to sign in lands on the registry, not in that workspace');
 
+/* ------------------------------------------- opening two in a row ---------- */
+// The registry is a list of buttons and the files behind one take a moment to
+// arrive, so a person can start a second application before the first has
+// finished. Every open takes a number and a late answer checks it before
+// touching anything; leaving bumps it too, so nothing lands in an empty screen.
+const seq = await page.evaluate(() => {
+  const start = S.Sync.seq;
+  const ws = { id: 'zzzz', region: 'fargona', state: {}, files: [] };
+  S.Sync.open(ws, { id: 'aaaa', number: '1' });
+  const afterFirst = S.Sync.seq;
+  S.Sync.open(ws, { id: 'bbbb', number: '2' });
+  const afterSecond = S.Sync.seq;
+  S.Sync.close();
+  return { start, afterFirst, afterSecond, afterClose: S.Sync.seq };
+});
+check(seq.afterFirst === seq.start + 1 && seq.afterSecond === seq.start + 2,
+  `each open takes its own number (${seq.start} -> ${seq.afterFirst} -> ${seq.afterSecond})`);
+check(seq.afterClose === seq.afterSecond + 1,
+  'and leaving takes one too, so nothing still arriving can land');
+
 await page.screenshot({ path: join(root, 'test/shot-list.png') });
 await browser.close();
 server.kill();

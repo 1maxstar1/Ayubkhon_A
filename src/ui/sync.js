@@ -30,6 +30,7 @@
   var Sync = {
     ws: null, app: null, files: {}, corr: {}, q: Promise.resolve(), loading: false, dirty: false,
     pend: {}, ct: 0,        // prices typed but not yet written; see correctSoon()
+    seq: 0,                 // which open() is the current one; see open()
 
     init: function () {
       var self = this;
@@ -63,8 +64,17 @@
     },
 
     /* ------------------------------------------------------------- open */
+    /**
+     * Opening a workspace fetches its corrections and its uploaded files, and
+     * a person browsing the registry can start a second one before the first
+     * has arrived. Each open takes a number; an answer that belongs to an
+     * earlier one is thrown away rather than dropped on top of the workspace
+     * now on screen.
+     */
     open: function (w, a) {
       var self = this;
+      var mine = ++this.seq;
+      var current = function () { return self.seq === mine; };
       this.ws = w; this.app = a;
       this.files = (w.state && w.state.files) || {};
       this.corr = {};
@@ -83,9 +93,12 @@
       this.corrList = [];
       S.pb.collection('corrections').getFullList({ filter: S.pb.filter('workspace = {:w}', { w: w.id }), fields: 'id,res_key,market_price' })
         .then(function (list) {
+          if (!current()) return;
           self.corrList = list;
           self.indexCorr();
-        }).catch(function (e) { app.toast('Правки не загружены: ' + S.pbErr(e), true); });
+        }).catch(function (e) {
+          if (current()) app.toast('Правки не загружены: ' + S.pbErr(e), true);
+        });
 
       var st = w.state || {};
       var wanted = (st.projects || []).map(function (p) { return { name: p.file, id: p.fileId }; })
@@ -98,8 +111,10 @@
           return r.blob();
         }).then(function (b) { return new File([b], f.name, { type: b.type }); });
       })).then(function (files) {
+        if (!current()) return;               // another application was opened meanwhile
         app.addFiles(files);                  // upload is skipped while loading
       }).catch(function (e) {
+        if (!current()) return;
         app.busy(false);
         app.toast('Не удалось получить файлы: ' + (e.message || e), true);
         self.restore();
@@ -440,6 +455,7 @@
      */
     close: function (force) {
       var self = this, app = A();
+      this.seq++;                             // anything still arriving is for a workspace nobody is in
       this.flush();
       var done = this.dirty ? this.saveNow() : this.q;
       return Promise.resolve(done).catch(function (e) {

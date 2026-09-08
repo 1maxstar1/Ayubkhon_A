@@ -133,6 +133,36 @@ faylni qo'lda tahrirlashda davom etsa bo'ladi.
 
 ---
 
+## Bir resursni tanish
+
+Smetalar qo'lda, yarim ruscha-yarim o'zbekcha klaviaturada yoziladi, shuning
+uchun bitta resurs `СТАЛЬ` va `CТАЛЬ` (lotincha C), `КАШТАН` va `KASHTAN`,
+`ДИАМ. 16 ММ` va `ДИАМ.16 ММ` bo'lib keladi. Ikkita haqiqiy kitobdagi 896
+nomdan 139 tasi ikkala alifboni aralashtiradi, 55 tasida esa bitta so'z
+ichida aralashadi.
+
+Shu sababli **ikkita kalit** bor:
+
+* `S.nameKey` — **hujjat ichidagi ayniylik**. Ehtiyotkor: faqat ko'zga
+  ko'rinmaydigan xatoni tuzatadi (klaviatura almashinuvi, qo'shtirnoq va nuqta,
+  Ё → Е, Ъ → Ь). Eksport qilingan `.xlsx` da qaysi qatorlar bitta narxni
+  bo'lishishini shu kalit hal qiladi.
+* `S.matchKey` — **loyihalar orasidagi qidiruv**, faqat narx eslatmalari uchun.
+  Bitta alifboga transliteratsiya qiladi va ajratgichlarni olib tashlaydi;
+  eslatma — taklif bo'lgani uchun u dadilroq bo'lishi mumkin.
+
+Ikkalasi ham buzmaydigan yagona qoida — **raqamlar saqlanadi**: `АНКЕР М5` ≠
+`АНКЕР М8`, `4.1.1` ≠ `4.11`, `СТАЛЬ А-I` ≠ `СТАЛЬ А-III` (rim raqamlari ham
+raqam). Ikki raqam orasidagi ajratgich hech qachon shunchaki o'chirilmaydi —
+aks holda `ПРОВОД 1, 5 ММ2` va `ПРОВОД 15 ММ2` bitta bo'lib qolardi.
+
+Aniq moslik topilmasa, narx oynasi eng yaqin nomlarni ball bilan taklif
+qiladi (TF-IDF kosinusi va tahrir masofasi, o'lchov birligi — qattiq filtr).
+Raqamlari qarama-qarshi bo'lgan nomlar hech qachon taklif qilinmaydi.
+
+Server ham xuddi shu kalitlarni hisoblaydi: `build.mjs` `pb_hooks/lib/nlp.js`
+ni sahifa ishlatadigan fayllardan generatsiya qiladi.
+
 ## Tezlik
 
 Draft versiyaning sekinligi ikkita sababdan edi: butun jadval DOM ga
@@ -159,7 +189,11 @@ src/
   worker.js           .xlsx ni fon oqimida o'qish
   vendor/fflate.umd.js
   lib/
-    util.js           umumiy yordamchilar, nom kaliti, raqam formatlari
+    normalize.js      nom kaliti: klaviatura almashinuvi, Ё/Ъ, tinish belgilari
+    match.js          transliteratsiya, moslik kaliti, TF-IDF + Levenshtein o'xshashlik
+    sections.js       nomdan bo'lim (материалы / машины / труд / оборудование)
+    regions.js        ariza matnidan viloyat (gazetteer + ball)
+    util.js           umumiy yordamchilar, raqam formatlari
     formula.js        formulalarni ustun/qator xaritasi bo'yicha ko'chirish
     xlsx-read.js      .xlsx o'qish (skaner, DOM emas)
     xlsx-write.js     to'liq formatli .xlsx yozish
@@ -173,7 +207,11 @@ src/
     app.js            ulanish
 test/
   pipeline.cjs        brauzersiz to'liq o'tkazish (node)
+  normalize.cjs       ikki kalit va o'xshashlik, haqiqiy 896 nom ustida
+  sections.cjs        bo'lim klassifikatori, 2085 belgilangan resurs
+  regions.cjs         viloyat klassifikatori, 1247 belgilangan ariza
   browser.mjs         haqiqiy brauzerda uchidan-uchiga test
+  fixtures/           haqiqiy hujjatlardan olingan tekshiruv ma'lumotlari
 build.mjs             hammasini bitta HTML ga yig'adi
 dist/smeta-taqqoslash.html
 ```

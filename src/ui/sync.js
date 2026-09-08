@@ -132,6 +132,27 @@
       return { map: out, moved: moved };
     },
 
+    /**
+     * The same prices written the way the previous version of the page keyed
+     * them. It is saved alongside the current map so that going back to that
+     * version — if this one turns out to be wrong somewhere — loses nothing:
+     * the old page reads `prices`, this one reads `prices2`.
+     *
+     * Lossless in this direction, because the new key never splits what the
+     * old one joined: two live rows can never share one old key.
+     */
+    downgrade: function (map) {
+      var app = A();
+      if (!app.model || !S.resKeyV1) return map;
+      var back = {};
+      app.model.resources.forEach(function (r) {
+        back[r.key] = S.resKeyV1(r.name, r.unit || '', r.price == null ? 0 : r.price);
+      });
+      var out = {};
+      Object.keys(map).forEach(function (k) { out[back[k] || k] = map[k]; });
+      return out;
+    },
+
     /** Server corrections, keyed the way the live rows are keyed. */
     indexCorr: function () {
       var raw = {};
@@ -170,8 +191,11 @@
       if (st.mode) $('reportMode').value = st.mode;
       app.looseBook = st.looseBook || null;
       app.rebuild(); app.renderSide();
-      if (st.prices && Object.keys(st.prices).length) {
-        var r = st.keys === KEYS ? { map: st.prices, moved: 0 } : this.reindex(st.prices);
+      // `prices2` is this version's keying; `prices` is the previous one's, kept
+      // so a workspace saved here can still be opened by the older page.
+      var saved = (st.keys === KEYS && st.prices2) ? st.prices2 : st.prices;
+      if (saved && Object.keys(saved).length) {
+        var r = (st.keys === KEYS && st.prices2) ? { map: saved, moved: 0 } : this.reindex(saved);
         app.setPrices(r.map);
         if (r.moved) { this.dirty = true; app.toast('Цены перенесены на обновлённые названия ресурсов: ' + r.moved); }
       }
@@ -205,7 +229,8 @@
           };
         }),
         files: this.files,
-        prices: app.prices,
+        prices: this.downgrade(app.prices),   // readable by the previous version
+        prices2: app.prices,
         looseBook: app.looseBook || null,
         opts: app.opts,
         mode: $('reportMode').value,

@@ -282,6 +282,8 @@ form.grid .foot{grid-column:1 / -1;display:flex;gap:8px;align-items:center}
 .hp-row.near{background:#fffdf8}
 .hp-name{font-style:normal;color:var(--ink);font-weight:600}
 /* the row is filed under one band of the estimate but reads like another */
+.brand .ver{font-style:normal;font-size:10px;color:var(--mute);margin-left:6px;
+  border:1px solid var(--rule2);border-radius:3px;padding:0 4px;vertical-align:middle}
 .tags{display:inline-block;background:#fdecea;color:#8a2019;border:0;border-radius:3px;padding:1px 6px;
   font-size:10px;margin-left:6px;cursor:help;font-family:inherit;white-space:nowrap}
 

@@ -7,6 +7,11 @@ import { fileURLToPath } from 'node:url';
 const root = dirname(fileURLToPath(import.meta.url));
 const read = (p) => readFileSync(join(root, p), 'utf8');
 
+// Stamped into every page. The point is not bookkeeping: when a release turns
+// out to be wrong and the server is put back on the previous one, this is how
+// anybody can tell, at a glance, which one they are actually looking at.
+const VERSION = 'v' + JSON.parse(read('package.json')).version;
+
 // Order matters: plain scripts sharing one global namespace, cheapest possible
 // startup (no module graph, no dynamic import) for a file served from file://.
 // Name normalisation and the matching layer come first and are shared with the
@@ -64,6 +69,7 @@ function page(scripts, screens) {
   const workerSrc = WORKER_LIBS.map(read).join('\n;\n') + '\n;\n' + read('src/worker.js');
   const js = scripts.map(read).join('\n;\n');
   return read('src/index.html')
+    .replace('/*__VERSION__*/', () => VERSION)
     .replace('/*__CSS__*/', () => css)
     .replace('<!--__SCREENS__-->', () => (screens && existsSync(join(root, 'src/screens.html')) ? read('src/screens.html') : ''))
     .replace('/*__WORKER__*/', () => JSON.stringify(workerSrc))
@@ -72,7 +78,7 @@ function page(scripts, screens) {
 
 function emit(name, html) {
   writeFileSync(join(root, 'dist', name), html);
-  console.log(`built dist/${name}  ${(html.length / 1024).toFixed(0)} KB`);
+  console.log(`built dist/${name}  ${(html.length / 1024).toFixed(0)} KB  ${VERSION}`);
 }
 
 // The hooks need the very same normalisation the page uses — a match key
@@ -92,6 +98,7 @@ function build() {
   emit('index.html', page(SERVER_SCRIPTS, true));         // served by PocketBase
   if (existsSync(join(root, 'src/admin.html'))) {
     const admin = read('src/admin.html')
+      .replace('/*__VERSION__*/', () => VERSION)
       .replace('/*__CSS__*/', () => read('src/app.css'))
       .replace('<!--__SCREENS__-->', () => read('src/screens.html'))
       .replace('/*__JS__*/', () => ['src/vendor/pocketbase.umd.js', 'src/vendor/xlsx.full.min.js',

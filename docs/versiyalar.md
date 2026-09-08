@@ -14,7 +14,7 @@ Bu hujjat ikki savolga javob beradi:
 | Versiya | Nima | Commit |
 |---|---|---|
 | **v1.0** | NLP qatlamidan **oldingi** dastur. Reyestr, ish maydonlari, aniq nom bo'yicha narx eslatmalari, viloyat — regex bilan. | `7718eb41c9c3888019c6c18711cd96b8da64e3f7` |
-| **v2.0** | Resursni ikki alifboda tanish, o'xshash nomlar bo'yicha narx taklifi, bo'limni nomdan aniqlash, viloyatni gazetteer bilan aniqlash. | `claude/excel-price-validation-5ehbvb` branch'ining oxiri |
+| **v2.0** | Resursni ikki alifboda tanish, o'xshash nomlar bo'yicha narx taklifi, bo'limni nomdan aniqlash, viloyatni gazetteer bilan aniqlash. | `e0acf169821b61429afe314df6191e4527467272` |
 
 Versiya — bu shunchaki **commit**. Git har bir o'zgarishni saqlaydi, shuning
 uchun «eski versiya» hech qayerga yo'qolmaydi: u tarixda turadi va istalgan
@@ -42,7 +42,7 @@ shundan keyin `v1.0` deb yozish `rollback.sh` da ishlaydi:
 ```sh
 git fetch origin
 git tag -a v1.0 7718eb41c9c3888019c6c18711cd96b8da64e3f7 -m "NLP qatlamidan oldingi versiya"
-git tag -a v2.0 origin/claude/excel-price-validation-5ehbvb -m "Resurs, bo'lim va viloyatni tanish"
+git tag -a v2.0 e0acf169821b61429afe314df6191e4527467272 -m "Resurs, bo'lim va viloyatni tanish"
 git push origin v1.0 v2.0
 ```
 

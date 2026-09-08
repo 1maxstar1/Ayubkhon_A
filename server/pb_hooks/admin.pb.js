@@ -135,8 +135,15 @@ routerAdd("POST", "/api/admin/imports/{id}/revert", (e) => {
 
   // A json field comes back as raw JSON bytes, which look like an array of
   // byte values to JS — toString() turns them into the text to parse.
+  //
+  // What matters here is whether the upload RECORDED its numbers, not whether
+  // it recorded any. An upload that created nothing records an empty list, and
+  // that is exactly what a weekly re-upload of the same registry does; reading
+  // that as "nothing was recorded" and falling back to time would delete every
+  // application created in the hour before it — the whole registry, on the day
+  // it was first loaded.
   let numbers = [];
-  let source = "recorded";
+  let recorded = false;
   const stored = imp.get("created_numbers");
   if (stored != null) {
     let text = "";
@@ -144,14 +151,15 @@ routerAdd("POST", "/api/admin/imports/{id}/revert", (e) => {
     if (text) {
       try {
         const parsed = JSON.parse(text);
-        if (Array.isArray(parsed)) numbers = parsed.map((n) => String(n));
-      } catch (_) { numbers = []; }
+        if (Array.isArray(parsed)) { numbers = parsed.map((n) => String(n)); recorded = true; }
+      } catch (_) { /* unreadable: treat as never recorded */ }
     }
   }
+  const source = recorded ? "recorded" : "by time";
   // Plain SQL, not a record filter: an upload can carry tens of thousands of
   // numbers, far past the length a filter expression may have.
   const ids = [];
-  if (numbers.length) {
+  if (recorded) {
     for (let i = 0; i < numbers.length; i += 200) {
       const chunk = numbers.slice(i, i + 200);
       const params = {};
@@ -161,8 +169,8 @@ routerAdd("POST", "/api/admin/imports/{id}/revert", (e) => {
       for (const r of found) ids.push(r.id);
     }
   } else {
-    // Legacy upload: the applications born while it ran, one hour back at most.
-    source = "by time";
+    // Written before the page recorded its numbers at all: the applications
+    // born while it ran, one hour back at most.
     const rows = arrayOf(new DynamicModel({ id: "" }));
     $app.db().newQuery(
       "SELECT id FROM applications WHERE created <= {:end} AND created >= datetime({:end}, '-60 minutes')"

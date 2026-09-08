@@ -145,6 +145,37 @@ check((await count('applications', "number='990102'")) === 0, 'the untouched app
 check((await count('applications', "number='990101'")) === 1, 'the one with work stays');
 check((await count('registry_imports', `id='${imp.id}'`)) === 0, 'the history line went with it');
 
+// The weekly re-upload adds nothing, so it records an EMPTY list of created
+// numbers. Undoing it must therefore delete nothing at all. An empty list once
+// read as "this upload recorded nothing, fall back to deleting whatever was
+// created around it", which on the day the registry was first loaded is the
+// whole registry.
+const before = await count('applications');
+const quiet = await api('/api/registry/import', {
+  method: 'POST', body: JSON.stringify({ rows: [undoRows[0]] })     // 990101 is still there
+}, su);
+check(quiet.added === 0 && quiet.createdNumbers.length === 0, 'the re-upload creates nothing');
+const quietImp = await api('/api/collections/registry_imports/records', {
+  method: 'POST',
+  body: JSON.stringify({ rows: 2, rows_added: 0, rows_updated: 2, by: me.id, created_numbers: quiet.createdNumbers })
+}, su);
+const quietPre = await api(`/api/admin/imports/${quietImp.id}/revert`, { method: 'POST', body: JSON.stringify({ preview: true }) }, su);
+check(quietPre.deletable === 0 && quietPre.total === 0,
+  `undoing an upload that created nothing offers to delete nothing (${quietPre.deletable} of ${quietPre.total}, source ${quietPre.source})`);
+const quietDone = await api(`/api/admin/imports/${quietImp.id}/revert`, { method: 'POST', body: JSON.stringify({}) }, su);
+check(quietDone.deleted === 0, `and deletes nothing (${quietDone.deleted})`);
+check((await count('applications')) === before, 'the registry is untouched');
+check((await count('registry_imports', `id='${quietImp.id}'`)) === 0, 'but the history line is gone');
+
+// A history line written before the app recorded its numbers at all still falls
+// back to time, because for those there is nothing else to go on.
+const legacy = await api('/api/collections/registry_imports/records', {
+  method: 'POST', body: JSON.stringify({ rows: 1, rows_added: 1, rows_updated: 0, by: me.id })
+}, su);
+const legacyPre = await api(`/api/admin/imports/${legacy.id}/revert`, { method: 'POST', body: JSON.stringify({ preview: true }) }, su);
+check(legacyPre.source === 'by time', `an upload with no recorded numbers still falls back to time (${legacyPre.source})`);
+await fetch(`${BASE}/api/collections/registry_imports/records/${legacy.id}`, { method: 'DELETE', headers: { Authorization: su } });
+
 /* --------------------------------------- starting over ------------------ */
 check((await count('applications')) > 0 && (await count('workspaces')) > 0, 'there is data to wipe');
 const noWord = await fetch(BASE + '/api/admin/reset', {

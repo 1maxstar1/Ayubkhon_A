@@ -16,7 +16,7 @@ Holat belgilari: `[ ]` bajarilmagan · `[x]` bajarilgan va testdan o'tgan.
 
 ## 1-daraja — ma'lumot yo'qolishi va ruxsatsiz kirish
 
-### [ ] 1.1 «Отменить загрузку» butun reyestrni o'chirib yuborishi mumkin
+### [x] 1.1 «Отменить загрузку» butun reyestrni o'chirib yuborishi mumkin
 
 `server/pb_hooks/admin.pb.js:154`
 
@@ -38,6 +38,12 @@ raqamlardan foydalanish (bo'sh bo'lsa: o'chiradigan narsa yo'q). Faqat maydon
 umuman bo'lmaganda vaqt bo'yicha zaxira yo'lga tushish.
 
 **Xavf:** yo'q — hozirgi xatti-harakat noto'g'ri, uni saqlashning ma'nosi yo'q.
+
+*Bajarildi.* `test/dedupe.mjs` avval xatoni takrorladi (404 tadan **402** ta
+ariza o'chirilishi taklif qilindi), tuzatishdan keyin `0`. Server endi maydon
+**yozilgan-yozilmaganini** tekshiradi, bo'sh-emasligini emas; raqamlari umuman
+yozilmagan eski yozuvlar avvalgidek vaqt bo'yicha ishlaydi va bu ham test bilan
+qulflangan.
 
 ### [ ] 1.2 Ofis tarmog'i rejimida superuser paroli repozitoriyada ochiq
 

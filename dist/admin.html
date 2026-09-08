@@ -1786,7 +1786,8 @@ if (typeof self !== 'undefined') self.S = S;
       document.dispatchEvent(new CustomEvent('auth:signedin', { detail: S.me() }));
     },
     tick: function () {
-      var now = Date.now();
+      var self = this, now = Date.now();
+      if (!this.timer) return;              // the session is over; there is nothing to watch
       if (!S.pb.authStore.isValid) { this.lock('Сессия истекла. Войдите снова.'); return; }
       if (now - this.last > IDLE_MS) { this.lock('4 часа без активности — программа заблокирована. Войдите снова.'); return; }
       if (now - this.lastRefresh > REFRESH_MS) {
@@ -1809,6 +1810,13 @@ if (typeof self !== 'undefined') self.S = S;
      */
     lock: function (msg) {
       var self = this;
+      // The idle watch stops with the session. Left running, it fired every
+      // minute over the login screen — the store is no longer valid, so it
+      // locked again, and lock() clears the code field: an expert typing in
+      // the code from an e-mail that «иногда идёт 10-20 минут» had it wiped
+      // under their fingers, once a minute, for as long as they kept trying.
+      clearInterval(this.timer);
+      this.timer = null;
       this.show(msg);
       var leaving = (S.Sync && S.Sync.ws) ? S.Sync.close(true) : null;
       var settled = Promise.resolve(leaving).catch(function (e) {

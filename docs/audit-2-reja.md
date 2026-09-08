@@ -232,7 +232,7 @@ Ikkala mijoz tomonidagi filtr `render()` ichida, `this.items` ustida ishlaydi �
 u esa faqat olingan sahifalarni saqlaydi. O'lchangani: 70 ta ariza, 4 tasi ishda
 (ikkinchi sahifada) → **0 qator**, hisoblagichda «0 / 70».
 
-### [ ] 2.14 Qulf taymeri kiritilayotgan kirish kodini o'chiradi
+### [x] 2.14 Qulf taymeri kiritilayotgan kirish kodini o'chiradi
 
 `src/ui/auth.js:153` — **medium**
 
@@ -240,6 +240,13 @@ u esa faqat olingan sahifalarni saqlaydi. O'lchangani: 70 ta ariza, 4 tasi ishda
 keyin `tick()` har daqiqada `lock()` ni qayta chaqiradi, u esa `show()` →
 `reset(false)` orqali `loginCode.value` ni tozalaydi. Xat 10-20 daqiqada
 kelishi mumkinligi ilovaning o'z izohida yozilgan.
+
+**Bajarildi.** `lock()` taymerni to'xtatadi, `tick()` esa taymer yo'q bo'lsa
+darhol qaytadi — kuzatadigan sessiya yo'q. Qayta kirilganda `start()` uni
+o'zi tiklaydi.
+
+`test/e2e-auth.mjs`: qulflangandan keyin `S.Auth.timer === null`, kod yoziladi,
+`tick()` ikki marta chaqiriladi — kod ham, kod oynasi ham joyida qoladi.
 
 ---
 

@@ -69,6 +69,24 @@ await page.evaluate(() => { S.Auth.last = Date.now() - 5 * 3600 * 1000; S.Auth.t
 await page.waitForSelector('#screen-login:not([hidden])');
 check((await page.textContent('#loginMsg')).includes('4 часа'), 'idle lock shows the four-hour message');
 check(await page.evaluate(() => !S.pb.authStore.isValid), 'token cleared on lock');
+
+/*
+ * A locked session stops being watched. The idle timer used to keep running
+ * over the login screen and lock again once a minute — and locking clears the
+ * code field. The app's own hint says the letter «иногда идёт 10-20 минут», so
+ * an expert waiting for it and typing the code in had it wiped under their
+ * fingers, again and again, with the message changing to «Сессия истекла» even
+ * when they had pressed «Выйти» themselves.
+ */
+check(await page.evaluate(() => S.Auth.timer === null), 'the idle watch stops when the session ends');
+await page.fill('#loginEmail', 'test@example.com');
+await page.click('#loginBtn');
+await page.waitForSelector('#codeBox:not([hidden])');
+await page.fill('#loginCode', '12345678');
+await page.evaluate(() => { S.Auth.tick(); S.Auth.tick(); });
+check((await page.inputValue('#loginCode')) === '12345678', 'and a code being typed in is not wiped from under it');
+check(await page.isVisible('#codeBox'), 'nor is the code box taken away');
+
 await page.reload();
 check(await page.isVisible('#screen-login'), 'locked session stays locked after reload');
 

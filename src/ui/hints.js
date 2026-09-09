@@ -202,14 +202,25 @@
       var list = Object.keys(want);
       if (!list.length) { this.rankSimilar(open); return; }
 
-      Promise.all(chunk(list).map(function (ch) {
+      // Halved on a full page for the same reason the exact pass is: a chunk
+      // of prefixes shares one ceiling, and «ТРО…» alone can fill it while
+      // «ЩЕБ…» comes back with nothing to compare against.
+      function fetchPrefixes(ch) {
         var params = { w: ws.id, r: ws.region };
         var ors = ch.map(function (p, i) { params['p' + i] = p + '%'; return 'match_key ~ {:p' + i + '}'; }).join(' || ');
         return S.pb.collection('corrections').getList(1, SIM_PER_CHUNK, {
           filter: S.pb.filter('region = {:r} && workspace != {:w} && (' + ors + ')', params),
           sort: '-updated', expand: 'application,contragent,by', fields: FIELDS
-        }).then(function (res) { return res.items; });
-      })).then(function (lists) {
+        }).then(function (res) {
+          if (ch.length > 1 && res.totalItems > SIM_PER_CHUNK) {
+            var half = Math.ceil(ch.length / 2);
+            return Promise.all([fetchPrefixes(ch.slice(0, half)), fetchPrefixes(ch.slice(half))])
+              .then(function (two) { return two[0].concat(two[1]); });
+          }
+          return res.items;
+        });
+      }
+      Promise.all(chunk(list).map(fetchPrefixes)).then(function (lists) {
         list.forEach(function (p) { self.prefixed[p] = 1; });
         var seen = {};
         self.pool.forEach(function (c) { seen[c.id] = 1; });

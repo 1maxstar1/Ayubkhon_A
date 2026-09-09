@@ -45,6 +45,13 @@ is('qoraqalpogiston', 'Қорақалпоғистон Республикаси, 
 is('qoraqalpogiston', 'Реконструкция здания в Республике Каракалпакстан');
 
 console.log('-- the apostrophe is a letter, not a break --');
+/* The town in «G‘allaorol MGQB» is the department's own address, not where the
+   pipeline is being worked on, so reading it as the region looks like a
+   mistake — it is the largest single evidence class among the benchmark's
+   wrong answers, 76 rows over. Measured before skipping it the way «Навоий
+   кўчаси» is skipped: 38 correct answers lost and 12 more broken, against 2
+   fixed. A gas department mostly works in its own region, and where it does
+   not, nothing in the title says so. */
 is('jizzax', '“G‘allaorol MGQB “DBST” magistral gaz quvurini 374 km');
 is('jizzax', "G'allaorol tumani suv ta'minoti");
 is('samarqand', 'Kattaqoʻrgʻon tumani maktab');

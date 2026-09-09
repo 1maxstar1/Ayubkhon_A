@@ -111,6 +111,28 @@ await page.evaluate(() => S.Sync.q);
 check((await count('corrections')) === 1, 'one correction row saved');
 const corr = (await api('/api/collections/corrections/records?perPage=1', {}, su)).items[0];
 check(corr.region === 'fargona' && corr.market_price === Math.round(first.price * 1.1) && corr.res_key === first.key, 'correction carries region, key and market price');
+/*
+ * What one flush turns into. The server refuses more than 3000 rows in a
+ * request and counts deletions among the writes, so «Вернуть сметные цены» on
+ * a project of that size has to go out in pieces — the deletions used to ride
+ * along whole on the first request and be refused for ever after.
+ */
+const split = await page.evaluate(() => {
+  const set = [], del = [];
+  for (let i = 0; i < 2500; i++) { set.push({ res_key: 's' + i }); del.push('d' + i); }
+  const parts = S.Sync.parts(set, del);
+  return {
+    parts: parts.length,
+    biggest: Math.max(...parts.map((p) => p.set.length + p.del.length)),
+    sets: parts.reduce((n, p) => n + p.set.length, 0),
+    dels: parts.reduce((n, p) => n + p.del.length, 0),
+    none: S.Sync.parts([], []).length
+  };
+});
+check(split.biggest <= 1000, `no request carries more than the chunk (${split.biggest})`);
+check(split.sets === 2500 && split.dels === 2500, `and nothing is dropped on the way (${split.sets}/${split.dels})`);
+check(split.none === 0, 'nothing to say means no request at all');
+
 const w1 = (await api('/api/collections/workspaces/records?perPage=1', {}, su)).items[0];
 check(w1.changed === 1 && w1.state.projects.length === 2 && Object.keys(w1.state.files).length === 2, 'workspace state: 2 projects, 2 files, changed=1');
 
@@ -243,13 +265,14 @@ const pct = (await api(`/api/collections/corrections/records?perPage=1&filter=${
 check(pct && Math.abs(pct.market_price - Math.round(first.price * 0.9)) <= 1, 'and the price stored is the one applied');
 
 // «Сбросить» puts every resource back on its own estimate price, which means
-// removing every correction — also one request.
+// removing every correction — in as few requests as the writes took, and cut
+// the same way, because the server counts deletions among the rows it caps.
 corrWrites = 0;
 await page.click('#resetBtn');
 await page.evaluate(() => S.Sync.flush());
 await page.evaluate(() => S.Sync.q);
 check((await count('corrections')) === 0, 'resetting them all removes every correction');
-check(corrWrites === 1, `in one request (${corrWrites})`);
+check(corrWrites === Math.ceil(all / 1000), `in ${corrWrites} request(s) of at most a thousand, not ${all}`);
 
 // A price book is how prices are carried from one project to the next. It used
 // to be written straight into the model, around the one method the server

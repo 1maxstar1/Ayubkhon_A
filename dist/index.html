@@ -6149,13 +6149,28 @@ if (typeof self !== 'undefined') self.S = S;
       });
       if (!set.length && !del.length) return;
 
-      // The server refuses more than 3000 in one request; a project big enough
-      // to reach that is sent in pieces rather than refused.
-      var ws = this.ws, parts = [], n = 0;
+      var ws = this.ws;
+      this.parts(set, del).forEach(function (part) { self.sendBulk(ws, part, marks, waiting); });
+    },
+
+    /**
+     * The requests one flush becomes. The server refuses more than 3000 rows
+     * at once and counts deletions among them, so a project big enough to
+     * reach that is sent in pieces rather than refused.
+     *
+     * The deletions are cut into pieces too, and that is not tidiness. «Вернуть
+     * сметные цены» hands back every price of the project in one gesture, so
+     * the list of keys to delete gets exactly as long as the list of keys to
+     * write ever gets. It used to ride along whole on the first request —
+     * which then carried a thousand writes and every deletion besides, was
+     * refused by the server, retried thirty seconds later and refused again,
+     * with the expert's whole reset stuck in the queue behind it.
+     */
+    parts: function (set, del) {
+      var parts = [], n;
       for (n = 0; n < set.length; n += BULK) parts.push({ set: set.slice(n, n + BULK), del: [] });
-      if (!parts.length) parts.push({ set: [], del: [] });
-      parts[0].del = del;
-      parts.forEach(function (part) { self.sendBulk(ws, part, marks, waiting); });
+      for (n = 0; n < del.length; n += BULK) parts.push({ set: [], del: del.slice(n, n + BULK) });
+      return parts;
     },
 
     sendBulk: function (ws, part, marks, waiting) {

@@ -101,6 +101,10 @@ check(filled.filled === 1, `the backfill repaired the one row it had to (${fille
 const healed = await api(`/api/collections/corrections/records/${old.id}`, {}, su);
 check(healed.match_key === S.matchKey('ЛИПА МЕЛКОЛИСТНАЯ'), 'the key the server wrote is the key the page computes');
 check(healed.match_unit_key === S.matchUnitKey('ШТ'), 'the unit key too');
+/* The hint list is ordered by `updated`, in the query and in the popover
+   alike. A backfill that saved the record would stamp every historical row
+   with the same minute and shuffle a region's whole price history. */
+check(healed.updated === old.updated, `and it left «updated» alone (${old.updated} -> ${healed.updated})`);
 const lipa = await api(`/api/collections/corrections/records?filter=${
   encodeURIComponent(`region='fargona' && match_key='${S.matchKey('LIPA MELKOLISTNAYA')}'`)}`, {}, su);
 check(lipa.totalItems === 1, 'and the healed row is now reachable from the Latin spelling');

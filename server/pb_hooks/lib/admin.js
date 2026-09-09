@@ -22,6 +22,16 @@ module.exports = {
    * Batched on purpose: a single transaction over the whole table would hold a
    * write lock for as long as it takes. A name that normalises to nothing gets
    * "-" so the same row is not picked up on every pass.
+   *
+   * Written with SQL rather than tx.save(), and that is the whole point of the
+   * loop below. Saving a record stamps `updated`, and `updated` is what the
+   * hint list is ordered by — both in the query (`sort: '-updated'`, capped at
+   * a thousand rows a chunk) and in the popover, where the newest price of a
+   * resource is shown first. A backfill that saved every historical row would
+   * stamp them all with the same minute, in whatever order the batches came
+   * out, and a region's whole price history would arrive shuffled — the one
+   * thing the expert reads it for, which project paid what most recently,
+   * lost to a migration that was only meant to fill in two columns.
    */
   backfillKeys(app, cap) {
     const N = require(`${__hooks}/lib/nlp.js`);
@@ -32,9 +42,13 @@ module.exports = {
       if (!rows.length) break;
       app.runInTransaction((tx) => {
         for (const r of rows) {
-          r.set("match_key", N.matchKey(r.getString("name")) || "-");
-          r.set("match_unit_key", N.matchUnitKey(r.getString("unit")));
-          tx.save(r);
+          tx.db().newQuery("UPDATE corrections SET match_key = {:k}, match_unit_key = {:u} WHERE id = {:id}")
+            .bind({
+              k: N.matchKey(r.getString("name")) || "-",
+              u: N.matchUnitKey(r.getString("unit")),
+              id: r.id
+            })
+            .execute();
         }
       });
       done += rows.length;

@@ -156,7 +156,7 @@
 
   /** Words of a name, transliterated; digits stay glued to their word. */
   function tokensOf(name) {
-    var t = translit(S.foldMarks(S.fold(String(name == null ? '' : name).replace(APOS, '').toUpperCase())));
+    var t = translit(S.foldMarks(S.fold(S.spell(String(name == null ? '' : name).replace(APOS, '').toUpperCase()))));
     var out = [], cur = '';
     for (var i = 0; i < t.length; i++) {
       var ch = t.charAt(i);
@@ -180,8 +180,20 @@
      before transliteration, where Cyrillic И and Х are still their own
      characters and a Latin I really is a numeral. */
   var ROMAN = { I: 1, II: 1, III: 1, IV: 1, V: 1, VI: 1, VII: 1, VIII: 1, IX: 1 };
-  var ROMAN_RE = /[IVX]+/g;
-  var LAT_OR_DIGIT = /[A-Z0-9]/;
+  /*
+   * A grade marker is a whole word: «II» in «СОРТА II», or a class letter with
+   * the numeral glued to it — «АIII», «AIII» typed on the Latin layout, «ВРI».
+   * Reading the numerals out of the middle of words instead got it wrong in
+   * both directions: «АРМАТУРА AI» and «АРМАТУРА AII» looked like one grade
+   * and were offered for each other at 0.909, while «ОМIСRОN» and «IН=100А»
+   * grew a numeral nobody wrote and were discounted for it.
+   *
+   * The class letters are the ones the standards use (А/A, В/B, С/C, Э/E,
+   * optionally with Р/P/R for Вр-I). A word that merely happens to contain
+   * Roman letters — MIX, PIPE, OMICRON, IP65 — cannot match this shape.
+   */
+  var WORDS_RE = /[A-ZА-ЯЁЎҚҒҲ0-9]+/g;
+  var GRADE_RE = /^[АAВBСCЭE]?[РPR]?([IVX]+)$/;
 
   /**
    * Every quantity in a name, in the order written — the part that may never
@@ -190,14 +202,14 @@
    * confused with a size.
    */
   function numbersOf(name) {
-    var raw = String(name).toUpperCase();
+    // S.spell first, so «АІ» typed with the Ukrainian І and «16 ММ²» carry the
+    // same numbers as the plain spellings the keys already agree on.
+    var raw = S.spell(String(name).toUpperCase());
     var out = [], m;
-    ROMAN_RE.lastIndex = 0;
-    while ((m = ROMAN_RE.exec(raw))) {
-      if (!ROMAN[m[0]]) continue;
-      var before = raw.charAt(m.index - 1), after = raw.charAt(m.index + m[0].length);
-      if (LAT_OR_DIGIT.test(before) || LAT_OR_DIGIT.test(after)) continue;   // part of a Latin word
-      out.push('R' + m[0]);
+    WORDS_RE.lastIndex = 0;
+    while ((m = WORDS_RE.exec(raw))) {
+      var g = GRADE_RE.exec(m[0]);
+      if (g && ROMAN[g[1]]) out.push('R' + g[1]);
     }
     var t = translit(raw).replace(/(\d),(?=\d)/g, '$1.').replace(STD, ' ');
     var nums = t.match(/\d+(?:\.\d+)*/g) || [];

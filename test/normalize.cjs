@@ -90,6 +90,18 @@ check(S.numberRelation('АРМАТУРА АIII', 'АРМАТУРА А-III') === 
 check(S.numbers('OMICRON 5').join() === '5', 'the I of a Latin word is not a numeral');
 check(S.numbers('PIPE TECHNOLOGIES 63').join() === '63', 'nor the I of PIPE');
 check(S.numbers('ТИП-1 IP65').join() === '1,65', 'nor the I of IP65');
+// A grade marker is a whole word — the class letter with the numeral glued to
+// it, or the numeral alone. Read out of the middle of words instead, it went
+// wrong in both directions: a grade typed on the Latin layout was invisible,
+// and words that merely contain Roman letters grew a numeral nobody wrote.
+check(S.numberRelation('АРМАТУРА AI', 'АРМАТУРА AII') === 'conflict',
+  'a grade typed on the Latin layout is still a grade');
+check(S.similarity('АРМАТУРА AI', 'АРМАТУРА AII', {}) === 0, 'so one is never offered for the other');
+check(S.numbers('АГРЕГАТЫ СВАРОЧНЫЕ ОМIСRОN').join() === '',
+  'and a brand name with a stray Latin I carries no numeral');
+check(S.numbers('АВТОМАТИЧЕСКИЙ ВЫКЛЮЧАТЕЛЬ IН=100А ВА47-100').join() === '100,47,100',
+  'nor does «IН=100А» — the I belongs to the current, not to a grade');
+check(S.numbers('MIX 20').join() === '20', 'nor MIX, whose letters merely look Roman');
 
 console.log('-- a standard is not a size --');
 check(S.numberRelation('ЛЮК ЧУГУННЫЙ ЛЕГКИЙ ГОСТ 3634-79', 'ЛЮК ЧУГУННЫЙ ЛЕГКИЙ') === 'same',

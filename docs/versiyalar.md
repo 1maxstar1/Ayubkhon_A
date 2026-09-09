@@ -144,6 +144,7 @@ qaysi so'z nimani anglatishini modeldan yaxshiroq bilasiz.
 | `test/fixtures/resource-names.json` | 903 ta haqiqiy resurs nomi | — (faqat birlashmalarni tekshirish uchun) |
 | `test/fixtures/resource-sections.json` | 2085 ta resurs + bo'limi | **smetaning o'zi** (qaysi band ostida turgani) |
 | `test/fixtures/application-regions.json` | 1247 ta ariza + viloyati | **reyestrning o'zi** («место» ustuni) |
+| smeta faylining o'zi (`test/hints.cjs`) | har bir resursning narxi | **smetaning o'zi** (narx ustuni) |
 
 Yorliqlarni men ham, siz ham yozmaganmiz — ular hujjatlardan olingan. Shuning
 uchun raqamlarga ishonish mumkin.
@@ -164,13 +165,20 @@ node test/sections.cjs | grep "held out"
 git checkout src/lib/sections.js
 ```
 
-Uchta o'lchov buyrug'i:
+To'rtta o'lchov buyrug'i:
 
 ```sh
 node test/normalize.cjs   # nom kalitlari va o'xshashlik
 node test/sections.cjs    # bo'lim
 node test/regions.cjs     # viloyat
+node test/hints.cjs a.xlsx b.xlsx   # «Похожие ресурсы» takliflari
 ```
+
+Oxirgisi o'xshashlik balini narx bilan o'lchaydi: har bir resursga o'z kaliti
+hovuzdan olib tashlangan holda taklif so'raladi (`hints.js` qanday ishlasa,
+xuddi shunday), so'ng eng yuqoridagi taklifning narxi resursning o'z narxi
+bilan solishtiriladi. Taklif haqiqatan ham o'sha resurs bo'lsa, narxlar
+yaqin turadi. Hech narsa yozilmaydi — smeta faqat xotirada o'qiladi.
 
 ### Misol 1 — bo'limga yangi so'z qo'shish
 
@@ -261,6 +269,7 @@ Yangi smeta yoki yangi reyestr eksporti kelsa, o'lchov ma'lumotini yangilang:
 ```sh
 node test/fixtures.cjs --smeta yangi1.xlsx yangi2.xlsx --registry yangi-reestr.xls
 node test/normalize.cjs && node test/sections.cjs && node test/regions.cjs
+node test/hints.cjs yangi1.xlsx yangi2.xlsx
 ```
 
 Raqamlar tushib ketsa — yangi hujjatlarda dastur bilmaydigan so'zlar bor,

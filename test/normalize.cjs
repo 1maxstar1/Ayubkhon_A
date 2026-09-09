@@ -148,6 +148,24 @@ check(S.numberRelation('КАШТАН', 'КАШТАН 3М') === 'extra', 'an adde
 check(S.numberRelation('ТРУБА 6,3ММ', 'ТРУБА 6.3ММ') === 'same', 'comma and dot are one number');
 check(S.editDistance('ЖЖЕННЫЙ', 'ЖЖЕНЫЙ') === 1, 'edit distance counts the doubled letter');
 
+console.log('-- a word the other side has no spelling of --');
+/* Four words out of five agree and the fifth names another product. Prices
+   from the three real workbooks, so the cost of getting these wrong is on
+   the record: 5 210 against 82 087, and eighteen times over for the machines. */
+const other = (a, b) => check(S.similarity(a, b, {}) === 0, `sim = 0  ${show(a)} ~ ${show(b)}`);
+other('ПЕРЕХОД ПОЛИЭТИЛЕНОВЫЙ Д-63Х20ММ', 'АДАПТЕР ПОЛИЭТИЛЕНОВЫЙ Д-63Х20ММ');
+other('СТАНКИ СВЕРЛИЛЬНЫЕ', 'СТАНКИ ФРЕЗЕРНЫЕ');
+other('КАТКИ ДОРОЖНЫЕ САМОХОДНЫЕ ГЛАДКИЕ 8 Т', 'КАТКИ ДОРОЖНЫЕ ПРИЦЕПНЫЕ КУЛАЧКОВЫЕ 8 Т');
+other('СИРЕНЬ ИНДИЙСКАЯ С КОМОМ 0,2Х0,15', 'СИРЕНЬ ОБЫКНОВЕННЫЙ С КОМОМ 0,2Х0,15');
+other('КИСЛОРОД ТЕХНИЧЕСКИЙ ГАЗООБРАЗНЫЙ', 'АЦЕТИЛЕН ГАЗООБРАЗНЫЙ ТЕХНИЧЕСКИЙ');
+/* What the guard may not touch: one word spelled two ways, and one name
+   spelled out more fully than the other. */
+near('ЩЕБЕНЬ ФРАКЦИЯ 5-20ММ', 'ЩЕБЕНЬ ФРАКЦИИ 5-20ММ', 0.8, {});
+near('ТРОЙНИКИ ПОЛИЭТИЛЕНОВЫЕ Д-100ММ', 'ТРОЙНИК ПОЛИЭТИЛЕНОВАЯ Д-100ММ', 0.8, {});
+near('LOLA DAPXTU', 'LOLA DAPAXTI', 0.7, {});
+near('КОЖУХ СТАЛЬНАЯ ЭЛЕКТРОСВАРНАЯ Д-159Х4ММ', 'КОЖУХ ИЗ ТРУБ СТАЛЬНЫХ ЭЛЕКТРОСВАРНЫХ Д-159Х4ММ', 0.7, {});
+near('БЕТОН В15', 'БЕТОН ТЯЖЕЛЫЙ КЛАССА В15', 0.62, {});
+
 console.log('-- best matches, with the unit as a hard filter --');
 const cands = [
   { name: 'ТРОЙНИК ПОЛИЭТИЛЕНОВЫЕ Д-110ММ', unit: 'ШТ', price: 100 },

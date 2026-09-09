@@ -25,6 +25,7 @@ node test/browser.mjs a.xlsx b.xlsx                   # haqiqiy brauzerda (bitta
 sh server/setup.sh && sh server/run.sh                # PocketBase (server rejimi), README «Server rejimi»
 sh test/pb-smoke.sh; node test/e2e-workspace.mjs      # server rejimi testlari
 node test/normalize.cjs; node test/sections.cjs; node test/regions.cjs   # NLP o'lchovlari
+node test/hints.cjs a.xlsx b.xlsx                      # o'xshash resurs takliflari o'lchovi
 node test/fixtures.cjs --smeta a.xlsx --registry r.xls  # o'lchov ma'lumotini yangilash
 sh server/deploy/rollback.sh root@IP v1.0             # serverni eski versiyaga qaytarish
 ```
@@ -47,8 +48,9 @@ va server rejimi `dist/index.html` + `dist/admin.html` (PocketBase orqali).
   Summalarni hisoblashda har doim qatorma-qator yig'ish kerak, «umumiy
   miqdor × bitta narx» emas.
 * NLP jadvallari (`sections.js` `LEX`, `regions.js` `NAME`/`PLACE`,
-  `match.js` `UNIT_SAME`) **o'lchovsiz o'zgartirilmaydi**: har bir o'zgarish
-  `test/sections.cjs` / `test/regions.cjs` raqamlari bilan asoslanadi.
+  `match.js` `UNIT_SAME`) va o'xshashlik bahosi (`match.js` `similarity`)
+  **o'lchovsiz o'zgartirilmaydi**: har bir o'zgarish `test/sections.cjs` /
+  `test/regions.cjs` / `test/hints.cjs` raqamlari bilan asoslanadi.
   Bir necha viloyatda uchraydigan joy nomi hech kimga berilmaydi.
 * Raqamlar hech qachon yo'qolmaydi: `АНКЕР М5` ≠ `АНКЕР М8`, `4.1.1` ≠ `4.11`;
   ikki raqam orasidagi ajratgich o'chirilmaydi.

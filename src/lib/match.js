@@ -330,6 +330,61 @@
     return 1 - d / max;
   }
 
+  /*
+   * The word that tells one resource from another.
+   *
+   * Two names can share every word but one and still be two different things:
+   * «ПЕРЕХОД ПОЛИЭТИЛЕНОВЫЙ Д-63Х20ММ» against «АДАПТЕР ПОЛИЭТИЛЕНОВЫЙ
+   * Д-63Х20ММ» — 5 210 against 82 087; «СТАНКИ СВЕРЛИЛЬНЫЕ» against «СТАНКИ
+   * ФРЕЗЕРНЫЕ» — eighteen times apart; «КАТКИ ДОРОЖНЫЕ САМОХОДНЫЕ ГЛАДКИЕ 8 Т»
+   * against «КАТКИ ДОРОЖНЫЕ ПРИЦЕПНЫЕ КУЛАЧКОВЫЕ 8 Т» — twenty-four. Four
+   * words out of five agree, so the cosine is high and the edit distance
+   * short, and the wrong price arrived at the top of the expert's list.
+   *
+   * What separates those from «ЩЕБЕНЬ ФРАКЦИЯ» / «ЩЕБЕНЬ ФРАКЦИИ» — one gravel
+   * declined two ways — is not how far apart the names are but whether the
+   * differing words are the same word. Two spellings of one word share a stem
+   * («ПОЛИЭТИЛЕНОВАЯ» / «ПОЛИЭТИЛЕНОВЫЕ») or lie a typo apart («KIYON» /
+   * «KLYON», «DAPXTU» / «DAPAXTI»). Two different words share neither.
+   *
+   * So: when each side carries a substantive word the other has no spelling
+   * of, they are different resources. One-sided is not enough — «БЕТОН В15»
+   * and «БЕТОН ТЯЖЕЛЫЙ КЛАССА В15» are one concrete spelled out further, and
+   * discounting that costs twenty-five true hints to win three false ones.
+   *
+   * Measured over the 846 priced resources of the three real workbooks,
+   * leave-one-out, exactly as hints.js ranks them. Of the resources offered a
+   * top suggestion: 162 before, 113 after; pointing at a price more than 25 %
+   * away, 37 before, 12 after; more than three times away, 13 before, 3 after.
+   * The twelve that remain are the same resource at another project's price,
+   * which is what the tier is for.
+   */
+  var MARK = 5;               // shorter words join things rather than name them
+
+  /** Two spellings of one word: a shared stem, or a typo apart. */
+  function sameWord(x, y) {
+    if (x === y) return true;
+    var n = Math.min(x.length, y.length), i = 0;
+    while (i < n && x.charAt(i) === y.charAt(i)) i++;
+    if (i >= 4 || i >= n * 0.6) return true;
+    return editDistance(x, y, 2) <= 2;
+  }
+
+  /** A substantive word of `ta` that `tb` has no spelling of. */
+  function unmatched(ta, tb) {
+    for (var i = 0; i < ta.length; i++) {
+      var w = ta[i], found = false;
+      if (w.length < MARK || /^[0-9]/.test(w)) continue;
+      for (var j = 0; j < tb.length && !found; j++)
+        if (tb[j].length >= MARK && sameWord(w, tb[j])) found = true;
+      if (!found) return true;
+    }
+    return false;
+  }
+
+  /** Each side names something the other does not. */
+  function substituted(ta, tb) { return unmatched(ta, tb) && unmatched(tb, ta); }
+
   /**
    * How alike two names read, 0..1.
    *
@@ -337,8 +392,9 @@
    * cosine, steady when the words are reordered or one name is longer), and
    * character distance (steady against a typo inside one long word).
    *
-   * Hard rule first: names whose numbers contradict each other are never
-   * similar, whatever the words say. That is what keeps «АНКЕР М5» away from
+   * Two hard rules first: names whose numbers contradict each other are never
+   * similar, and neither are names that each carry a word the other lacks a
+   * spelling of. That is what keeps «АНКЕР М5» away from
    * «АНКЕР М8» and «КРАН ДО 5 Т» away from «КРАН ДО 8 Т». A name that merely
    * adds a dimension the other lacks is allowed through at a discount — it may
    * be the same resource spelled out more fully, or another size.
@@ -348,6 +404,7 @@
     if (rel === 'conflict') return 0;
     var ta = tokens(a), tb = tokens(b);
     if (!ta.length || !tb.length) return 0;
+    if (substituted(ta, tb)) return 0;
     var score = Math.max(tokenScore(ta, tb, idf), charSimilarity(a, b));
     if (rel === 'extra') score *= 0.7;   // an added dimension may well be another size
     return Math.round(score * 1000) / 1000;

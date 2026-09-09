@@ -272,6 +272,10 @@ for (const odd of ['constructor', 'toString', '__proto__', 'hasOwnProperty', 'va
     `«${odd}» is a name, not a method (${JSON.stringify(S.matchKey(odd))})`);
   check(Array.isArray(S.tokens(odd)) && Array.isArray(S.numbers(odd)),
     `and its words and numbers come back as lists`);
+  // The identity key has its own memo, and it is the one a workbook cannot
+  // survive: unitKey called .replace on the function it got back.
+  check(typeof S.nameKey(odd) === 'string' && typeof S.unitKey(odd) === 'string',
+    `and the identity key answers with a key, not a method (${typeof S.nameKey(odd)})`);
 }
 check(S.matchKey('') === '' && S.matchKey(null) === '', 'an empty name still keys to nothing');
 // Asked twice, answered the same — the memo must not hand back another name's answer.

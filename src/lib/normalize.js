@@ -119,7 +119,11 @@ var S = (typeof S !== 'undefined' && S) || {};
     });
   }
 
-  var nkCache = {}, nkCount = 0;
+  /* Without a prototype: a resource or a unit named «constructor» is a key
+     like any other, not Object.prototype.constructor handed back as an answer.
+     unitKey then called .replace on a function and took the whole workbook
+     down with it. */
+  var nkCache = Object.create(null), nkCount = 0;
 
   /**
    * Resource-name key. Prices are keyed by name so one edit propagates to every
@@ -145,7 +149,7 @@ var S = (typeof S !== 'undefined' && S) || {};
       .replace(/[^A-ZА-ЯЎҚҒҲҮҢӨӘҺ0-9]+/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-    if (nkCount > 20000) { nkCache = {}; nkCount = 0; }   // a long session must not grow without bound
+    if (nkCount > 20000) { nkCache = Object.create(null); nkCount = 0; }   // a long session must not grow without bound
     nkCache[raw] = k; nkCount++;
     return k;
   }

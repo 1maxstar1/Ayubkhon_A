@@ -223,6 +223,32 @@ check(conflicts === 0, `${scored} pairs would be suggested, none with contradict
 check(scored > 20, `the suggestion pass finds something to offer (${scored} pairs)`);
 
 /*
+ * Glyphs that arrive from somewhere else.
+ *
+ * An estimate is pasted together out of other documents, and what comes with
+ * it is «м²», a diameter typed on a fullwidth keyboard, a grade written with
+ * the Roman-numeral codepoint or the Ukrainian І. None of those characters is
+ * in the alphabet the keys are built from, so all of them used to be struck
+ * out with the punctuation — and the number they carried went with them. That
+ * is the one thing this program may never do.
+ */
+console.log('-- a character that spells a digit is a digit --');
+check(S.unitKey('м²') === S.unitKey('М2'), `«м²» is the square metre (${S.unitKey('м²')})`);
+check(S.unitKey('м³') === S.unitKey('М3'), `«м³» is the cubic metre (${S.unitKey('м³')})`);
+check(S.unitKey('м²') !== S.unitKey('м'), 'and neither of them is the plain metre');
+check(S.matchPair('ПЛЕНКА ПОЛИЭТИЛЕНОВАЯ', 'м²') !== S.matchPair('ПЛЕНКА ПОЛИЭТИЛЕНОВАЯ', 'м'),
+  'so a price per square metre is never offered as the price of a metre');
+check(S.nameKey('ТРУБА Д-１１０ММ') !== S.nameKey('ТРУБА Д-１６０ММ'),
+  'two diameters typed in fullwidth digits are two resources');
+check(S.nameKey('ТРУБА Д-１１０ММ') === S.nameKey('ТРУБА Д-110ММ'),
+  'and a fullwidth diameter is the same resource as the plain one');
+check(S.nameKey('АРМАТУРА АІ') !== S.nameKey('АРМАТУРА АІІІ'),
+  'А-I and А-III written with the Ukrainian І are two steel grades');
+check(S.nameKey('АРМАТУРА АⅢ') === S.nameKey('АРМАТУРА АIII'),
+  'and the Roman-numeral codepoint spells the same grade as the letters');
+check(S.matchKey('ЛЮК Ⅱ СОРТА') === S.matchKey('ЛЮК II СОРТА'), 'the match key spells them out too');
+
+/*
  * The three string functions the matcher leans on remember their answers —
  * scoring one project against a region's history asks the same question about
  * the same few hundred names tens of thousands of times. The table that

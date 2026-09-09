@@ -19,6 +19,52 @@ var S = (typeof S !== 'undefined' && S) || {};
   var NBSP = /[   ]/g;
   var APOS = /[`‘’ʻʼ]/g;
 
+  /*
+   * Characters that spell a digit or a letter without being one.
+   *
+   * An estimate is often pasted together out of other documents, and what
+   * arrives is «м²», «Д-110ММ» typed on a fullwidth keyboard, «АРМАТУРА АⅢ»
+   * with the Roman-numeral codepoint, «А-І» with the Ukrainian І. None of them
+   * is in the alphabet the keys are built from, so all of them used to be
+   * struck out as punctuation — and the number they carried went with them:
+   * «м²» became «М», so a price per square metre was offered as the price of a
+   * metre, and two diameters typed in fullwidth digits became one resource.
+   *
+   * Spelled out in an explicit table rather than through a Unicode
+   * normalisation call, so the browser and the server's Goja cannot disagree
+   * about what a character means.
+   */
+  var SPELL = {
+    '¹': '1', '²': '2', '³': '3',
+    '⁰': '0', '⁴': '4', '⁵': '5', '⁶': '6',
+    '⁷': '7', '⁸': '8', '⁹': '9',
+    'Ⅰ': 'I', 'Ⅱ': 'II', 'Ⅲ': 'III', 'Ⅳ': 'IV', 'Ⅴ': 'V',
+    'Ⅵ': 'VI', 'Ⅶ': 'VII', 'Ⅷ': 'VIII', 'Ⅸ': 'IX', 'Ⅹ': 'X',
+    'Ⅺ': 'XI', 'Ⅻ': 'XII',
+    /* Cyrillic letters that are only ever a Latin one typed on the wrong layout */
+    'І': 'I', 'і': 'I', 'Ӏ': 'I', 'Ѕ': 'S', 'ѕ': 'S',
+    'Ј': 'J', 'ј': 'J'
+  };
+  var SPELL_RE = /[¹²³⁰⁴-⁹Ⅰ-Ⅻⅰ-ⅻІіӀЅѕЈј０-９Ａ-Ｚａ-ｚ]/g;
+
+  /** «м²» -> «м2», fullwidth «110» -> «110», «АⅢ» -> «АIII». */
+  function spell(s) {
+    SPELL_RE.lastIndex = 0;
+    if (!SPELL_RE.test(s)) { SPELL_RE.lastIndex = 0; return s; }
+    SPELL_RE.lastIndex = 0;
+    return s.replace(SPELL_RE, function (ch) {
+      var known = SPELL[ch];
+      if (known) return known;
+      var c = ch.charCodeAt(0);
+      if (c >= 0xFF10 && c <= 0xFF19) return String.fromCharCode(c - 0xFF10 + 48);
+      if (c >= 0xFF21 && c <= 0xFF3A) return String.fromCharCode(c - 0xFF21 + 65);
+      if (c >= 0xFF41 && c <= 0xFF5A) return String.fromCharCode(c - 0xFF41 + 65);
+      if (c >= 0x2170 && c <= 0x217B) return SPELL[String.fromCharCode(c - 0x2170 + 0x2160)] || ch;
+      return ch;
+    });
+  }
+
+
   /* Letters that look identical in both alphabets. Estimates are typed with the
      keyboard layout half-switched, so «СТАЛЬ» arrives with a Latin C and
      «КОМПРЕССОРЫ» with a Latin K — the same word, a different byte. */
@@ -94,7 +140,7 @@ var S = (typeof S !== 'undefined' && S) || {};
     // Ё for Е is optional Russian spelling; Ъ for Ь is the everyday typo in
     // «ГРУЗОПОДЪЕМНОСТЬЮ». No Russian word is told from another by Ъ against Ь,
     // while Ь against nothing does tell УГОЛ from УГОЛЬ — so Ь is never dropped.
-    var k = fold(raw.replace(NBSP, ' ').replace(APOS, "'").toUpperCase())
+    var k = fold(spell(raw.replace(NBSP, ' ').replace(APOS, "'").toUpperCase()))
       .replace(/Ё/g, 'Е')
       .replace(/Ъ/g, 'Ь')
       .replace(/[^A-ZА-ЯЎҚҒҲҮҢӨӘҺ0-9]+/g, ' ')
@@ -120,7 +166,7 @@ var S = (typeof S !== 'undefined' && S) || {};
   function unitKeyV1(s) { return nameKeyV1(s).replace(/[.\-\s]/g, ''); }
 
 
-  S.fold = fold; S.foldMarks = foldMarks;
+  S.fold = fold; S.foldMarks = foldMarks; S.spell = spell;
   S.nameKey = nameKey; S.unitKey = unitKey;
   S.nameKeyV1 = nameKeyV1; S.unitKeyV1 = unitKeyV1;
 })(S);
@@ -244,7 +290,10 @@ if (typeof self !== 'undefined') self.S = S;
    */
   var matchKey = memo(function (raw) {
     if (!raw) return '';
-    return squeeze(translit(S.foldMarks(S.fold(raw.toUpperCase()))));
+    // S.spell first, for the same reason the identity key does it: a character
+    // that spells a digit without being one must not be struck out with the
+    // punctuation, taking its number with it.
+    return squeeze(translit(S.foldMarks(S.fold(S.spell(raw.toUpperCase())))));
   }, MEMO);
 
   /* Units that name the same quantity. Applied to the alphabetic tail only, so

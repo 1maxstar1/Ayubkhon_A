@@ -115,7 +115,10 @@
    */
   var matchKey = memo(function (raw) {
     if (!raw) return '';
-    return squeeze(translit(S.foldMarks(S.fold(raw.toUpperCase()))));
+    // S.spell first, for the same reason the identity key does it: a character
+    // that spells a digit without being one must not be struck out with the
+    // punctuation, taking its number with it.
+    return squeeze(translit(S.foldMarks(S.fold(S.spell(raw.toUpperCase())))));
   }, MEMO);
 
   /* Units that name the same quantity. Applied to the alphabetic tail only, so

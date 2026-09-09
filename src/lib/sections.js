@@ -26,7 +26,20 @@
 (function (S) {
   'use strict';
 
-  /* Units that settle the matter by themselves. Keys are S.matchUnitKey form. */
+  /*
+   * Units that settle the matter by themselves, and settle it outright: an
+   * estimate hires a machine by the machine-hour and a worker by the man-hour,
+   * and nothing else in the book is priced in either. Keys are matchUnitKey
+   * form.
+   *
+   * They used to be worth six points and could be outvoted by the name. That
+   * is how «МАШИНЫ ДЛЯ ОЧИСТКИ И ГРУНТОВКИ ТРУБ ДИАМЕТРОМ 600-800ММ», priced
+   * in МАШ-Ч, came out a material: ГРУНТОВКА is a primer sold by the kilogram
+   * and the word appears twice over in that name. Measured on the labelled
+   * corpus, deciding by the unit is right 402 times out of 402 for МАШ-Ч and
+   * 5 of 5 for ЧЕЛ-Ч, and it removes the last mislabelled rows of both
+   * workbooks: held out, 824 right and 1 wrong became 825 and 0.
+   */
   var BY_UNIT = {
     CHELCH: 'labor',        // чел.-ч, ЧЕЛ-Ч, киши-соат
     CHASCH: 'labor',
@@ -143,8 +156,7 @@
 
     var uk = S.matchUnitKey(unit || '');
     if (uk && BY_UNIT[uk]) {
-      score[BY_UNIT[uk]] += 6;
-      evidence.push(uk);
+      return { section: BY_UNIT[uk], confidence: 1, evidence: [uk] };
     } else if (uk && UNIT_LEAN[uk]) {
       score[UNIT_LEAN[uk]] += 1;
       evidence.push(uk);

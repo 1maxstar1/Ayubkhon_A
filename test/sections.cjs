@@ -94,6 +94,19 @@ for (const band of ['machines', 'labor']) {
   const got = set.filter((r) => S.sections.classify(r.n, r.u).section === band).length;
   check(got / set.length >= 0.98, `${band}: ${got} of ${set.length} recognised on the held-out workbook`);
 }
+/* Nothing a machine is hired by the hour for is a material, whatever the name
+   mentions: «МАШИНЫ ДЛЯ ОЧИСТКИ И ГРУНТОВКИ ТРУБ» carries ГРУНТОВКА, which is
+   a primer sold by the kilogram, and that word used to outweigh the МАШ-Ч it
+   is priced in — the last two mislabelled rows of the whole corpus. */
+console.log('-- the unit a resource is priced in, when only a machine has it --');
+const byHour = S.sections.classify('МАШИНЫ ДЛЯ ОЧИСТКИ И ГРУНТОВКИ ТРУБ ДИАМЕТРОМ 600-800ММ', 'МАШ-Ч');
+check(byHour.section === 'machines', `a machine-hour is a machine (${byHour.section})`);
+check(byHour.confidence === 1, 'and nothing in the name is left to argue with it');
+check(S.sections.classify('ЗАТРАТЫ ТРУДА РАБОЧИХ-СТРОИТЕЛЕЙ', 'ЧЕЛ.-Ч').section === 'labor',
+  'a man-hour is labour');
+check(S.sections.classify('ГРУНТОВКА БИТУМНАЯ', 'КГ').section === 'materials',
+  'and the primer itself is still a material');
+
 // And nothing else may be mistaken for one of them.
 const falseMachines = held.filter((r) => r.s !== 'machines' && S.sections.classify(r.n, r.u).section === 'machines');
 check(falseMachines.length <= 2,

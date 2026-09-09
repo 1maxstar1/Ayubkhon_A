@@ -1460,9 +1460,21 @@ if (typeof self !== 'undefined') self.S = S;
    */
   var SKIP = { XORAZMIY: 1, XORAZMI: 1, XORAZMIYNOMLI: 1 };
   var SKIP_AFTER = { ALISHER: 1, ABU: 1, ABURAYHON: 1, AL: 1, MIRZO: 1 };
-  /* A place name followed by one of these is a street or a mahalla named after
-     it, not the place: «Навоий кўчаси» in Tashkent is a street, and
-     «"Zarafshon" MFY» in Surxondaryo is a neighbourhood. */
+  /*
+   * A place name followed by one of these is a street or a mahalla named after
+   * it, not the place: «Навоий кўчаси» in Tashkent is a street, and
+   * «"Zarafshon" MFY» in Surxondaryo is a neighbourhood.
+   *
+   * An exact list, and Uzbek declines these words endlessly — кўчасини,
+   * кўчасининг, кўчасидан, кўчаларида, махалласини. Measured before widening
+   * it to a stem match: the registry's 1247 applications carry 42 such
+   * spellings the list does not have, 150 times over; nine of them stand right
+   * after a name in the gazetteer, and not one changes the answer, because
+   * every one of those rows also names its district — «Чилонзор тумани
+   * Арнасой кўчасидаги», «Миробод тумани … Нукус кўчасидан» — and a district
+   * outweighs a street. So the list stays as it is: a stem match would buy
+   * nothing here and would have to be taught that КЎЧАТ is a sapling.
+   */
   var SKIP_BEFORE = {
     KOCHASI: 1, KOCHA: 1, KUCHASI: 1, KUCHA: 1, KOCHASIDA: 1, KUCHASIDA: 1,
     ULITSA: 1, ULITSI: 1, PROSPEKT: 1, PROSPEKTI: 1, SHOXKOCHASI: 1,

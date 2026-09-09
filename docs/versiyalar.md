@@ -16,7 +16,7 @@ Bu hujjat ikki savolga javob beradi:
 | **v1.0** | NLP qatlamidan **oldingi** dastur. Reyestr, ish maydonlari, aniq nom bo'yicha narx eslatmalari, viloyat — regex bilan. | `7718eb41c9c3888019c6c18711cd96b8da64e3f7` |
 | **v2.0** | Resursni ikki alifboda tanish, o'xshash nomlar bo'yicha narx taklifi, bo'limni nomdan aniqlash, viloyatni gazetteer bilan aniqlash. | `e0acf169821b61429afe314df6191e4527467272` |
 | **v2.1** | Ikki to'liq tekshiruvning tuzatishlari: narxlarni bitta so'rovda yozish, o'chirilgan hisobning sessiyasini tugatish, fayl havolasini bosilganda imzolash, zaxira sog'ligi banti, eslatmalarni tezlashtirish. Yangi imkoniyat qo'shilmagan — o'zgarishlar tuzatish. | `85128579c2c6e3e7f7dc1c7e57336e1312d7cf35` |
-| **v2.2** | Uchinchi tekshiruvning tuzatishlari (`docs/audit-3-reja.md`): boshqa mahsulot narxini taklif qilmaslik (37 → 12 uzoq taklif), mashina-soatni hal qiluvchi qilish, `updated` ni buzmaydigan migratsiya, «Сбросить» ni bo'laklab yuborish, to'la sahifani ikkiga bo'lish; `м²`, to'liq kenglikdagi raqamlar va rim raqamlarini tanish. Yangi o'lchov: `test/hints.cjs`. | (quyida) |
+| **v2.2** | Uchinchi tekshiruvning tuzatishlari (`docs/audit-3-reja.md`): boshqa mahsulot narxini taklif qilmaslik (37 → 12 uzoq taklif), mashina-soatni hal qiluvchi qilish, `updated` ni buzmaydigan migratsiya, «Сбросить» ni bo'laklab yuborish, to'la sahifani ikkiga bo'lish; `м²`, to'liq kenglikdagi raqamlar va rim raqamlarini tanish. Yangi o'lchov: `test/hints.cjs`. | `80f64f165c590935688d0006dd426c5ba1e638e7` |
 
 Versiya — bu shunchaki **commit**. Git har bir o'zgarishni saqlaydi, shuning
 uchun «eski versiya» hech qayerga yo'qolmaydi: u tarixda turadi va istalgan

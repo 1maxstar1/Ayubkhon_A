@@ -6427,7 +6427,20 @@ if (typeof self !== 'undefined') self.S = S;
       // of the session, with nothing on screen to say why.
 
       var got = 0, fresh = {};
-      Promise.all(chunk(list).map(function (ch) {
+      /*
+       * One request asks for as many keys as fit in a filter, and takes the
+       * newest thousand rows of the answer. Those two numbers are not related,
+       * and a region's history only grows: forty keys in a chunk, one of them
+       * a resource every project buys, and that one resource's thousand newest
+       * corrections are the whole page — the other thirty-nine keys come back
+       * empty, are marked fetched, and stay without a hint for the rest of the
+       * session, with nothing on screen to say why.
+       *
+       * So a full page is not an answer: the chunk is halved and asked again,
+       * down to a single key, where a thousand of one resource's own prices is
+       * more than the popover's twelve will ever show.
+       */
+      function fetchKeys(ch) {
         var params = { w: ws.id, r: ws.region };
         var ors = ch.map(function (k, i) { params['k' + i] = k; return 'match_key = {:k' + i + '}'; }).join(' || ');
         // Newest first, and a ceiling: a region's history only grows, and the
@@ -6436,13 +6449,18 @@ if (typeof self !== 'undefined') self.S = S;
           filter: S.pb.filter('region = {:r} && workspace != {:w} && (' + ors + ')', params),
           sort: '-updated', expand: 'application,contragent,by', fields: FIELDS
         }).then(function (res) {
+          if (ch.length > 1 && res.totalItems > PER_CHUNK) {
+            var half = Math.ceil(ch.length / 2);
+            return Promise.all([fetchKeys(ch.slice(0, half)), fetchKeys(ch.slice(half))]);
+          }
           res.items.forEach(function (c) {
             var h = hintOf(c);
             (fresh[S.matchPair(c.name, c.unit || '')] = fresh[S.matchPair(c.name, c.unit || '')] || []).push(h);
             got++;
           });
         });
-      })).then(function () {
+      }
+      Promise.all(chunk(list).map(fetchKeys)).then(function () {
         list.forEach(function (k) { self.fetched[k] = 1; });
         // rank first, publish after: a half-loaded map would show unsorted tags
         Object.keys(fresh).forEach(function (mk) { self.map[mk] = rank((self.map[mk] || []).concat(fresh[mk])); });

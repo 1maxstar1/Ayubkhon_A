@@ -141,6 +141,50 @@ const applied = await page.evaluate((p) => p.map((x) => app.prices[x.key]), pick
 check(applied.includes(picked[0].market) || applied.includes(picked[1].market), 'Qo\'llash applied the hinted price');
 await page.evaluate(() => S.Sync.q);
 await page.waitForFunction(() => !S.Sync.dirty, null, { timeout: 15000 });
+
+/*
+ * One request asks for as many keys as fit in a filter and takes the newest
+ * thousand rows of the answer. A resource every project buys can fill that
+ * page by itself, and then every other key in the chunk comes back empty, is
+ * marked fetched, and stays without a hint for the rest of the session with
+ * nothing on screen to say why. So a full page is not an answer.
+ *
+ * The server is answered from here rather than seeded with a thousand rows of
+ * one name: every request for more than one key is told the page overflowed.
+ */
+const asked = await page.evaluate(() => {
+  const real = S.pb.collection.bind(S.pb);
+  const seen = [];
+  S.pb.collection = function (name) {
+    const c = real(name);
+    if (name !== 'corrections') return c;
+    const getList = c.getList.bind(c);
+    c.getList = function (page, per, opts) {
+      const keys = (String(opts.filter).match(/match_key = /g) || []).length;
+      if (!keys) return getList(page, per, opts);          // the prefix pass, left alone
+      seen.push(keys);
+      return Promise.resolve(keys > 1 ? { items: [], totalItems: per + 1 } : { items: [], totalItems: 3 });
+    };
+    return c;
+  };
+  window.__seen = seen;
+  S.Hints.fetched = {};
+  S.Hints.load();
+  return new Set(app.model.resources.map((r) => S.matchKey(r.name)).filter(Boolean)).size;
+});
+await page.waitForFunction((n) => Object.keys(S.Hints.fetched).length === n, asked, { timeout: 30000 });
+const seen = await page.evaluate(() => {
+  const s = window.__seen;
+  delete window.__seen;
+  return { alone: s.filter((n) => n === 1).length, most: Math.max.apply(null, s), all: s.length };
+});
+check(seen.most > 1, `the first request asks for a chunk of keys at once (${seen.most})`);
+check(seen.alone === asked, `and every key of a full page is asked for on its own (${seen.alone} of ${asked})`);
+await page.reload();
+await page.waitForSelector('#screen-list:not([hidden])');
+await openApp(B.number);
+await page.waitForFunction(() => Object.keys(S.Hints.map).length > 0, null, { timeout: 20000 });
+
 await closeApp();
 
 // C: same contragent as A (when the fixture has one) -> "same" first

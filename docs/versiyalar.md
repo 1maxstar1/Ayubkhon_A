@@ -60,17 +60,24 @@ Tegsiz ham hammasi ishlaydi — `rollback.sh` ga commit raqamini bersangiz bo'ld
 Har safar **shu ketma-ketlikda** qiling. Uchinchi qadam eng muhimi: zaxira
 bo'lmasa, orqaga qaytish ham bo'lmaydi.
 
+Quyidagi buyruqlarda **`reestr.xls`, `smeta1.xlsx`, `smeta2.xlsx` va
+`SERVER_IP` — o'rnini bosuvchi nomlar**: ular o'rniga o'z fayllaringizning
+yo'lini va serveringizning haqiqiy IP manzilini yozing. Aynan shu holda
+nusxalab qo'yilsa, skriptlar buni aytadi va to'xtaydi.
+
 ```sh
 # 1. Barcha testlar o'tishini tekshiring (o'z kompyuteringizda)
-sh test/all.sh reestr.xls smeta1.xlsx smeta2.xlsx
+sh test/all.sh ~/Downloads/reestr.xls ~/Downloads/smeta1.xlsx ~/Downloads/smeta2.xlsx
 #    "25 ok, 0 fail" chiqishi kerak
+#    brauzer testlari uchun bir marta: npm i -D playwright && npx playwright install chromium
+#    o'rnatilmagan bo'lsa ular "SKIP" deb belgilanadi, xato emas
 
 # 2. Serverdagi hozirgi holatni yuklab oling
-sh server/deploy/pull-backup.sh root@SERVER_IP
+sh server/deploy/pull-backup.sh root@203.0.113.17
 #    ~/Backups/smeta/ ga .zip tushadi — bu sizning "qaytish nuqtangiz"
 
 # 3. Yangi versiyani chiqaring
-sh server/deploy/push.sh root@SERVER_IP
+sh server/deploy/push.sh root@203.0.113.17
 
 # 4. Brauzerda tekshiring: Ctrl+Shift+R, sarlavhadagi versiya raqami yangimi?
 ```

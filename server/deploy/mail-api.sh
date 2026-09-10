@@ -7,6 +7,7 @@
 set -e
 TARGET="$1"; KEY="$2"; SENDER="$3"
 [ -n "$SENDER" ] || { echo "usage: sh server/deploy/mail-api.sh root@IP 'brevo-api-key' sender@email"; exit 1; }
+. "$(dirname "$0")/target.sh"
 ssh "$TARGET" "cd /opt/taqqoslash/server && \
   grep -q '^BREVO_API_KEY=' .env || printf '\nBREVO_API_KEY=\n' >> .env; \
   sed -i \"s|^BREVO_API_KEY=.*|BREVO_API_KEY=$KEY|; s|^SENDER_ADDRESS=.*|SENDER_ADDRESS=$SENDER|\" .env && \

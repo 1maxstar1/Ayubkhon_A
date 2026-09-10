@@ -7,6 +7,7 @@
 set -e
 TARGET="$1"; HOST="$2"; PORT="$3"; USER="$4"; PASS="$5"; TLS="${6:-false}"
 [ -n "$PASS" ] || { echo "usage: sh server/deploy/smtp.sh root@IP smtp-host port login 'password' [tls:true|false]"; exit 1; }
+. "$(dirname "$0")/target.sh"
 echo "--- $HOST:$PORT serverdan ochiqmi (IPv4):"
 BANNER=$(ssh "$TARGET" "curl -4 -sS -m 8 telnet://$HOST:$PORT </dev/null 2>&1 | head -1" || true)
 case "$BANNER" in

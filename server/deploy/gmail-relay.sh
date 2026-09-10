@@ -7,6 +7,7 @@
 set -e
 TARGET="$1"; URL="$2"; SECRET="$3"
 [ -n "$URL" ] || { echo "usage: sh server/deploy/gmail-relay.sh root@IP 'https://script.google.com/macros/s/…/exec' 'SECRET'"; exit 1; }
+. "$(dirname "$0")/target.sh"
 if [ "$URL" = off ]; then URL=""; SECRET=""; fi
 ssh "$TARGET" "cd /opt/taqqoslash/server && \
   grep -q '^GMAIL_RELAY_URL=' .env || printf '\nGMAIL_RELAY_URL=\nGMAIL_RELAY_SECRET=\n' >> .env; \

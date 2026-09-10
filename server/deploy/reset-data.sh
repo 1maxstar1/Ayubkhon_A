@@ -7,6 +7,7 @@
 set -e
 TARGET="$1"; OK="$2"
 [ -n "$TARGET" ] || { echo "usage: sh server/deploy/reset-data.sh root@IP YES"; exit 1; }
+. "$(dirname "$0")/target.sh"
 if [ "$OK" != YES ]; then
   echo "Bu buyruq serverdagi BARCHA arizalar, ish maydonlari, tuzatishlar va"
   echo "eksportlarni o'chiradi (foydalanuvchilar qoladi). Rozi bo'lsangiz:"

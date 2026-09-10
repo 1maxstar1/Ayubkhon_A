@@ -5,6 +5,7 @@
 #   sh server/deploy/mail-check.sh root@SERVER_IP [you@example.com]
 TARGET="$1"; TO="$2"
 [ -n "$TARGET" ] || { echo "usage: sh server/deploy/mail-check.sh root@IP [email]"; exit 1; }
+. "$(dirname "$0")/target.sh"
 ssh "$TARGET" "cd /opt/taqqoslash/server && . ./.env && \
   echo '--- service';   systemctl is-active pocketbase; \
   echo '--- .env';      grep -E '^(GMAIL_RELAY_URL|BREVO_API_KEY|SENDER_ADDRESS|SMTP_HOST|PB_DOMAIN)=' .env | sed 's/\(BREVO_API_KEY=xkeysib-.\{8\}\).*/\1…/'; \

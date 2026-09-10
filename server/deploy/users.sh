@@ -6,6 +6,7 @@
 set -e
 TARGET="$1"; shift
 [ -n "$1" ] || { echo "usage: sh server/deploy/users.sh root@IP email1 [email2 …]"; exit 1; }
+. "$(dirname "$0")/target.sh"
 ROLE="${ROLE:-ekspert}"
 # The whole job runs on the server in one ssh session (LOCAL=1 runs it here, for tests).
 CMD='

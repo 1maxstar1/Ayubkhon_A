@@ -4,6 +4,7 @@
 set -e
 TARGET="$1"; DEST="${2:-$HOME/Backups/smeta}"
 [ -n "$TARGET" ] || { echo "usage: sh server/deploy/pull-backup.sh root@IP [dest]"; exit 1; }
+. "$(dirname "$0")/target.sh"
 mkdir -p "$DEST"
 # Both halves are checked before anything is downloaded: this script used to
 # announce «saqlandi» over yesterday's backup when the sign-in returned nothing

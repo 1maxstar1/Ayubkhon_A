@@ -6,6 +6,29 @@ cd "$(dirname "$0")/.."
 REG="$1"; S1="$2"; S2="$3"
 OUT=test/all-results.txt
 : > "$OUT"
+
+# The usage line above names the files by what they are, not by their real
+# paths, and those names have been typed in literally — a whole run then ends
+# in a node stack trace saying ENOENT smeta1.xlsx, which says the same thing
+# far less clearly. Said once, here, before anything runs.
+for F in "$REG" "$S1" "$S2"; do
+  [ -z "$F" ] && continue
+  [ -f "$F" ] && continue
+  echo "fayl topilmadi: $F"
+  echo
+  echo "  test/all.sh ga o'z fayllaringizning yo'lini bering, masalan:"
+  echo "  sh test/all.sh ~/Downloads/reestr.xls ~/Downloads/smeta1.xlsx ~/Downloads/smeta2.xlsx"
+  echo
+  echo "  fayllarsiz ham ishlaydi — u holda smetaga bog'liq testlar o'tkazib yuboriladi:"
+  echo "  sh test/all.sh"
+  exit 1
+done
+
+# The browser tests need a browser. Without playwright each of them ends in the
+# same twelve-line «Cannot find package» trace, which reads like seven separate
+# failures of the program rather than one missing dependency.
+if node -e "require.resolve('playwright')" 2>/dev/null; then PW=1; else PW=0; fi
+
 run() {
   NAME="$1"; shift
   printf '%-22s ' "$NAME"
@@ -17,6 +40,18 @@ run() {
   [ "$R" = FAIL ] && tail -15 "test/.log-$NAME.txt"
   return 0
 }
+skip() {
+  printf '%-22s %-4s %3s   %s\n' "$1" "SKIP" "-" "$2"
+  printf '%s\tSKIP\t0\n' "$1" >> "$OUT"
+}
+# A browser test with no browser, or a smeta test with no smeta, is skipped by
+# name rather than left out of the summary: a run that says «20 ok» and lists
+# twenty tests is telling the truth about a suite of twenty-five only if it
+# says which five it did not run.
+browser_run() { if [ "$PW" = 1 ]; then run "$@"; else skip "$1" "playwright o'rnatilmagan: npm i -D playwright && npx playwright install chromium"; fi; }
+smeta_run() { if [ -n "$S1" ]; then run "$@"; else skip "$1" "smeta fayli berilmagan"; fi; }
+both_run() { if [ -n "$S1" ]; then browser_run "$@"; else skip "$1" "smeta fayli berilmagan"; fi; }
+
 node build.mjs --serve >/dev/null
 echo "test                   sonuc  vaqt"
 echo "-----------------------------------"
@@ -25,8 +60,8 @@ run normalize        node test/normalize.cjs
 run xlsx-guard       node test/xlsx-guard.cjs
 run sections         node test/sections.cjs
 run regions          node test/regions.cjs
-[ -n "$S1" ] && run pipeline  node test/pipeline.cjs "$S1" "$S2" --out test/out.xlsx
-[ -n "$S1" ] && run hints     node test/hints.cjs "$S1" "$S2"
+smeta_run pipeline       node test/pipeline.cjs "$S1" "$S2" --out test/out.xlsx
+smeta_run hints          node test/hints.cjs "$S1" "$S2"
 run registry-parse   node test/registry.cjs
 run pb-smoke         sh test/pb-smoke.sh
 run install          node test/install.mjs
@@ -38,14 +73,20 @@ run match-keys       node test/match-keys.mjs
 run corrections-bulk node test/corrections-bulk.mjs
 run ownership        node test/ownership.mjs
 run disable-user     node test/disable-user.mjs
-[ -n "$S1" ] && run browser   node test/browser.mjs "$S1" "$S2"
-run e2e-auth         node test/e2e-auth.mjs
-run e2e-admin        node test/e2e-admin.mjs
-run upload-order     node test/upload-order.mjs
-[ -n "$S1" ] && run e2e-workspace node test/e2e-workspace.mjs "$S1" "$S2"
-[ -n "$S1" ] && run e2e-hints     node test/e2e-hints.mjs "$S1"
-[ -n "$REG" ] && run e2e-fullregistry node test/e2e-fullregistry.mjs "$REG"
+both_run  browser        node test/browser.mjs "$S1" "$S2"
+browser_run e2e-auth     node test/e2e-auth.mjs
+browser_run e2e-admin    node test/e2e-admin.mjs
+browser_run upload-order node test/upload-order.mjs
+both_run  e2e-workspace  node test/e2e-workspace.mjs "$S1" "$S2"
+both_run  e2e-hints      node test/e2e-hints.mjs "$S1"
+if [ -n "$REG" ]; then browser_run e2e-fullregistry node test/e2e-fullregistry.mjs "$REG"; else skip e2e-fullregistry "reyestr fayli berilmagan"; fi
 echo "-----------------------------------"
-FAILED=$(grep -c 'FAIL' "$OUT" || true)
-echo "$(grep -c OK "$OUT") ok, $FAILED fail"
+# Counted by column rather than by grepping for the word: «\t» is a tab to GNU
+# grep and the letter t to the one on a Mac, and the summary is the line most
+# likely to be believed without checking.
+count() { awk -F'\t' -v r="$1" '$2 == r { n++ } END { print n + 0 }' "$OUT"; }
+FAILED=$(count FAIL)
+PASSED=$(count OK)
+SKIPPED=$(count SKIP)
+echo "$PASSED ok, $FAILED fail$([ "$SKIPPED" -gt 0 ] && echo ", $SKIPPED skip")"
 [ "$FAILED" = 0 ]

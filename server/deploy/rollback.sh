@@ -14,6 +14,7 @@
 # would be the one step that could not be undone.
 set -e
 TARGET="$1"; TAG="$2"
+. "$(dirname "$0")/target.sh"
 cd "$(dirname "$0")/../.."
 
 if [ -z "$TARGET" ]; then

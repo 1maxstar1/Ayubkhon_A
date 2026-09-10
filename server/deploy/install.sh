@@ -12,6 +12,19 @@ TEST="${NO_SYSTEMD:-0}"
 TMP_PORT="${PB_SETUP_PORT:-8091}"
 cd "$APP/server"
 
+# In-place editing, spelled so that both seds understand it. GNU sed reads the
+# script after -i, BSD sed reads a backup suffix there, so no single spelling
+# of an in-place sed works on both — and on a Mac this script died right here,
+# half-installed, under `set -e`, with nothing in the output to say which line
+# it was. The file is rewritten through its own inode, so .env keeps the 600 it
+# was created with.
+edit() {
+  _f=$1; shift
+  _t="$_f.editing.$$"
+  sed "$@" "$_f" > "$_t" && cat "$_t" > "$_f"
+  rm -f "$_t"
+}
+
 if [ "$TEST" != 1 ]; then
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -qq && apt-get install -y -qq curl unzip ca-certificates ufw openssl >/dev/null
@@ -33,12 +46,12 @@ if [ ! -f .env ]; then
   echo "yangi .env yaratildi (superuser paroli ichida): $APP/server/.env"
 fi
 if [ -n "$PB_DOMAIN" ]; then
-  sed -i "s|^PB_DOMAIN=.*|PB_DOMAIN=$PB_DOMAIN|; s|^APP_URL=.*|APP_URL=https://$PB_DOMAIN|" .env
+  edit .env -e "s|^PB_DOMAIN=.*|PB_DOMAIN=$PB_DOMAIN|" -e "s|^APP_URL=.*|APP_URL=https://$PB_DOMAIN|"
 elif ! grep -q '^PB_DOMAIN=.' .env; then
-  sed -i "s|^APP_URL=.*|APP_URL=http://$IP|" .env
+  edit .env -e "s|^APP_URL=.*|APP_URL=http://$IP|"
 fi
 # the sender name used to be Latin; keep existing custom values, refresh the old default
-sed -i 's|^SENDER_NAME="Taqqoslash jadvali"|SENDER_NAME="Таблица сопоставления №2"|' .env
+edit .env -e 's|^SENDER_NAME="Taqqoslash jadvali"|SENDER_NAME="Таблица сопоставления №2"|'
 . ./.env
 
 # 3. superuser + collections (setup.sh runs its own temporary instance)

@@ -7,6 +7,7 @@
 set -e
 TARGET="$1"; DOMAIN="$2"
 [ -n "$TARGET" ] || { echo "usage: sh server/deploy/push.sh root@IP [domain]"; exit 1; }
+. "$(dirname "$0")/target.sh"
 cd "$(dirname "$0")/../.."
 command -v node >/dev/null || { echo "node kerak (brew install node)"; exit 1; }
 node build.mjs --serve

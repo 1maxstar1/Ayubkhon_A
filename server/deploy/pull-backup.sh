@@ -1,9 +1,11 @@
 #!/bin/sh
 # Run on your Mac: makes a fresh backup on the server and downloads it.
 #   sh server/deploy/pull-backup.sh root@SERVER_IP [~/Backups/smeta]
+#   sh server/deploy/pull-backup.sh                      (the address that worked last time)
 set -e
-TARGET="$1"; DEST="${2:-$HOME/Backups/smeta}"
-[ -n "$TARGET" ] || { echo "usage: sh server/deploy/pull-backup.sh root@IP [dest]"; exit 1; }
+# Once the address is remembered (deploy/.target) the first argument may be
+# left out, and then a bare path is still the destination.
+case "$1" in *@*|'') TARGET="$1"; DEST="${2:-$HOME/Backups/smeta}" ;; *) TARGET=""; DEST="$1" ;; esac
 . "$(dirname "$0")/target.sh"
 mkdir -p "$DEST"
 # Both halves are checked before anything is downloaded: this script used to
@@ -21,3 +23,4 @@ ssh "$TARGET" 'cd /opt/taqqoslash/server && . ./.env && \
 LATEST=$(ssh "$TARGET" 'ls -t /opt/taqqoslash/server/pb_data/backups/*.zip | head -1')
 scp -q "$TARGET:$LATEST" "$DEST/"
 echo "saqlandi: $DEST/$(basename "$LATEST")"
+remember_target

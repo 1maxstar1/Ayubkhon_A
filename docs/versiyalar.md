@@ -60,27 +60,41 @@ Tegsiz ham hammasi ishlaydi — `rollback.sh` ga commit raqamini bersangiz bo'ld
 Har safar **shu ketma-ketlikda** qiling. Uchinchi qadam eng muhimi: zaxira
 bo'lmasa, orqaga qaytish ham bo'lmaydi.
 
-Quyidagi buyruqlarda **`reestr.xls`, `smeta1.xlsx`, `smeta2.xlsx` va
-`SERVER_IP` — o'rnini bosuvchi nomlar**: ular o'rniga o'z fayllaringizning
-yo'lini va serveringizning haqiqiy IP manzilini yozing. Aynan shu holda
-nusxalab qo'yilsa, skriptlar buni aytadi va to'xtaydi.
+Server manzili **bir marta** topiladi va eslab qolinadi (`server/deploy/.target`,
+gitga tushmaydi); shundan keyin chiqarish buyruqlari argumentsiz ishlaydi.
+Manzilni o'zingiz yozishingiz shart emas — `find-server.sh` uni shu
+kompyuterning tarixidan (oldingi `push.sh`, `ssh`) va `~/.ssh` dan topadi:
 
 ```sh
-# 1. Barcha testlar o'tishini tekshiring (o'z kompyuteringizda)
-sh test/all.sh ~/Downloads/reestr.xls ~/Downloads/smeta1.xlsx ~/Downloads/smeta2.xlsx
-#    "25 ok, 0 fail" chiqishi kerak
-#    brauzer testlari uchun bir marta: npm i -D playwright && npx playwright install chromium
-#    o'rnatilmagan bo'lsa ular "SKIP" deb belgilanadi, xato emas
+sh server/deploy/find-server.sh        # topilganlarni raqamlab ko'rsatadi
+sh server/deploy/find-server.sh 1      # birinchisini tekshiradi (ssh) va eslab qoladi
+```
 
-# 2. Serverdagi hozirgi holatni yuklab oling
-sh server/deploy/pull-backup.sh root@203.0.113.17
-#    ~/Backups/smeta/ ga .zip tushadi — bu sizning "qaytish nuqtangiz"
+Hech narsa topilmasa, manzil brauzerda: dastur ochiladigan sahifaning manzil
+qatorida `http://` dan keyin turgan raqamlar. Shu raqamlarni `root@` dan keyin
+yozib bering: `sh server/deploy/find-server.sh root@` + raqamlar.
+
+Chiqarishning o'zi — har safar shu to'rt qadam:
+
+```sh
+# 1. Barcha testlar (fayllarsiz ham bo'ladi — smetaga bog'liqlari SKIP bo'ladi)
+sh test/all.sh
+#    "… ok, 0 fail" chiqishi kerak. Smeta fayllari bilan to'liq tekshirish uchun
+#    «sh test/all.sh » deb yozing va fayllarni Finder'dan terminalga sudrab tashlang.
+#    Brauzer testlari uchun bir marta: npm i -D playwright, keyin npx playwright install chromium
+
+# 2. Serverdagi hozirgi holatni yuklab oling — bu sizning "qaytish nuqtangiz"
+sh server/deploy/pull-backup.sh
 
 # 3. Yangi versiyani chiqaring
-sh server/deploy/push.sh root@203.0.113.17
+sh server/deploy/push.sh
 
-# 4. Brauzerda tekshiring: Ctrl+Shift+R, sarlavhadagi versiya raqami yangimi?
+# 4. Brauzerda tekshiring: Cmd+Shift+R (Windows: Ctrl+Shift+R), sarlavhadagi versiya raqami yangimi?
 ```
+
+Skriptlarga manzilni qo'lda ham berish mumkin (`sh server/deploy/push.sh root@…`);
+ko'rsatmadagi `root@SERVER_IP` yoki misoldagi raqam aynan shu holda berilsa,
+skript buni aytadi va hech narsa qilmasdan to'xtaydi.
 
 Keyin **bir necha kun haqiqiy ish bilan sinang**: bitta arizani oching,
 narxlarni kiriting, hujjatni eksport qiling, natijani eski hujjat bilan
@@ -91,10 +105,11 @@ solishtiring.
 Agar yangi versiya biror joyda noto'g'ri ishlasa:
 
 ```sh
-sh server/deploy/rollback.sh root@SERVER_IP v1.0
+sh server/deploy/rollback.sh v2.1
 ```
 
-Skript uch ish qiladi:
+(Manzil eslab qolingan bo'lsa — yuqoridagi `find-server.sh` — yozilmaydi;
+aks holda `sh server/deploy/rollback.sh root@… v2.1`.) Skript uch ish qiladi:
 
 1. **serverda yangi zaxira oladi** — ya'ni qaytishning o'zi ham qaytariladi;
 2. eski versiyani **vaqtinchalik nusxada** yig'adi, sizning fayllaringizga
@@ -108,7 +123,7 @@ qaytarib bo'lmaydigan qadam bo'lardi.
 Qayta oldinga yurish uchun oddiy `push.sh` yetarli:
 
 ```sh
-sh server/deploy/push.sh root@SERVER_IP
+sh server/deploy/push.sh
 ```
 
 ### Ma'lumot yo'qoladimi?

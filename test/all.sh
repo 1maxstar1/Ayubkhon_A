@@ -66,6 +66,7 @@ run regions          node test/regions.cjs
 smeta_run pipeline       node test/pipeline.cjs "$S1" "$S2" --out test/out.xlsx
 smeta_run hints          node test/hints.cjs "$S1" "$S2"
 run registry-parse   node test/registry.cjs
+run deploy-target    sh test/deploy-target.sh
 run pb-smoke         sh test/pb-smoke.sh
 run install          node test/install.mjs
 run registry-import  sh test/registry-import.sh

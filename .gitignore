@@ -17,3 +17,4 @@ test/all-results.txt
 server/pb_data_walk/
 server/.env
 test/.book.json
+server/deploy/.target

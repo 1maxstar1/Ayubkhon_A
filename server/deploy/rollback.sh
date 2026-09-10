@@ -13,8 +13,10 @@
 # release does not know about are simply ignored by it, and dropping them
 # would be the one step that could not be undone.
 set -e
-TARGET="$1"; TAG="$2"
-. "$(dirname "$0")/target.sh"
+# Once the address is remembered (deploy/.target) the first argument may be
+# left out, and then a bare word is the version.
+case "$1" in *@*|'') TARGET="$1"; TAG="$2" ;; *) TARGET=""; TAG="$1" ;; esac
+if [ -n "$TARGET" ] || [ -f "$(dirname "$0")/.target" ]; then . "$(dirname "$0")/target.sh"; fi
 cd "$(dirname "$0")/../.."
 
 if [ -z "$TARGET" ]; then

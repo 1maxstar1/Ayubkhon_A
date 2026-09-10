@@ -234,10 +234,11 @@ chiqarishdan oldin zaxira oling, chiqargandan keyin bir necha kun haqiqiy ish
 bilan sinang; biror narsa noto'g'ri bo'lsa — bitta buyruq bilan qayting:
 
 ```sh
-sh test/all.sh reestr.xls a.xlsx b.xlsx      # avval testlar (fayl nomlari — o'zingiznikiga almashtiriladi)
-sh server/deploy/pull-backup.sh root@IP      # zaxira
-sh server/deploy/push.sh root@IP             # chiqarish
-sh server/deploy/rollback.sh root@IP v1.0    # kerak bo'lsa — qaytish
+sh server/deploy/find-server.sh 1            # bir marta: server manzilini topib eslab qolish
+sh test/all.sh                               # avval testlar (smeta fayllari bilan — to'liqroq)
+sh server/deploy/pull-backup.sh              # zaxira
+sh server/deploy/push.sh                     # chiqarish
+sh server/deploy/rollback.sh v2.1            # kerak bo'lsa — qaytish
 ```
 
 Ma'lumot ikkala yo'nalishda ham saqlanadi: ish maydoni narxlarni ikkala

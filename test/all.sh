@@ -16,11 +16,14 @@ for F in "$REG" "$S1" "$S2"; do
   [ -f "$F" ] && continue
   echo "fayl topilmadi: $F"
   echo
-  echo "  test/all.sh ga o'z fayllaringizning yo'lini bering, masalan:"
-  echo "  sh test/all.sh ~/Downloads/reestr.xls ~/Downloads/smeta1.xlsx ~/Downloads/smeta2.xlsx"
+  echo "  Bu yerga o'z faylingizning yo'li kerak. Eng oson yo'li: buyruqni"
+  echo "  «sh test/all.sh » deb yozing va faylni Finder'dan terminal oynasiga"
+  echo "  sudrab tashlang — yo'li o'zi yoziladi. Uchtagacha fayl beriladi:"
+  echo "  reyestr (.xls), keyin ikkita smeta (.xlsx)."
   echo
-  echo "  fayllarsiz ham ishlaydi — u holda smetaga bog'liq testlar o'tkazib yuboriladi:"
-  echo "  sh test/all.sh"
+  echo "  Fayllarsiz ham ishlaydi — u holda smetaga bog'liq testlar SKIP bo'ladi:"
+  echo
+  echo "      sh test/all.sh"
   exit 1
 done
 

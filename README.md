@@ -245,6 +245,42 @@ Ma'lumot ikkala yo'nalishda ham saqlanadi: ish maydoni narxlarni ikkala
 kalitda yozadi. Batafsil, shuningdek NLP jadvallarini o'zingiz o'zgartirish
 tartibi — `docs/versiyalar.md`.
 
+## Noutbuk rejimi — bitta odam, o'z kompyuterida
+
+Server ham, oylik to'lov ham, internet ham kerak emas: dastur noutbukning
+o'zida ishlaydi, baza shu diskdagi fayl, ma'lumot hech qayerga ketmaydi.
+
+```sh
+sh server/laptop.sh              # birinchi marta: o'rnatadi, ishga tushiradi, brauzerni ochadi
+sh server/laptop.sh autostart    # ... va bundan keyin kompyuter yonganda o'zi
+```
+
+Birinchi ishga tushirishda ishchi pochtangiz so'raladi — kirish shu bilan
+bo'ladi. **Kod hech qayerga yuborilmaydi**: dastur shu kompyuterda
+ishlayotgani uchun «Отправить код» bosilishi bilan kod o'zi to'ldiriladi va
+siz ichkaridasiz. Hisob `admin` huquqi bilan yaratiladi, shuning uchun
+reyestrni (`Report_1.xls`) o'zingiz yuklaysiz: `http://127.0.0.1:8090/admin.html`.
+
+| Buyruq | Nima qiladi |
+|---|---|
+| `sh server/laptop.sh` | ishga tushiradi (Ctrl+C — to'xtatish) |
+| `sh server/laptop.sh autostart` | kompyuter yonganda o'zi ishga tushsin |
+| `sh server/laptop.sh status` | ishlayaptimi, baza hajmi, oxirgi zaxira |
+| `sh server/laptop.sh backup` | hoziroq zaxira olish |
+| `sh server/laptop.sh update` | yangi versiyani olib, qayta ishga tushirish |
+| `sh server/laptop.sh stop` | to'xtatish |
+| `sh server/laptop.sh uninstall` | o'zi ishga tushishini bekor qilish (ma'lumot qoladi) |
+
+**Ma'lumot** `server/pb_data/` ichida — `git pull` unga tegmaydi. **Zaxira**
+har ishga tushganda (kuniga bir marta) olinadi va `~/Backups/smeta` ga
+nusxalanadi, oxirgi 14 tasi saqlanadi. Zaxira `pb_data` dan **tashqarida**
+turadi: diskdagi papka yo'qolsa, uning ichidagi zaxira ham yo'qoladi.
+
+Keyinchalik xodimlar ko'paysa — hech narsa qayta yozilmaydi: o'sha baza bilan
+`sh server/lan.sh` (butun ofis shu kompyuterga ulanadi) yoki serverga chiqarish
+(`server/deploy/push.sh`) ishlaydi. Faqat kirish kodi o'sha paytda pochtaga
+yuborila boshlaydi.
+
 ## Server rejimi (2-bosqich)
 
 Bir necha xodim bitta bazada ishlaydi: kirish — email + bir martalik kod,

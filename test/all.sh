@@ -79,6 +79,7 @@ run ownership        node test/ownership.mjs
 run disable-user     node test/disable-user.mjs
 both_run  browser        node test/browser.mjs "$S1" "$S2"
 browser_run e2e-auth     node test/e2e-auth.mjs
+browser_run laptop       node test/laptop.mjs
 browser_run e2e-admin    node test/e2e-admin.mjs
 browser_run upload-order node test/upload-order.mjs
 both_run  e2e-workspace  node test/e2e-workspace.mjs "$S1" "$S2"

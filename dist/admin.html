@@ -1814,8 +1814,11 @@ if (typeof self !== 'undefined') self.S = S;
       this.screen.hidden = false;
       // A code asked for earlier is still good: the letter may only be arriving now.
       var pend = this.pending();
-      if (pend) { document.getElementById('loginEmail').value = pend.email; this.askCode(pend.email); }
-      else document.getElementById('loginEmail').focus();
+      if (pend) {
+        document.getElementById('loginEmail').value = pend.email;
+        this.askCode(pend.email);
+        this.autoFill(pend.list[pend.list.length - 1].id);
+      } else document.getElementById('loginEmail').focus();
     },
     hide: function () { this.screen.hidden = true; },
     reset: function (keepEmail) {
@@ -1832,6 +1835,39 @@ if (typeof self !== 'undefined') self.S = S;
         'Код отправлен на ' + email + '. Он в теме письма и действует 30 минут; ' +
         'письмо иногда идёт 10\u201320 минут — страницу можно закрыть и вернуться.';
       document.getElementById('loginCode').focus();
+    },
+
+    /**
+     * The code, when the program is running on this same computer.
+     *
+     * One person on their own laptop has no mail server and no reason to run
+     * one, so the code is not emailed at all — it is written beside the
+     * database, and the local server hands it back here (/api/laptop/otp,
+     * which server/laptop.sh turns on and which only answers this machine).
+     * Without it the code would have to be read out of a terminal window
+     * every morning.
+     *
+     * A real server never answers that route, so the request fails and
+     * nothing happens: the code is in the mail, where the hint already says
+     * it is. Asked twice because the file is written while the request that
+     * creates the code is still being answered.
+     */
+    autoFill: function (otpId) {
+      var self = this, tries = 0;
+      function ask() {
+        fetch(S.pb.baseUrl + '/api/laptop/otp?id=' + encodeURIComponent(otpId))
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (j) {
+            if (j && j.code) {
+              document.getElementById('loginCode').value = j.code;
+              document.getElementById('codeHint').textContent =
+                'Код подставлен автоматически: программа работает на этом компьютере.';
+              self.verify();
+            } else if (++tries < 2) setTimeout(ask, 400);
+          })
+          .catch(function () { /* a server: the code went by mail */ });
+      }
+      ask();
     },
 
     /* ------------------------------------------------- pending requests */
@@ -1879,6 +1915,7 @@ if (typeof self !== 'undefined') self.S = S;
       S.pb.collection('users').requestOTP(email).then(function (r) {
         self.remember(email, r.otpId);
         self.askCode(email);
+        self.autoFill(r.otpId);
       }).catch(function (e) {
         self.error('Код не отправлен: ' + S.pbErr(e));
       }).finally(function () { btn.disabled = false; });

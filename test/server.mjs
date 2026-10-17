@@ -30,9 +30,10 @@ export const DATA = join(ROOT, 'server/pb_data_test');
  * @param {boolean} [opts.registry]  also parse the sample registry into rows.json
  * @param {boolean} [opts.build]     rebuild dist and pb_public first
  * @param {string}  [opts.dev]       PB_DEV; '1' writes sign-in codes to a file
+ * @param {string}  [opts.laptop]    PB_LAPTOP; '1' also hands the code back to this machine
  */
 export async function startServer(opts) {
-  const { port, registry = false, build = false, dev = '1' } = opts;
+  const { port, registry = false, build = false, dev = '1', laptop = '' } = opts;
   const base = `http://127.0.0.1:${port}`;
 
   if (build) execSync('node build.mjs --serve', { cwd: ROOT, stdio: 'ignore' });
@@ -44,7 +45,7 @@ export async function startServer(opts) {
   let proc = null;
   const spawnOne = () => spawn('sh', ['server/run.sh'], {
     cwd: ROOT,
-    env: { ...process.env, PB_DATA_DIR: 'pb_data_test', PB_HTTP: `127.0.0.1:${port}`, PB_DEV: dev },
+    env: { ...process.env, PB_DATA_DIR: 'pb_data_test', PB_HTTP: `127.0.0.1:${port}`, PB_DEV: dev, PB_LAPTOP: laptop },
     stdio: 'ignore'
   });
   const up = async () => {

@@ -195,6 +195,56 @@ function Start-Server {
   Die "Server ishga tushmadi. Sababini ko'rish uchun:  laptop.cmd debug"
 }
 
+# The version label the page carries in its header (class="ver").
+function Version-Of([string]$html) {
+  $m = [regex]::Match([string]$html, 'class="ver"[^>]*>(v[0-9.]+)<')
+  if ($m.Success) { return $m.Groups[1].Value }
+  return ''
+}
+function Local-Version {
+  return Version-Of ([IO.File]::ReadAllText((Join-Path (Join-Path $Root 'dist') 'index.html')))
+}
+function Served-Version {
+  try { return Version-Of (Invoke-WebRequest -UseBasicParsing -Uri "$Url/" -TimeoutSec 5).Content } catch { return '' }
+}
+function Autologin-On {
+  try {
+    $r = Invoke-WebRequest -UseBasicParsing -Method Post -Uri "$Url/api/laptop/signin" -TimeoutSec 5
+    return ($r.StatusCode -eq 200)
+  } catch { return $false }
+}
+
+# Is what answers on the port this version, running the way this script runs
+# it? Something answering is not enough: a server left from an earlier
+# attempt, or from an older version, answers just as well - and the first
+# Windows install opened the browser on exactly that, an old server asking
+# for an e-mail the new one no longer asks for.
+function Is-Current {
+  if (-not (Answering)) { return $false }
+  if ((Served-Version) -ne (Local-Version)) { return $false }
+  if ($env:PB_AUTOLOGIN -ne '0' -and -not (Autologin-On)) { return $false }
+  return $true
+}
+
+# Whatever PocketBase holds the port, even one this script did not start.
+# Nothing that is not PocketBase is touched.
+function Stop-PortHolder {
+  $ids = @()
+  if ($OnWindows) {
+    try {
+      $ids = @(Get-NetTCPConnection -LocalPort ([int]$Port) -State Listen -ErrorAction Stop | ForEach-Object { $_.OwningProcess })
+    } catch { $ids = @() }
+  } elseif (Get-Command lsof -ErrorAction SilentlyContinue) {
+    $ids = @(& lsof -t "-iTCP:$Port" -sTCP:LISTEN 2>$null)
+  }
+  foreach ($id in $ids) {
+    $p = Get-Process -Id ([int]$id) -ErrorAction SilentlyContinue
+    if ($p -and $p.ProcessName -like 'pocketbase*') { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
+  }
+  # Give it the time to let go of the port.
+  for ($i = 0; $i -lt 20 -and (Answering); $i++) { Start-Sleep -Milliseconds 500 }
+}
+
 function Stop-Server {
   foreach ($f in @($SupFile, $PidFile)) {
     $id = Running-Pid $f
@@ -218,12 +268,26 @@ function After-Start {
   $tok = Su-Token
   if (-not $tok) { Die "Bazaga kirib bo'lmadi - settings.env dagi parol mos kelmayapti." }
   Api 'Put' '/api/collections/import' ([IO.File]::ReadAllText($Schema, [Text.Encoding]::UTF8)) $tok | Out-Null
-  try {
-    Api 'Post' '/api/collections/users/records' @{
-      email = $script:Email; password = $script:Pass; passwordConfirm = $script:Pass
-      name = 'Administrator'; role = 'admin'; active = $true; emailVisibility = $true
-    } $tok | Out-Null
-  } catch { }   # already there
+  # The one person's account: there, active, and an administrator. An earlier
+  # attempt may have left it as something else; a failure to create it is
+  # said out loud rather than discovered as a login screen.
+  $filter = [Uri]::EscapeDataString("email='" + $script:Email + "'")
+  $found = Api 'Get' "/api/collections/users/records?perPage=1&filter=$filter" $null $tok
+  if (-not $found.items -or @($found.items).Count -eq 0) {
+    try {
+      Api 'Post' '/api/collections/users/records' @{
+        email = $script:Email; password = $script:Pass; passwordConfirm = $script:Pass
+        name = 'Administrator'; role = 'admin'; active = $true; emailVisibility = $true
+      } $tok | Out-Null
+    } catch {
+      Die ("Hisob yaratilmadi (" + $script:Email + "): " + $_.Exception.Message)
+    }
+  } else {
+    $u = @($found.items)[0]
+    if ($u.role -ne 'admin' -or -not $u.active) {
+      Api 'Patch' "/api/collections/users/records/$($u.id)" @{ role = 'admin'; active = $true } $tok | Out-Null
+    }
+  }
   Backup-IfStale
 }
 
@@ -283,8 +347,14 @@ function Open-Browser { if ($OnWindows) { Start-Process "$Url/" } }
 # ------------------------------------------------------------------ commands
 switch ($Command) {
   'start' {
-    if (Answering) { Say "Allaqachon ishlayapti: $Url/"; Open-Browser; break }
+    if (Is-Current) { Say "Allaqachon ishlayapti: $Url/"; Open-Browser; break }
     Ensure-Settings $true
+    if (Answering) {
+      Say "Eski server topildi ($(Served-Version)) - $(Local-Version) bilan almashtirilmoqda..."
+      Stop-Server
+      Stop-PortHolder
+      if (Answering) { Die "$Port-port boshqa dastur tomonidan band. Uni yoping yoki kompyuterni qayta yoqing." }
+    }
     Prepare
     Start-Server
     After-Start
@@ -324,7 +394,9 @@ switch ($Command) {
     $sc.WindowStyle = 7
     $sc.Description = 'Taqqoslash jadvali - mahalliy server'
     $sc.Save()
-    if (-not (Answering)) {
+    if (-not (Is-Current)) {
+      Stop-Server
+      Stop-PortHolder
       Start-Supervisor
       for ($i = 0; $i -lt 60; $i++) { if (Answering) { break }; Start-Sleep -Seconds 1 }
     }
@@ -354,7 +426,12 @@ switch ($Command) {
   }
 
   'status' {
-    if (Answering) { Say "Ishlayapti: $Url/" } else { Say "Ishlamayapti" }
+    if (Answering) {
+      Say "Ishlayapti: $Url/"
+      $sv = Served-Version; $lv = Local-Version
+      if ($sv -eq $lv) { Say "Versiya: $sv" } else { Say "Versiya: $sv ishlayapti, papkada $lv - almashtirish uchun: laptop.cmd start" }
+      if (Autologin-On) { Say "Kirish oynasisiz: ha" } else { Say "Kirish oynasisiz: yo'q (kirish oynasi chiqadi)" }
+    } else { Say "Ishlamayapti" }
     $lnk = Startup-Link
     if ($lnk -and (Test-Path $lnk)) { Say "Windows'ga kirganda o'zi ishga tushadi" }
     if (Test-Path $Data) {
@@ -398,6 +475,7 @@ switch ($Command) {
     $lnk = Startup-Link
     if ($lnk -and (Test-Path $lnk)) { $wasAuto = $true }
     Stop-Server
+    Stop-PortHolder
     Ensure-Settings $false
     if ($wasAuto) {
       Start-Supervisor

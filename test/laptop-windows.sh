@@ -73,6 +73,32 @@ TOKEN2=$(curl -sS -X POST "$URL/api/collections/users/auth-with-otp" -H 'content
 [ -z "$TOKEN2" ] && ok 'a code that was used once does not work twice' || no 'code reuse'
 ps1 nonsense >/dev/null 2>&1 && no 'an unknown command must fail' || ok 'an unknown command is refused'
 
+echo '-- an old server still holding the port --'
+# What the first Windows install ran into: a server from an earlier attempt,
+# an older version without auto sign-in, answering on the port - and «start»
+# took «something answers» for «it is running» and opened the browser on it.
+ps1 stop >/dev/null
+SU=$(curl -sS -X POST "$URL/api/collections/_superusers/auth-with-password" -H 'content-type: application/json' \
+  -d "{\"identity\":\"ekspert@example.com\",\"password\":\"$PASS\"}" 2>/dev/null | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+mkdir -p "$T/oldpub"
+sed 's/>v[0-9.]*</>v2.2.0</' dist/index.html > "$T/oldpub/index.html"
+( PB_DEV=1 server/pocketbase serve --http=127.0.0.1:$PORT --dir="$TAQ_HOME/pb_data" --hooksDir=server/pb_hooks \
+    --publicDir="$T/oldpub" >/dev/null 2>&1 & )
+i=0; while [ $i -lt 20 ] && [ "$(health)" != 200 ]; do sleep 0.5; i=$((i + 1)); done
+SU=$(curl -sS -X POST "$URL/api/collections/_superusers/auth-with-password" -H 'content-type: application/json' \
+  -d "{\"identity\":\"ekspert@example.com\",\"password\":\"$PASS\"}" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+UID_=$(curl -sS "$URL/api/collections/users/records?filter=email%3D%27ekspert%40example.com%27" -H "Authorization: $SU" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -1)
+curl -sS -o /dev/null -X PATCH "$URL/api/collections/users/records/$UID_" -H "Authorization: $SU" -H 'content-type: application/json' -d '{"role":"ekspert"}'
+is "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$URL/api/laptop/signin")" 404 'the old server asks for an e-mail (no auto sign-in)'
+ps1 status | grep -q 'v2.2.0 ishlayapti' && ok 'status says an older version is running' || no "status: $(ps1 status | head -3)"
+OUT=$(ps1 start 2>&1)
+echo "$OUT" | grep -q 'Eski server topildi (v2.2.0)' && ok 'start notices it is not the current one' || no "start: $(echo "$OUT" | head -2)"
+SIGNIN=$(curl -sS -X POST "$URL/api/laptop/signin")
+echo "$SIGNIN" | grep -q '"token":"' && ok 'and replaces it: no sign-in again' || no "after replace: $SIGNIN"
+echo "$SIGNIN" | grep -q '"role":"admin"' && ok 'with the account put back to administrator' || no 'role not restored'
+is "$(curl -s -o /dev/null -w '%{http_code}' "$URL/" -D - | grep -ci '^cache-control: no-cache')" 1 'and the page is served so the browser asks for it afresh'
+ps1 start | grep -q 'Allaqachon ishlayapti' && ok 'a start after that leaves the current one alone' || no 'restart loop'
+
 echo '-- the one-paste installer --'
 # What `irm …/install-windows.ps1 | iex` does, from a ZIP shaped the way GitHub
 # shapes it: everything inside one folder named after the branch.

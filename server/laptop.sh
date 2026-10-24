@@ -86,6 +86,35 @@ start_server() {
   say "server ishga tushmadi — $LOG ga qarang"; tail -5 "$LOG" 2>/dev/null; exit 1
 }
 
+# The version label the page carries in its header (class="ver").
+version_of() { sed -n 's/.*class="ver"[^>]*>\(v[0-9.]*\)<.*/\1/p' | head -1; }
+local_version() { version_of < dist/index.html; }
+served_version() { curl -sS -m 5 "$URL/" 2>/dev/null | version_of; }
+autologin_on() { [ "$(curl -s -o /dev/null -w '%{http_code}' -m 5 -X POST "$URL/api/laptop/signin")" = 200 ]; }
+
+# Is what answers on the port this version, running the way this script runs
+# it? Something answering is not enough: a server left from an earlier attempt
+# or an older version answers just as well, and opening the browser on it shows
+# a login the current version no longer has.
+is_current() {
+  answering || return 1
+  [ "$(served_version)" = "$(local_version)" ] || return 1
+  [ "${PB_AUTOLOGIN:-1}" = 0 ] || autologin_on || return 1
+}
+
+# Whatever PocketBase holds the port, even one this script did not start.
+# Nothing that is not PocketBase is touched.
+stop_port_holder() {
+  if command -v lsof >/dev/null 2>&1; then
+    for id in $(lsof -t "-iTCP:$PORT" -sTCP:LISTEN 2>/dev/null); do
+      case "$(ps -p "$id" -o comm= 2>/dev/null)" in *pocketbase*) kill "$id" 2>/dev/null || true ;; esac
+    done
+  fi
+  # PocketBase shuts down gracefully; give it the time to let go of the port.
+  i=0
+  while [ $i -lt 20 ] && answering; do sleep 0.5; i=$((i + 1)); done
+}
+
 stop_server() {
   if running; then kill "$(cat "$PID_FILE")" 2>/dev/null || true; sleep 1; fi
   rm -f "$PID_FILE"
@@ -98,6 +127,12 @@ ensure_user() {
   [ -n "$SU" ] || die "bazaga kirib bo'lmadi — server/.env dagi parol mos kelmayapti"
   curl -sS -o /dev/null -X POST "$URL/api/collections/users/records" -H "Authorization: $SU" -H 'content-type: application/json' \
     -d "{\"email\":\"$PB_ADMIN_EMAIL\",\"password\":\"$PB_ADMIN_PASS\",\"passwordConfirm\":\"$PB_ADMIN_PASS\",\"name\":\"Administrator\",\"role\":\"admin\",\"active\":true,\"emailVisibility\":true}" || true
+  # An earlier attempt may have left the account as something else.
+  F=$(node -e "console.log(encodeURIComponent(\"email='\"+process.argv[1]+\"'\"))" "$PB_ADMIN_EMAIL")
+  ID=$(curl -sS "$URL/api/collections/users/records?perPage=1&filter=$F" -H "Authorization: $SU" | json '.items[0]&&JSON.parse(d).items[0].id')
+  [ -n "$ID" ] && [ "$ID" != undefined ] || die "hisob yaratilmadi: $PB_ADMIN_EMAIL"
+  curl -sS -o /dev/null -X PATCH "$URL/api/collections/users/records/$ID" -H "Authorization: $SU" \
+    -H 'content-type: application/json' -d '{"role":"admin","active":true}' || true
 }
 
 # setup.sh polls its own temporary instance until it answers, so the first
@@ -190,7 +225,15 @@ PLIST
 
 case "${1:-start}" in
   start)
-    if answering; then say "allaqachon ishlayapti: $URL/"; open_browser; exit 0; fi
+    if is_current; then say "allaqachon ishlayapti: $URL/"; open_browser; exit 0; fi
+    # Before setup: setup rewrites pb_hooks/lib/nlp.js, a running PocketBase
+    # watches that folder and restarts itself, and for that moment it is
+    # neither answering nor holding the port — so it has to be gone first.
+    if answering; then
+      say "eski server topildi ($(served_version)) — $(local_version) bilan almashtirilmoqda..."
+      stop_server; stop_port_holder
+      if answering; then die "$PORT-port boshqa dastur tomonidan band"; fi
+    fi
     setup
     start_server
     ensure_user
@@ -239,7 +282,12 @@ case "${1:-start}" in
     ;;
 
   status)
-    if answering; then say "ishlayapti: $URL/"; else say "ishlamayapti"; fi
+    if answering; then
+      say "ishlayapti: $URL/"
+      SV=$(served_version); LV=$(local_version)
+      if [ "$SV" = "$LV" ]; then say "versiya: $SV"; else say "versiya: $SV ishlayapti, papkada $LV — almashtirish: sh server/laptop.sh"; fi
+      if autologin_on; then say "kirish oynasisiz: ha"; else say "kirish oynasisiz: yo'q"; fi
+    else say "ishlamayapti"; fi
     [ -f "$AGENT" ] && say "kompyuter yonganda o'zi ishga tushadi (launchd: $LABEL)" || true
     [ -d server/pb_data ] && say "ma'lumot: $(du -sh server/pb_data 2>/dev/null | cut -f1)  ($ROOT/server/pb_data)" || true
     N=$(ls -1 "$BACKUPS"/*.zip 2>/dev/null | wc -l | tr -d ' ')

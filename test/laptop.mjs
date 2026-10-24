@@ -76,10 +76,27 @@ check(errors.length === 0, 'and no page reported an error' + (errors.length ? ':
 pb.stop();
 await new Promise((r) => setTimeout(r, 700));
 
+/* ---------------------------------- laptop where the auto sign-in failed */
+console.log('-- a laptop where the auto sign-in did not work --');
+pb = await startServer({ port: 8138, dev: '1', laptop: '1', autologin: '1', as: 'nobody@example.com' });
+page = await newPage();
+await page.goto(pb.base + '/');
+await page.waitForSelector('#loginErr:not([hidden])', { timeout: 10000 });
+const said = await page.textContent('#loginErr');
+check(said.includes('учётная запись не найдена'), `the login screen says why, in the program's language (${said})`);
+check(said.includes('laptop.cmd doctor'), 'and what to run to find out more');
+pb.stop();
+await new Promise((r) => setTimeout(r, 700));
+
 /* ----------------------------------- laptop with the login switched back on */
 console.log('-- the login switched back on (PB_AUTOLOGIN=0) --');
 pb = await startServer({ port: 8133, dev: '1', laptop: '1' });
 check((await post(pb.base + '/api/laptop/signin')).status === 404, 'nobody is signed in by themselves');
+page = await newPage();
+await page.goto(pb.base + '/');
+await page.waitForSelector('#screen-login:not([hidden])');
+await new Promise((r) => setTimeout(r, 500));
+check(await page.isHidden('#loginErr'), 'and, since that was chosen, the login screen does not call it a failure');
 const otp = await fetch(pb.base + '/api/collections/users/request-otp', {
   method: 'POST', headers: { 'content-type': 'application/json' },
   body: JSON.stringify({ email: 'test@example.com' })
@@ -105,6 +122,11 @@ await new Promise((r) => setTimeout(r, 700));
 console.log('-- a server --');
 pb = await startServer({ port: 8135, dev: '1' });
 check((await post(pb.base + '/api/laptop/signin')).status === 404, 'there is no sign-in route at all');
+page = await newPage();
+await page.goto(pb.base + '/');
+await page.waitForSelector('#loginErr:not([hidden])', { timeout: 10000 });
+check((await page.textContent('#loginErr')).includes('не через laptop.cmd'),
+  'opened on this computer, it says the server was not started by the launcher — the Windows symptom');
 check((await fetch(`${pb.base}/api/laptop/otp?id=${otp.otpId}`)).status === 404, 'nor a code route');
 page = await newPage();
 await page.goto(pb.base + '/');

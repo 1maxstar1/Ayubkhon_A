@@ -1810,10 +1810,32 @@ if (typeof self !== 'undefined') self.S = S;
           if (self.laptop && !S.pb.authStore.isValid) self.autoSignIn();
         });
       });
-      this.autoSignIn().then(function (ok) {
-        if (ok) return;
-        if (S.pb.authStore.isValid) self.start(); else self.show('');
+      this.autoSignIn().then(function (r) {
+        if (r === true) return;
+        if (S.pb.authStore.isValid) { self.start(); return; }
+        self.show('');
+        self.explain(r);
       });
+    },
+
+    /**
+     * Why the login screen is up on a laptop at all. On this computer's own
+     * address and for any reason but the login having been switched back on,
+     * the screen says what went wrong — so that a screenshot of it is a
+     * diagnosis, not just a question. Anywhere else it says nothing.
+     */
+    explain: function (why) {
+      if (!/^(127\.0\.0\.1|localhost|\[::1\])$/.test(location.hostname)) return;
+      if (!why || why === 'autologin-off') return;
+      var RU = {
+        'not-laptop': 'сервер на этом компьютере запущен не через laptop.cmd',
+        'no-email': 'не указана учётная запись',
+        'no-user': 'учётная запись не найдена',
+        'inactive': 'учётная запись отключена',
+        'not-own-page': 'запрос пришёл не со страницы программы'
+      };
+      this.error('Автовход не сработал: ' + (RU[why] || why) +
+        '. Запустите laptop.cmd doctor и пришлите результат.');
     },
 
     /**
@@ -1832,9 +1854,16 @@ if (typeof self !== 'undefined') self.S = S;
     autoSignIn: function () {
       var self = this;
       return fetch(S.pb.baseUrl + '/api/laptop/signin', { method: 'POST' })
-        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (j) {
+            if (r.ok && j && j.token) return j;
+            // the server's reason ("Not-laptop."), or the status when there is none
+            var why = String((j && j.message) || '').toLowerCase().replace(/[^a-z-]/g, '');
+            return why || ('http-' + r.status);
+          });
+        })
         .then(function (j) {
-          if (!j || !j.token) return false;
+          if (typeof j === 'string') return j;
           self.laptop = true;
           self.last = self.lastRefresh = Date.now();
           S.pb.authStore.save(j.token, j.record);
@@ -1842,7 +1871,7 @@ if (typeof self !== 'undefined') self.S = S;
           if (!self.timer) self.start(); else self.render();
           return true;
         })
-        .catch(function () { return false; });
+        .catch(function (e) { return 'network: ' + (e && e.message || e); });
     },
 
     /* ---------------------------------------------------------- screens */

@@ -61,6 +61,10 @@ is "$(curl -s -o /dev/null -w '%{http_code}' "$URL/admin.html")" 200 'and so is 
 
 echo '-- the other commands --'
 ps1 start | grep -q 'Allaqachon ishlayapti' && ok 'a second start finds it running' || no 'second start'
+DOC=$(ps1 doctor 2>&1)
+echo "$DOC" | grep -q 'Avtomatik kirish: ISHLAYAPTI' && ok 'doctor: the auto sign-in works' || no "doctor: $DOC"
+echo "$DOC" | grep -q "Hisob bazada:    bor, rol admin" && ok 'doctor: the account is there, an administrator' || no 'doctor account'
+echo "$DOC" | grep -q "Server tomoni to'g'ri" && ok 'doctor: and says the rest is the browser' || no 'doctor verdict'
 ps1 status | grep -q "Ishlayapti: $URL/" && ok 'status says it is running' || no 'status running'
 ps1 backup >/dev/null && is "$(ls "$TAQ_BACKUPS"/*.zip | wc -l | tr -d ' ')" 2 'backup makes another copy'
 ps1 stop >/dev/null
@@ -91,6 +95,17 @@ UID_=$(curl -sS "$URL/api/collections/users/records?filter=email%3D%27ekspert%40
 curl -sS -o /dev/null -X PATCH "$URL/api/collections/users/records/$UID_" -H "Authorization: $SU" -H 'content-type: application/json' -d '{"role":"ekspert"}'
 is "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$URL/api/laptop/signin")" 404 'the old server asks for an e-mail (no auto sign-in)'
 ps1 status | grep -q 'v2.2.0 ishlayapti' && ok 'status says an older version is running' || no "status: $(ps1 status | head -3)"
+DOC=$(ps1 doctor 2>&1)
+echo "$DOC" | grep -q 'ISHLAMAYAPTI.*ot-laptop' && ok 'doctor names the reason: not started as a laptop' || no "doctor stale: $(echo "$DOC" | grep -i avtomatik)"
+echo "$DOC" | grep -q 'Sinovda avtomatik kirish: ISHLAYAPTI' && ok 'runs it once itself, and there it works' || no "doctor trial: $(echo "$DOC" | grep -i sinov)"
+echo "$DOC" | grep -q -- '--- server xabarlari ---' && ok "and shows what the server said" || no 'doctor log'
+is "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$URL/api/laptop/signin")" 200 'and leaves the working one running'
+# put the old one back, for start to find
+ps1 stop >/dev/null
+( PB_DEV=1 server/pocketbase serve --http=127.0.0.1:$PORT --dir="$TAQ_HOME/pb_data" --hooksDir=server/pb_hooks \
+    --publicDir="$T/oldpub" >/dev/null 2>&1 & )
+i=0; while [ $i -lt 20 ] && [ "$(health)" != 200 ]; do sleep 0.5; i=$((i + 1)); done
+curl -sS -o /dev/null -X PATCH "$URL/api/collections/users/records/$UID_" -H "Authorization: $SU" -H 'content-type: application/json' -d '{"role":"ekspert"}'
 OUT=$(ps1 start 2>&1)
 echo "$OUT" | grep -q 'Eski server topildi (v2.2.0)' && ok 'start notices it is not the current one' || no "start: $(echo "$OUT" | head -2)"
 SIGNIN=$(curl -sS -X POST "$URL/api/laptop/signin")

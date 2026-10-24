@@ -14,20 +14,28 @@
  * It comes back by itself wherever PB_AUTOLOGIN is not set: server/lan.sh,
  * a VPS, a developer's run.sh. server/laptop.sh and laptop.ps1 set it.
  */
+/*
+ * Every refusal is a 404 — to anything outside, the route is simply not there
+ * — but each says which reason it was. On the laptop the login screen shows
+ * that reason, so a screenshot of an unexpected login says why: started some
+ * other way than the launcher, the account missing, and so on.
+ */
 routerAdd("POST", "/api/laptop/signin", (e) => {
-  const gone = () => new NotFoundError("not here");
-  if ($os.getenv("PB_LAPTOP") !== "1" || $os.getenv("PB_AUTOLOGIN") !== "1") throw gone();
-  if (!require(`${__hooks}/lib/laptop.js`).ownPage(e)) throw gone();
+  const no = (why) => new NotFoundError(why);
+  if ($os.getenv("PB_LAPTOP") !== "1") throw no("not-laptop");
+  if ($os.getenv("PB_AUTOLOGIN") !== "1") throw no("autologin-off");
+  if (!require(`${__hooks}/lib/laptop.js`).ownPage(e)) throw no("not-own-page");
 
   // The launcher names the person. Nobody named, nobody signed in.
   const email = $os.getenv("PB_AUTOLOGIN_EMAIL");
-  if (!email) throw gone();
+  if (!email) throw no("no-email");
   let user = null;
   try {
     user = $app.findAuthRecordByEmail("users", email);
   } catch (err) {
     user = null;
   }
-  if (!user || !user.getBool("active")) throw gone();
+  if (!user) throw no("no-user");
+  if (!user.getBool("active")) throw no("inactive");
   return $apis.recordAuthResponse(e, user, "laptop", null);
 });

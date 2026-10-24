@@ -40,4 +40,8 @@
   Write-Host ""
   if ($env:TAQ_NOSTART -eq '1') { return }          # the test stops here
   & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $ps1 start
+  Write-Host ""
+  # The diagnosis, every time: if the page still asks for an e-mail, this
+  # window already says why.
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $ps1 doctor
 }

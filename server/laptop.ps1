@@ -10,6 +10,7 @@
 #   laptop.cmd stop            stop it
 #   laptop.cmd uninstall       stop, and stop starting at sign-in
 #   laptop.cmd debug           run it in this window, to see why it does not start
+#   laptop.cmd doctor          everything that decides the login, on one screen
 #
 # Nothing here needs Node or Git. The pages are the built ones already in
 # dist\, the hooks are already in server\pb_hooks\, and PocketBase is one .exe
@@ -161,12 +162,30 @@ function Prepare-Public {
   foreach ($f in @('index.html', 'admin.html')) {
     Copy-Item (Join-Path (Join-Path $Root 'dist') $f) (Join-Path $Public $f) -Force
   }
-  $env:PB_DEV = '1'
-  $env:PB_LAPTOP = '1'
+}
+
+# What the server is told, handed to it explicitly rather than left for it to
+# inherit from this window: on the one real Windows laptop the server came up
+# without laptop mode and asked for an e-mail, and inheritance through
+# Start-Process is the one link in that chain no test here could watch.
+function Server-Env {
+  $auto = '1'
   # No sign-in at all on a computer only its owner uses (owner's decision,
-  # 2026-10). Setting PB_AUTOLOGIN=0 before running this brings the login back.
-  if ($env:PB_AUTOLOGIN -ne '0') { $env:PB_AUTOLOGIN = '1' }
-  $env:PB_AUTOLOGIN_EMAIL = $script:Email
+  # 2026-10). PB_AUTOLOGIN=0 set before running this brings the login back.
+  if ($env:PB_AUTOLOGIN -eq '0') { $auto = '0' }
+  return @{ PB_DEV = '1'; PB_LAPTOP = '1'; PB_AUTOLOGIN = $auto; PB_AUTOLOGIN_EMAIL = $script:Email }
+}
+
+function New-ServerStart([string]$file, [string]$arguments, [bool]$hidden) {
+  $psi = New-Object System.Diagnostics.ProcessStartInfo
+  $psi.FileName = $file
+  $psi.Arguments = $arguments
+  $psi.UseShellExecute = $false
+  $psi.CreateNoWindow = $hidden
+  $psi.WorkingDirectory = $AppHome
+  $e = Server-Env
+  foreach ($k in $e.Keys) { $psi.EnvironmentVariables[$k] = [string]$e[$k] }
+  return $psi
 }
 
 # The server must outlive this script - the window it was started from is
@@ -178,14 +197,16 @@ function Prepare-Public {
 function Start-Server {
   Prepare-Public
   if ($OnWindows) {
-    $proc = Start-Process -FilePath $Pb -ArgumentList (Server-Args) -WindowStyle Hidden -PassThru
+    # No window, no console of its own: closing this one does not reach it.
+    $psi = New-ServerStart $Pb (Server-Args) $true
   } else {
     # only the test runs here: a shell holds the log files instead
     $sh = Join-Path $AppHome 'serve.sh'
     $line = 'exec "' + $Pb + '" ' + (Server-Args) + ' >"' + (Join-Path $AppHome 'server.log') + '" 2>&1 </dev/null'
     [IO.File]::WriteAllText($sh, $line + "`n")
-    $proc = Start-Process -FilePath '/bin/sh' -ArgumentList ('"' + $sh + '"') -PassThru
+    $psi = New-ServerStart '/bin/sh' ('"' + $sh + '"') $false
   }
+  $proc = [System.Diagnostics.Process]::Start($psi)
   Set-Content -Path $PidFile -Value $proc.Id
   for ($i = 0; $i -lt 40; $i++) {
     if (Answering) { return }
@@ -212,6 +233,23 @@ function Autologin-On {
     $r = Invoke-WebRequest -UseBasicParsing -Method Post -Uri "$Url/api/laptop/signin" -TimeoutSec 5
     return ($r.StatusCode -eq 200)
   } catch { return $false }
+}
+
+# What a refused request said. Windows PowerShell 5.1 and PowerShell 7 hand the
+# body over differently; ErrorDetails carries it in both.
+# Kept to one line: PocketBase's own reason when there is one ("Not-laptop."),
+# otherwise whatever the failure itself said.
+function Error-Body($err) {
+  $body = ''
+  if ($err.ErrorDetails -and $err.ErrorDetails.Message) { $body = $err.ErrorDetails.Message }
+  if (-not $body) {
+    try { $body = (New-Object IO.StreamReader($err.Exception.Response.GetResponseStream())).ReadToEnd() } catch { }
+  }
+  if ($body) {
+    try { $m = ($body | ConvertFrom-Json).message; if ($m) { return [string]$m } } catch { }
+    return (($body -replace '\s+', ' ').Trim())
+  }
+  return $err.Exception.Message
 }
 
 # Is what answers on the port this version, running the way this script runs
@@ -416,7 +454,88 @@ switch ($Command) {
     Prepare
     Prepare-Public
     Say "Server shu oynada ishlayapti, hamma xabarlari ko'rinadi. To'xtatish: Ctrl+C"
-    $p = Start-Process -FilePath $Pb -ArgumentList (Server-Args) -NoNewWindow -PassThru -Wait
+    $p = [System.Diagnostics.Process]::Start((New-ServerStart $Pb (Server-Args) $false))
+    $p.WaitForExit()
+  }
+
+  # Everything that decides whether the page opens without a login, in one
+  # screenful that can be copied back - for when it does not.
+  'doctor' {
+    $s = Read-Settings
+    $script:Email = $s['PB_ADMIN_EMAIL']; $script:Pass = $s['PB_ADMIN_PASS']
+    Say "=== Tashxis ==="
+    Say "Dastur papkasi:  $Root  (versiya $(Local-Version))"
+    Say "Ma'lumot:        $Data"
+    Say "PocketBase:      $Pb  (bor: $(Test-Path $Pb))"
+    Say "Hisob:           $($script:Email)"
+    $ok = $false
+    if (Answering) {
+      Say "Portda server:   bor, versiya $(Served-Version)"
+      if ($OnWindows) {
+        try {
+          foreach ($c in @(Get-NetTCPConnection -LocalPort ([int]$Port) -State Listen -ErrorAction Stop)) {
+            $p = Get-Process -Id $c.OwningProcess -ErrorAction SilentlyContinue
+            if ($p) { Say ("  jarayon:       {0} (pid {1}) {2}" -f $p.ProcessName, $p.Id, $p.Path) }
+          }
+        } catch { }
+      }
+      try {
+        Invoke-WebRequest -UseBasicParsing -Method Post -Uri "$Url/api/laptop/signin" -TimeoutSec 5 | Out-Null
+        Say "Avtomatik kirish: ISHLAYAPTI"
+        $ok = $true
+      } catch {
+        $why = Error-Body $_
+        Say "Avtomatik kirish: ISHLAMAYAPTI - $why"
+      }
+      if ($script:Email -and $script:Pass) {
+        try {
+          $tok = Su-Token
+          $f = [Uri]::EscapeDataString("email='" + $script:Email + "'")
+          $u = @((Api 'Get' "/api/collections/users/records?perPage=1&filter=$f" $null $tok).items)
+          if ($u.Count) { Say "Hisob bazada:    bor, rol $($u[0].role), faol $($u[0].active)" } else { Say "Hisob bazada:    YO'Q" }
+        } catch { Say "Hisob bazada:    tekshirib bo'lmadi - $($_.Exception.Message)" }
+      }
+    } else { Say "Portda server:   yo'q" }
+
+    if ($ok) {
+      Say ""
+      Say "Server tomoni to'g'ri. Brauzerdagi barcha 'Smeta' varaqlarini yoping,"
+      Say "$Url/ ni oching va Ctrl+F5 bosing."
+      Say "Yana kirish oynasi chiqsa - undagi qizil yozuvni yuboring."
+      break
+    }
+
+    # Not working: run it once here, where everything it says can be seen.
+    Say ""
+    Say "=== Sinov: server 8 soniya shu yerda ishga tushiriladi ==="
+    Ensure-Settings $false
+    Stop-Server
+    Stop-PortHolder
+    Prepare
+    Prepare-Public
+    $psi = New-ServerStart $Pb (Server-Args) $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $p = [System.Diagnostics.Process]::Start($psi)
+    $outTask = $p.StandardOutput.ReadToEndAsync()
+    $errTask = $p.StandardError.ReadToEndAsync()
+    for ($i = 0; $i -lt 16 -and -not (Answering); $i++) { Start-Sleep -Milliseconds 500 }
+    try {
+      Invoke-WebRequest -UseBasicParsing -Method Post -Uri "$Url/api/laptop/signin" -TimeoutSec 5 | Out-Null
+      Say "Sinovda avtomatik kirish: ISHLAYAPTI"
+    } catch {
+      $why = Error-Body $_
+      Say "Sinovda avtomatik kirish: ISHLAMAYAPTI - $why"
+    }
+    if (-not $p.HasExited) { $p.Kill() }
+    $p.WaitForExit()
+    Say "--- server xabarlari ---"
+    (($outTask.Result + $errTask.Result) -split "`n") | Select-Object -Last 25 | ForEach-Object { Say "  $_" }
+    Say "------------------------"
+    Start-Sleep -Milliseconds 700
+    Start-Server
+    After-Start
+    Say "Server qayta ishga tushirildi. Shu oynadagi hamma yozuvni yuboring."
   }
 
   'stop' {
@@ -493,5 +612,5 @@ switch ($Command) {
     Say "O'chirildi: endi o'zi ishga tushmaydi. Ma'lumot joyida: $Data"
   }
 
-  default { Die "Buyruqlar: start, autostart, status, backup, update, stop, uninstall, debug" }
+  default { Die "Buyruqlar: start, autostart, status, backup, update, stop, uninstall, debug, doctor" }
 }

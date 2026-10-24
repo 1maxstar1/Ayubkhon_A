@@ -255,11 +255,19 @@ sh server/laptop.sh              # birinchi marta: o'rnatadi, ishga tushiradi, b
 sh server/laptop.sh autostart    # ... va bundan keyin kompyuter yonganda o'zi
 ```
 
-Birinchi ishga tushirishda ishchi pochtangiz so'raladi — kirish shu bilan
-bo'ladi. **Kod hech qayerga yuborilmaydi**: dastur shu kompyuterda
-ishlayotgani uchun «Отправить код» bosilishi bilan kod o'zi to'ldiriladi va
-siz ichkaridasiz. Hisob `admin` huquqi bilan yaratiladi, shuning uchun
-reyestrni (`Report_1.xls`) o'zingiz yuklaysiz: `http://127.0.0.1:8090/admin.html`.
+Birinchi ishga tushirishda ishchi pochtangiz so'raladi — hisobingiz shu
+nomda yaratiladi. **Kirish oynasi yo'q**: kompyuterni faqat siz
+ishlatasiz, shuning uchun sahifa ochilishi bilan ichkaridasiz — na kod,
+na 4 soatlik qulf, na «Выйти». Hisob `admin` huquqi bilan yaratiladi,
+shuning uchun reyestrni (`Report_1.xls`) o'zingiz yuklaysiz:
+`http://127.0.0.1:8090/admin.html`.
+
+Kirish oynasi o'chirib tashlanmagan, faqat noutbukda o'chirilgan: hisob va
+«kim qaysi narxni yozgan» yozuvi joyida. `PB_AUTOLOGIN=0 sh server/laptop.sh`
+(Windows'da `set PB_AUTOLOGIN=0` dan keyin `laptop.cmd`) uni qaytaradi;
+ofis tarmog'i yoki VPS da esa u o'z-o'zidan bor. Avtomatik kirish faqat
+dasturning o'z sahifasiga beriladi — brauzerda ochiq boshqa sayt
+`127.0.0.1` ga so'rov yuborsa ham hech narsa olmaydi.
 
 | Buyruq | Nima qiladi |
 |---|---|
@@ -288,7 +296,8 @@ tushishda o'zi yuklanadi.
    skriptni «internetdan kelgan» deb so'rab turadi.
 2. ZIP ni istalgan papkaga oching, masalan `C:\Smeta`.
 3. `server\laptop.cmd` ni **ikki marta bosing**. Birinchi marta pochtangizni
-   so'raydi, keyin brauzer ochiladi. Oynani yopsangiz ham server ishlayveradi.
+   so'raydi, keyin brauzer ochiladi — kirish oynasisiz, to'g'ridan-to'g'ri
+   arizalar ro'yxati. Oynani yopsangiz ham server ishlayveradi.
 
 Kompyuter yonganda o'zi ishga tushishi uchun bir marta: Windows qidiruviga
 `cmd` deb yozing, ochilgan oynada `C:\Smeta\server\laptop.cmd autostart`

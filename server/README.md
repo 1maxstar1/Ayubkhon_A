@@ -13,9 +13,11 @@ PB_ADMIN_EMAIL=admin@example.com PB_ADMIN_PASS=change-me-1234 ./setup.sh   # onc
   `pb_public/` (`node build.mjs --serve` copies the build there).
 * `laptop.sh` — the whole program on one person's own machine: set-up, a
   launchd agent that starts it at login, a daily backup copied out to
-  `~/Backups/smeta`, and `PB_LAPTOP=1`, which is what lets the page ask for
-  its own sign-in code (`/api/laptop/otp`, this machine only — see
-  `pb_hooks/dev-otp.pb.js`). Nothing in it is specific to one computer, so the
+  `~/Backups/smeta`, `PB_LAPTOP=1`, which lets the page ask for its own
+  sign-in code (`/api/laptop/otp`, `pb_hooks/dev-otp.pb.js`), and
+  `PB_AUTOLOGIN=1`, which skips the sign-in altogether
+  (`/api/laptop/signin`, `pb_hooks/laptop.pb.js`). Both answer only the
+  program's own page on this machine (`pb_hooks/lib/laptop.js`). Nothing in it is specific to one computer, so the
   same `pb_data` can later be served to the office by `lan.sh` or pushed to a
   VPS.
 * `laptop.cmd` / `laptop.ps1` — the same on Windows, for Windows PowerShell 5.1

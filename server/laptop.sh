@@ -74,7 +74,10 @@ su_token() {
 
 start_server() {
   mkdir -p server/pb_data
-  ( cd server && PB_DEV=1 PB_LAPTOP=1 PB_HTTP="127.0.0.1:$PORT" sh run.sh >"$ROOT/$LOG" 2>&1 & echo $! > "$ROOT/$PID_FILE" )
+  # PB_AUTOLOGIN: no sign-in at all on a laptop only its owner uses (owner's
+  # decision, 2026-10). PB_AUTOLOGIN=0 sh server/laptop.sh brings the login back.
+  ( cd server && PB_DEV=1 PB_LAPTOP=1 PB_AUTOLOGIN="${PB_AUTOLOGIN:-1}" PB_AUTOLOGIN_EMAIL="$PB_ADMIN_EMAIL" \
+      PB_HTTP="127.0.0.1:$PORT" sh run.sh >"$ROOT/$LOG" 2>&1 & echo $! > "$ROOT/$PID_FILE" )
   i=0
   while [ $i -lt 20 ]; do
     answering && return 0
@@ -146,9 +149,8 @@ banner() {
   say "  Admin sahifa:  $URL/admin.html"
   say "  Baza paneli:   $URL/_/     (parol: server/.env)"
   say ""
-  say "  Kirish pochtasi: $PB_ADMIN_EMAIL"
-  say "  «Kod yuborish» bosilganda kod o'zi to'ldiriladi — dastur shu"
-  say "  kompyuterda ishlayapti, kod hech qayerga yuborilmaydi."
+  say "  Kirish oynasi yo'q — sahifa ochilishi bilan ichkaridasiz."
+  say "  Hisob: $PB_ADMIN_EMAIL (administrator)"
   say ""
   say "  Ma'lumot shu yerda:  $ROOT/server/pb_data"
   say "  Zaxiralar:           $BACKUPS"

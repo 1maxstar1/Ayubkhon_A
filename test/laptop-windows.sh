@@ -36,7 +36,15 @@ PASS=$(sed -n 's/^PB_ADMIN_PASS=//p' "$TAQ_HOME/settings.env")
 [ ${#PASS} -ge 20 ] && ok "and a generated password (${#PASS} characters)" || no "password length ${#PASS}"
 is "$(ls "$TAQ_BACKUPS"/*.zip 2>/dev/null | wc -l | tr -d ' ')" 1 'a first backup is taken, outside the data folder'
 
-echo '-- signing in the way the page does --'
+echo '-- no sign-in at all --'
+SIGNIN=$(curl -sS -X POST "$URL/api/laptop/signin")
+echo "$SIGNIN" | grep -q '"token":"' && ok 'the page is handed a session without asking for anything' || no "laptop/signin: $SIGNIN"
+echo "$SIGNIN" | grep -q '"email":"ekspert@example.com"' && ok "the one person's own" || no 'signin email'
+echo "$SIGNIN" | grep -q '"role":"admin"' && ok 'who is an administrator' || no 'signin role'
+is "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Origin: http://evil.example' "$URL/api/laptop/signin")" 404 \
+  'another site open in the browser gets nothing'
+
+echo '-- signing in by code, the way the page does with the login back on --'
 OTP=$(curl -sS -X POST "$URL/api/collections/users/request-otp" -H 'content-type: application/json' -d '{"email":"ekspert@example.com"}' | sed -n 's/.*"otpId":"\([^"]*\)".*/\1/p')
 [ -n "$OTP" ] && ok 'the one person can ask for a code' || no 'request-otp'
 sleep 1

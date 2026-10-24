@@ -313,7 +313,7 @@ ul.files .mute{color:var(--mute)}
 
 <header class="bar">
   <div class="brand">
-    <b>Администратор</b><i class="ver" title="Версия программы">v2.2.0</i>
+    <b>Администратор</b><i class="ver" title="Версия программы">v2.3.0</i>
     <span>реестр, рабочие области и пользователи</span>
   </div>
   <div class="grow"></div>
@@ -1793,6 +1793,7 @@ if (typeof self !== 'undefined') self.S = S;
     lastRefresh: Date.now(),
     timer: null,
     refused: {},        // "otpId|code" pairs the server has already turned down
+    laptop: false,      // one person on their own computer: no login, no lock
 
     init: function () {
       var self = this;
@@ -1804,7 +1805,44 @@ if (typeof self !== 'undefined') self.S = S;
         document.addEventListener(t, function () { self.last = Date.now(); }, { passive: true });
       });
       S.pb.authStore.onChange(function () { self.render(); });
-      if (S.pb.authStore.isValid) this.start(); else this.show('');
+      ['focus', 'visibilitychange'].forEach(function (t) {
+        (t === 'focus' ? window : document).addEventListener(t, function () {
+          if (self.laptop && !S.pb.authStore.isValid) self.autoSignIn();
+        });
+      });
+      this.autoSignIn().then(function (ok) {
+        if (ok) return;
+        if (S.pb.authStore.isValid) self.start(); else self.show('');
+      });
+    },
+
+    /**
+     * On one person's own computer there is no sign-in: the local server hands
+     * the page that person's session (/api/laptop/signin, which only
+     * server/laptop.sh and laptop.ps1 switch on, and which only answers this
+     * program's own page). The account, the rules and the record of who
+     * priced what are all still there, so the login comes back unchanged
+     * wherever the switch is off — an office network, a VPS.
+     *
+     * Anywhere else the route is not there, the request fails, and the page
+     * goes on as it always has. Also asked again whenever the session runs
+     * out on a laptop — after a night asleep the token has expired, and the
+     * answer to that on a laptop is a new one, not a login screen.
+     */
+    autoSignIn: function () {
+      var self = this;
+      return fetch(S.pb.baseUrl + '/api/laptop/signin', { method: 'POST' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) {
+          if (!j || !j.token) return false;
+          self.laptop = true;
+          self.last = self.lastRefresh = Date.now();
+          S.pb.authStore.save(j.token, j.record);
+          self.hide();
+          if (!self.timer) self.start(); else self.render();
+          return true;
+        })
+        .catch(function () { return false; });
     },
 
     /* ---------------------------------------------------------- screens */
@@ -1984,8 +2022,13 @@ if (typeof self !== 'undefined') self.S = S;
     tick: function () {
       var self = this, now = Date.now();
       if (!this.timer) return;              // the session is over; there is nothing to watch
-      if (!S.pb.authStore.isValid) { this.lock('Сессия истекла. Войдите снова.'); return; }
-      if (now - this.last > IDLE_MS) { this.lock('4 часа без активности — программа заблокирована. Войдите снова.'); return; }
+      if (!S.pb.authStore.isValid) {
+        if (this.laptop) { this.autoSignIn(); return; }
+        this.lock('Сессия истекла. Войдите снова.');
+        return;
+      }
+      // No idle lock on a laptop: the computer's own screen lock is the lock.
+      if (!this.laptop && now - this.last > IDLE_MS) { this.lock('4 часа без активности — программа заблокирована. Войдите снова.'); return; }
       if (now - this.lastRefresh > REFRESH_MS) {
         this.lastRefresh = now;
         S.pb.collection('users').authRefresh().catch(function (e) {
@@ -1995,7 +2038,8 @@ if (typeof self !== 'undefined') self.S = S;
           // nothing else here would notice. Anything other than a refusal is a
           // network hiccup — the next tick decides.
           if (e && (e.status === 401 || e.status === 403)) {
-            self.lock('Доступ к программе закрыт. Обратитесь к администратору.');
+            if (self.laptop) self.autoSignIn();
+            else self.lock('Доступ к программе закрыт. Обратитесь к администратору.');
           }
         });
       }
@@ -2045,9 +2089,11 @@ if (typeof self !== 'undefined') self.S = S;
       var initial = (label.trim().charAt(0) || '?').toUpperCase();
       box.innerHTML = '<span class="who"><span class="av">' + S.esc(initial) + '</span><span id="who">' + S.esc(label) + '</span></span>' +
         (S.isAdmin() && !/admin\.html$/.test(location.pathname) ? '<a class="btn sm" href="admin.html">Админ</a>' : '') +
-        '<button class="btn sm" id="signOut" title="Выйти из системы">Выйти</button>';
+        // Signing out of a laptop that signs you straight back in means nothing.
+        (this.laptop ? '' : '<button class="btn sm" id="signOut" title="Выйти из системы">Выйти</button>');
       var self = this;
-      document.getElementById('signOut').addEventListener('click', function () { self.signOut(); });
+      var out = document.getElementById('signOut');
+      if (out) out.addEventListener('click', function () { self.signOut(); });
     }
   };
 

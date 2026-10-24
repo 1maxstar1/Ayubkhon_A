@@ -64,6 +64,19 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   Bir necha viloyatda uchraydigan joy nomi hech kimga berilmaydi.
 * Raqamlar hech qachon yo'qolmaydi: `АНКЕР М5` ≠ `АНКЕР М8`, `4.1.1` ≠ `4.11`;
   ikki raqam orasidagi ajratgich o'chirilmaydi.
+* **Xavfsizlik bo'limi hozircha o'chirilgan (egasining qarori, 2026-10-24).**
+  Dastur bitta odamning o'z kompyuterida ishlaydi, uni boshqa hech kim
+  ishlatmaydi va ko'rmaydi — shuning uchun noutbuk rejimida kirish oynasi,
+  4 soatlik qulf va «Выйти» yo'q: sahifa ochilishi bilan ichkaridasiz
+  (`PB_AUTOLOGIN=1`, `server/pb_hooks/laptop.pb.js`, `src/ui/auth.js`
+  `autoSignIn`). **Bu vaqtinchalik — egasi uni keyin qaytarmoqchi.** Hech narsa
+  o'chirib tashlanmagan: hisob, qoidalar, «kim qaysi narxni yozgan» joyida.
+  Qaytarish: noutbukda `PB_AUTOLOGIN=0` bilan ishga tushirish (kirish oynasi
+  qaytadi, kod o'zi to'ldiriladi); ko'p foydalanuvchiga o'tishda (`lan.sh`,
+  VPS) esa o'z-o'zidan qaytadi — u yerda `PB_AUTOLOGIN` yo'q, kod pochtaga
+  ketadi. Bitta himoya o'chirilmaydi: avtomatik kirish faqat dasturning o'z
+  sahifasiga beriladi, brauzerda ochiq boshqa saytga emas
+  (`server/pb_hooks/lib/laptop.js`).
 * Har bir versiya sahifa sarlavhasida ko'rinadi va orqaga qaytariladi
   (`server/deploy/rollback.sh`); ish maydoni narxlarni eski va yangi kalitda
   saqlaydi, shuning uchun qaytish ma'lumot yo'qotmaydi.

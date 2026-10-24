@@ -163,6 +163,10 @@ function Prepare-Public {
   }
   $env:PB_DEV = '1'
   $env:PB_LAPTOP = '1'
+  # No sign-in at all on a computer only its owner uses (owner's decision,
+  # 2026-10). Setting PB_AUTOLOGIN=0 before running this brings the login back.
+  if ($env:PB_AUTOLOGIN -ne '0') { $env:PB_AUTOLOGIN = '1' }
+  $env:PB_AUTOLOGIN_EMAIL = $script:Email
 }
 
 # The server must outlive this script - the window it was started from is
@@ -265,9 +269,8 @@ function Banner {
   Say "  Admin sahifa:  $Url/admin.html"
   Say "  Baza paneli:   $Url/_/     (parol: $Settings)"
   Say ""
-  Say "  Kirish pochtasi: $($script:Email)"
-  Say "  Kod so'rash tugmasi bosilganda kod o'zi to'ldiriladi - dastur"
-  Say "  shu kompyuterda ishlayapti, kod hech qayerga yuborilmaydi."
+  Say "  Kirish oynasi yo'q - sahifa ochilishi bilan ichkaridasiz."
+  Say "  Hisob: $($script:Email) (administrator)"
   Say ""
   Say "  Ma'lumot shu yerda:  $Data"
   Say "  Zaxiralar:           $Backups"

@@ -29,21 +29,22 @@ onMailerRecordOTPSend((e) => {
  * — every morning, for a program whose database is a file on that same disk.
  *
  * Three things keep it to that case:
- *   · PB_LAPTOP=1 — set by server/laptop.sh and by nothing else, so neither a
- *     server nor a developer's own PB_DEV run answers this at all;
- *   · the connection must come from this machine — remoteIP, which is the
- *     socket's own peer, not a header a request can claim for itself;
+ *   · PB_LAPTOP=1 — set by server/laptop.sh and laptop.ps1 and by nothing
+ *     else, so neither a server nor a developer's own PB_DEV run answers this;
+ *   · the request must be the program's own page on this computer, not some
+ *     other site open in the same browser (lib/laptop.js);
  *   · the otpId must be the one the last code was issued for, so the answer is
  *     only ever the code the asker has just caused to be made.
  *
  * It hands out nothing that is not already in pb_data/dev-otp.txt, which any
- * program running as this user can read directly.
+ * program running as this user can read directly. On a laptop with
+ * PB_AUTOLOGIN the page does not even get this far (laptop.pb.js); this is
+ * what remains when the login has been switched back on.
  */
 routerAdd("GET", "/api/laptop/otp", (e) => {
   const gone = () => new NotFoundError("not here");
   if ($os.getenv("PB_LAPTOP") !== "1" || $os.getenv("PB_DEV") !== "1") throw gone();
-  const ip = e.remoteIP();
-  if (ip !== "127.0.0.1" && ip !== "::1") throw gone();
+  if (!require(`${__hooks}/lib/laptop.js`).ownPage(e)) throw gone();
 
   const want = (e.requestInfo().query || {}).id;
   if (!want) throw gone();

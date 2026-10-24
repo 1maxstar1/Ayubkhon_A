@@ -31,9 +31,11 @@ export const DATA = join(ROOT, 'server/pb_data_test');
  * @param {boolean} [opts.build]     rebuild dist and pb_public first
  * @param {string}  [opts.dev]       PB_DEV; '1' writes sign-in codes to a file
  * @param {string}  [opts.laptop]    PB_LAPTOP; '1' also hands the code back to this machine
+ * @param {string}  [opts.autologin] PB_AUTOLOGIN; with laptop, '1' signs the page in by itself
+ *                                   as PB_AUTOLOGIN_EMAIL (opts.as, the test user by default)
  */
 export async function startServer(opts) {
-  const { port, registry = false, build = false, dev = '1', laptop = '' } = opts;
+  const { port, registry = false, build = false, dev = '1', laptop = '', autologin = '', as = 'test@example.com' } = opts;
   const base = `http://127.0.0.1:${port}`;
 
   if (build) execSync('node build.mjs --serve', { cwd: ROOT, stdio: 'ignore' });
@@ -45,7 +47,7 @@ export async function startServer(opts) {
   let proc = null;
   const spawnOne = () => spawn('sh', ['server/run.sh'], {
     cwd: ROOT,
-    env: { ...process.env, PB_DATA_DIR: 'pb_data_test', PB_HTTP: `127.0.0.1:${port}`, PB_DEV: dev, PB_LAPTOP: laptop },
+    env: { ...process.env, PB_DATA_DIR: 'pb_data_test', PB_HTTP: `127.0.0.1:${port}`, PB_DEV: dev, PB_LAPTOP: laptop, PB_AUTOLOGIN: autologin, PB_AUTOLOGIN_EMAIL: as },
     stdio: 'ignore'
   });
   const up = async () => {

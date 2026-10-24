@@ -276,6 +276,31 @@ har ishga tushganda (kuniga bir marta) olinadi va `~/Backups/smeta` ga
 nusxalanadi, oxirgi 14 tasi saqlanadi. Zaxira `pb_data` dan **tashqarida**
 turadi: diskdagi papka yo'qolsa, uning ichidagi zaxira ham yo'qoladi.
 
+### Windows'da
+
+Windows uchun alohida ishga tushirgich bor — unga **Node ham, Git ham kerak
+emas**: sahifalar `dist\` da tayyor turibdi, PocketBase birinchi ishga
+tushishda o'zi yuklanadi.
+
+1. GitHub'dagi repozitoriya sahifasida **Code → Download ZIP**. ZIP ni
+   ochishdan oldin unga o'ng tugma bilan bosing → **Properties** →
+   pastdagi **Unblock** belgisini qo'ying → OK. Aks holda Windows har bir
+   skriptni «internetdan kelgan» deb so'rab turadi.
+2. ZIP ni istalgan papkaga oching, masalan `C:\Smeta`.
+3. `server\laptop.cmd` ni **ikki marta bosing**. Birinchi marta pochtangizni
+   so'raydi, keyin brauzer ochiladi. Oynani yopsangiz ham server ishlayveradi.
+
+Kompyuter yonganda o'zi ishga tushishi uchun bir marta: Windows qidiruviga
+`cmd` deb yozing, ochilgan oynada `C:\Smeta\server\laptop.cmd autostart`
+(o'z papkangiz yo'li bilan). Boshqa buyruqlar ham xuddi shunday:
+`laptop.cmd status | backup | update | stop | uninstall | debug`.
+
+Windows'da ma'lumot dastur papkasida emas, **`%LOCALAPPDATA%\Taqqoslash`**
+ichida turadi; zaxiralar `%USERPROFILE%\Backups\smeta` da. Shuning uchun
+yangi versiyani ZIP qilib ochsangiz ham — yoki `laptop.cmd update` desangiz
+— narx xotirasi joyida qoladi. Ishga tushmasa: `laptop.cmd debug` serverni
+shu oynada ochadi va nima deyotganini ko'rsatadi.
+
 Keyinchalik xodimlar ko'paysa — hech narsa qayta yozilmaydi: o'sha baza bilan
 `sh server/lan.sh` (butun ofis shu kompyuterga ulanadi) yoki serverga chiqarish
 (`server/deploy/push.sh`) ishlaydi. Faqat kirish kodi o'sha paytda pochtaga

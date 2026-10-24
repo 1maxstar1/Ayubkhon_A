@@ -25,6 +25,8 @@ node test/pipeline.cjs a.xlsx b.xlsx --out out.xlsx   # brauzersiz tekshiruv
 node test/browser.mjs a.xlsx b.xlsx                   # haqiqiy brauzerda (bitta-fayl rejim)
 sh server/setup.sh && sh server/run.sh                # PocketBase (server rejimi), README «Server rejimi»
 sh server/laptop.sh [autostart|status|backup|update|stop]   # noutbuk rejimi: bitta odam, baza shu diskda
+server\laptop.cmd [autostart|status|backup|update|stop|debug]   # xuddi shu, Windows'da (Node/Git kerak emas)
+sh test/laptop-windows.sh                             # Windows ishga tushirgichi, pwsh ostida
 sh test/pb-smoke.sh; node test/e2e-workspace.mjs      # server rejimi testlari
 node test/normalize.cjs; node test/sections.cjs; node test/regions.cjs   # NLP o'lchovlari
 node test/hints.cjs a.xlsx b.xlsx                      # o'xshash resurs takliflari o'lchovi
@@ -36,9 +38,9 @@ sh server/deploy/rollback.sh v2.1                     # serverni eski versiyaga 
 
 Ikki mahsulot: bitta-fayl `dist/smeta-taqqoslash.html` (serversiz, avvalgidek)
 va server rejimi `dist/index.html` + `dist/admin.html` (PocketBase orqali).
-Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh`, bitta
-odam — kirish kodi pochtaga ketmaydi, `PB_LAPTOP=1` da shu kompyuterga
-qaytariladi), ofis tarmog'ida (`server/lan.sh`) yoki VPS da
+Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
+`server/laptop.cmd` Windows; bitta odam — kirish kodi pochtaga ketmaydi,
+`PB_LAPTOP=1` da shu kompyuterga qaytariladi), ofis tarmog'ida (`server/lan.sh`) yoki VPS da
 (`server/deploy/push.sh`). Kod bitta — farqi faqat qayerda ishlashida.
 `src/lib/` yadro ikkalasiga umumiy; server qismi `S.pb` bo'lmasa o'zini o'chiradi.
 

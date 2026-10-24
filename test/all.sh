@@ -31,6 +31,8 @@ done
 # same twelve-line «Cannot find package» trace, which reads like seven separate
 # failures of the program rather than one missing dependency.
 if node -e "require.resolve('playwright')" 2>/dev/null; then PW=1; else PW=0; fi
+# The Windows launcher is checked under PowerShell when there is one.
+PWSH="${PWSH:-$(command -v pwsh 2>/dev/null)}"; export PWSH
 
 run() {
   NAME="$1"; shift
@@ -54,6 +56,7 @@ skip() {
 browser_run() { if [ "$PW" = 1 ]; then run "$@"; else skip "$1" "playwright o'rnatilmagan: npm i -D playwright && npx playwright install chromium"; fi; }
 smeta_run() { if [ -n "$S1" ]; then run "$@"; else skip "$1" "smeta fayli berilmagan"; fi; }
 both_run() { if [ -n "$S1" ]; then browser_run "$@"; else skip "$1" "smeta fayli berilmagan"; fi; }
+pwsh_run() { if [ -n "$PWSH" ] && [ -x "$PWSH" ]; then run "$@"; else skip "$1" "pwsh (PowerShell) o'rnatilmagan"; fi; }
 
 node build.mjs --serve >/dev/null
 echo "test                   sonuc  vaqt"
@@ -80,6 +83,7 @@ run disable-user     node test/disable-user.mjs
 both_run  browser        node test/browser.mjs "$S1" "$S2"
 browser_run e2e-auth     node test/e2e-auth.mjs
 browser_run laptop       node test/laptop.mjs
+pwsh_run  laptop-windows sh test/laptop-windows.sh
 browser_run e2e-admin    node test/e2e-admin.mjs
 browser_run upload-order node test/upload-order.mjs
 both_run  e2e-workspace  node test/e2e-workspace.mjs "$S1" "$S2"

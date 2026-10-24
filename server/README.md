@@ -18,6 +18,12 @@ PB_ADMIN_EMAIL=admin@example.com PB_ADMIN_PASS=change-me-1234 ./setup.sh   # onc
   `pb_hooks/dev-otp.pb.js`). Nothing in it is specific to one computer, so the
   same `pb_data` can later be served to the office by `lan.sh` or pushed to a
   VPS.
+* `laptop.cmd` / `laptop.ps1` — the same on Windows, for Windows PowerShell 5.1
+  and without Node or Git: the pages come from `dist/`, PocketBase is
+  downloaded on first run, and the data lives in `%LOCALAPPDATA%\Taqqoslash`
+  so a new version unpacked over the folder leaves it alone. Autostart is a
+  shortcut in the Startup folder. Tested off Windows by `test/laptop-windows.sh`
+  under PowerShell 7 with the Linux binary.
 * `pb_hooks/` — server-side JS: `dev-otp.pb.js` (above), `registry.pb.js`
   (registry import, phase 3).
 * Env: `PB_DATA_DIR` (default `pb_data`), `PB_HTTP` (default `127.0.0.1:8090`).

@@ -1,0 +1,4 @@
+# Windows launchers keep the line endings Windows expects, whatever anybody's
+# core.autocrlf says: a ZIP downloaded from GitHub carries the bytes as committed.
+*.cmd -text
+*.ps1 -text

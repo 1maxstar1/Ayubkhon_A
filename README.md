@@ -290,18 +290,24 @@ Windows uchun alohida ishga tushirgich bor — unga **Node ham, Git ham kerak
 emas**: sahifalar `dist\` da tayyor turibdi, PocketBase birinchi ishga
 tushishda o'zi yuklanadi.
 
-1. GitHub'dagi repozitoriya sahifasida **Code → Download ZIP**. ZIP ni
-   ochishdan oldin unga o'ng tugma bilan bosing → **Properties** →
-   pastdagi **Unblock** belgisini qo'ying → OK. Aks holda Windows har bir
-   skriptni «internetdan kelgan» deb so'rab turadi.
-2. ZIP ni istalgan papkaga oching, masalan `C:\Smeta`.
-3. `server\laptop.cmd` ni **ikki marta bosing**. Birinchi marta pochtangizni
-   so'raydi, keyin brauzer ochiladi — kirish oynasisiz, to'g'ridan-to'g'ri
-   arizalar ro'yxati. Oynani yopsangiz ham server ishlayveradi.
+**PowerShell** oching (Start menyusida `PowerShell` deb yozing) va shu qatorni
+nusxalab qo'ying:
 
-Kompyuter yonganda o'zi ishga tushishi uchun bir marta: Windows qidiruviga
-`cmd` deb yozing, ochilgan oynada `C:\Smeta\server\laptop.cmd autostart`
-(o'z papkangiz yo'li bilan). Boshqa buyruqlar ham xuddi shunday:
+```
+irm https://raw.githubusercontent.com/1maxstar1/Ayubkhon_A/HEAD/server/install-windows.ps1 | iex
+```
+
+U dasturni `C:\Smeta` ga yuklab qo'yadi, birinchi marta pochtangizni so'raydi
+va brauzerni ochadi — kirish oynasisiz, to'g'ridan-to'g'ri arizalar ro'yxati.
+Oynani yopsangiz ham server ishlayveradi. Shu qatorni keyin yana qo'ysangiz —
+bu yangilash: narx xotirasi `C:\Smeta` da emas, unga tegilmaydi.
+
+Qo'lda o'rnatish ham mumkin: GitHub'da **Code → Download ZIP**, ZIP ga o'ng
+tugma → **Properties** → **Unblock**, ichidagi papka **mazmunini** `C:\Smeta`
+ga ko'chiring va `C:\Smeta\server\laptop.cmd` ni ikki marta bosing.
+
+Kompyuter yonganda o'zi ishga tushishi uchun bir marta, o'sha PowerShell
+oynasida: `C:\Smeta\server\laptop.cmd autostart`. Boshqa buyruqlar ham xuddi shunday:
 `laptop.cmd status | backup | update | stop | uninstall | debug`.
 
 Windows'da ma'lumot dastur papkasida emas, **`%LOCALAPPDATA%\Taqqoslash`**

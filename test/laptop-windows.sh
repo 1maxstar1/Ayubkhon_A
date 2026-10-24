@@ -73,6 +73,18 @@ TOKEN2=$(curl -sS -X POST "$URL/api/collections/users/auth-with-otp" -H 'content
 [ -z "$TOKEN2" ] && ok 'a code that was used once does not work twice' || no 'code reuse'
 ps1 nonsense >/dev/null 2>&1 && no 'an unknown command must fail' || ok 'an unknown command is refused'
 
+echo '-- the one-paste installer --'
+# What `irm …/install-windows.ps1 | iex` does, from a ZIP shaped the way GitHub
+# shapes it: everything inside one folder named after the branch.
+git archive --format=zip --prefix=Ayubkhon_A-claude-excel-price-validation-5ehbvb/ -o "$T/repo.zip" HEAD
+OUT=$(TAQ_DIR="$T/Smeta" TAQ_ZIP="$T/repo.zip" TAQ_NOSTART=1 "$PWSH" -NoProfile -Command \
+  'Get-Content -Raw ./server/install-windows.ps1 | Invoke-Expression; "still here"' 2>&1)
+[ -f "$T/Smeta/server/laptop.cmd" ] && ok 'it unpacks into the folder itself, not a folder inside it' || no "layout: $(ls "$T/Smeta" | head -3)"
+echo "$OUT" | grep -q 'still here' && ok 'and leaves the PowerShell window it was pasted into open' || no "iex: $OUT"
+head -c 3 "$T/Smeta/server/laptop.ps1" | od -An -tx1 | grep -q 'ef bb bf' && ok 'laptop.ps1 keeps its byte-order mark' || no 'BOM lost'
+grep -q "$(printf '\r')" "$T/Smeta/server/laptop.cmd" && ok 'and laptop.cmd its Windows line endings' || no 'CRLF lost'
+LC_ALL=C grep -q "$(printf '[\200-\377]')" server/install-windows.ps1 && no 'the installer must stay plain ASCII' || ok 'the installer is plain ASCII, as iex needs it'
+
 echo
 if [ "$FAIL" = 0 ]; then echo "laptop-windows OK"; else echo "FAILED ($FAIL)"; fi
 [ "$FAIL" = 0 ]

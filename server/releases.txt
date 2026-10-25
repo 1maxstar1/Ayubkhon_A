@@ -1,0 +1,9 @@
+# Releases the Windows laptop launcher (server/laptop.ps1) installs by itself.
+#
+# One line per release:   v<major>.<minor>.<patch> <full commit hash> [note]
+#
+# The commit is the release commit itself: package.json carries that version
+# and dist/ was built from it. The line is added in a later commit, so nothing
+# that is not listed here - half-done work on the branch included - ever
+# reaches the owner's computer by itself. Lines that do not look like this one
+# are ignored.

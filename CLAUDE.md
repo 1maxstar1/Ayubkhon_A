@@ -25,7 +25,7 @@ node test/pipeline.cjs a.xlsx b.xlsx --out out.xlsx   # brauzersiz tekshiruv
 node test/browser.mjs a.xlsx b.xlsx                   # haqiqiy brauzerda (bitta-fayl rejim)
 sh server/setup.sh && sh server/run.sh                # PocketBase (server rejimi), README «Server rejimi»
 sh server/laptop.sh [autostart|status|backup|update|stop]   # noutbuk rejimi: bitta odam, baza shu diskda
-server\laptop.cmd [autostart|status|backup|update|stop|debug]   # xuddi shu, Windows'da (Node/Git kerak emas)
+server\laptop.cmd [autostart|status|backup|update|rollback|autoupdate|drive|stop|debug|doctor]   # xuddi shu, Windows'da (Node/Git kerak emas)
 irm https://raw.githubusercontent.com/1maxstar1/Ayubkhon_A/HEAD/server/install-windows.ps1 | iex   # Windows: bitta qator bilan o'rnatish/yangilash
 sh test/laptop-windows.sh                             # Windows ishga tushirgichi, pwsh ostida
 sh test/pb-smoke.sh; node test/e2e-workspace.mjs      # server rejimi testlari
@@ -81,3 +81,10 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
 * Har bir versiya sahifa sarlavhasida ko'rinadi va orqaga qaytariladi
   (`server/deploy/rollback.sh`); ish maydoni narxlarni eski va yangi kalitda
   saqlaydi, shuning uchun qaytish ma'lumot yo'qotmaydi.
+* **Windows noutbuk o'zi yangilanadi** — faqat `server/releases.txt` dagi
+  relizga. Reliz chiqarish: `package.json` versiyasini ko'tarish →
+  `node build.mjs` → testlar → commit + push; keyin **alohida commit** bilan
+  `releases.txt` ga `vX.Y.Z <o'sha commit hash>` qatori va
+  `docs/versiyalar.md` ga qator. Shu qatorsiz hech bir commit egasining
+  kompyuteriga tushmaydi, shuning uchun chala ish ham tushmaydi. Ishga
+  tushmagan reliz o'zi qaytariladi (`laptop.cmd rollback` — qo'lda).

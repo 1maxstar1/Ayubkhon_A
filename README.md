@@ -308,12 +308,44 @@ ga ko'chiring va `C:\Smeta\server\laptop.cmd` ni ikki marta bosing.
 
 Kompyuter yonganda o'zi ishga tushishi uchun bir marta, o'sha PowerShell
 oynasida: `C:\Smeta\server\laptop.cmd autostart`. Boshqa buyruqlar ham xuddi shunday:
-`laptop.cmd status | backup | update | stop | uninstall | debug`.
+
+| Buyruq | Nima qiladi |
+|---|---|
+| `laptop.cmd status` | ishlayaptimi, versiya, oxirgi yangilanish, zaxiralar, Drive |
+| `laptop.cmd backup` | hoziroq zaxira olish |
+| `laptop.cmd update` | eng yangi relizni hoziroq o'rnatish |
+| `laptop.cmd rollback` | oxirgi yangilanishdan oldingi versiyaga qaytish |
+| `laptop.cmd rollback v2.4.0` | ro'yxatdagi istalgan relizga qaytish |
+| `laptop.cmd autoupdate off` / `on` | o'zi yangilanishini o'chirish / yoqish |
+| `laptop.cmd drive` / `drive off` | zaxiralarni Google Drive'ga ham qo'yish / to'xtatish |
+| `laptop.cmd stop` · `uninstall` · `debug` · `doctor` | to'xtatish · o'zi ishga tushmasin · xatoni ko'rish · tashxis |
+
+**O'zi yangilanadi.** `autostart` qilingan kompyuterda fondagi kuzatuvchi har
+6 soatda GitHub'dagi `server/releases.txt` ga qaraydi. Yangi reliz chiqqan
+bo'lsa — Windows'ga kirganda yoki ish vaqtidan tashqari (19:00–08:00) — avval
+zaxira oladi, joriy versiyani `%LOCALAPPDATA%\Taqqoslash\previous` ga saqlab
+qo'yadi, yangisini o'rnatadi va **u ishga tushib, kirish oynasisiz ochilsagina**
+qoldiradi. Ochilmasa — eskisini o'zi qaytaradi va o'sha relizni qayta
+urinmaydi. Ishga tushirgichi buzilgan reliz umuman o'rnatilmaydi. Nima bo'lgani
+`laptop.cmd status` da ko'rinadi. Yangi versiya yoqmasa: `laptop.cmd rollback`.
+
+**Zaxira Google Drive'da ham.** Kompyuterda «Google Drive для компьютера»
+o'rnatilgan bo'lsa (https://www.google.com/drive/download/), dastur uning
+papkasini (`G:\Мой диск`, `G:\My Drive` …) o'zi topadi va har bir zaxiraning
+nusxasini `Smeta zaxira` papkasiga qo'yadi — Drive uni o'zi yuklaydi, boshqa
+kompyuterdan ham ochsa bo'ladi. Keyin o'rnatilgan bo'lsa: `laptop.cmd drive`.
+
+**Uzoqdan kuzatish.** Kompyuterdan uzoqda bo'lsangiz, uning ekranini Chrome
+Remote Desktop (remotedesktop.google.com/access) bilan oching: `laptop.cmd
+status` ni ishga tushirish, dasturni ko'rish, kerak bo'lsa `rollback`. Buning
+uchun kompyuter uxlamasligi kerak (Параметры → Система → Питание → «Спящий
+режим: Никогда»). 8090-portni internetga **ochmang**: noutbukda kirish oynasi
+yo'q, port ochilsa dastur qulfsiz internetda turadi.
 
 Windows'da ma'lumot dastur papkasida emas, **`%LOCALAPPDATA%\Taqqoslash`**
 ichida turadi; zaxiralar `%USERPROFILE%\Backups\smeta` da. Shuning uchun
-yangi versiyani ZIP qilib ochsangiz ham — yoki `laptop.cmd update` desangiz
-— narx xotirasi joyida qoladi. Ishga tushmasa: `laptop.cmd debug` serverni
+yangi versiyani ZIP qilib ochsangiz ham — yoki u o'zi yangilansa —
+narx xotirasi joyida qoladi. Ishga tushmasa: `laptop.cmd debug` serverni
 shu oynada ochadi va nima deyotganini ko'rsatadi.
 
 Keyinchalik xodimlar ko'paysa — hech narsa qayta yozilmaydi: o'sha baza bilan

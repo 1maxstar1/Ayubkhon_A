@@ -7,3 +7,4 @@
 # that is not listed here - half-done work on the branch included - ever
 # reaches the owner's computer by itself. Lines that do not look like this one
 # are ignored.
+v2.4.1 a3ef5f8d539805c9634093d33ecf62d0b6993978 o'zi yangilanadi; zaxira Google Drive'da

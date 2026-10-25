@@ -82,9 +82,17 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   (`server/deploy/rollback.sh`); ish maydoni narxlarni eski va yangi kalitda
   saqlaydi, shuning uchun qaytish ma'lumot yo'qotmaydi.
 * **Windows noutbuk o'zi yangilanadi** — faqat `server/releases.txt` dagi
-  relizga. Reliz chiqarish: `package.json` versiyasini ko'tarish →
-  `node build.mjs` → testlar → commit + push; keyin **alohida commit** bilan
-  `releases.txt` ga `vX.Y.Z <o'sha commit hash>` qatori va
-  `docs/versiyalar.md` ga qator. Shu qatorsiz hech bir commit egasining
-  kompyuteriga tushmaydi, shuning uchun chala ish ham tushmaydi. Ishga
-  tushmagan reliz o'zi qaytariladi (`laptop.cmd rollback` — qo'lda).
+  relizga (o'rnatuvchi `install-windows.ps1` ham shu ro'yxatdan oladi). Reliz
+  chiqarish: `package.json` versiyasini ko'tarish → `node build.mjs` →
+  testlar (`test/laptop-windows.sh` ham) → commit + push; keyin **alohida
+  commit** bilan `releases.txt` ga `vX.Y.Z <o'sha commit hash>` qatori va
+  `docs/versiyalar.md` ga qator. Versiya raqami hech qachon qayta
+  ishlatilmaydi — buzilgan relizni keyingi patch-versiya tuzatadi. Har bir
+  versiya `%LOCALAPPDATA%\Taqqoslash\app\` da o'z papkasida turadi,
+  `current.txt` qaysi biri ishlashini aytadi; yangi versiya o'zini sinovdan
+  o'tkazmaguncha ko'rsatkich o'zgarmaydi. Versiyalar orasidagi kelishuv
+  (`current.txt`/`previous.txt`, `TAQ_LAUNCHER`, `serve trial`, `selftest`)
+  keyingi versiyalarda **o'zgarmasligi shart** — `C:\Smeta` dagi eski
+  ishga tushirgich shu orqali yangilarini ishga tushiradi. Eslatma: v2.3
+  ning `laptop.cmd update` i (birinchi o'tish) shoxning oxirgi holatini oladi —
+  shuning uchun o'sha paytda shoxda faqat relizning o'zi turishi kerak.

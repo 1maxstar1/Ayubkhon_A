@@ -27,18 +27,31 @@ PB_ADMIN_EMAIL=admin@example.com PB_ADMIN_PASS=change-me-1234 ./setup.sh   # onc
   shortcut in the Startup folder; what it starts (`laptop.ps1 serve`) keeps the
   server alive, takes the daily backup, copies it into Google Drive when Drive
   for desktop is there (`laptop.cmd drive`), and installs new releases by
-  itself: it reads `releases.txt` every 6 hours, downloads the listed commit,
-  refuses one whose launcher does not parse, backs up, keeps the old version
-  in `%LOCALAPPDATA%\Taqqoslash\previous`, and keeps the new one only if it
-  comes up and signs in — otherwise it puts the old one back and never tries
-  that release again by itself (`laptop.cmd rollback` does the same by hand).
-  Tested off Windows by `test/laptop-windows.sh` under PowerShell 7 with the
-  Linux binary.
-* `releases.txt` — what the Windows laptops install by themselves, one line
-  per release: `v2.4.0 <commit>`. Add the line in a commit after the release
-  commit (the one whose `package.json` carries that version and whose `dist/`
-  was built from it); the laptops take it within 6 hours, at sign-in or out of
-  working hours.
+  itself. An install never writes into the program folder: each release is
+  unpacked into `%LOCALAPPDATA%\Taqqoslash\app\<version>-<commit>`, and
+  `current.txt` names the one that runs — the program folder's launcher hands
+  every command except `stop` and `rollback` to that version's launcher. The
+  supervisor reads `releases.txt` every 6 hours; a newer release goes in at
+  sign-in or after 20 minutes without keyboard or mouse input. It is refused
+  if the version inside differs, its launcher does not parse or does not
+  answer `selftest`; otherwise the database is backed up (no backup, no
+  update), the new version's own launcher is started (`serve trial`), and only
+  when it keeps the server up, serving its version and signing in by itself,
+  does `current.txt` move to it and the old supervisor leave. A release that
+  fails is remembered by version and commit and never tried again by itself; a
+  version that later fails to start three times in a row (within a week of
+  the switch) gives way to the previous one. `laptop.cmd rollback` moves the
+  pointer back by hand. Tested off Windows by `test/laptop-windows.sh` under
+  PowerShell 7 with the Linux binary; `PSA=…/PSScriptAnalyzer.psd1` adds a
+  Windows PowerShell 5.1 compatibility check.
+* `releases.txt` — what the Windows laptops install by themselves (and what
+  `install-windows.ps1` installs), one line per release: `v2.4.0 <commit>`.
+  Add the line in a commit after the release commit (the one whose
+  `package.json` carries that version and whose `dist/` was built from it).
+  Never reuse a version number: to fix a bad release, release the next patch
+  version. A release that changes `$PbVersion` gets its own PocketBase binary
+  (`pocketbase-<version>.exe`); mind that a newer PocketBase may migrate the
+  database in a way an older one cannot read.
 * `pb_hooks/` — server-side JS: `dev-otp.pb.js` (above), `registry.pb.js`
   (registry import, phase 3).
 * Env: `PB_DATA_DIR` (default `pb_data`), `PB_HTTP` (default `127.0.0.1:8090`).

@@ -19,7 +19,20 @@
 
   $dir = 'C:\Smeta'
   if ($env:TAQ_DIR) { $dir = $env:TAQ_DIR }
+  # The newest release in server/releases.txt - the same list the program
+  # updates itself from - and the branch itself only when the list has none.
   $url = 'https://github.com/1maxstar1/Ayubkhon_A/archive/refs/heads/claude/excel-price-validation-5ehbvb.zip'
+  if (-not $env:TAQ_ZIP) { try {
+    $list = [string](Invoke-WebRequest -UseBasicParsing -TimeoutSec 30 -Uri 'https://raw.githubusercontent.com/1maxstar1/Ayubkhon_A/claude/excel-price-validation-5ehbvb/server/releases.txt').Content
+    $best = $null
+    foreach ($line in ($list -split "`n")) {
+      $m = [regex]::Match($line, '^\s*v(\d+\.\d+\.\d+)\s+([0-9a-fA-F]{7,40})\b')
+      if ($m.Success -and (-not $best -or [version]$m.Groups[1].Value -gt $best.Num)) {
+        $best = @{ Num = [version]$m.Groups[1].Value; Sha = $m.Groups[2].Value }
+      }
+    }
+    if ($best) { $url = 'https://github.com/1maxstar1/Ayubkhon_A/archive/' + $best.Sha + '.zip'; Write-Host "Reliz: v$($best.Num)" }
+  } catch { Write-Host "Relizlar ro'yxati olinmadi - oxirgi nusxa olinadi." } }
   $tmp = Join-Path ([IO.Path]::GetTempPath()) ('smeta-' + [Guid]::NewGuid().ToString('N'))
   New-Item -ItemType Directory -Force -Path $tmp, $dir | Out-Null
 

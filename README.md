@@ -321,13 +321,23 @@ oynasida: `C:\Smeta\server\laptop.cmd autostart`. Boshqa buyruqlar ham xuddi shu
 | `laptop.cmd stop` · `uninstall` · `debug` · `doctor` | to'xtatish · o'zi ishga tushmasin · xatoni ko'rish · tashxis |
 
 **O'zi yangilanadi.** `autostart` qilingan kompyuterda fondagi kuzatuvchi har
-6 soatda GitHub'dagi `server/releases.txt` ga qaraydi. Yangi reliz chiqqan
-bo'lsa — Windows'ga kirganda yoki ish vaqtidan tashqari (19:00–08:00) — avval
-zaxira oladi, joriy versiyani `%LOCALAPPDATA%\Taqqoslash\previous` ga saqlab
-qo'yadi, yangisini o'rnatadi va **u ishga tushib, kirish oynasisiz ochilsagina**
-qoldiradi. Ochilmasa — eskisini o'zi qaytaradi va o'sha relizni qayta
-urinmaydi. Ishga tushirgichi buzilgan reliz umuman o'rnatilmaydi. Nima bo'lgani
-`laptop.cmd status` da ko'rinadi. Yangi versiya yoqmasa: `laptop.cmd rollback`.
+6 soatda GitHub'dagi `server/releases.txt` ga qaraydi. Yangi reliz bo'lsa, uni
+Windows'ga kirganda yoki kompyuterga 20 daqiqa hech kim tegmaganda o'rnatadi:
+
+1. relizni o'z papkasiga ochadi — `%LOCALAPPDATA%\Taqqoslash\app\<versiya>`;
+   `C:\Smeta` ga hech qachon yozilmaydi;
+2. zaxira oladi (olinmasa — yangilanmaydi);
+3. yangi versiyaning **o'z ishga tushirgichi** serverni ko'taradi, eski versiya
+   esa kuzatib turadi;
+4. yangi versiya ishlab, o'z versiyasini ko'rsatib, kirish oynasisiz ochilib
+   bir muddat tursagina — `current.txt` bitta fayli unga o'tkaziladi.
+
+Bo'lmasa — eski versiya ishlashda davom etadi va o'sha reliz qayta
+urinilmaydi. O'rnatish o'rtasida tok o'chsa ham `current.txt` eski versiyani
+ko'rsatib turadi. O'rnatilgan versiya keyinchalik (bir hafta ichida) uch marta
+ketma-ket ishga tushmasa, kuzatuvchi oldingisini o'zi qaytaradi. Nima bo'lgani
+`laptop.cmd status` da ko'rinadi. Yangi versiya yoqmasa: `laptop.cmd rollback`
+— u yangi versiyaning o'zi buzilgan bo'lsa ham ishlaydi.
 
 **Zaxira Google Drive'da ham.** Kompyuterda «Google Drive для компьютера»
 o'rnatilgan bo'lsa (https://www.google.com/drive/download/), dastur uning

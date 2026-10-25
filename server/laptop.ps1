@@ -34,10 +34,23 @@
 # that file written back. A release that does not come up is never tried again
 # by itself.
 #
-# The hand-over between versions is a protocol every future version keeps:
-# current.txt / previous.txt hold one folder name under app\ (or ROOT for the
-# program folder itself), TAQ_LAUNCHER names the program folder's launcher,
-# «serve trial» starts a version on approval, and «selftest» answers.
+# The hand-over between versions is a contract every future version keeps,
+# because the launcher in C:\Smeta stays the one that was installed and runs
+# whatever version current.txt names:
+#   - the command line: one command word and at most one argument, positional;
+#   - current.txt / previous.txt: one folder name under app\ («v2.4.1-<12 hex
+#     of the commit>») or ROOT for the program folder itself;
+#   - TAQ_LAUNCHER: the program folder's launcher, set for every launcher it
+#     starts; «serve» (sign-in), «serve resumed», «serve trial»;
+#   - «selftest» prints «selftest ok v<version>»;
+#   - autostart.pid, server.pid, trial.pid: «<pid> <UTC start ticks>»;
+#   - trial.ok: «<version> <pid> <count>», written by a version on approval
+#     each time it has found itself healthy (its own Is-Current);
+#   - supervisor.beat: «<pid> <count>», written by a supervisor after each full
+#     round (backup, Drive, update check);
+#   - update.env keys FAILED («v2.4.1@<12 hex>», comma separated), ROOT_SEEN;
+#   - exit codes of «serve»: 0 = handed over / recovered / gave up on purpose,
+#     anything else with autostart.pid still there = it died.
 #
 # Written for Windows PowerShell 5.1, which every Windows 10 and 11 has: no
 # ?? or ?:, string bodies sent as UTF-8 bytes (5.1 sends Latin-1 otherwise),
@@ -85,6 +98,9 @@ $AppsDir      = Join-Path $AppHome 'app'
 $CurrentFile  = Join-Path $AppHome 'current.txt'
 $PreviousFile = Join-Path $AppHome 'previous.txt'
 $TrialFile    = Join-Path $AppHome 'trial.pid'
+$TrialOk      = Join-Path $AppHome 'trial.ok'
+$BeatFile     = Join-Path $AppHome 'supervisor.beat'
+$WatchFile    = Join-Path $AppHome 'watchdog.pid'
 $UpdateFile   = Join-Path $AppHome 'update.env'
 $LockFile     = Join-Path $AppHome 'update.lock'
 $LogFile      = Join-Path $AppHome 'supervisor.log'
@@ -688,12 +704,12 @@ function App-Dir([string]$name) {
   if (-not $name -or $name -eq 'ROOT') { return '' }
   return Join-Path $AppsDir $name
 }
-# A version folder that can run: its pages, and a launcher that parses.
+# A version folder that can run: a launcher that parses.
 function App-Ok([string]$name) {
   $d = App-Dir $name
   if (-not $d) { return $false }
   $ps = Join-Path (Join-Path $d 'server') 'laptop.ps1'
-  if (-not (Test-Path -LiteralPath $ps) -or -not (Version-In $d)) { return $false }
+  if (-not (Test-Path -LiteralPath $ps)) { return $false }
   $errs = $null; $tokens = $null
   [void][System.Management.Automation.Language.Parser]::ParseFile($ps, [ref]$tokens, [ref]$errs)
   return (@($errs).Count -eq 0)
@@ -702,23 +718,45 @@ function This-Name {
   if ($InApp) { return (Split-Path -Leaf $Root) }
   return 'ROOT'
 }
+# The program folder, whichever launcher asks.
+function Root-Dir { return (Split-Path -Parent (Split-Path -Parent $Launcher)) }
+# The version a pointer names, from the name itself (ROOT: the program folder).
+function Pointer-Version([string]$name) {
+  if ($name -eq 'ROOT') { return (Version-In (Root-Dir)) }
+  $m = [regex]::Match([string]$name, '^(v\d+\.\d+\.\d+)-')
+  if ($m.Success) { return $m.Groups[1].Value }
+  return ''
+}
+# Both pointers at once, and what the program folder held at that moment, so
+# that a later change of the program folder (a ZIP unpacked over it by hand)
+# can be told from a pointer written on purpose.
+function Set-Pointers([string]$cur, [string]$prev) {
+  if ($prev) { Write-Atomic $PreviousFile $prev } else { Remove-Item $PreviousFile -Force -ErrorAction SilentlyContinue }
+  Write-Atomic $CurrentFile $cur
+  Set-UpdateState @{ ROOT_SEEN = (Version-In (Root-Dir)) }
+}
 function Is-GitCheckout {
   return [bool]((Test-Path (Join-Path $Root '.git')) -and (Get-Command git -ErrorAction SilentlyContinue))
 }
 # The version folder the program folder hands its commands to, or '' to run
-# itself: the one current.txt names, else previous.txt; and never one older
-# than the program folder itself (the installer was run again, or a newer ZIP
-# unpacked over it).
+# itself: the one current.txt names, else previous.txt. The pointer decides -
+# unless the program folder itself changed since the pointer was written (a
+# newer ZIP unpacked over it by hand): then, once, the newer program folder
+# takes over, and the pointers say so.
 function Active-App {
   if ($InApp -or (Is-GitCheckout)) { return '' }
+  $seen = [string](Read-Env $UpdateFile)['ROOT_SEEN']
+  $mine = Local-Version
   foreach ($f in @($CurrentFile, $PreviousFile)) {
     $n = Read-Pointer $f
     if ($n -eq 'ROOT') { return '' }
-    if (App-Ok $n) {
-      $d = App-Dir $n
-      if ((Version-Num (Local-Version)) -gt (Version-Num (Version-In $d))) { return '' }
-      return $d
+    if (-not (App-Ok $n)) { continue }
+    if ($seen -and $seen -ne $mine -and (Version-Num $mine) -gt (Version-Num (Pointer-Version $n))) {
+      Set-Pointers 'ROOT' $n
+      Log "the program folder now holds $mine, newer than $n - it runs"
+      return ''
     }
+    return (App-Dir $n)
   }
   return ''
 }
@@ -733,7 +771,8 @@ function Run-In([string]$dir, [string]$cmd, [string]$a) {
   $env:TAQ_LAUNCHER = $Launcher
   $ps = Join-Path (Join-Path $dir 'server') 'laptop.ps1'
   $argLine = '-NoProfile -ExecutionPolicy Bypass -File "' + $ps + '" ' + $cmd
-  if ($a) { $argLine += ' "' + $a + '"' }
+  # a trailing backslash would escape the closing quote (G:\ -> G:")
+  if ($a) { $argLine += ' "' + ($a -replace '(\\+)$', '$1$1') + '"' }
   $p = Start-Process -FilePath (Ps-Exe) -ArgumentList $argLine -NoNewWindow -PassThru
   $null = $p.Handle   # without it Windows PowerShell forgets the exit code
   $p.WaitForExit()
@@ -745,16 +784,18 @@ function Start-Hidden([string]$ps, [string]$cmdArgs) {
   $env:TAQ_LAUNCHER = $Launcher
   $a = '-NoProfile -ExecutionPolicy Bypass -File "' + $ps + '" ' + $cmdArgs
   if ($OnWindows) {
-    Start-Process -FilePath (Ps-Exe) -ArgumentList ('-WindowStyle Hidden ' + $a) -WindowStyle Hidden | Out-Null
+    $p = Start-Process -FilePath (Ps-Exe) -ArgumentList ('-WindowStyle Hidden ' + $a) -WindowStyle Hidden -PassThru
   } else {
     # the test: not on the end of the pipe of whoever called this
-    Start-Process -FilePath (Ps-Exe) -ArgumentList $a -RedirectStandardOutput '/dev/null' -RedirectStandardError (Join-Path $AppHome 'supervisor.err') | Out-Null
+    $p = Start-Process -FilePath (Ps-Exe) -ArgumentList $a -RedirectStandardOutput '/dev/null' -RedirectStandardError (Join-Path $AppHome 'supervisor.err') -PassThru
   }
+  $null = $p.Handle
+  return $p
 }
 # The supervisor, through the program folder's launcher: it runs whichever
 # version current.txt names.
 function Start-Supervisor([string]$how) {
-  Start-Hidden $Launcher ('serve ' + $how)
+  [void](Start-Hidden $Launcher ('serve ' + $how))
 }
 function Wait-Supervisor {
   for ($i = 0; $i -lt 60; $i++) { if ((Pid-Alive $SupFile) -and (Answering)) { return $true }; Start-Sleep -Seconds 1 }
@@ -862,44 +903,68 @@ function Prune-Apps {
   }
 }
 
+# trial.ok / supervisor.beat: what the other version says about itself.
+function Read-Marker([string]$file) {
+  if (-not (Test-Path $file)) { return @() }
+  try { return @(([IO.File]::ReadAllText($file)).Trim() -split '\s+') } catch { return @() }
+}
+
 # The new version runs - its own launcher, its own pages and hooks - while
-# this one watches. It is kept only when its launcher stays up, the server
-# answers with its version, and the page signs in by itself, for $Settle
-# seconds on end.
+# this one watches. The new version judges its own health (its Is-Current
+# knows whether it expects the page to sign in by itself) and writes trial.ok
+# each time; it is kept only when its process lives, the server answers with
+# its version, and it has found itself healthy $Settle times in a row - counted
+# in its rounds, not on the clock, so a computer asleep in the middle proves
+# nothing. 'ok', 'failed', or 'busy' when the port could not even be freed.
 function Trial([string]$dir, [string]$tag) {
   Kill-From $TrialFile
+  Remove-Item $TrialOk -Force -ErrorAction SilentlyContinue
   Stop-ServerOnly
   Stop-PortHolder
-  if (Answering) { Log "trial $tag : the port is held by something else"; return $false }
-  Start-Hidden (Join-Path (Join-Path $dir 'server') 'laptop.ps1') 'serve trial'
-  $good = $null
-  for ($i = 0; $i -lt ($TrialWait + $Settle); $i++) {
+  if (Answering) { Log "trial $tag : the port is held by a server this account cannot stop"; return 'busy' }
+  $script:TrialProc = Start-Hidden (Join-Path (Join-Path $dir 'server') 'laptop.ps1') 'serve trial'
+  $good = 0; $lastN = ''
+  for ($i = 0; $i -lt ($TrialWait + 4 * $Settle); $i++) {
     Start-Sleep -Seconds 1
-    $up = (Pid-Alive $TrialFile) -and ((Served-Version) -eq $tag) -and ($env:PB_AUTOLOGIN -eq '0' -or (Autologin-On))
-    if (-not $up) {
-      $good = $null
-      if ($i -gt 10 -and -not (Pid-Alive $TrialFile)) { break }
-      continue
-    }
-    if (-not $good) { $good = Get-Date }
-    if (((Get-Date) - $good).TotalSeconds -ge $Settle) { return $true }
+    if ($script:TrialProc.HasExited) { Log "trial $tag : its launcher ended ($($script:TrialProc.ExitCode))"; return 'failed' }
+    $m = Read-Marker $TrialOk
+    $up = ($m.Count -ge 3 -and $m[0] -eq $tag -and $m[1] -eq [string]$script:TrialProc.Id -and (Served-Version) -eq $tag)
+    if (-not $up) { $good = 0; continue }
+    if ($m[2] -ne $lastN) { $good++; $lastN = $m[2] }
+    if ($good -ge $Settle) { return 'ok' }
   }
-  return $false
+  Log "trial $tag : not healthy in time"
+  return 'failed'
+}
+# A version on approval, and whatever server it started, gone for sure.
+function Stop-Trial {
+  if ($script:TrialProc -and -not $script:TrialProc.HasExited) {
+    try { Stop-Process -Id $script:TrialProc.Id -Force -ErrorAction Stop; [void]$script:TrialProc.WaitForExit(5000) } catch { }
+  }
+  Kill-From $TrialFile
+  Remove-Item $TrialOk -Force -ErrorAction SilentlyContinue
+  Stop-ServerOnly
+  Stop-PortHolder
 }
 # The version on approval is told it is the one now (current.txt names it),
-# takes over the supervisor's file, and this process can go.
+# takes over the supervisor's file, and runs one full round as the supervisor
+# - backup, Drive, update check - before this process goes. If it does not,
+# the pointers go back as they were.
 function Promote([string]$name, [string]$tag) {
   $prev = This-Name
-  Write-Atomic $PreviousFile $prev
-  Write-Atomic $CurrentFile $name
-  for ($i = 0; $i -lt 60; $i++) {
-    $sup = Pid-Alive $SupFile
-    if ($sup -and $sup -ne $PID -and -not (Pid-Alive $TrialFile)) { return $true }
+  $oldPrev = Read-Pointer $PreviousFile
+  Set-Pointers $name $prev
+  $beat0 = Read-Marker $BeatFile
+  for ($i = 0; $i -lt (90 + 2 * $Settle); $i++) {
     Start-Sleep -Seconds 1
+    if ($script:TrialProc.HasExited) { break }
+    $sup = Pid-Alive $SupFile
+    $beat = Read-Marker $BeatFile
+    if ($sup -and $sup -eq $script:TrialProc.Id -and $beat.Count -ge 2 -and $beat[0] -eq [string]$sup -and
+        ($beat0.Count -lt 2 -or $beat[0] -ne $beat0[0] -or $beat[1] -ne $beat0[1])) { return $true }
   }
-  # It never took over: the pointers go back before anything starts from them.
-  Write-Atomic $CurrentFile $prev
-  Remove-Item $PreviousFile -Force -ErrorAction SilentlyContinue
+  Log "promote $tag : its supervisor did not complete a round"
+  Set-Pointers $prev $oldPrev
   return $false
 }
 
@@ -928,23 +993,32 @@ function Install-Locked($rel, [bool]$supervised) {
     return "zaxira olinmadi, yangilanmadi: $($_.Exception.Message)"
   }
   if (-not $supervised) { Kill-From $SupFile }
-  Say "Yangi versiya sinab ko'rilmoqda: $($rel.Tag)..."
-  if ((Trial $dir $rel.Tag) -and (Promote $rel.Name $rel.Tag)) {
+  Say "Yangi versiya sinab ko'rilmoqda: $($rel.Tag) (bir-ikki daqiqa, oynani yopmang)..."
+  $script:TrialProc = $null
+  $t = Trial $dir $rel.Tag
+  if ($t -eq 'ok' -and (Promote $rel.Name $rel.Tag)) {
     Set-UpdateState @{ LAST_UPDATE = ((Get-Date).ToString('yyyy-MM-dd HH:mm') + " $from -> $($rel.Tag)"); AVAILABLE = ''; WAITING_FOR = ''; WAITING_SINCE = ''; WAITING_SHA = '' }
     Log "update $from -> $($rel.Tag): ok"
     Prune-Apps
     return ''
   }
-  # It did not prove itself: it goes, and this version - never stopped being
-  # the one current.txt names - comes back.
-  Log "update $($rel.Tag) did not prove itself - back to $from"
-  Add-Failed (Fail-Key $rel)
-  Kill-From $TrialFile
-  Stop-ServerOnly
-  Stop-PortHolder
+  # It did not prove itself (or the port could not be freed): it goes, and
+  # this version - never stopped being the one current.txt names - comes back.
+  Stop-Trial
+  # this process supervises again
+  if ($supervised) { Write-Pid $SupFile $PID }
+  if ($t -eq 'busy') {
+    Log "update $($rel.Tag): port busy, not tried"
+  } else {
+    Log "update $($rel.Tag) did not prove itself - back to $from"
+    Add-Failed (Fail-Key $rel)
+  }
   $back = Start-AndCheck
   if (-not $supervised -and ($hadSup -or (Autostart-On))) { Start-Supervisor 'resumed'; [void](Wait-Supervisor) }
   Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+  if ($t -eq 'busy') {
+    return "$Port-port boshqa (administrator sifatida ishga tushirilgan?) server qo'lida - kompyuterni qayta yoqing, so'ng yana urinib ko'ring"
+  }
   if ($back) {
     Set-UpdateState @{ LAST_UPDATE = ((Get-Date).ToString('yyyy-MM-dd HH:mm') + " $($rel.Tag) ishga tushmadi, $from qoldi") }
     return "$($rel.Tag) ishga tushmadi - $from da qoldi"
@@ -970,14 +1044,31 @@ public static class TaqIdle {
   public static uint Seconds() {
     LASTINPUTINFO i = new LASTINPUTINFO();
     i.cbSize = (uint)Marshal.SizeOf(i);
-    if (!GetLastInputInfo(ref i)) return 0;
+    if (!GetLastInputInfo(ref i)) return uint.MaxValue;
     return ((uint)Environment.TickCount - i.dwTime) / 1000;
   }
 }
 '@
     }
-    return [int][TaqIdle]::Seconds()
+    $v = [TaqIdle]::Seconds()
+    if ($v -eq [uint32]::MaxValue) { return -1 }
+    return [int]$v
   } catch { return -1 }
+}
+# How long the computer stays awake without input before it sleeps, in
+# seconds (the shorter of the plugged-in and battery settings); 0 = never or
+# unknown. A computer that sleeps after 15 minutes never reaches 20 idle ones.
+function Sleep-After {
+  if ($env:TAQ_SLEEP_AFTER) { return [int]$env:TAQ_SLEEP_AFTER }
+  if (-not $OnWindows) { return 0 }
+  if ($script:SleepAfter -ne $null) { return $script:SleepAfter }
+  $script:SleepAfter = 0
+  try {
+    $out = [string](& powercfg /q SCHEME_CURRENT SUB_SLEEP STANDBYIDLE 2>$null | Out-String)
+    $vals = @([regex]::Matches($out, '0x([0-9a-fA-F]{8})\s*$', 'Multiline') | ForEach-Object { [Convert]::ToInt32($_.Groups[1].Value, 16) } | Where-Object { $_ -gt 0 })
+    if ($vals.Count) { $script:SleepAfter = ($vals | Measure-Object -Minimum).Minimum }
+  } catch { }
+  return $script:SleepAfter
 }
 # When the supervisor may restart the server for an update: at sign-in, or
 # when nobody has used the computer for 20 minutes. A release that has waited
@@ -988,21 +1079,28 @@ function May-Restart([bool]$justStarted, [double]$waitedHours) {
   if ($justStarted) { return $true }
   $idle = Idle-Seconds
   if ($idle -ge 0) {
-    if ($idle -ge 1200) { return $true }
-    return ($waitedHours -ge 72 -and $idle -ge 300)
+    $need = 1200
+    $sleep = Sleep-After
+    if ($sleep -gt 0) { $need = [Math]::Max(120, [Math]::Min(1200, $sleep - 180)) }
+    if ($idle -ge $need) { return $true }
+    return ($waitedHours -ge 72 -and $idle -ge [Math]::Min(300, $need))
   }
   $h = (Get-Date).Hour
   return ($h -ge 21 -or $h -lt 7 -or $waitedHours -ge 72)
 }
 
-function Update-IfDue([bool]$justStarted) {
+# $mode: '' as usual; 'dry' - everything but the install (a version on
+# approval proving the code runs); 'down' - nothing is running, so there is
+# nobody to disturb: look now (within the retry interval) and install.
+function Update-IfDue([bool]$justStarted, [string]$mode) {
   $s = Read-Settings
   if ($s['AUTO_UPDATE'] -eq '0') { return }
+  if ($mode -eq 'down') { $justStarted = $true }
   if ((Is-GitCheckout) -and -not $InApp) { return }
   $u = Read-Env $UpdateFile
   $now = Get-Date
   $due = $true
-  if ($u['NEXT_CHECK'] -and -not $justStarted) {
+  if ($u['NEXT_CHECK'] -and (-not $justStarted -or ($mode -eq 'down' -and $u['CHECK_ERROR']))) {
     try { $due = ([datetime]::Parse($u['NEXT_CHECK'], [Globalization.CultureInfo]::InvariantCulture) -le $now) } catch { }
   }
   $rel = $null
@@ -1028,7 +1126,7 @@ function Update-IfDue([bool]$justStarted) {
       if ($rel.Num -le (Version-Num (Local-Version)) -or (Failed-Keys) -contains (Fail-Key $rel)) { $rel = $null }
     }
   }
-  if (-not $rel) { return }
+  if (-not $rel -or $mode -eq 'dry') { return }
   if ($u['WAITING_FOR'] -ne $rel.Tag -or -not $u['WAITING_SINCE']) {
     Set-UpdateState @{ WAITING_FOR = $rel.Tag; WAITING_SINCE = $now.ToString('s') }
     $u = Read-Env $UpdateFile
@@ -1036,6 +1134,12 @@ function Update-IfDue([bool]$justStarted) {
   $waited = 0
   try { $waited = ($now - [datetime]::Parse($u['WAITING_SINCE'], [Globalization.CultureInfo]::InvariantCulture)).TotalHours } catch { }
   if (-not (May-Restart $justStarted $waited)) { return }
+  # About to install: what is listed now, not what was listed when it was
+  # first seen - a release taken off the list must not arrive anyway.
+  if (-not $due) {
+    try { $rel = Newer-Release $true } catch { return }
+    if (-not $rel) { Set-UpdateState @{ AVAILABLE = ''; WAITING_FOR = ''; WAITING_SINCE = ''; WAITING_SHA = '' }; return }
+  }
   $why = Install-Release $rel $true
   if (-not $why) { exit 0 }
 }
@@ -1051,8 +1155,7 @@ function Recover-Previous {
   try { if ((Get-Item $CurrentFile).LastWriteTime -lt (Get-Date).AddDays(-7)) { return $false } } catch { return $false }
   Log "$(Local-Version) does not start - back to $prev"
   Add-Failed (Name-Key (This-Name))
-  Write-Atomic $CurrentFile $prev
-  Remove-Item $PreviousFile -Force -ErrorAction SilentlyContinue
+  Set-Pointers $prev ''
   Set-UpdateState @{ LAST_UPDATE = ((Get-Date).ToString('yyyy-MM-dd HH:mm') + " $(Local-Version) ishga tushmay qoldi, oldingisi qaytarildi") }
   Start-Supervisor 'resumed'
   return $true
@@ -1079,12 +1182,58 @@ function Banner {
 function Open-Browser { if ($OnWindows) { Start-Process "$Url/" } }
 
 # ------------------------------------------------------------------ hand-over
-# Started from the program folder, every command except the two that must
-# work when the version itself is broken - stop and rollback - goes to the
-# launcher of the version current.txt names.
-if (-not $InApp -and $Command -ne 'stop' -and $Command -ne 'rollback' -and $Command -ne 'selftest') {
-  $active = Active-App
-  if ($active) { exit (Run-In $active $Command $Arg) }
+# Started from the program folder, every command except those that must work
+# when the version itself is broken - stop, and rollback to the version before
+# - goes to the launcher of the version current.txt names. For «serve» the
+# program folder stays as a watchdog: a supervisor that dies (not stopped on
+# purpose - stop removes autostart.pid) is started again, and one that dies
+# three times running, within a week of becoming current, gives way to the
+# version before it.
+if (-not $InApp -and $Command -ne 'stop' -and $Command -ne 'selftest' -and -not ($Command -eq 'rollback' -and -not $Arg)) {
+  if ($Command -ne 'serve') {
+    $active = Active-App
+    if ($active) { exit (Run-In $active $Command $Arg) }
+  } else {
+    # One watchdog at a time: a newer one (every Start-Supervisor starts one)
+    # takes over, and this one goes.
+    Write-Pid $WatchFile $PID
+    $deaths = 0
+    $how = $Arg
+    while ($true) {
+      if ((Pid-Alive $WatchFile) -ne $PID) { exit 0 }
+      $active = Active-App
+      if (-not $active) { break }
+      $name = Split-Path -Leaf $active
+      $code = Run-In $active 'serve' $how
+      # Whoever supervises now - the child, or the version it handed an
+      # update over to - is watched until it ends.
+      while ((Pid-Alive $WatchFile) -eq $PID) {
+        $sup = Pid-Alive $SupFile
+        if (-not $sup) { break }
+        try { [void](Get-Process -Id $sup).WaitForExit(60000) } catch { Start-Sleep -Seconds 5 }
+      }
+      if ((Pid-Alive $WatchFile) -ne $PID) { exit 0 }
+      # stopped on purpose: stop removes autostart.pid
+      if (-not (Test-Path $SupFile)) { exit 0 }
+      $deaths++
+      Log "the supervisor of $name ended ($code)"
+      $how = 'resumed'
+      if ($deaths -ge 3) {
+        $prev = Read-Pointer $PreviousFile
+        $young = $false
+        try { $young = ((Get-Item $CurrentFile).LastWriteTime -gt (Get-Date).AddDays(-7)) } catch { }
+        if ($young -and $prev -and ($prev -eq 'ROOT' -or (App-Ok $prev)) -and (Read-Pointer $CurrentFile) -eq $name) {
+          Log "$name keeps dying - back to $prev"
+          Add-Failed (Name-Key $name)
+          Set-Pointers $prev ''
+          Set-UpdateState @{ LAST_UPDATE = ((Get-Date).ToString('yyyy-MM-dd HH:mm') + " $name ishlamay qoldi, oldingisi qaytarildi") }
+          $deaths = 0
+          continue
+        }
+      }
+      Start-Sleep -Seconds ([Math]::Min(300, 10 * [Math]::Pow(2, [Math]::Min($deaths, 5))))
+    }
+  }
 }
 
 # ------------------------------------------------------------------ commands
@@ -1128,43 +1277,95 @@ switch ($Command) {
   # release.
   'serve' {
     $script:NoDie = $true
-    Ensure-Settings $false
-    $trial = ($Arg -eq 'trial')
-    $first = ($Arg -ne 'resumed' -and -not $trial)
-    if ($trial) { Write-Pid $TrialFile $PID; Log "on approval: $(Local-Version)" }
-    else { Write-Pid $SupFile $PID; Log "supervisor started ($(Local-Version))" }
-    $fails = 0
-    $began = Get-Date
-    while ($true) {
-      if ($trial) {
-        # Approved: current.txt names this version. Not approved within a
-        # quarter of an hour: whoever started this has gone, and so does this.
-        if ((Read-Pointer $CurrentFile) -eq (This-Name)) {
-          Write-Pid $SupFile $PID
-          Remove-Item $TrialFile -Force -ErrorAction SilentlyContinue
-          $trial = $false
-          Log "supervisor started ($(Local-Version), after the update)"
-        } elseif (((Get-Date) - $began).TotalMinutes -gt 15) { exit 0 }
-      }
-      if (-not (Answering)) {
-        $ok = $true
-        try { Prepare; Start-Server; After-Start } catch { $ok = $false; Log "start failed: $($_.Exception.Message)" }
-        if ($ok) { $fails = 0 } else {
-          $fails++
-          if (-not $trial -and $fails -ge 3 -and (Recover-Previous)) { exit 0 }
-          Start-Sleep -Seconds ([Math]::Min(300, 10 * [Math]::Pow(2, [Math]::Min($fails - 1, 5))))
+    try {
+      Ensure-Settings $false
+      $trial = ($Arg -eq 'trial')
+      $first = ($Arg -ne 'resumed' -and -not $trial)
+      if ($trial) { Write-Pid $TrialFile $PID; Log "on approval: $(Local-Version)" }
+      else { Write-Pid $SupFile $PID; Log "supervisor started ($(Local-Version))" }
+      $fails = 0
+      $rounds = 0
+      $healthy = 0
+      $exercised = $false
+      $began = Get-Date
+      while ($true) {
+        if ($trial) {
+          # Approved: current.txt names this version - it becomes the
+          # supervisor. Not approved, and whoever started it has gone (a closed
+          # window, a computer switched off) or a quarter of an hour has passed:
+          # it stops its server and starts the supervisor of the version
+          # current.txt still names.
+          if ((Read-Pointer $CurrentFile) -eq (This-Name)) {
+            Write-Pid $SupFile $PID
+            Remove-Item $TrialFile, $TrialOk -Force -ErrorAction SilentlyContinue
+            $trial = $false
+            Log "supervisor started ($(Local-Version), after the update)"
+          } elseif (-not (Lock-Holder) -or ((Get-Date) - $began).TotalMinutes -gt 15) {
+            Log "on approval, but nobody is waiting for $(Local-Version) any more - giving way"
+            Stop-ServerOnly
+            Remove-Item $TrialFile, $TrialOk -Force -ErrorAction SilentlyContinue
+            Start-Supervisor 'resumed'
+            exit 0
+          }
+        }
+        # A server on the port that is not this version - one left by an
+        # install cut off with everything else - is not watched as if it were.
+        $answering = Answering
+        if ($answering) {
+          $sv = Served-Version
+          if ($sv -and $sv -ne (Local-Version)) {
+            Log "the server on the port is $sv, not $(Local-Version) - replacing it"
+            Stop-ServerOnly
+            Stop-PortHolder
+            $answering = Answering
+          }
+        }
+        if (-not $answering) {
+          $ok = $true
+          try { Prepare; Start-Server; After-Start } catch { $ok = $false; Log "start failed: $($_.Exception.Message)" }
+          if ($ok) { $fails = 0 } else {
+            $fails++
+            if (-not $trial -and $fails -ge 3) {
+              if (Recover-Previous) { exit 0 }
+              # Nothing to go back to, and nothing running: a fixed release
+              # may be waiting - this is the moment to take it.
+              try { Stop-ServerOnly; Update-IfDue $true 'down' } catch { Log "update check failed: $($_.Exception.Message)" }
+            }
+            Start-Sleep -Seconds ([Math]::Min(300, 10 * [Math]::Pow(2, [Math]::Min($fails - 1, 5))))
+            continue
+          }
+        }
+        if ($trial) {
+          # The supervisor's own round, once, without installing anything -
+          # code that dies here dies on approval, not after it.
+          if (-not $exercised) {
+            Backup-IfStale
+            Sync-Drive
+            Update-IfDue $false 'dry'
+            $exercised = $true
+          }
+          if (Is-Current) { $healthy++; Write-Atomic $TrialOk "$(Local-Version) $PID $healthy" }
+          Start-Sleep -Seconds 1
           continue
         }
+        try { Backup-IfStale } catch { }
+        try { Sync-Drive } catch { }
+        try { Update-IfDue $first '' } catch { Log "update check failed: $($_.Exception.Message)" }
+        $first = $false
+        $rounds++
+        Write-Atomic $BeatFile "$PID $rounds"
+        # While a release waits for a quiet moment, look every minute.
+        $wait = $Tick
+        if ([string](Read-Env $UpdateFile)['WAITING_FOR']) { $wait = [Math]::Min($Tick, 60) }
+        $id = Pid-Alive $PidFile
+        if ($id) { try { [void](Get-Process -Id $id).WaitForExit($wait * 1000) } catch { } }
+        else { Start-Sleep -Seconds ([Math]::Min(60, $wait)) }
+        Start-Sleep -Seconds 1
       }
-      if ($trial) { Start-Sleep -Seconds 1; continue }
-      try { Backup-IfStale } catch { }
-      try { Sync-Drive } catch { }
-      try { Update-IfDue $first } catch { Log "update check failed: $($_.Exception.Message)" }
-      $first = $false
-      $id = Pid-Alive $PidFile
-      if ($id) { try { [void](Get-Process -Id $id).WaitForExit($Tick * 1000) } catch { } }
-      else { Start-Sleep -Seconds ([Math]::Min(60, $Tick)) }
-      Start-Sleep -Seconds 1
+    } catch {
+      # A hidden process has no screen: what killed it goes into the log.
+      Log ("serve died ($(Local-Version)): " + $_.Exception.Message + ' at line ' + $_.InvocationInfo.ScriptLineNumber)
+      exit 1
     }
   }
 
@@ -1392,6 +1593,7 @@ switch ($Command) {
     Wait-Install
     Ensure-Settings $false
     $cur = Read-Pointer $CurrentFile
+    if (-not $cur) { $cur = This-Name }
     $curLabel = Local-Version
     if ($cur -and $cur -ne 'ROOT' -and (App-Ok $cur)) { $curLabel = Version-In (App-Dir $cur) }
     if ($Arg) {
@@ -1401,18 +1603,24 @@ switch ($Command) {
       if (-not $rel) { Die "$tag relizlar ro'yxatida yo'q. Bor: $(($all | ForEach-Object { $_.Tag }) -join ', ')" }
       # The supervisor first, so that it writes nothing while this does.
       Kill-From $SupFile
-      foreach ($r in $all) { if ($r.Num -gt $rel.Num) { Add-Failed (Fail-Key $r) } }
+      if (Answering) { try { Backup-Now } catch { } }
       if (App-Ok $rel.Name) {
         # already on the disk: only the pointer moves
-        Write-Atomic $PreviousFile $cur
-        Write-Atomic $CurrentFile $rel.Name
         Stop-Server; Stop-PortHolder
+        Set-Pointers $rel.Name $cur
         Start-Supervisor 'resumed'
-        if (-not (Wait-Supervisor)) { Die "$tag ishga tushmadi. laptop.cmd doctor ni ishga tushirib, natijasini yuboring." }
+        if (-not (Wait-Supervisor)) {
+          Stop-Server; Stop-PortHolder
+          Set-Pointers $cur ''
+          Start-Supervisor 'resumed'
+          Die "$tag ishga tushmadi - $curLabel qaytarildi. laptop.cmd doctor ni ishga tushirib, natijasini yuboring."
+        }
       } else {
         $why = Install-Release $rel $false
         if ($why) { Die $why }
       }
+      # Only now that it runs: the newer ones are not taken again by themselves.
+      foreach ($r in $all) { if ($r.Num -gt $rel.Num) { Add-Failed (Fail-Key $r) } }
       Log "rollback $curLabel -> $tag"
       Set-UpdateState @{ LAST_UPDATE = ((Get-Date).ToString('yyyy-MM-dd HH:mm') + " qaytarildi: $curLabel -> $tag") }
       Say "Qaytarildi: $curLabel -> $tag. Undan yangilari o'zi o'rnatilmaydi (keyingi reliz chiqquncha)."
@@ -1426,16 +1634,20 @@ switch ($Command) {
       if ($names.Count) { $hint = " Ro'yxatdagi relizlar: $($names -join ', ') - masalan: laptop.cmd rollback $($names[-1])" }
       Die "Oldingi versiya saqlanmagan.$hint"
     }
-    Kill-From $SupFile
-    Add-Failed (Name-Key $cur)
+    if (Answering) { try { Backup-Now } catch { } }
     Stop-Server
     Stop-PortHolder
-    Write-Atomic $CurrentFile $prev
-    Remove-Item $PreviousFile -Force -ErrorAction SilentlyContinue
-    $label = ''
-    if ($prev -eq 'ROOT') { $label = Version-In (Split-Path -Parent (Split-Path -Parent $Launcher)) } else { $label = Version-In (App-Dir $prev) }
+    # The two pointers swap: a rollback can itself be rolled back.
+    Set-Pointers $prev $cur
+    $label = Pointer-Version $prev
     Start-Supervisor 'resumed'
-    if (-not (Wait-Supervisor)) { Die "Oldingi versiya ($label) ishga tushmadi. laptop.cmd doctor ni ishga tushirib, natijasini yuboring." }
+    if (-not (Wait-Supervisor)) {
+      Stop-Server; Stop-PortHolder
+      Set-Pointers $cur $prev
+      Start-Supervisor 'resumed'
+      Die "Oldingi versiya ($label) ishga tushmadi - $curLabel qaytarildi. laptop.cmd doctor ni ishga tushirib, natijasini yuboring."
+    }
+    Add-Failed (Name-Key $cur)
     Set-UpdateState @{ LAST_UPDATE = ((Get-Date).ToString('yyyy-MM-dd HH:mm') + " qaytarildi: $curLabel -> $label") }
     Log "rollback $curLabel -> $label"
     Say "Qaytarildi: $curLabel -> $label. $curLabel o'zi qayta o'rnatilmaydi."

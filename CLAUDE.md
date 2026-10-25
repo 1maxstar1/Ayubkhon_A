@@ -91,8 +91,10 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   versiya `%LOCALAPPDATA%\Taqqoslash\app\` da o'z papkasida turadi,
   `current.txt` qaysi biri ishlashini aytadi; yangi versiya o'zini sinovdan
   o'tkazmaguncha ko'rsatkich o'zgarmaydi. Versiyalar orasidagi kelishuv
-  (`current.txt`/`previous.txt`, `TAQ_LAUNCHER`, `serve trial`, `selftest`)
-  keyingi versiyalarda **o'zgarmasligi shart** — `C:\Smeta` dagi eski
-  ishga tushirgich shu orqali yangilarini ishga tushiradi. Eslatma: v2.3
+  (to'liq ro'yxati `server/laptop.ps1` boshida: buyruq qatori, ko'rsatkichlar,
+  `TAQ_LAUNCHER`, `serve`/`serve resumed`/`serve trial`, `selftest`, pid
+  fayllari, `trial.ok`, `supervisor.beat`, `FAILED`/`ROOT_SEEN`, `serve` ning
+  chiqish kodlari) keyingi versiyalarda **o'zgarmasligi shart** — `C:\Smeta`
+  dagi eski ishga tushirgich shu orqali yangilarini ishga tushiradi. Eslatma: v2.3
   ning `laptop.cmd update` i (birinchi o'tish) shoxning oxirgi holatini oladi —
   shuning uchun o'sha paytda shoxda faqat relizning o'zi turishi kerak.

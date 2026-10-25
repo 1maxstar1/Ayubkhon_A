@@ -300,7 +300,8 @@ irm https://raw.githubusercontent.com/1maxstar1/Ayubkhon_A/HEAD/server/install-w
 U dasturni `C:\Smeta` ga yuklab qo'yadi, birinchi marta pochtangizni so'raydi
 va brauzerni ochadi — kirish oynasisiz, to'g'ridan-to'g'ri arizalar ro'yxati.
 Oynani yopsangiz ham server ishlayveradi. Shu qatorni keyin yana qo'ysangiz —
-bu yangilash: narx xotirasi `C:\Smeta` da emas, unga tegilmaydi.
+bu yangilash: o'rnatilgan dasturning o'z `update` i ishlaydi (pastga qarang);
+narx xotirasi `C:\Smeta` da emas, unga tegilmaydi.
 
 Qo'lda o'rnatish ham mumkin: GitHub'da **Code → Download ZIP**, ZIP ga o'ng
 tugma → **Properties** → **Unblock**, ichidagi papka **mazmunini** `C:\Smeta`
@@ -322,22 +323,27 @@ oynasida: `C:\Smeta\server\laptop.cmd autostart`. Boshqa buyruqlar ham xuddi shu
 
 **O'zi yangilanadi.** `autostart` qilingan kompyuterda fondagi kuzatuvchi har
 6 soatda GitHub'dagi `server/releases.txt` ga qaraydi. Yangi reliz bo'lsa, uni
-Windows'ga kirganda yoki kompyuterga 20 daqiqa hech kim tegmaganda o'rnatadi:
+Windows'ga kirganda yoki kompyuterga bir muddat hech kim tegmaganda o'rnatadi
+(20 daqiqa; kompyuter undan oldin uxlab qolsa — uxlashidan 3 daqiqa oldin):
 
 1. relizni o'z papkasiga ochadi — `%LOCALAPPDATA%\Taqqoslash\app\<versiya>`;
    `C:\Smeta` ga hech qachon yozilmaydi;
 2. zaxira oladi (olinmasa — yangilanmaydi);
-3. yangi versiyaning **o'z ishga tushirgichi** serverni ko'taradi, eski versiya
-   esa kuzatib turadi;
-4. yangi versiya ishlab, o'z versiyasini ko'rsatib, kirish oynasisiz ochilib
-   bir muddat tursagina — `current.txt` bitta fayli unga o'tkaziladi.
+3. yangi versiyaning **o'z ishga tushirgichi** serverni ko'taradi va o'zini
+   o'zi tekshiradi (o'z versiyasini ko'rsatyaptimi, sahifa kerakli tarzda
+   ochilyaptimi), eski versiya esa kuzatib turadi;
+4. yangi versiya bir necha marta ketma-ket sog'lom chiqsa — `current.txt` bitta
+   fayli unga o'tkaziladi, u kuzatuvchi bo'lib to'liq bir aylanishni (zaxira,
+   Drive, yangilanish tekshiruvi) bajaradi, shundan keyingina eskisi ketadi.
 
 Bo'lmasa — eski versiya ishlashda davom etadi va o'sha reliz qayta
-urinilmaydi. O'rnatish o'rtasida tok o'chsa ham `current.txt` eski versiyani
-ko'rsatib turadi. O'rnatilgan versiya keyinchalik (bir hafta ichida) uch marta
-ketma-ket ishga tushmasa, kuzatuvchi oldingisini o'zi qaytaradi. Nima bo'lgani
-`laptop.cmd status` da ko'rinadi. Yangi versiya yoqmasa: `laptop.cmd rollback`
-— u yangi versiyaning o'zi buzilgan bo'lsa ham ishlaydi.
+urinilmaydi. O'rnatish o'rtasida tok o'chsa yoki `update` oynasini yopsangiz
+ham `current.txt` eski versiyani ko'rsatib turadi va u qaytadi. `C:\Smeta`
+dagi ishga tushirgich faol versiyaning kuzatuvchisini kuzatib turadi: u
+yiqilsa qayta ishga tushiradi, bir hafta ichida uch marta ketma-ket yiqilsa —
+oldingi versiyani qaytaradi. Nima bo'lgani `laptop.cmd status` da ko'rinadi.
+Yangi versiya yoqmasa: `laptop.cmd rollback` — u yangi versiyaning o'zi buzilgan
+bo'lsa ham ishlaydi, va uni yana `rollback` bilan qaytarsa bo'ladi.
 
 **Zaxira Google Drive'da ham.** Kompyuterda «Google Drive для компьютера»
 o'rnatilgan bo'lsa (https://www.google.com/drive/download/), dastur uning

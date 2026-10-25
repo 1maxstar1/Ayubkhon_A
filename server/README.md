@@ -32,16 +32,26 @@ PB_ADMIN_EMAIL=admin@example.com PB_ADMIN_PASS=change-me-1234 ./setup.sh   # onc
   `current.txt` names the one that runs — the program folder's launcher hands
   every command except `stop` and `rollback` to that version's launcher. The
   supervisor reads `releases.txt` every 6 hours; a newer release goes in at
-  sign-in or after 20 minutes without keyboard or mouse input. It is refused
-  if the version inside differs, its launcher does not parse or does not
-  answer `selftest`; otherwise the database is backed up (no backup, no
-  update), the new version's own launcher is started (`serve trial`), and only
-  when it keeps the server up, serving its version and signing in by itself,
-  does `current.txt` move to it and the old supervisor leave. A release that
-  fails is remembered by version and commit and never tried again by itself; a
-  version that later fails to start three times in a row (within a week of
-  the switch) gives way to the previous one. `laptop.cmd rollback` moves the
-  pointer back by hand. Tested off Windows by `test/laptop-windows.sh` under
+  sign-in or after 20 minutes without keyboard or mouse input (less when the
+  power plan sleeps sooner; while a release waits, idle is checked every
+  minute). It is refused if the version inside differs, its launcher does not
+  parse or does not answer `selftest`; otherwise the database is backed up (no
+  backup, no update) and the new version's own launcher is started
+  (`serve trial`). It runs the supervisor's round once without installing,
+  then judges its own health (its own `Is-Current`) and says so in `trial.ok`;
+  when it has been healthy `$Settle` rounds in a row `current.txt` moves to it,
+  it takes over `autostart.pid` and must finish one full round
+  (`supervisor.beat`) before the old supervisor leaves - otherwise the
+  pointers go back. A trial whose installer has gone (a closed window) gives
+  way by itself. A release that fails is remembered by version and commit and
+  never tried again by itself. Started through the program folder (as at
+  sign-in), the program folder's launcher stays as a watchdog of the version's
+  supervisor (`watchdog.pid`): it restarts one that dies and, after three
+  deaths within a week of the switch, goes back to the previous version; a
+  version that cannot start its server three times running does the same, or
+  takes a fixed release if there is nothing to go back to. `laptop.cmd
+  rollback` swaps the two pointers by hand. The full contract between versions
+  is at the top of `laptop.ps1`. Tested off Windows by `test/laptop-windows.sh` under
   PowerShell 7 with the Linux binary; `PSA=…/PSScriptAnalyzer.psd1` adds a
   Windows PowerShell 5.1 compatibility check.
 * `releases.txt` — what the Windows laptops install by themselves (and what

@@ -160,6 +160,8 @@ mkrel() {
     badps1) printf '\r\nfunction Broken {{{\r\n' >> "$d/server/laptop.ps1" ;;
     # parses and answers selftest, but the supervisor dies the moment it runs
     crash) sed -i "s/^  'serve' {\r\$/  'serve' {\r\n    Invoke-NoSuchCommand\r/" "$d/server/laptop.ps1" ;;
+    # passes the trial, but its supervisor dies in its first full round
+    postcrash) sed -i "s/^        \$rounds++\r\$/        throw 'boom after the trial'\r\n        \$rounds++\r/" "$d/server/laptop.ps1" ;;
   esac
   (cd "$T/rel/src" && zip -qr "$T/rel/zips/$2.zip" .)
 }
@@ -167,7 +169,8 @@ release() { printf 'v%s %s %s\n' "$1" "$2" "$3" >> "$T/rel/releases.txt"; }
 SHA1=1111111111111111111111111111111111111111; SHA2=2222222222222222222222222222222222222222
 SHA3=3333333333333333333333333333333333333333; SHA4=4444444444444444444444444444444444444444
 SHA5=5555555555555555555555555555555555555555; SHA6=6666666666666666666666666666666666666666
-SHA7=7777777777777777777777777777777777777777
+SHA7=7777777777777777777777777777777777777777; SHA8=8888888888888888888888888888888888888888
+SHA9=9999999999999999999999999999999999999999
 
 app start >/dev/null
 is "$(served)" "$ORIG" "the copy runs its own version ($ORIG)"
@@ -197,8 +200,11 @@ signs_in && ok 'signing in by itself' || no 'signin after rollback'
 is "$(tr -d '\r\n' < "$TAQ_HOME/current.txt")" ROOT 'current.txt points at the program folder again'
 grep -q '^FAILED=.*v9.0.0@111111111111' "$TAQ_HOME/update.env" && ok 'the version rolled back from is not taken again by itself' || no "update.env: $(cat "$TAQ_HOME/update.env")"
 OUT=$(app rollback 2>&1)
-echo "$OUT" | grep -q 'Oldingi versiya saqlanmagan.*rollback v9.0.0' && ok 'a second rollback has nothing to go back to, and names what there is' || no "second rollback: $OUT"
-app start >/dev/null
+echo "$OUT" | grep -q "Qaytarildi: $ORIG -> v9.0.0" && ok 'a second rollback undoes the first (the pointers swap)' || no "second rollback: $OUT"
+is "$(served)" v9.0.0 'and that version runs again'
+OUT=$(app rollback 2>&1)
+echo "$OUT" | grep -q "Qaytarildi: v9.0.0 -> $ORIG" && ok 'and a third goes back again' || no "third rollback: $OUT"
+is "$(served)" "$ORIG" 'to the program folder'
 
 mkrel v9.0.1 $SHA2 badps1; release 9.0.1 $SHA2 broken launcher
 OUT=$(app update 2>&1)
@@ -217,6 +223,29 @@ is "$(served)" "$ORIG" 'the old one answers'
 grep -q '^FAILED=.*v9.0.1@222222222222.*v9.0.2@333333333333.*v9.0.3@444444444444' "$TAQ_HOME/update.env" \
   && ok 'all three remembered by version and commit' || no "FAILED: $(grep FAILED "$TAQ_HOME/update.env")"
 app status | grep -q "o'zi qayta urinmaydi: .*v9.0.3" && ok 'status lists them' || no 'status FAILED'
+mkrel v9.0.4 $SHA8 postcrash; release 9.0.4 $SHA8 dies after its trial
+OUT=$(app update 2>&1)
+echo "$OUT" | grep -q 'v9.0.4 ishga tushmadi' && ok 'a version whose supervisor dies after the trial is not kept either' || no "postcrash: $OUT"
+is "$(served)" "$ORIG" 'the old one answers'
+grep -q 'serve died (v9.0.4)' "$TAQ_HOME/supervisor.log" && ok 'and the log says what killed it' || no "no serve died: $(tail -4 "$TAQ_HOME/supervisor.log")"
+is "$(tr -d '\r\n' < "$TAQ_HOME/current.txt")" ROOT 'current.txt is back where it was'
+
+# The window of a typed update is closed in the middle of the trial: the
+# version on approval gives way, and the version current.txt names comes back
+# supervised.
+mkrel v9.0.5 $SHA9; release 9.0.5 $SHA9 cut off by hand
+TAQ_SETTLE=60 "$PWSH" -NoProfile -File "$APP/server/laptop.ps1" update >/dev/null 2>&1 &
+UPD=$!
+wait_for 90 'alive trial.pid && [ "$(served)" = v9.0.5 ]' && ok 'a typed update puts the new version on approval' || no 'typed trial did not start'
+# Closing a console window ends every process attached to it: the update and
+# a launcher it handed the command to - not the version on approval, which
+# runs hidden, in a console of its own.
+for c in $(pgrep -P $UPD); do grep -q 'serve' /proc/$c/cmdline 2>/dev/null || kill -9 $c 2>/dev/null; done
+kill -9 $UPD 2>/dev/null
+wait_for 60 '[ "$(served)" = "$ORIG" ] && alive autostart.pid' && ok 'its window closed: the old version is back, under a supervisor' || no "after closing: served $(served)"
+alive trial.pid && no 'the version on approval is still running' || ok 'and the version on approval has gone'
+grep -q 'nobody is waiting for v9.0.5' "$TAQ_HOME/supervisor.log" && ok 'saying why in the log' || no 'trial give-way log'
+app stop >/dev/null; app start >/dev/null
 
 echo '-- backups in Google Drive --'
 grep -q '^BACKUP_COPY=' "$TAQ_HOME/settings.env" && no 'no Drive, yet a Drive copy set' || ok 'no Drive folder: nothing is set'
@@ -289,15 +318,18 @@ app stop >/dev/null
 # The machine goes off in the middle of an install: whatever was running
 # before is what starts next time.
 mkrel v9.2.0 $SHA6; release 9.2.0 $SHA6 third
+BEFORE=$(tr -d '\r\n' < "$TAQ_HOME/current.txt"); BEFOREV=$(served)
+[ -n "$BEFOREV" ] || { app start >/dev/null 2>&1; BEFOREV=$(served); }
+app stop >/dev/null
 TAQ_TICK=2 TAQ_UPDATE_EVERY=3 TAQ_IDLE_SECONDS=3600 TAQ_SETTLE=60 \
   "$PWSH" -NoProfile -File "$APP/server/laptop.ps1" serve resumed >/dev/null 2>&1 &
 SUP=$!
 wait_for 90 'alive trial.pid && [ "$(served)" = v9.2.0 ]' && ok 'the new version is on approval' || no 'trial did not start'
-kill -9 $SUP "$(pidof_ trial.pid)" "$(pidof_ server.pid)" 2>/dev/null; SUP=''
+kill -9 $SUP $(pgrep -P $SUP) "$(pidof_ autostart.pid)" "$(pidof_ trial.pid)" "$(pidof_ server.pid)" 2>/dev/null; SUP=''
 sleep 1
-is "$(tr -d '\r\n' < "$TAQ_HOME/current.txt")" ROOT 'cut off before approval: current.txt still names the old version'
+is "$(tr -d '\r\n' < "$TAQ_HOME/current.txt")" "$BEFORE" 'cut off before approval: current.txt still names the old version'
 TAQ_IDLE_SECONDS=0 TAQ_AUTOSTART=1 app start >/dev/null 2>&1
-is "$(served)" "$ORIG" 'and the old version is what starts'
+is "$(served)" "$BEFOREV" 'and the old version is what starts'
 alive autostart.pid && ok 'start, set to start at sign-in, leaves a supervisor running' || no 'start left no supervisor'
 
 # A lock left by a process that died, whose number now belongs to another.
@@ -316,6 +348,30 @@ echo "$OUT" | grep -q 'Qaytarildi: v9.2.0 -> v9.0.0' && ok 'rollback to a releas
 is "$(served)" v9.0.0 'brings that release'
 grep -q '^FAILED=.*v9.3.0@777777777777' "$TAQ_HOME/update.env" && ok 'and keeps the newer ones from coming back by themselves' || no 'rollback by name FAILED'
 app status | grep -q "Avtomatik yangilanish: o'chirilgan" && ok 'autoupdate off is shown' || no 'status autoupdate off'
+
+# Started through the program folder (as the sign-in shortcut does), the
+# program folder watches the version's supervisor: one that dies is started
+# again.
+app stop >/dev/null
+TAQ_AUTOSTART=1 TAQ_IDLE_SECONDS=0 app start >/dev/null 2>&1
+is "$(served)" v9.0.0 'started through the program folder: the version current.txt names'
+alive watchdog.pid && ok 'with the program folder watching' || no 'no watchdog'
+DEAD=$(pidof_ autostart.pid)
+kill -9 "$DEAD"
+wait_for 60 'alive autostart.pid && [ "$(pidof_ autostart.pid)" != "$DEAD" ]' && ok 'a supervisor that dies is started again' || no 'not restarted'
+grep -q "the supervisor of v9.0.0-111111111111 ended" "$TAQ_HOME/supervisor.log" && ok 'and the death is logged' || no 'death log'
+
+# A newer program folder unpacked over C:\Smeta by hand runs - once, said in
+# the pointers - and a rollback after that still means something.
+cp "$APP/dist/index.html" "$T/index.keep"
+sed -i 's/\(class="ver"[^>]*>\)v[0-9.]*</\1v9.9.9</' "$APP/dist/index.html"
+app status >/dev/null 2>&1
+is "$(tr -d '\r\n' < "$TAQ_HOME/current.txt")" ROOT 'a newer program folder takes over'
+is "$(tr -d '\r\n' < "$TAQ_HOME/previous.txt")" v9.0.0-111111111111 'with the version it replaced kept as previous'
+OUT=$(app rollback 2>&1)
+echo "$OUT" | grep -q 'Qaytarildi: v9.9.9 -> v9.0.0' && ok 'rollback from it goes to that version' || no "rollback from ROOT: $OUT"
+is "$(served)" v9.0.0 'and it is what runs - the newer program folder does not take over again'
+cp "$T/index.keep" "$APP/dist/index.html"
 app stop >/dev/null
 is "$(health)" 000 'stop stops the supervisor and the server'
 
@@ -330,6 +386,11 @@ echo "$OUT" | grep -q 'still here' && ok 'and leaves the PowerShell window it wa
 head -c 3 "$T/Smeta/server/laptop.ps1" | od -An -tx1 | grep -q 'ef bb bf' && ok 'laptop.ps1 keeps its byte-order mark' || no 'BOM lost'
 grep -q "$(printf '\r')" "$T/Smeta/server/laptop.cmd" && ok 'and laptop.cmd its Windows line endings' || no 'CRLF lost'
 LC_ALL=C grep -q "$(printf '[\200-\377]')" server/install-windows.ps1 && no 'the installer must stay plain ASCII' || ok 'the installer is plain ASCII, as iex needs it'
+echo 'mine' > "$T/Smeta/README.md"
+OUT=$(TAQ_DIR="$T/Smeta" TAQ_ZIP="$T/repo.zip" TAQ_NOSTART=1 "$PWSH" -NoProfile -Command \
+  'Get-Content -Raw ./server/install-windows.ps1 | Invoke-Expression' 2>&1)
+echo "$OUT" | grep -q "allaqachon o'rnatilgan" && ok 'run again over an install that updates itself, it hands over to its update' || no "installer again: $OUT"
+is "$(cat "$T/Smeta/README.md")" mine 'and copies nothing over it'
 
 echo '-- Windows PowerShell 5.1 --'
 # The tests above run PowerShell 7. PSScriptAnalyzer's Windows PowerShell 5.1

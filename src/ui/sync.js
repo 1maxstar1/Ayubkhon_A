@@ -93,7 +93,8 @@
       }
 
       this.corrList = [];
-      S.pb.collection('corrections').getFullList({ filter: S.pb.filter('workspace = {:w}', { w: w.id }), fields: 'id,res_key,market_price' })
+      this.marks = {};
+      S.pb.collection('corrections').getFullList({ filter: S.pb.filter('workspace = {:w}', { w: w.id }), fields: 'id,res_key,market_price,source' })
         .then(function (list) {
           if (!current()) return;
           self.corrList = list;
@@ -183,7 +184,7 @@
     /** Server corrections, keyed the way the live rows are keyed. */
     indexCorr: function () {
       var raw = {};
-      (this.corrList || []).forEach(function (c) { raw[c.res_key] = { id: c.id, market: c.market_price }; });
+      (this.corrList || []).forEach(function (c) { raw[c.res_key] = { id: c.id, market: c.market_price, source: c.source || '' }; });
       this.corr = this.reindex(raw).map;
     },
 
@@ -394,10 +395,13 @@
           if (cur) { delete self.corr[k]; del.push(k); }
           return;
         }
-        if (cur && S.near(cur.market, value)) return;          // already recorded
+        var from = self.priceSource(k, value);
+        var source = from ? from.source : 'typed';
+        if (cur && S.near(cur.market, value) && cur.source === source) return;   // already recorded
         set.push({
           res_key: k, name: rec.name, unit: rec.unit || '',
-          smeta_price: rec.price, market_price: value, note: app.opts.noteText || ''
+          smeta_price: rec.price, market_price: value, note: app.opts.noteText || '',
+          source: source, source_price: from ? from.price : null
         });
         marks[k] = value;
       });
@@ -435,7 +439,7 @@
         }).then(function (r) {
           part.set.forEach(function (row) {
             var k = row.res_key;
-            self.corr[k] = { id: (r.ids && r.ids[k]) || (self.corr[k] && self.corr[k].id), market: marks[k] };
+            self.corr[k] = { id: (r.ids && r.ids[k]) || (self.corr[k] && self.corr[k].id), market: marks[k], source: row.source };
           });
         });
       }).catch(function (e) {
@@ -448,6 +452,21 @@
         app.toast('Правки не сохранены (' + (part.set.length + part.del.length) + '): ' +
           S.pbErr(e) + ' — повтор через ' + (RETRY_MS / 1000) + ' секунд', true);
       });
+    },
+
+    /**
+     * Where a price came from, for the correction it becomes. «Применить» on a reference line or a hint marks the
+     * resource with the price it set and its source (`ref:<package>:<record>`, `hint:<correction>`); anything else —
+     * typed, pasted, a percentage, the price book — is `typed`. A mark holds only while the price is still the one
+     * it set: a number typed over an applied price goes out as `typed`.
+     */
+    markSource: function (key, price, source) {
+      this.marks = this.marks || {};
+      this.marks[key] = { price: price, source: String(source || '').slice(0, 200) };
+    },
+    priceSource: function (key, value) {
+      var m = this.marks && this.marks[key];
+      return m && S.near(m.price, value) ? m : null;
     },
 
     /* ---------------------------------------------------------- exports */
@@ -528,7 +547,7 @@
           throw e;
         }
       }).then(function () {
-        self.ws = null; self.app = null; self.files = {}; self.corr = {};
+        self.ws = null; self.app = null; self.files = {}; self.corr = {}; self.marks = {};
         self.loading = true;
         app.projects = []; app.prices = {}; app.looseBook = null; app.queue = [];
         app.rebuild(); app.renderSide();
@@ -541,6 +560,8 @@
   };
 
   S.Sync = Sync;
+  S.markSource = function (key, price, source) { Sync.markSource(key, price, source); };
+  S.priceSource = function (key, value) { return Sync.priceSource(key, value); };
   document.addEventListener('DOMContentLoaded', function () { Sync.init(); });
   if (document.readyState !== 'loading') Sync.init();
 })(S);

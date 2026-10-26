@@ -180,7 +180,11 @@
     if (el) { el.focus(); el.select(); }
   };
 
-  Prices.prototype.apply = function () {
+  /**
+   * Filter and sort the list. `keepScroll` leaves the list where it stands: answers that arrive while the expert is
+   * scrolling or typing (reference prices) must not throw the list back to the top.
+   */
+  Prices.prototype.apply = function (keepScroll) {
     var m = this.app.model;
     if (!m) { this.view = []; this.list.setCount(0); this.status(); return; }
     var q = S.nameKey(document.getElementById('q').value);
@@ -196,6 +200,8 @@
         case 'multi': return r.variants > 1;
         case 'hint': return !!(S.Hints && S.Hints.hasRow(r));
         case 'near': return !!(S.Hints && S.Hints.nearRow(r));
+        case 'ref': return !!(S.Refs && S.Refs.hasRow(r));
+        case 'nearref': return !!(S.Refs && S.Refs.nearRow(r));
         case 'wrongsec': return !!secWarn(r);
         default: return true;
       }
@@ -209,7 +215,7 @@
     });
 
     this.view = list;
-    this.list.setCount(list.length);
+    this.list.setCount(list.length, keepScroll === true);
     this.status();
   };
 
@@ -224,7 +230,8 @@
       this.view.length + ' / ' + total + ' ресурсов · изменено ' + changed +
       (hinted ? ' · с подсказками ' + hinted : '') +
       (near ? ' · похожих ' + near : '') +
-      (mis ? ' · не тот раздел ' + mis : '');
+      (mis ? ' · не тот раздел ' + mis : '') +
+      (S.Refs ? S.Refs.statusText() : '');
   };
 
   Prices.prototype.renderRange = function (from, to) {
@@ -238,12 +245,13 @@
       var many = r.variants > 1;
       var multi = many ? '<button class="tagm" data-nm="' + S.esc(r.name) + '" title="' +
         S.esc(multiHint(r)) + '">' + r.variants + ' цены</button>' : '';
-      var hint = S.Hints ? S.Hints.tag(r) : '';
+      var hint = (S.Hints ? S.Hints.tag(r) : '') + (S.Refs ? S.Refs.tag(r) : '');
       var sec = secTag(r);
       out.push(
         '<div class="vrow' + (changed ? ' chg' : '') + (many ? ' many' : '') + '">' +
         cell(COLS[0], i + 1) +
-        '<div class="c" style="' + width(COLS[1]) + '" title="' + S.esc(r.name) + '">' + S.esc(r.name) + multi + hint + sec + '</div>' +
+        '<div class="c" style="' + width(COLS[1]) + '" title="' + S.esc(r.name) + '"><span class="nmt">' + S.esc(r.name) + '</span>' +
+        multi + hint + sec + '</div>' +
         cell(COLS[2], S.esc(r.unit)) +
         cell(COLS[3], r.count) +
         cell(COLS[4], S.qty(r.qty)) +

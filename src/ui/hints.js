@@ -33,7 +33,7 @@
    * Measured against a region holding 18 000 corrections: 30.2 MB became
    * 7.5 MB for the same rows, over an office connection to a VPS.
    */
-  var FIELDS = 'id,name,unit,region,contragent,market_price,smeta_price,note,updated,' +
+  var FIELDS = 'id,name,unit,region,contragent,market_price,smeta_price,note,updated,source,source_price,' +
     'expand.application.number,expand.application.org_name,expand.contragent.name,' +
     'expand.by.name,expand.by.email';
   var SIM_MIN = 0.62;           // below this two names are merely related
@@ -294,6 +294,7 @@
       this.pop.querySelectorAll('button[data-i]').forEach(function (b) {
         b.addEventListener('click', function () {
           var h = all[+b.dataset.i];
+          if (S.markSource && h.id) S.markSource(key, h.price, 'hint:' + h.id);
           app.setPrice(key, h.price);
           app.prices_ui.apply();
           app.sheetList.refresh();
@@ -336,6 +337,7 @@
       (near ? '<em class="hp-name">' + S.esc(h.name) + '</em> · ' + Math.round(h.score * 100) + '%<br>' : '') +
       '№ ' + S.esc(h.number) + ' · ' + S.esc(h.contragent) + ' · ' + day(h.at) +
       (h.same ? ' <em>тот же контрагент</em>' : '') +
+      (h.ref ? ' <em class="hp-ref" title="Эту цену эксперт применил из справочника цен, а не ввёл сам">из справочника</em>' : '') +
       (h.count > 1 ? ' · ×' + h.count : '') +
       (h.smeta != null && rec && !S.near(h.smeta, rec.price) ? '<small>сметная цена там: ' + S.price(h.smeta) + '</small>' : '') +
       '</span>' +
@@ -347,7 +349,9 @@
     var a = c.expand && c.expand.application, ct = c.expand && c.expand.contragent, by = c.expand && c.expand.by;
     var mine = S.Sync.app && S.Sync.app.contragent;
     return {
-      price: c.market_price, smeta: c.smeta_price, note: c.note, at: c.updated, name: c.name,
+      id: c.id, price: c.market_price, smeta: c.smeta_price, note: c.note, at: c.updated, name: c.name,
+      // applied from the reference package and still that price: shown as such, never as a price somebody typed
+      ref: /^ref:/.test(c.source || '') && S.near(c.market_price, c.source_price),
       number: a ? a.number : '', contragent: ct ? ct.name : (a ? a.org_name : ''),
       region: c.region, by: by ? (by.name || by.email) : '',
       same: !!(mine && c.contragent === mine)

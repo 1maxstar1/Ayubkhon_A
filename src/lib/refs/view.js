@@ -81,11 +81,15 @@ var S = (typeof S !== 'undefined' && S) || {};
   }
   function quarter(d) { return d ? d.slice(0, 4) + ', ' + (Math.floor((+d.slice(5, 7) - 1) / 3) + 1) + ' кв.' : ''; }
 
+  /* an issuer written in lower-case Latin words only is the extractor's note that the document names none
+     («unknown», «not stated …»), not a name */
+  var NOTE = /^[a-z][a-z\s(),.;:-]*$/;
+
   /** «ООО … № …», «биржа», «каталог: <завод>», or the document type: never a source id. */
   function sourceLabel(src, group, plant, basis) {
     if (basis === 'exchange-spot' || basis === 'exchange-forward' || group === 'exchange') return 'биржа';
     if (group === 'catalogue' && plant) return 'каталог: ' + plant;
-    var t = src && src.issuer ? String(src.issuer).replace(/\s*\(.*$/, '').slice(0, 80) : '';
+    var t = src && src.issuer && !NOTE.test(String(src.issuer).trim()) ? String(src.issuer).replace(/\s*\(.*$/, '').slice(0, 80) : '';
     if (!t) t = (src && RU.DOC[src.doc_type]) || 'документ';
     if (src && src.doc_no) t += (/^№/.test(src.doc_no) ? ' ' : ' № ') + src.doc_no;
     return t;

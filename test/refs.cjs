@@ -272,6 +272,11 @@ const vPipe = R.view(sug(sp1, Q('Труба стальная электросв�
 ok(/за 1 т → .* за 1 м \(по данным изделия\)/.test(vPipe.conv), 'a converted line shows raw → normalised «по данным изделия»');
 ok(R.view({ price: 1, tier: 'document', name: 'x', src: 'fake-src-9999', region: 'nowhere', how: 'exact-key', flags: [] }, ctx).source.indexOf('fake-src') < 0,
   'an unknown source shows its document type or «документ», never its id');
+{
+  const noted = new Map([['fake-src-0004', Object.assign({}, fixture.sources[3], { issuer: 'unknown (no header)' })]]);
+  const v = R.view(lab2[0], Object.assign({}, ctx, { sources: noted }));
+  ok(/^таблица ставок( № \S+)? · /.test(v.source) && v.source.indexOf('unknown') < 0, 'an issuer that is only the extractor\'s note («unknown …») shows the document type');
+}
 
 /* ------------------------------------------------------------------ query */
 section('query');

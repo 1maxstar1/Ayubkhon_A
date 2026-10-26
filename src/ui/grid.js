@@ -76,8 +76,11 @@
 
     if (keep) {
       var esc = cssEscape(keep);
-      var again = this.body.querySelector('[data-focus="' + esc + '"]') ||
-                  this.body.querySelector('[data-key="' + esc + '"]');
+      // the same kind of element: a hint tag in the name cell carries the row's data-key too, and comes first —
+      // a price field being typed in lost its focus to that button on every repaint
+      var tag = act.tagName ? act.tagName.toLowerCase() : '';
+      var again = this.body.querySelector(tag + '[data-focus="' + esc + '"]') ||
+                  this.body.querySelector(tag + '[data-key="' + esc + '"]');
       if (again && again.focus) {
         again.focus();
         try { again.setSelectionRange(selStart, selEnd); } catch (e) { /* not a text input */ }

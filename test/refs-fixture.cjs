@@ -8,6 +8,9 @@
  *   const F = require('./refs-fixture.cjs');
  *   F.makePackage()          → the package object (format smeta-refs v1)
  *   F.gzip(pkg)              → its .json.gz bytes (Buffer)
+ *   F.makeSmeta()            → a small smeta workbook (.xlsx bytes) whose resources meet the package: one per kind
+ *                              of line (median, wide spread, «Похожий», wage table, machine list, t·km, М8 ≠ М5),
+ *                              one that meets nothing, and filler rows so the price list scrolls
  *   node test/refs-fixture.cjs --out <dir>       writes fake-20260101-1.json.gz (a gitignored dir: test/.refs/)
  *   node test/refs-fixture.cjs --doc-example     prints the example of docs/spravochnik.md
  */
@@ -87,6 +90,74 @@ function makePackage(opts) {
   };
 }
 
+/*
+ * The synthetic smeta: [name, unit, qty, smeta price]. Smeta prices are derived from the fixture prices (never
+ * written as numbers), so no number here can be a real one.
+ */
+const SMETA = {
+  labor: [['Затраты труда рабочих-строителей', 'чел-ч', 120, P.a * 0.9]],
+  machines: [['Экскаватор одноковшовый 0,65 м3', 'маш-ч', 12, P.e * 1.05]],
+  materials: [
+    ['Кабель ВВГ 3х2,5', 'м', 500, P.b * 0.8],
+    ['Кабель ВВГнг(А)-LS 3х2,5', 'м', 200, P.b * 0.85],
+    ['Кабель ВВГ 3х4', 'м', 300, P.c * 1.1],
+    ['Труба стальная электросварная 57х3,5', 'т', 2, P.f * 0.95],
+    ['Бетон тяжёлый В15', 'м3', 40, P.g * 1.2],
+    ['Анкер М8', 'шт', 100, P.d * 0.7],
+    ['Перевозка грузов 20 т 15 км', 'т-км', 900, P.c / 1000 * 1.5],
+    ['Краска масляная белая МА-15', 'кг', 20, P.a / 100]
+  ]
+};
+const FILLER = 60;   // «Материал вспомогательный N»: meets nothing, makes the list long enough to scroll
+
+function xmlEsc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+/** A one-sheet .xlsx the program's smeta reader takes: header, bands, items (Uint8Array). */
+function makeSmeta() {
+  const fflate = require('./load.cjs').load('fflate').__fflate;
+  const enc = new TextEncoder();
+  const COLS = 'ABCDEF';
+  let r = 0;
+  const rows = [];
+  const cell = (c, v) => (typeof v === 'number'
+    ? `<c r="${COLS[c]}${r}"><v>${+v.toFixed(2)}</v></c>`
+    : `<c r="${COLS[c]}${r}" t="inlineStr"><is><t>${xmlEsc(v)}</t></is></c>`);
+  const row = (...vals) => { r++; rows.push(`<row r="${r}">` + vals.map((v, i) => (v == null ? '' : cell(i, v))).join('') + '</row>'); };
+  row(null, 'Локальная ресурсная смета (тестовая)');
+  row('№', 'Наименование', 'Ед. изм.', 'Кол-во', 'Цена', 'Сумма');
+  let n = 0;
+  const items = (list) => list.forEach(([nm, unit, qty, price]) => { n++; row(n, nm, unit, qty, price, qty * price); });
+  row('Затраты труда'); items(SMETA.labor);
+  row('Машины и механизмы'); items(SMETA.machines);
+  row('Материалы');
+  items(SMETA.materials);
+  const filler = [];
+  for (let i = 1; i <= FILLER; i++) filler.push(['Материал вспомогательный ' + i, 'шт', i, P.a / 1000 + i]);
+  items(filler);
+  const files = {
+    '[Content_Types].xml': '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+      '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+      '</Types>',
+    '_rels/.rels': '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
+      '</Relationships>',
+    'xl/_rels/workbook.xml.rels': '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
+      '</Relationships>',
+    'xl/workbook.xml': '<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
+      'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+      '<sheets><sheet name="Объект 1" sheetId="1" r:id="rId1"/></sheets></workbook>',
+    'xl/worksheets/sheet1.xml': '<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      '<sheetData>' + rows.join('') + '</sheetData></worksheet>'
+  };
+  const zip = {};
+  for (const k in files) zip[k] = enc.encode(files[k]);
+  return fflate.zipSync(zip);
+}
+
 function gzip(pkg) { return zlib.gzipSync(Buffer.from(JSON.stringify(pkg), 'utf8'), { level: 9 }); }
 
 /** The example of docs/spravochnik.md: the head and the first row of the fixture. */
@@ -96,7 +167,7 @@ function docExample() {
   return JSON.stringify(head, null, 2).replace(/\n {6,}/g, ' ').replace(/\n {4}\]/g, ' ]');
 }
 
-module.exports = { makePackage, gzip, docExample, PRICES, SOURCES, RECORDS, FIELDS };
+module.exports = { makePackage, makeSmeta, gzip, docExample, PRICES, SOURCES, RECORDS, FIELDS, SMETA, FILLER };
 
 if (require.main === module) {
   const args = process.argv.slice(2);

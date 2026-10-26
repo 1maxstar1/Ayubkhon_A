@@ -16,7 +16,9 @@
  *                   { type: 'error', phase, message }                                     Russian, never a value
  *
  * The derived pool is cached in IndexedDB (`smeta-refs`, store `pool`, key `current`) under the stamp of the
- * deriving code and the package sha256: a release that changes the parsers, or a new package, derives again by itself.
+ * deriving code, the package record and its sha256: a release that changes the parsers, or a new package, derives
+ * again by itself. The sha256 the server lists is the uploading page's claim, so a downloaded file is hashed here and
+ * refused unless it is exactly that package.
  * Without IndexedDB (a private window, blocked storage) it derives every time. Rows the validator refuses are
  * skipped and counted; a package whose head is wrong, or with too many bad rows, is not used at all.
  */
@@ -79,17 +81,29 @@
   }
 
   /* ------------------------------------------------------------------ download and unpack */
-  function download(url) {
+  var NOT_THIS = 'Файл справочника не совпадает с загруженным пакетом (контрольная сумма) — загрузите пакет заново на странице администратора';
+  /** The gzip bytes, hashed as they arrive (about 0.6 s for 50 MB) and refused unless their sha256 is `sha`. */
+  function download(url, sha) {
+    var h = R.pkg.sha256Stream();
+    function checked(all) { if (h.hex() !== sha) throw new Error(NOT_THIS); return all; }
     return fetch(url).then(function (r) {
       if (!r.ok) throw new Error('Справочник не получен с сервера (' + r.status + ')');
       var total = +(r.headers.get('content-length') || 0);
-      if (!r.body || !r.body.getReader) return r.arrayBuffer().then(function (b) { return new Uint8Array(b); });
+      if (!r.body || !r.body.getReader) {
+        return r.arrayBuffer().then(function (b) {
+          var all = new Uint8Array(b);
+          if (all.length > R.pkg.LIMITS.gzip) throw new Error('Файл справочника больше 50 МБ');
+          h.update(all);
+          return checked(all);
+        });
+      }
       var reader = r.body.getReader(), parts = [], got = 0;
       function pump() {
         return reader.read().then(function (x) {
-          if (x.done) return join(parts, got);
+          if (x.done) return checked(join(parts, got));
           got += x.value.length;
           if (got > R.pkg.LIMITS.gzip) { reader.cancel(); throw new Error('Файл справочника больше 50 МБ'); }
+          h.update(x.value);
           parts.push(x.value);
           progress('download', got, total || got);
           return pump();
@@ -161,13 +175,15 @@
     var p = (msg.pkgs || [])[0];
     if (!p) { fail('open', 'Нет активного пакета справочника'); return; }
     var shas = (msg.pkgs || []).map(function (x) { return x.sha256; });
+    // the record too: a package uploaded again under a recycled hash is another record, and is downloaded and checked
+    var ids = (msg.pkgs || []).map(function (x) { return x.id; }).join(',');
     var db = null, cached = null, phase = 'cache';
     progress('cache', 0, 1);
     idb().then(function (d) { db = d; return idbGet(d); }).catch(function () { return null; }).then(function (c) {
-      if (c && c.keys === R.KEYS && c.shas && c.shas.join(',') === shas.join(',') && c.enc && c.sources) cached = c;
+      if (c && c.keys === R.KEYS && c.shas && c.shas.join(',') === shas.join(',') && c.ids === ids && c.enc && c.sources) cached = c;
       if (cached) return { recs: R.decodeCache(cached.enc), sources: cached.sources, skipped: cached.skipped || 0 };
       phase = 'download';
-      return download(p.url).then(function (gz) {
+      return download(p.url, p.sha256).then(function (gz) {
         phase = 'unpack';
         progress('unpack', 0, 1);
         return gunzip(gz);
@@ -184,7 +200,7 @@
         progress('store', 0, 1);
         var enc = R.encodeCache(recs);
         recs = null;
-        var value = { keys: R.KEYS, shas: shas, created: new Date().toISOString(), package_id: p.package_id, enc: enc,
+        var value = { keys: R.KEYS, shas: shas, ids: ids, created: new Date().toISOString(), package_id: p.package_id, enc: enc,
           sources: sources, skipped: skipped };
         var stored = db ? idbPut(db, value).catch(function () { /* storage full or blocked: derive next time */ }) : Promise.resolve();
         // the cold path decodes the in-memory form: the records then share their repeated values, as from the cache

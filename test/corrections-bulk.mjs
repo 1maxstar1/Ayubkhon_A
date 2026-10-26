@@ -135,22 +135,62 @@ check(after.region === 'buxoro' && after.by === me.id && after.application === a
 
 /* --------------------------------------------- where an applied price came from */
 // «Применить» on a reference line sends the line's source and the price it gave; a page of an older version sends
-// neither, and the row says nothing about its origin rather than something wrong.
+// neither, and the row says nothing about its origin rather than something wrong. Other experts' hints read «из
+// справочника» from it, so the server keeps a reference only when that package exists, a hint only when that
+// correction exists, and anything else as «typed». The synthetic package of test/refs-fixture.cjs is uploaded first.
+{
+  const F = createRequire(import.meta.url)('./refs-fixture.cjs');
+  const { load } = createRequire(import.meta.url)('./load.cjs');
+  const P = load('util', 'refs-package');
+  const pkg = F.makePackage();
+  const gz = F.gzip(pkg);
+  const fd = new FormData();
+  const fields = { package_id: pkg.package_id, sha256: P.refs.pkg.sha256(new Uint8Array(gz)), manifest: JSON.stringify(P.refs.pkg.manifest(pkg)),
+    records: String(pkg.counts.records), sources: String(pkg.counts.sources), date_min: pkg.date_min, date_max: pkg.date_max };
+  for (const k of Object.keys(fields)) fd.append(k, fields[k]);
+  fd.append('file', new Blob([gz], { type: 'application/gzip' }), pkg.package_id + '.json.gz');
+  const up = await fetch(pb.base + '/api/collections/ref_packages/records', { method: 'POST', headers: { Authorization: su }, body: fd });
+  check(up.status === 200, `the synthetic package is uploaded (${up.status})`);
+}
+const corrOf = async (k) => (await api(`/api/collections/corrections/records?filter=${
+  encodeURIComponent(`workspace='${ws.id}' && res_key='${k}'`)}`, {}, su)).items[0];
 const withSource = await raw('/api/corrections/bulk', {
   workspace: ws.id,
   set: [{ ...resource(5), source: 'ref:fake-20260101-1:2', source_price: 2005 },
     { ...resource(7), source: 'ref:fake-20260101-1:median:' + '1,'.repeat(150), source_price: 2007 }]
 }, tok);
 check(withSource.status === 200, 'a correction carrying its source is accepted');
-const c5 = (await api(`/api/collections/corrections/records?filter=${
-  encodeURIComponent(`workspace='${ws.id}' && res_key='k5'`)}`, {}, su)).items[0];
+const c5 = await corrOf('k5');
 check(c5.source === 'ref:fake-20260101-1:2' && c5.source_price === 2005, 'the source and the price it gave are stored');
-const c7 = (await api(`/api/collections/corrections/records?filter=${
-  encodeURIComponent(`workspace='${ws.id}' && res_key='k7'`)}`, {}, su)).items[0];
-check(c7.source.length === 200, `a source is cut at 200 characters (${c7.source.length})`);
+const c7 = await corrOf('k7');
+check(c7.source.length <= 200 && /^ref:fake-20260101-1:median:(1,)*1…$/.test(c7.source) && c7.source_price === 2007,
+  `a long median list is cut at a whole record number, with «…» (${c7.source.length} characters)`);
+const claims = await raw('/api/corrections/bulk', {
+  workspace: ws.id,
+  set: [{ ...resource(9), source: 'ref:no-such-package:2', source_price: 2009 },
+    { ...resource(11), source: 'from the reference, trust me', source_price: 2011 },
+    { ...resource(13), source: 'hint:' + c5.id, source_price: 2013 },
+    { ...resource(15), source: 'hint:aaaaaaaaaaaaaaa', source_price: 2015 }]
+}, tok);
+const [c9, c11, c13, c15] = [await corrOf('k9'), await corrOf('k11'), await corrOf('k13'), await corrOf('k15')];
+check(claims.status === 200 && c9.source === 'typed' && !c9.source_price, 'a reference to a package the server does not have is stored as «typed»');
+check(c11.source === 'typed' && !c11.source_price, 'a source in no known form is stored as «typed»');
+check(c13.source === 'hint:' + c5.id && c13.source_price === 2013, 'a hint naming an existing correction is kept');
+check(c15.source === 'typed', 'a hint naming no correction is stored as «typed»');
+// the create limit above (40 per 5 s) was used up by the one-by-one writes: wait it out
+await new Promise((r) => setTimeout(r, 5500));
+const direct = await fetch(pb.base + '/api/collections/corrections/records', {
+  method: 'POST', headers: { 'content-type': 'application/json', Authorization: tok },
+  body: JSON.stringify({ workspace: ws.id, res_key: 'direct-1', name: 'X', unit: 'ШТ', smeta_price: 1, market_price: 2, source: 'ref:no-such-package:1', source_price: 2 })
+}).then((r) => r.json());
+check(direct.source === 'typed' && !direct.source_price, 'the records API checks the source the same way' + (direct.source === 'typed' ? '' : ': ' + JSON.stringify(direct).slice(0, 300)));
+const directOk = await fetch(pb.base + '/api/collections/corrections/records/' + direct.id, {
+  method: 'PATCH', headers: { 'content-type': 'application/json', Authorization: tok },
+  body: JSON.stringify({ source: 'ref:fake-20260101-1:3', source_price: 2 })
+}).then((r) => r.json());
+check(directOk.source === 'ref:fake-20260101-1:3' && directOk.source_price === 2, 'and keeps a valid one');
 const oldPage = await raw('/api/corrections/bulk', { workspace: ws.id, set: [resource(5)] }, tok);
-const c5b = (await api(`/api/collections/corrections/records?filter=${
-  encodeURIComponent(`workspace='${ws.id}' && res_key='k5'`)}`, {}, su)).items[0];
+const c5b = await corrOf('k5');
 check(oldPage.status === 200 && c5b.source === '' && !c5b.source_price, 'a row from an older page has no source (unknown, never a stale one)');
 
 /* ------------------------------------------------- writing the same twice */

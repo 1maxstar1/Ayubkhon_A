@@ -296,6 +296,15 @@ form.grid .foot{grid-column:1 / -1;display:flex;gap:8px;align-items:center}
 .tagr.near{background:#fbfaf3;color:#6b5a1e;border:1px dashed #cdbb7a}
 .tagr.near:hover{background:#f4f0dc}
 .hp-ref{color:#1d5c39 !important}
+/* the as-of date of the reference prices, on the toolbar of «Цены»; a date picked by hand stands out */
+.ra{display:inline-flex;align-items:center;gap:2px;flex-wrap:wrap}
+.ra .link{padding:1px 4px;font-size:12px}
+.ra .ra-date{color:var(--ink);font-variant-numeric:tabular-nums}
+.ra.man{background:#fdf3e0;color:#8a5a10;border-radius:4px;padding:0 4px}
+.ra.man .ra-date{color:#8a5a10;font-weight:600}
+.ra-edit{display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap}
+.ra-edit small{display:none}
+.rp-asof .btn{margin-left:4px}
 #refPop{position:fixed;z-index:76;background:var(--sf);border:1px solid var(--rule2);border-radius:8px;
   box-shadow:0 10px 30px rgba(20,23,28,.14);width:520px;max-width:calc(100vw - 16px);max-height:70vh;overflow:auto;font-size:12px}
 #refPop[hidden]{display:none}

@@ -14,6 +14,11 @@
  * «typed» and is replaced only after a confirm; the derived pool comes back from IndexedDB after a reload; another
  * as-of date gives the older edition; in a second workspace the hint built from an applied price says «из
  * справочника»; and a repaint never takes the focus from a price field to a tag button of its row.
+ * Review round 2: the date in force is on the toolbar («справочник на …», «выбрана вручную · сбросить»), a date is
+ * taken only whole and only from «Применить дату» or Enter (typing keeps the popover open and applies nothing), a
+ * workspace reopened with a picked date says so; the popover never covers its own row; a price typed again after
+ * Escape is «typed» even when it equals the reference price; a package whose file is not the one its hash names is
+ * refused by the expert's browser.
  *
  *   node test/e2e-refs.mjs
  */
@@ -250,7 +255,16 @@ await ep.waitForFunction((n) => document.querySelectorAll('#priceScroll .vrow').
 const cab = await popover('Кабель ВВГ 3х2,5');
 check(cab.lines.length >= 1 && cab.lines.length <= 6 && cab.lines.every((l) => l.name.trim().length > 0),
   'cable: ≤ 6 lines, the matched record\'s name on every line');
-check(cab.lines[0].badge === 'Документ' && /Медиана 2 документов/.test(cab.lines[0].text), 'its top line: «Документ», the median of two documents');
+check(cab.lines[0].badge === 'Документ' && /Медиана: 2 документа/.test(cab.lines[0].text), 'its top line: «Документ», the median of two documents');
+const bar0 = await ep.evaluate(() => { const b = document.getElementById('refAsof'); return { shown: !!b && !b.hidden, text: b ? b.textContent : '', man: b ? !b.querySelector('.ra-man').hidden : null }; });
+check(bar0.shown && /справочник на 29\.08\.2026/.test(bar0.text) && bar0.man === false,
+  'the toolbar shows the date in force, outside any popover (the registration date, not «выбрана вручную»)');
+const cover = await ep.evaluate(() => {
+  const p = document.getElementById('refPop').getBoundingClientRect();
+  const row = document.querySelector('#priceScroll .vrow:has(.tagr)').getBoundingClientRect();
+  return p.bottom <= row.top + 1 || p.top >= row.bottom - 1;
+});
+check(cover, 'the popover does not cover its own row');
 check(/Хорезмская область · на 29\.08\.2026/.test(cab.text), 'header: the workspace region and the as-of date (the application\'s registration date)');
 check(/к сметной цене: [+−]\d/.test(cab.text), 'the difference to this line\'s smeta price');
 await ep.click('#refPop button[data-fold]');
@@ -296,6 +310,48 @@ check(cCab && /^ref:fake-20260101-2:median:(2,3|3,2)$/.test(cCab.source) && cCab
   cCab.market_price === r2((P.a + P.g) / 2), 'a median: ref:<package>:median:<records>');
 check(await ep.evaluate(() => app.model.resources.filter((r) => !S.near(r.market, r.price)).length === 2), 'and no other price changed');
 
+/* ------------------------------------------------------------- the popover low on the screen: above its row, never over it */
+await closePop();
+await ep.fill('#q', '');
+await ep.selectOption('#filter', 'all');
+// a tag in the last rows of the window: below it there is no room for the popover
+let low = null;
+for (let top = 0; top < 6000 && !low; top += 96) {
+  await ep.evaluate((t) => { document.getElementById('priceScroll').scrollTop = t; }, top);
+  await settle();
+  low = await ep.evaluate(() => {
+    const vh = window.innerHeight;
+    const t = [...document.querySelectorAll('#priceScroll .tagr')].find((b) => { const r = b.getBoundingClientRect(); return r.top > vh - 130 && r.bottom < vh - 4; });
+    return t ? t.dataset.res : null;
+  });
+}
+if (low) await ep.click('#priceScroll .tagr[data-res="' + low.replace(/["\\]/g, '\\$&') + '"]');
+await ep.waitForSelector('#refPop:not([hidden])').catch(() => null);
+const lowCover = await ep.evaluate(() => {
+  const p = document.getElementById('refPop').getBoundingClientRect();
+  const key = S.Refs.open && S.Refs.open.key;
+  const tag = document.querySelector('#priceScroll .tagr[data-res="' + key + '"]');
+  const row = tag && tag.closest('.vrow').getBoundingClientRect();
+  return { ok: !!row && (p.bottom <= row.top + 1 || p.top >= row.bottom - 1) && p.top >= 0 && p.bottom <= window.innerHeight, above: !!row && p.bottom <= row.top + 1 };
+});
+check(low && lowCover.ok && lowCover.above, 'a row low on the screen: the popover opens above it, within the window, the row stays in sight');
+await closePop();
+await ep.evaluate(() => { document.getElementById('priceScroll').scrollTop = 0; });
+
+/* ------------------------------------------------------------- Escape, then the same number typed: «typed» */
+await only('Кабель ВВГ 3х2,5');
+await ep.focus('#priceScroll .pin');
+await ep.keyboard.press('Escape');
+const gone = await (async () => { for (let i = 0; i < 40; i++) { if (!(await corr('Кабель ВВГ 3х2,5'))) return true; await new Promise((r) => setTimeout(r, 250)); } return false; })();
+await ep.focus('#priceScroll .pin');
+await ep.keyboard.press('Control+A');
+await ep.keyboard.type(String(cCab.market_price).replace('.', ','));
+await ep.keyboard.press('Tab');
+const cRetyped = await waitCorr('Кабель ВВГ 3х2,5', (c) => c.source === 'typed');
+check(gone && cRetyped && cRetyped.source === 'typed' && cRetyped.market_price === cCab.market_price,
+  'Escape drops the applied price; the same number typed again is «typed», not «из справочника»');
+await ep.fill('#q', '');
+
 /* ------------------------------------------------------------- a typed price */
 await ep.selectOption('#filter', 'all');
 await only('Экскаватор одноковшовый 0,65 м3');
@@ -320,6 +376,12 @@ const kept = await ep.evaluate(() => {
 check(Object.keys(kept.by).length === 3 && kept.by['Анкер М8'] === r2(P.d) && kept.by['Экскаватор одноковшовый 0,65 м3'] === P.typed,
   'after a reload the applied and the typed prices stay, nothing else changed');
 check(kept.cached === true, 'the derived pool comes back from the IndexedDB cache');
+// idle (no workspace for a while, or a hidden tab): the worker goes, the answers on screen stay, it comes back warm
+const slept = await ep.evaluate(() => { const n = S.Refs.count().all; S.Refs.sleep(); return { n, worker: !!S.Refs.worker, state: S.Refs.state, kept: S.Refs.count().all, bar: !document.getElementById('refAsof').hidden }; });
+check(slept.n === 9 && !slept.worker && slept.state === 'off' && slept.kept === 9 && slept.bar, 'an idle worker goes; the reference lines on screen and the date stay');
+await ep.evaluate(() => S.Refs.resume());
+await ep.waitForFunction(() => S.Refs.state === 'ready' && S.Refs.worker && !Object.keys(S.Refs.batches).length, null, { timeout: 60 * SEC });
+check(await ep.evaluate(() => S.Refs.count().all === 9 && S.Refs.cached), 'and comes back from the cache when it is needed again');
 const exc = await popover('Экскаватор одноковшовый 0,65 м3');
 check(/Ваша цена: 44 444,44/.test(exc.text), 'the popover shows the expert\'s own price');
 await ep.click('#refPop button[data-i="0"]');
@@ -333,7 +395,20 @@ await closePop();
 await ep.click(await tagOf('Кабель ВВГ 3х2,5'));
 await ep.waitForSelector('#refPop:not([hidden])');
 await ep.click('#refPop [data-asof]');
-await ep.$eval('#refPop .rp-asof input', (el) => { el.value = '2026-01-31'; el.dispatchEvent(new Event('change', { bubbles: true })); });
+// typed with the keyboard, segment by segment: nothing is taken while it is typed
+await ep.click('#refPop .rp-asof input');
+await ep.keyboard.type('0103');
+await settle();
+const typing = await ep.evaluate(() => ({ asof: S.Refs.asof, set: S.Refs.asofSet, open: !document.getElementById('refPop').hidden }));
+check(typing.asof === null && !typing.set && typing.open, 'typing a date applies nothing and keeps the popover open');
+await ep.$eval('#refPop .rp-asof input', (el) => { el.value = '2018-01-01'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+const early = await ep.evaluate(() => document.querySelector('#refPop [data-asof-ok]').disabled);
+await ep.focus('#refPop .rp-asof input');
+await ep.keyboard.press('Enter');
+await settle();
+check(early && await ep.evaluate(() => S.Refs.asof === null), 'a date before 2019 is not taken (the button is off, Enter does nothing)');
+await ep.$eval('#refPop .rp-asof input', (el) => { el.value = '2026-01-31'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+await ep.click('#refPop [data-asof-ok]');
 await ep.waitForFunction(() => {
   const r = app.model.resources.find((x) => x.name === 'Кабель ВВГ 3х2,5');
   const l = S.Refs.lines(r)[0];
@@ -346,6 +421,33 @@ check(/на 31\.01\.2026/.test(await ep.textContent('#refPop .rp-head')), 'the p
 check(await ep.evaluate(() => S.Sync.state().refs && S.Sync.state().refs.asof === '2026-01-31'), 'the date is kept in the workspace state');
 check(await ep.evaluate(() => Object.keys(app.prices).length === 3), 'changing the date applies nothing');
 await closePop();
+const bar1 = await ep.evaluate(() => { const b = document.getElementById('refAsof'); return { text: b.textContent, man: !b.querySelector('.ra-man').hidden }; });
+check(/справочник на 31\.01\.2026/.test(bar1.text) && bar1.man, 'the toolbar: «справочник на 31.01.2026 · выбрана вручную · сбросить»');
+
+/* a date that leaves no reference line at all is still in sight, and the workspace says so when it is opened again */
+await ep.click('#refAsof .ra-date');
+await ep.$eval('#refAsof .ra-edit input', (el) => { el.value = '2019-01-01'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+await ep.click('#refAsof [data-asof-ok]');
+await ep.waitForFunction(() => S.Refs.asof === '2019-01-01' && !Object.keys(S.Refs.batches).length && S.Refs.count().all === 0, null, { timeout: 30 * SEC });
+check(await ep.evaluate(() => !document.getElementById('refAsof').hidden && !document.querySelector('#priceScroll .tagr')),
+  'a date with no reference line: no tag anywhere, the date and «сбросить» still on the toolbar');
+await ep.evaluate(() => S.Sync.saveNow());
+await ep.reload();
+// every message the page shows from here on (several follow one another when a workspace opens)
+await ep.evaluate(() => {
+  const t = document.getElementById('toast');
+  window.__toasts = [];
+  new MutationObserver(() => window.__toasts.push(t.textContent)).observe(t, { childList: true, characterData: true, subtree: true });
+});
+await openApp(rows[0].number);
+await reopen();
+await ep.waitForFunction(() => window.__toasts.some((x) => /на 01\.01\.2019 — дата выбрана вручную/.test(x)), null, { timeout: 30 * SEC })
+  .then(() => check(true, 'a workspace opened with a picked date says so'), () => check(false, 'a workspace opened with a picked date says so'));
+await ep.waitForFunction(() => S.Refs.state === 'ready' && S.Refs.recGen === S.Refs.gen, null, { timeout: 60 * SEC });
+await ep.click('#refAsof [data-ra-reset]');
+await refsReady();
+check(await ep.evaluate(() => !S.Refs.asofSet && /справочник на 29\.08\.2026/.test(document.getElementById('refAsof').textContent) &&
+  S.Refs.count().all === 9), '«сбросить» on the toolbar: the registration date again, every reference line back');
 await ep.evaluate(() => S.Sync.saveNow());
 await ep.click('#wsList');
 
@@ -377,6 +479,28 @@ const kept2 = await ep.evaluate(() => {
 });
 check(kept2.both && kept2.pin, 'a repaint keeps the focus in the price field of a row that has a hint tag and a «справ.» tag');
 await ep.evaluate(() => document.activeElement && document.activeElement.blur());
+
+/* ------------------------------------------------------------- a package whose file is not the one its hash names */
+{
+  const p9 = F.makePackage({ id: 'fake-20260101-3' }), g9 = F.gzip(p9);
+  const fd = new FormData();
+  const sha = createHash('sha256').update(g9).digest('hex');
+  const fields = { package_id: p9.package_id, sha256: (sha[0] === 'a' ? 'b' : 'a') + sha.slice(1),
+    manifest: JSON.stringify(Object.fromEntries(Object.entries(p9).filter(([k]) => k !== 'rows'))),
+    records: String(p9.counts.records), sources: String(p9.counts.sources), date_min: p9.date_min, date_max: p9.date_max };
+  for (const k of Object.keys(fields)) fd.append(k, fields[k]);
+  fd.append('file', new Blob([g9], { type: 'application/gzip' }), p9.package_id + '.json.gz');
+  const up = await fetch(pb.base + '/api/collections/ref_packages/records', { method: 'POST', headers: { Authorization: pb.su }, body: fd }).then((r) => r.json());
+  await fetch(pb.base + '/api/refs/' + up.id + '/activate', { method: 'POST', headers: { Authorization: pb.su } });
+  await ep.click('#wsList');
+  await openApp(rows[1].number);
+  await reopen();
+  await ep.waitForFunction(() => S.Refs.state === 'error', null, { timeout: 60 * SEC })
+    .then(() => check(true, 'a file that is not the package its hash names is refused by the expert\'s browser'),
+      () => check(false, 'a file that is not the package its hash names is refused by the expert\'s browser'));
+  check(/контрольная сумма/.test(await ep.evaluate(() => S.Refs.message)) && await ep.evaluate(() => S.Refs.count().all === 0),
+    'it says why, and shows no line from it');
+}
 
 /* ------------------------------------------------------------- sign-out: the derived pool leaves the browser */
 check(await ep.evaluate(async () => (await indexedDB.databases()).some((d) => d.name === 'smeta-refs')), 'the derived pool is kept in IndexedDB while signed in');

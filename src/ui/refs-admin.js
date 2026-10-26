@@ -291,7 +291,8 @@
         .catch(function (e) { toast((e && e.response && e.response.message) || S.pbErr(e), true); });
     },
 
-    /** The documents of a package, from its manifest: type, issuer, number, date, region. */
+    /** The documents of a package, from its manifest: type, issuer, number, date, region (issuer and number without the
+     *  extractor's notes, as the popover shows them; the full text is in the cell's title). */
     docs: function (id) {
       var box = $('refsDocs');
       var x = this.items.filter(function (i) { return i.id === id; })[0];
@@ -301,7 +302,10 @@
       box.dataset.id = id;
       box.innerHTML = '<h3>Документы пакета ' + S.esc(x.package_id) + '</h3><table class="tbl"><thead><tr><th>Вид</th><th>Кто выдал</th>' +
         '<th>№</th><th>Дата</th><th>Регион</th></tr></thead><tbody>' + src.map(function (d) {
-          return '<tr><td>' + S.esc(DOC[d.doc_type] || 'документ') + '</td><td>' + S.esc(d.issuer || '') + '</td><td>' + S.esc(d.doc_no || '') +
+          var V = S.refs.viewParts;
+          var iss = V.issuerText(d) || 'не указан', no = V.docNoText(d);
+          return '<tr><td>' + S.esc(DOC[d.doc_type] || 'документ') + '</td><td title="' + S.esc(d.issuer || '') + '">' + S.esc(iss) +
+            '</td><td title="' + S.esc(d.doc_no || '') + '">' + S.esc(no) +
             '</td><td>' + S.esc(day(d.issue_date || d.as_of_date)) + '</td><td>' +
             S.esc(d.region === 'national' ? 'вся республика' : (d.region && S.regionLabel ? S.regionLabel(d.region) : '')) + '</td></tr>';
         }).join('') + '</tbody></table>';

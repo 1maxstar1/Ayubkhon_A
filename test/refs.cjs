@@ -267,7 +267,43 @@ ok(vConc.evidence.some((e) => /документы расходятся: 3 стр
 ok(vConc.source.indexOf('ООО «Тест-Поставщик-6» № ТЕСТ-6') === 0 && /цена на 01\.12\.2025/.test(vConc.source), 'the source: issuer, document number, dates');
 ok(/^к сметной цене: \+/.test(vConc.vsSmeta), 'the difference to the smeta price of this line');
 const vCabOld = R.view(cabOld[0], ctx);
-ok(vCabOld.summary === 'Медиана 2 документов (разброс ×1,12)' && vCabOld.conv === '', 'a median line: «Медиана N документов», no single conversion');
+ok(vCabOld.summary === 'Медиана: 2 документа (разброс ×1,12)' && vCabOld.conv === '' && !vCabOld.flags.some((f) => /медиана/.test(f)),
+  'a median line: «Медиана: N документа», no single conversion, no second «медиана» flag');
+{
+  // two lines of one document are one document (review: «Медиана 4 документов» built from 2)
+  const one = Object.assign({}, cabOld[0], { components: cabOld[0].components.map((c) => Object.assign({}, c, { src: cabOld[0].components[0].src })) });
+  ok(R.view(one, ctx).summary === 'Медиана: 2 строки из 1 документа (разброс ×1,12)', 'lines of one document count once: «Медиана: 2 строки из 1 документа»');
+}
+{
+  // a smeta unit that carries its own multiplier: «за 100 м», never «за 1 100 м» (which reads as 1 100 metres)
+  const line = (raw, unit) => R.view({ price: 1250, tier: 'document', name: 'x', how: 'exact-key', flags: [], raw }, Object.assign({}, ctx, { unit }));
+  ok(line({ price: 12.5, unit: 'м', factor: 100 }, '100 м').conv === '13 за 1 м → 1 250 за 100 м', 'conversion to «100 м»: «за 100 м»');
+  ok(line({ price: 1250, unit: '1000шт', factor: 0.001 }, 'шт').conv === '1 250 за 1000 шт → 1 250 за 1 шт', 'and from «1000шт»: «за 1000 шт»');
+}
+{
+  // the parsers' tokens shown as the names spell them (review: «НУUNDАI», «ПЕСКОСТРУЙН», «страна RU»)
+  const v = R.view({ price: 1, tier: 'similar', name: 'Самосвал QWERTAX QX-270, дизельный', how: 'family-relaxed', flags: [],
+    drop: ['марка (QWЕRТАХ)', 'модель (QХ270)', 'исполнение (ДИЗЕЛ)', 'признаки кроме «ПЕСКОСТРУЙН» (ОБОРУДОВАН)', 'модель (УGW600)', 'страна CN/RU'] },
+    Object.assign({}, ctx, { queryName: 'ПЕСКОСТРУЙНОЕ ОБОРУДОВАНИЕ ТЕСТ' }));
+  const e = v.evidence[0];
+  ok(/марка \(QWERTAX\)/.test(e) && /модель \(QX-270\)/.test(e), 'a mixed-script brand and model read as the record spells them: ' + e);
+  ok(/исполнение \(дизельный\)/.test(e) && /кроме «ПЕСКОСТРУЙНОЕ» \(ОБОРУДОВАНИЕ\)/.test(e), 'a word stem reads as the whole word of the name');
+  ok(/модель \(YGW600\)/.test(e), 'a token no name holds is put in one script (a Latin-only letter makes it Latin)');
+  ok(/страна Китай, Россия/.test(e) && !/[A-Za-z][А-Яа-яЁё]|[А-Яа-яЁё][A-Za-z]/.test(e), 'country codes are named; no word mixes the scripts');
+}
+{
+  // the extractor's notes never reach the expert (review: English notes in the issuer and in brackets after a document number)
+  const V = R.viewParts;
+  ok(V.issuerText({ issuer: 'not given on this sheet (the row cites «Тест-Документ»)' }) === '', 'an issuer that is a note with a Russian quote in brackets names nobody');
+  ok(V.issuerText({ issuer: 'price catalogue of a region (screenshot of block «1. ТЕСТ»)' }) === '', 'so does «price catalogue of a region (…)»');
+  ok(V.issuerText({ issuer: 'ООО «Тест-Альфа» (dealer of ООО «Тест-Бета»)' }) === 'ООО «Тест-Альфа»', 'a note in brackets after a name goes');
+  ok(V.issuerText({ issuer: '«TEST QURILISH» MCHJ — per the cover letter on p.3' }) === '«TEST QURILISH» MCHJ', 'and a trailing English note');
+  ok(V.docNoText({ doc_no: 'ТЕСТ-1/2026 (prices); ТЕСТ-2/2026 (other costs 1 %)' }) === 'ТЕСТ-1/2026; ТЕСТ-2/2026', 'English notes in brackets leave a number');
+  ok(V.docNoText({ doc_no: 'calc «Тест расчёт»; temp. calc тест; с/ф №1 (01.01.2026)' }) === 'с/ф №1 (01.01.2026)', 'parts that are notes («calc …», «temp. …») leave it');
+  const long = 'Тестовое государственное унитарное предприятие по проверке длинных названий организаций Тестовой области';
+  const t = V.issuerText({ issuer: long });
+  ok(t.length <= 81 && /…$/.test(t) && long.indexOf(t.slice(0, -1)) === 0 && long.charAt(t.length - 1) === ' ', 'a long issuer is cut at a word, with «…»: ' + t);
+}
 const vPipe = R.view(sug(sp1, Q('Труба стальная электросварная 57х3,5', 'м', 'materials'))[0], ctx);
 ok(/за 1 т → .* за 1 м \(по данным изделия\)/.test(vPipe.conv), 'a converted line shows raw → normalised «по данным изделия»');
 ok(R.view({ price: 1, tier: 'document', name: 'x', src: 'fake-src-9999', region: 'nowhere', how: 'exact-key', flags: [] }, ctx).source.indexOf('fake-src') < 0,

@@ -40,7 +40,8 @@ var S = (typeof S !== 'undefined' && S) || {};
   var BASIS = ['catalogue', 'exchange-spot', 'exchange-forward', 'list', 'recommended', 'wage-12%', 'offer', 'declared',
     'designer-memory', 'plant-calc', 'protocol', 'invoice'];
   var ID_RE = /^[a-z0-9][a-z0-9._-]{2,63}$/;
-  var SRC_RE = /^[0-9a-z_-]{4,40}$/;
+  /* a document code: a letter or digit first, never «__» (no name of an object's own machinery) */
+  var SRC_RE = /^[0-9a-z](?:[0-9a-z-]|_(?!_)){3,39}$/;
   var DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
   /* ------------------------------------------------------------------ SHA-256 (FIPS 180-4), pure JS */
@@ -139,7 +140,7 @@ var S = (typeof S !== 'undefined' && S) || {};
     this.errors = [];
     this.next = 0;
     this.prevRid = -1;
-    this.srcIds = {};
+    this.srcIds = Object.create(null);   // a row's src is looked up here: no inherited «constructor», «__proto__»
     this.fatal = false;
   }
   Checker.prototype.err = function (row, field, msg) {
@@ -176,7 +177,7 @@ var S = (typeof S !== 'undefined' && S) || {};
     for (var s = 0; s < srcs.length; s++) {
       var d = srcs[s], where = 'sources[' + (s + 1) + '].';
       if (!d || typeof d !== 'object') { e('sources[' + (s + 1) + ']', 'не объект'); continue; }
-      if (!(typeof d.id === 'string' && SRC_RE.test(d.id))) { e(where + 'id', 'нужен код документа: 4–40 знаков a-z 0-9 _ -'); continue; }
+      if (!(typeof d.id === 'string' && SRC_RE.test(d.id))) { e(where + 'id', 'нужен код документа: 4–40 знаков a-z 0-9 _ -, первый — буква или цифра'); continue; }
       if (this.srcIds[d.id]) e(where + 'id', 'код документа повторяется');
       this.srcIds[d.id] = true;
       if (d.vat_default != null && typeof d.vat_default !== 'boolean' && !str(d.vat_default, LIMITS.short)) e(where + 'vat_default', 'не да/нет');
@@ -223,10 +224,11 @@ var S = (typeof S !== 'undefined' && S) || {};
       var av = get('avail');
       if (av !== null && (!isDate(av) || (isDate(pd) && av < pd))) this.err(n, 'avail', 'не дата или раньше price_date');
       var as = get('avail_src');
-      if (as !== null && !this.srcIds[as]) this.err(n, 'avail_src', 'нет такого документа в пакете');
+      if (as !== null && !(typeof as === 'string' && this.srcIds[as] === true)) this.err(n, 'avail_src', 'нет такого документа в пакете');
       var reg = get('region');
       if (reg !== null && !IS_REGION[reg]) this.err(n, 'region', 'неизвестный регион');
-      if (!this.srcIds[get('src')]) this.err(n, 'src', 'нет такого документа в пакете');
+      var src = get('src');
+      if (!(typeof src === 'string' && this.srcIds[src] === true)) this.err(n, 'src', 'нет такого документа в пакете');
       if (!str(get('group'), LIMITS.short)) this.err(n, 'group', 'не строка до ' + LIMITS.short + ' знаков');
       if (!IS_BASIS[get('basis')]) this.err(n, 'basis', 'неизвестное основание цены');
       var texts = ['delivery', 'plant', 'code'];

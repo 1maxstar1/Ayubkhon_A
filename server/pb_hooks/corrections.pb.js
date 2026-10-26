@@ -9,3 +9,13 @@
 routerAdd("POST", "/api/corrections/bulk", (e) => {
   return require(`${__hooks}/lib/corrections.js`).bulk(e);
 }, $apis.requireAuth());
+
+// The records API writes corrections too (the rules let any signed-in expert do it): the source of a price is
+// checked there exactly as in the bulk route.
+onRecordCreateRequest((e) => {
+  require(`${__hooks}/lib/corrections.js`).checkRecord(e);
+}, "corrections");
+
+onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/corrections.js`).checkRecord(e);
+}, "corrections");

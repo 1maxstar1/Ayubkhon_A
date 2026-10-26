@@ -14,10 +14,24 @@
  *            from (corrections.source = ref:<package>:<record>). Nothing else ever sets a price: loading, re-querying
  *            or changing the date never touch app.prices, and a price the expert typed is replaced only after a confirm.
  *   as-of    the date the prices are wanted for: the application's registration date unless the expert picks another
- *            (saved in the workspace state as refs.asof); records published after it are not offered.
+ *            (saved in the workspace state as refs.asof); records published after it are not offered. The date in
+ *            force is always on the toolbar of «Цены» («справочник на ДД.ММ.ГГГГ»), with «сбросить» when it was
+ *            picked by hand — also when it leaves no reference line at all — and a workspace that opens with a picked
+ *            date says so in the message of its first answers. A date is taken only whole, from «Применить» or Enter, and within 2019-01-01 … a year ahead:
+ *            the date field fires on every segment typed, and a half-typed date is not a date anybody chose.
  *
  * Results arrive in batches while the expert works: the list is repainted where it stands (never scrolled, the
  * focused field keeps its focus), and re-filtered only when one of the two reference filters is on.
+ *
+ * Questions go only to the worker of the package this workspace was told is active (recGen === gen): until the
+ * package list has answered, the worker still running may be the previous package's. A worker that is replaced takes
+ * its answers with it (gen, map, asked and batches start again). The worker of the same package is kept across
+ * workspaces, also while it is still preparing the pool. Memory: the worker holds the pool, its indexes and its
+ * answers for as long as it lives (renderer, measured with the Khiva smeta: about +600 MB right after a cold derive,
+ * settling near +170 MB within a minute). It goes when no workspace has been open for IDLE_MS or the tab has been
+ * hidden for HIDDEN_MS — the renderer was back at its size without the worker within 30 s — and comes back from the
+ * IndexedDB cache (about 3 s) when it is needed again, keeping the answers shown. (Replacing the worker that derived
+ * the pool by one that reads it back was measured too: 35 MB less after two minutes, not worth a second start.)
  */
 (function (S) {
   'use strict';
@@ -26,6 +40,10 @@
   var BATCH = 50;
   var PHASE = { cache: [0, 5], download: [0, 8], unpack: [8, 10], check: [10, 12], derive: [12, 80], store: [80, 88], index: [88, 100] };
   var NEAR = { similar: true, estimate: true };
+  var IDLE_MS = 3 * 60 * 1000;      // no workspace open this long: the worker goes
+  var HIDDEN_MS = 15 * 60 * 1000;   // the tab hidden this long: the worker goes, and comes back when the tab is shown
+  var MIN_ASOF = '2019-01-01';      // the oldest document of a package is younger; an earlier date is a typing slip
+  var DAY = 86400000;
 
   function $(id) { return document.getElementById(id); }
   function A() { return window.app; }
@@ -35,6 +53,14 @@
   function round2(v) { return Math.round(v * 100) / 100; }
   function ruDate(d) { return S.refs.viewParts.ruDate(d); }
   function fmt(v) { return S.refs.viewParts.money(v); }
+  function isoDay(ms) { var d = new Date(ms); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  /** A whole calendar date within MIN_ASOF … a year from today, else null. */
+  function okDate(d) {
+    if (typeof d !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
+    var t = Date.parse(d + 'T00:00:00Z');
+    if (!isFinite(t) || new Date(t).toISOString().slice(0, 10) !== d) return null;
+    return d >= MIN_ASOF && d <= isoDay(Date.now() + 366 * DAY) ? d : null;
+  }
 
   var Refs = {
     rec: null,            // the active ref_packages record { id, package_id, sha256, records }
@@ -44,10 +70,12 @@
     sources: {},
     map: {},              // keyOf(resource) -> lines
     asked: {},            // keyOf -> true while a question is out
-    gen: 0,               // bumped on every workspace open / close and as-of change: older answers are dropped
+    gen: 0,               // bumped on every workspace open / close, as-of change and new worker: older answers are dropped
+    recGen: -1,           // the gen whose active package is known: questions wait for it
     batch: 0, batches: {}, // batch number -> gen
     asof: null, asofSet: false,
     open: null,           // { key, k } of the popover on screen
+    idleT: 0, hiddenT: 0, slept: false,
 
     init: function () {
       var self = this;
@@ -61,6 +89,7 @@
       document.addEventListener('ws:open', function (e) { self.start(e.detail); });
       document.addEventListener('ws:close', function () { self.stop(); });
       document.addEventListener('auth:signedout', function () { self.forget(); });
+      document.addEventListener('visibilitychange', function () { self.visibility(); });
 
       // the workspace remembers a date the expert picked; without one the registration date is used every time
       if (S.Sync && S.Sync.state) {
@@ -81,6 +110,7 @@
         f.insertBefore(b, a.nextSibling);
       }
 
+      this.dateBar();
       this.pop = document.createElement('div');
       this.pop.id = 'refPop';
       this.pop.hidden = true;
@@ -100,13 +130,24 @@
     },
 
     /* ------------------------------------------------------------------ workspace */
-    start: function (w) {
+    /**
+     * A workspace opened (or, with `resume`, the worker comes back after it went idle: the answers shown and the date
+     * stay). Nothing is asked before the package list has said which package is active for this gen.
+     */
+    start: function (w, resume) {
       var self = this;
       var gen = ++this.gen;
-      this.map = {}; this.asked = {}; this.first = null; this.hide();
-      var st = (w && w.state && w.state.refs) || {};
-      this.asofSet = !!(st.asof && /^\d{4}-\d{2}-\d{2}$/.test(st.asof));
-      this.asof = this.asofSet ? st.asof : null;
+      var before = this.rec;
+      clearTimeout(this.idleT);
+      this.slept = false;
+      if (!resume) {
+        this.map = {}; this.asked = {}; this.first = null; this.hide();
+        var st = (w && w.state && w.state.refs) || {};
+        this.asof = okDate(st.asof) || (typeof st.asof === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(st.asof) ? st.asof : null);
+        this.asofSet = !!this.asof;
+        this.closeDate();
+      }
+      this.paintAsof();
       S.pb.collection('ref_packages').getList(1, 1, {
         filter: 'active = true', fields: 'id,collectionId,collectionName,package_id,sha256,file,records'
       }).then(function (res) {
@@ -114,22 +155,58 @@
         var rec = res.items[0] || null;
         self.rec = rec;
         self.filters(!!rec);
-        if (!rec) { self.state = 'off'; self.repaint(); return; }
-        if (self.worker && self.workerSha === rec.sha256 && self.state === 'ready') { self.query(); return; }
-        self.boot(rec, gen);
+        if (!rec) { self.kill(); self.state = 'off'; self.map = {}; self.repaint(); return; }
+        self.recGen = gen;
+        // the same package: its worker stays, also while it is still preparing the pool (a new one would start from zero)
+        if (self.worker && self.workerSha === rec.sha256 && self.workerId === rec.id && (self.state === 'ready' || self.state === 'loading')) {
+          if (self.state === 'ready') self.query(); else self.repaint();
+          return;
+        }
+        var same = !!(before && before.id === rec.id && before.sha256 === rec.sha256);
+        self.boot(rec, resume && same);
       }).catch(function (e) {
         if (gen !== self.gen || (e && e.status === 0)) return;
         console.error('refs', e);
         self.state = 'off';
         self.filters(false);
+        self.paintAsof();
       });
     },
 
     stop: function () {
+      var self = this;
       this.gen++;
       this.map = {}; this.asked = {};
       this.asof = null; this.asofSet = false;
       this.hide();
+      this.closeDate();
+      this.paintAsof();
+      // no workspace: the worker (hundreds of MB) goes after a while; the next workspace starts it again from the cache
+      clearTimeout(this.idleT);
+      this.idleT = setTimeout(function () { if (!(S.Sync && S.Sync.ws)) self.sleep(); }, IDLE_MS);
+    },
+
+    /** The worker goes; the answers on screen stay. resume() brings it back. */
+    sleep: function () {
+      if (!this.worker || this.state === 'loading') return;   // a pool half derived is not thrown away
+      this.kill();
+      this.gen++;
+      this.asked = {}; this.batches = {};
+      this.state = 'off';
+      this.slept = true;
+      this.repaint();
+    },
+
+    resume: function () {
+      if (!this.slept || this.worker || !(S.Sync && S.Sync.ws)) return;
+      this.start(S.Sync.ws, true);
+    },
+
+    visibility: function () {
+      var self = this;
+      clearTimeout(this.hiddenT);
+      if (document.hidden) this.hiddenT = setTimeout(function () { if (document.hidden) self.sleep(); }, HIDDEN_MS);
+      else this.resume();
     },
 
     /** Sign-out: the worker goes, and the derived pool (the documents' prices) leaves this browser's storage. */
@@ -144,15 +221,22 @@
 
     kill: function () {
       var w = this.worker;
-      this.worker = null; this.workerSha = null;
+      this.worker = null; this.workerSha = null; this.workerId = null;
       // let a «forget» reach the worker before it is gone
       if (w) setTimeout(function () { w.terminate(); }, 50);
     },
 
-    /** Start the worker on the active package (a new one when the administrator switched packages). */
-    boot: function (rec, gen) {
+    /**
+     * Start a worker on the active package (a new one when the administrator switched packages). Whatever the worker
+     * being replaced still owed is dropped and every key is asked again of the new one; `keep` keeps the answers on
+     * screen (the same package, back from idle).
+     */
+    boot: function (rec, keep) {
       var self = this;
       if (this.worker) this.kill();
+      this.gen++; this.recGen = this.gen;
+      this.asked = {}; this.batches = {};
+      if (!keep) { this.map = {}; this.first = null; }
       if (!window.__REFS_WORKER_SRC__ || typeof Worker === 'undefined') { this.state = 'off'; this.filters(false); return; }
       this.state = 'loading'; this.pct = 0; this.message = '';
       this.repaint();
@@ -160,7 +244,7 @@
       try {
         w = new Worker(URL.createObjectURL(new Blob([window.__REFS_WORKER_SRC__], { type: 'text/javascript' })));
       } catch (e) { this.fail('Справочник недоступен в этом браузере'); return; }
-      this.worker = w; this.workerSha = rec.sha256;
+      this.worker = w; this.workerSha = rec.sha256; this.workerId = rec.id;
       w.onmessage = function (e) { if (w === self.worker) self.onMessage(e.data); };
       w.onerror = function (e) { if (w === self.worker) { e.preventDefault(); self.fail('Ошибка справочника'); } };
       // a blob worker resolves nothing against the page: the file URL has to be absolute (S.fileURL gives one)
@@ -217,7 +301,7 @@
     /** Ask for every resource without an answer, the rows on screen first, in batches. */
     query: function () {
       var app = A(), self = this;
-      if (this.state !== 'ready' || !this.worker || !app.model || !S.Sync || !S.Sync.ws || S.Sync.loading) return;
+      if (this.state !== 'ready' || !this.worker || this.recGen !== this.gen || !app.model || !S.Sync || !S.Sync.ws || S.Sync.loading) return;
       var ctx = { region: S.Sync.ws.region || null, asof: this.asofNow() };
       var seen = {}, items = [];
       function add(r) {
@@ -239,12 +323,19 @@
       }
     },
 
-    /** The first full answer for a workspace says how many resources have reference prices. */
+    /**
+     * The first full answer for a workspace says how many resources have reference prices — and, when the workspace
+     * keeps a date the expert picked, that date (also when it leaves no line at all). It comes after the workspace's
+     * own messages (files restored, hints), so it is the one left on screen.
+     */
     passDone: function () {
       if (!this.first) return;
       this.first = false;
       var n = this.count().all;
-      if (n) A().toast('Справочные цены: ресурсов ' + n + (this.cached ? '' : ' (справочник подготовлен за ' + Math.round(this.ms / 1000) + ' с)'));
+      if (!n && !this.asofSet) return;
+      A().toast('Справочные цены' + (this.asofSet ? ' на ' + ruDate(this.asof) + ' — дата выбрана вручную, не дата регистрации заявки' : '') +
+        ': ' + (n ? 'ресурсов ' + n : 'ни одного ресурса') + (this.asofSet ? ' («сбросить» — на панели цен)' : '') +
+        (n && !this.cached ? ' (справочник подготовлен за ' + Math.round(this.ms / 1000) + ' с)' : ''), this.asofSet && !n);
     },
 
     /* ------------------------------------------------------------------ painting */
@@ -281,8 +372,9 @@
       return { all: all, near: near };
     },
 
-    /** The part of the status line that is ours. */
+    /** The part of the status line that is ours (the date control on the toolbar is painted with it). */
     statusText: function () {
+      this.paintAsof();
       if (this.state === 'loading') return ' · справочник: подготовка ' + this.pct + ' %';
       if (this.state === 'error') return ' · справочник: ошибка';
       if (this.state !== 'ready') return '';
@@ -313,14 +405,12 @@
       var lines = rec ? this.lines(rec) : [];
       if (!lines.length) { this.hide(); return; }
       this.open = { key: key, anchor: anchor };
-      var ctx = { sources: this.sources, asof: this.asofNow(), smetaPrice: rec.price, unit: rec.unit, regionLabel: S.regionLabel };
+      var ctx = { sources: this.sources, asof: this.asofNow(), smetaPrice: rec.price, unit: rec.unit, regionLabel: S.regionLabel, queryName: rec.name };
       var html = '<div class="rp-head"><span>Справочные цены · ' + S.esc(S.regionLabel(S.Sync.ws.region) || '') +
         ' · на <b class="rp-date" title="' + (this.asofSet ? 'Дата выбрана вручную' : 'Дата регистрации заявки') + '">' +
         ruDate(ctx.asof) + '</b> <button class="link" data-asof>изменить</button></span>' +
         '<button class="link" data-x title="Закрыть">×</button></div>';
-      html += '<div class="rp-asof" hidden><input type="date" value="' + S.esc(ctx.asof) + '">' +
-        (this.asofSet ? ' <button class="link" data-asof-reset>дата регистрации заявки</button>' : '') +
-        '<small>Цены, опубликованные после этой даты, не предлагаются</small></div>';
+      html += '<div class="rp-asof" hidden>' + this.dateEditorHtml(ctx.asof) + '</div>';
       if (!S.near(rec.market, rec.price)) html += '<div class="rp-mine">Ваша цена: <b>' + fmt(rec.market) + '</b></div>';
       var sub = false;
       lines.forEach(function (l, i) {
@@ -337,9 +427,7 @@
         box.hidden = !box.hidden;
         if (!box.hidden) box.querySelector('input').focus();
       });
-      this.pop.querySelector('.rp-asof input').addEventListener('change', function (e) { self.setAsof(e.target.value || null); });
-      var reset = this.pop.querySelector('[data-asof-reset]');
-      if (reset) reset.addEventListener('click', function () { self.setAsof(null); });
+      this.wireDateEditor(this.pop.querySelector('.rp-asof'), function () { self.pop.querySelector('.rp-asof').hidden = true; });
       this.pop.querySelectorAll('button[data-fold]').forEach(function (b) {
         b.addEventListener('click', function () {
           var box = self.pop.querySelector('.rp-comps[data-of="' + b.dataset.fold + '"]');
@@ -350,13 +438,28 @@
       this.pop.querySelectorAll('button[data-i]').forEach(function (b) {
         b.addEventListener('click', function () { self.apply(key, lines[+b.dataset.i]); });
       });
-      var r = anchor.getBoundingClientRect();
+      this.place(anchor);
+    },
+
+    /**
+     * Below the row or above it, whichever has more room, and no taller than that room (it scrolls inside): the row
+     * being priced — its tag and its «Рыночная цена» field — stays in sight while a line is chosen.
+     */
+    place: function (anchor) {
+      var row = (anchor.closest && anchor.closest('.vrow')) || anchor;
+      var r = row.getBoundingClientRect(), a = anchor.getBoundingClientRect();
+      var vh = window.innerHeight, gap = 4, edge = 6;
+      this.pop.style.maxHeight = '';
+      this.pop.style.top = '0px';
       this.pop.hidden = false;
       var w = this.pop.offsetWidth, h = this.pop.offsetHeight;
-      var left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
-      var top = r.bottom + 4 + h > window.innerHeight ? r.top - h - 4 : r.bottom + 4;
-      this.pop.style.left = left + 'px';
-      this.pop.style.top = Math.max(4, top) + 'px';
+      var below = vh - r.bottom - gap - edge, above = r.top - gap - edge;
+      var down = h <= below || below >= above;
+      var room = Math.max(120, down ? below : above);
+      var hh = Math.min(h, room);
+      this.pop.style.maxHeight = room + 'px';
+      this.pop.style.left = Math.max(8, Math.min(a.left, window.innerWidth - w - 8)) + 'px';
+      this.pop.style.top = Math.max(edge, down ? r.bottom + gap : r.top - gap - hh) + 'px';
     },
 
     /** One line of the popover (S.refs.view gives every text; nothing here reads an internal field). */
@@ -414,12 +517,17 @@
       return out;
     },
 
+    /** A whole date picked by the expert, or null for the registration date again. */
     setAsof: function (d) {
-      var ok = d && /^\d{4}-\d{2}-\d{2}$/.test(d);
+      var ok = d ? okDate(d) : null;
+      if (d && !ok) return;
       this.asofSet = !!ok;
-      this.asof = ok ? d : null;
+      this.asof = ok;
+      var known = this.recGen === this.gen;
       this.gen++;
+      if (known) this.recGen = this.gen;
       this.map = {}; this.asked = {}; this.first = null;
+      this.closeDate();
       if (S.Sync && S.Sync.touch) S.Sync.touch();
       var open = this.open;
       this.hide();
@@ -437,6 +545,72 @@
         setTimeout(function () { wait(100); }, 100);
       }
     }
+  };
+
+  /* ------------------------------------------------------------------ the as-of date */
+  /** The editor (popover and toolbar): a date field, «Применить», and the way back to the registration date. */
+  Refs.dateEditorHtml = function (value) {
+    return '<input type="date" min="' + MIN_ASOF + '" max="' + isoDay(Date.now() + 366 * DAY) + '" value="' + S.esc(value || '') + '">' +
+      ' <button class="btn sm" data-asof-ok>Применить дату</button>' +
+      (this.asofSet ? ' <button class="link" data-asof-reset>дата регистрации заявки</button>' : '') +
+      '<small>Цены, опубликованные после этой даты, не предлагаются. Дата берётся целиком: ' + ruDate(MIN_ASOF) +
+      ' — через год от сегодня.</small>';
+  };
+  /** Nothing is taken while the date is typed: only «Применить дату» or Enter, and only a whole, plausible date. */
+  Refs.wireDateEditor = function (box, close) {
+    var self = this, inp = box.querySelector('input[type=date]'), ok = box.querySelector('[data-asof-ok]');
+    function sync() { ok.disabled = !okDate(inp.value); }
+    function take() { var d = okDate(inp.value); if (d) self.setAsof(d); else inp.focus(); }
+    inp.addEventListener('input', sync);
+    inp.addEventListener('change', sync);
+    inp.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); take(); }
+      else if (e.key === 'Escape' && close) { e.stopPropagation(); close(); }
+    });
+    ok.addEventListener('click', take);
+    var reset = box.querySelector('[data-asof-reset]');
+    if (reset) reset.addEventListener('click', function () { self.setAsof(null); });
+    sync();
+  };
+
+  /** «справочник на ДД.ММ.ГГГГ» on the toolbar of «Цены»: always in sight while a package is in use. */
+  Refs.dateBar = function () {
+    var self = this, count = $('priceCount');
+    if (!count || !count.parentNode) return;
+    var bar = document.createElement('span');
+    bar.id = 'refAsof';
+    bar.className = 'count ra';
+    bar.hidden = true;
+    bar.innerHTML = 'справочник на <button class="link ra-date" title="Дата, на которую предлагаются справочные цены — изменить"></button>' +
+      '<span class="ra-man" hidden>· выбрана вручную · <button class="link" data-ra-reset title="Вернуть дату регистрации заявки">сбросить</button></span>' +
+      '<span class="ra-edit" hidden></span>';
+    count.parentNode.insertBefore(bar, count);
+    this.bar = bar;
+    bar.querySelector('.ra-date').addEventListener('click', function () {
+      var ed = bar.querySelector('.ra-edit');
+      if (!ed.hidden) { self.closeDate(); return; }
+      ed.innerHTML = self.dateEditorHtml(self.asofNow());
+      ed.hidden = false;
+      self.wireDateEditor(ed, function () { self.closeDate(); });
+      ed.querySelector('input').focus();
+    });
+    bar.querySelector('[data-ra-reset]').addEventListener('click', function () { self.setAsof(null); });
+  };
+  Refs.closeDate = function () {
+    var ed = this.bar && this.bar.querySelector('.ra-edit');
+    if (ed && !ed.hidden) { ed.hidden = true; ed.innerHTML = ''; }
+  };
+  Refs.paintAsof = function () {
+    var bar = this.bar;
+    if (!bar) return;
+    var on = !!(S.Sync && S.Sync.ws) && !!this.rec && (this.state !== 'off' || this.slept);
+    bar.hidden = !on;
+    if (!on) { this.closeDate(); return; }
+    var t = ruDate(this.asofNow());
+    var d = bar.querySelector('.ra-date');
+    if (d.textContent !== t) d.textContent = t;
+    bar.querySelector('.ra-man').hidden = !this.asofSet;
+    bar.classList.toggle('man', !!this.asofSet);
   };
 
   function cssq(s) { return String(s).replace(/["\\]/g, '\\$&'); }

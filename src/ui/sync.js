@@ -39,10 +39,10 @@
       var P = S.App.prototype;
       wrap(P, 'rebuild', function () { self.touch(); });
       wrap(P, 'saveOpts', function () { self.touch(); });
-      wrap(P, 'setPrice', function (key, value) { self.touch(); self.correctSoon(key, value); });
+      wrap(P, 'setPrice', function (key, value) { self.touch(); self.priceSet(key); self.correctSoon(key, value); });
       wrap(P, 'setPrices', function (map) {
         self.touch();
-        Object.keys(map).forEach(function (k) { self.correctSoon(k, map[k]); });
+        Object.keys(map).forEach(function (k) { self.priceSet(k); self.correctSoon(k, map[k]); });
       });
       // Leaving the field is the moment the number is finished being typed.
       ['priceScroll', 'sheetScroll'].forEach(function (id) {
@@ -456,13 +456,20 @@
 
     /**
      * Where a price came from, for the correction it becomes. «Применить» on a reference line or a hint marks the
-     * resource with the price it set and its source (`ref:<package>:<record>`, `hint:<correction>`); anything else —
-     * typed, pasted, a percentage, the price book — is `typed`. A mark holds only while the price is still the one
-     * it set: a number typed over an applied price goes out as `typed`.
+     * resource with the price it set and its source (`ref:<package>:<record>`, `hint:<correction>`) right before it
+     * sets the price; anything else — typed, pasted, Escape, «Сбросить», a percentage, the price book — is `typed`.
+     * The mark belongs to that one setPrice: the next change of the same price, by any other way, ends it, so a number
+     * typed again after Escape goes out as `typed` even when it equals the reference price.
      */
     markSource: function (key, price, source) {
       this.marks = this.marks || {};
-      this.marks[key] = { price: price, source: String(source || '').slice(0, 200) };
+      this.marks[key] = { price: price, source: String(source || '').slice(0, 200), fresh: true };
+    },
+    /** A price was set: the mark made for this very change stays (once), any older one ends. */
+    priceSet: function (key) {
+      var m = this.marks && this.marks[key];
+      if (!m) return;
+      if (m.fresh) m.fresh = false; else delete this.marks[key];
     },
     priceSource: function (key, value) {
       var m = this.marks && this.marks[key];

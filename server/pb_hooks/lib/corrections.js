@@ -11,7 +11,52 @@ function money(v) {
   return isFinite(n) ? n : 0;
 }
 
+// Where a price came from (corrections.source, written by the page): «typed», «hint:<correction id>»,
+// «ref:<package>:<record>» or «ref:<package>:median:<record>,<record>…». Other experts' hints label a price «из
+// справочника» by it, and these labels are meant to become learning data, so the server takes only these forms, and a
+// reference or a hint only when that package or that correction exists; anything else is stored as «typed». It stays
+// the page's claim about one click (the server cannot see the click), never a proof.
+const MAX_SOURCE = 200;
+const SOURCE_RE = /^(?:typed|hint:([a-z0-9]{15})|ref:([a-z0-9][a-z0-9._-]{2,63}):(?:\d{1,12}|median:\d{1,12}(?:,\d{1,12})*(?:…)?))$/;
+
+function sourceChecker(app) {
+  const known = new Map();
+  function exists(coll, field, value) {
+    const k = coll + "\u0000" + value;
+    if (!known.has(k)) {
+      let ok = false;
+      try { ok = !!(field === "id" ? app.findRecordById(coll, value) : app.findFirstRecordByData(coll, field, value)); } catch (_) { ok = false; }
+      known.set(k, ok);
+    }
+    return known.get(k);
+  }
+  /** { source, source_price } as stored: "" for a page that sends none (older versions), «typed» for a bad claim. */
+  return function (source, price) {
+    let s = String(source == null ? "" : source);
+    if (!s) return { source: "", price: 0 };
+    // a long median list is cut at a whole record number, as the page cuts it
+    if (s.length > MAX_SOURCE) s = s.slice(0, MAX_SOURCE - 1).replace(/,\d*$/, "") + "…";
+    const m = SOURCE_RE.exec(s);
+    let ok = !!m;
+    if (ok && m[1]) ok = exists("corrections", "id", m[1]);
+    if (ok && m[2]) ok = exists("ref_packages", "package_id", m[2]);
+    if (!ok || s === "typed") return { source: "typed", price: 0 };
+    return { source: s, price: money(price) };
+  };
+}
+
 module.exports = {
+  sourceChecker: sourceChecker,
+
+  /** A correction written through the records API (not the bulk route): its source is checked the same way. */
+  checkRecord(e) {
+    const r = e.record;
+    const src = sourceChecker($app)(r.get("source"), r.get("source_price"));
+    r.set("source", src.source);
+    r.set("source_price", src.price);
+    e.next();
+  },
+
   /**
    * Write a workspace's price corrections in one request.
    *
@@ -67,6 +112,7 @@ module.exports = {
 
     const ids = {};
     let saved = 0, deleted = 0;
+    const checkSource = sourceChecker($app);
 
     $app.runInTransaction((tx) => {
       for (const row of rows) {
@@ -93,10 +139,11 @@ module.exports = {
         rec.set("smeta_price", money(row.smeta_price));
         rec.set("market_price", money(row.market_price));
         rec.set("note", text(row.note));
-        // where the price came from: «ref:<package>:<record>», «hint:<correction>» or «typed»; empty from older pages.
-        // It holds only while market_price equals source_price — a price typed over an applied one is «typed» again.
-        rec.set("source", text(row.source).slice(0, 200));
-        rec.set("source_price", money(row.source_price));
+        // where the price came from (see sourceChecker); empty from older pages. It holds only while market_price
+        // equals source_price — a price typed over an applied one is «typed» again.
+        const src = checkSource(row.source, row.source_price);
+        rec.set("source", src.source);
+        rec.set("source_price", src.price);
         rec.set("by", by);
         tx.save(rec);
         ids[key] = rec.id;

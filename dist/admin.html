@@ -302,6 +302,15 @@ form.grid .foot{grid-column:1 / -1;display:flex;gap:8px;align-items:center}
 .tagr.near{background:#fbfaf3;color:#6b5a1e;border:1px dashed #cdbb7a}
 .tagr.near:hover{background:#f4f0dc}
 .hp-ref{color:#1d5c39 !important}
+/* the as-of date of the reference prices, on the toolbar of «Цены»; a date picked by hand stands out */
+.ra{display:inline-flex;align-items:center;gap:2px;flex-wrap:wrap}
+.ra .link{padding:1px 4px;font-size:12px}
+.ra .ra-date{color:var(--ink);font-variant-numeric:tabular-nums}
+.ra.man{background:#fdf3e0;color:#8a5a10;border-radius:4px;padding:0 4px}
+.ra.man .ra-date{color:#8a5a10;font-weight:600}
+.ra-edit{display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap}
+.ra-edit small{display:none}
+.rp-asof .btn{margin-left:4px}
 #refPop{position:fixed;z-index:76;background:var(--sf);border:1px solid var(--rule2);border-radius:8px;
   box-shadow:0 10px 30px rgba(20,23,28,.14);width:520px;max-width:calc(100vw - 16px);max-height:70vh;overflow:auto;font-size:12px}
 #refPop[hidden]{display:none}
@@ -1873,7 +1882,8 @@ var S = (typeof S !== 'undefined' && S) || {};
   var BASIS = ['catalogue', 'exchange-spot', 'exchange-forward', 'list', 'recommended', 'wage-12%', 'offer', 'declared',
     'designer-memory', 'plant-calc', 'protocol', 'invoice'];
   var ID_RE = /^[a-z0-9][a-z0-9._-]{2,63}$/;
-  var SRC_RE = /^[0-9a-z_-]{4,40}$/;
+  /* a document code: a letter or digit first, never «__» (no name of an object's own machinery) */
+  var SRC_RE = /^[0-9a-z](?:[0-9a-z-]|_(?!_)){3,39}$/;
   var DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
   /* ------------------------------------------------------------------ SHA-256 (FIPS 180-4), pure JS */
@@ -1972,7 +1982,7 @@ var S = (typeof S !== 'undefined' && S) || {};
     this.errors = [];
     this.next = 0;
     this.prevRid = -1;
-    this.srcIds = {};
+    this.srcIds = Object.create(null);   // a row's src is looked up here: no inherited «constructor», «__proto__»
     this.fatal = false;
   }
   Checker.prototype.err = function (row, field, msg) {
@@ -2009,7 +2019,7 @@ var S = (typeof S !== 'undefined' && S) || {};
     for (var s = 0; s < srcs.length; s++) {
       var d = srcs[s], where = 'sources[' + (s + 1) + '].';
       if (!d || typeof d !== 'object') { e('sources[' + (s + 1) + ']', 'не объект'); continue; }
-      if (!(typeof d.id === 'string' && SRC_RE.test(d.id))) { e(where + 'id', 'нужен код документа: 4–40 знаков a-z 0-9 _ -'); continue; }
+      if (!(typeof d.id === 'string' && SRC_RE.test(d.id))) { e(where + 'id', 'нужен код документа: 4–40 знаков a-z 0-9 _ -, первый — буква или цифра'); continue; }
       if (this.srcIds[d.id]) e(where + 'id', 'код документа повторяется');
       this.srcIds[d.id] = true;
       if (d.vat_default != null && typeof d.vat_default !== 'boolean' && !str(d.vat_default, LIMITS.short)) e(where + 'vat_default', 'не да/нет');
@@ -2056,10 +2066,11 @@ var S = (typeof S !== 'undefined' && S) || {};
       var av = get('avail');
       if (av !== null && (!isDate(av) || (isDate(pd) && av < pd))) this.err(n, 'avail', 'не дата или раньше price_date');
       var as = get('avail_src');
-      if (as !== null && !this.srcIds[as]) this.err(n, 'avail_src', 'нет такого документа в пакете');
+      if (as !== null && !(typeof as === 'string' && this.srcIds[as] === true)) this.err(n, 'avail_src', 'нет такого документа в пакете');
       var reg = get('region');
       if (reg !== null && !IS_REGION[reg]) this.err(n, 'region', 'неизвестный регион');
-      if (!this.srcIds[get('src')]) this.err(n, 'src', 'нет такого документа в пакете');
+      var src = get('src');
+      if (!(typeof src === 'string' && this.srcIds[src] === true)) this.err(n, 'src', 'нет такого документа в пакете');
       if (!str(get('group'), LIMITS.short)) this.err(n, 'group', 'не строка до ' + LIMITS.short + ' знаков');
       if (!IS_BASIS[get('basis')]) this.err(n, 'basis', 'неизвестное основание цены');
       var texts = ['delivery', 'plant', 'code'];
@@ -2146,12 +2157,19 @@ var S = (typeof S !== 'undefined' && S) || {};
  *   S.refs.view(line, ctx) → { price, badge, summary, flags[], name, evidence[], source, conv, basis, age, vsSmeta,
  *                              components[] }
  *   ctx: { sources: { id: { doc_type, issuer, doc_no, issue_date, as_of_date, region } } | Map,
- *          asof: 'YYYY-MM-DD', smetaPrice: number, unit: the smeta unit, regionLabel: function (key) → label }
+ *          asof: 'YYYY-MM-DD', smetaPrice: number, unit: the smeta unit, regionLabel: function (key) → label,
+ *          queryName: the smeta's own name of the resource }
  *
  * Everything shown is built from the structured fields of the line (tier, flags, name, how, sim, drop, changed,
  * range, raw, published, price_date, src → ctx.sources, region → a region label, components). The engine's `why`
  * texts are for measurement only and are never shown: they hold internal family keys and file ids. Neither is a
  * source id or a raw region key ever printed — a source without an issuer shows its document type.
+ *
+ * What the parsers dropped or changed (drop, changed) is written in their normalized tokens: Latin letters moved to
+ * their Cyrillic twins, word stems, country codes. Each token is shown as the record's or the smeta's own name spells
+ * it, else in one script (a letter only Latin has makes the word Latin, one only Cyrillic has makes it Cyrillic), and
+ * country codes as country names. The issuer and the number of a document lose the extractor's notes (parentheses,
+ * lower-case English notes such as «not stated …») and are cut at a word, with «…».
  */
 var S = (typeof S !== 'undefined' && S) || {};
 (function (S) {
@@ -2206,39 +2224,132 @@ var S = (typeof S !== 'undefined' && S) || {};
     // never a raw region key: an unknown key reads as «другой регион»
     return t && t !== key ? t : 'другой регион';
   }
+  /** 1 строка, 2 строки, 5 строк */
+  function plural(n, one, few, many) {
+    var m10 = n % 10, m100 = n % 100;
+    return n + ' ' + (m10 === 1 && m100 !== 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many);
+  }
+  function lines(n) { return plural(n, 'строка', 'строки', 'строк'); }
   function flagText(f) {
     if (RU.FLAG[f]) return RU.FLAG[f];
     var m = /^median-of-(\d+)-lines$/.exec(f);
-    if (m) return 'медиана ' + m[1] + ' строк';
+    if (m) return 'медиана: ' + lines(+m[1]);
     m = /^median-of-(\d+)$/.exec(f);
-    if (m) return 'медиана ' + m[1] + ' записей';
+    if (m) return 'медиана: ' + plural(+m[1], 'запись', 'записи', 'записей');
     return null;
-  }
-  /** 1 строка, 2 строки, 5 строк */
-  function lines(n) {
-    var m10 = n % 10, m100 = n % 100;
-    var w = m10 === 1 && m100 !== 11 ? 'строка' : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? 'строки' : 'строк';
-    return n + ' ' + w;
   }
   function quarter(d) { return d ? d.slice(0, 4) + ', ' + (Math.floor((+d.slice(5, 7) - 1) / 3) + 1) + ' кв.' : ''; }
 
+  /* ------------------------------------------------------------------ the parsers' tokens, as the names spell them */
+  var L2C = { A: 'А', B: 'В', C: 'С', E: 'Е', H: 'Н', K: 'К', M: 'М', O: 'О', P: 'Р', T: 'Т', X: 'Х', Y: 'У' };
+  var C2L = {};
+  for (var l2c in L2C) C2L[L2C[l2c]] = l2c;
+  var LAT_ONLY = /[DFGIJLNQRSUVWZ]/, CYR_ONLY = /[БГДЁЖЗИЙЛПФЦЧШЩЪЫЬЭЮЯЎҚҒҲ]/;
+  var AN = '0-9A-Za-zА-Яа-яЁё';
+  var TOKEN = new RegExp('[' + AN + '](?:[' + AN + '.\\-/]*[' + AN + '])?', 'g');
+  var COUNTRY = { RU: 'Россия', UZ: 'Узбекистан', CN: 'Китай', TR: 'Турция', BY: 'Беларусь', UA: 'Украина', KZ: 'Казахстан',
+    IR: 'Иран', AZ: 'Азербайджан', PL: 'Польша', DK: 'Дания', FR: 'Франция', KG: 'Кыргызстан', DE: 'Германия',
+    IT: 'Италия', KR: 'Корея', IN: 'Индия' };
+
+  function swap(c, map) {
+    var u = map[c.toUpperCase()];
+    return u ? (c === c.toUpperCase() ? u : u.toLowerCase()) : c;
+  }
+  function toLatin(s) { return s.replace(/[А-ЯЁа-яё]/g, function (c) { return swap(c, C2L); }); }
+  function toCyrillic(s) { return s.replace(/[A-Za-z]/g, function (c) { return swap(c, L2C); }); }
+  /** One script for a word the parsers mixed: a letter only Latin has makes it Latin, one only Cyrillic has makes it
+      Cyrillic; twin letters only — the script most of them are in. */
+  function oneScript(tok) {
+    if (!/[A-Za-z]/.test(tok) || !/[А-Яа-яЁё]/.test(tok)) return tok;
+    var up = tok.toUpperCase(), lat = LAT_ONLY.test(up), cyr = CYR_ONLY.test(up);
+    if (lat && !cyr) return toLatin(tok);
+    if (cyr && !lat) return toCyrillic(tok);
+    if (lat && cyr) return tok;
+    return (tok.match(/[A-Za-z]/g) || []).length > (tok.match(/[А-Яа-яЁё]/g) || []).length ? toLatin(tok) : toCyrillic(tok);
+  }
+  /** «НD270» → a pattern that finds «HD-270» in a name: either twin of each letter, any case, a separator or none. */
+  function tokenRx(tok, stem) {
+    var parts = [];
+    for (var i = 0; i < tok.length; i++) {
+      var ch = tok.charAt(i), up = ch.toUpperCase(), tw = L2C[up] || C2L[up];
+      if (/[0-9]/.test(ch)) parts.push(ch);
+      else if (/[A-Za-zА-Яа-яЁё]/.test(ch)) parts.push('[' + up + up.toLowerCase() + (tw ? tw + tw.toLowerCase() : '') + ']');
+      else parts.push('[.\\-/]?');
+    }
+    return new RegExp('(^|[^' + AN + '])(' + parts.join('[\\s\\-–./]?') + (stem ? '[А-Яа-яЁё]+' : '') + ')(?![' + AN + '])');
+  }
+  function spell(tok, names) {
+    var letters = (tok.match(/[A-Za-zА-Яа-яЁё]/g) || []).length;
+    if (!letters || tok === tok.toLowerCase()) return tok;          // a Russian label word, a plain number
+    if (tok.length >= 3 && letters >= 2) {
+      var rx = tokenRx(tok, false), i, m;
+      // a name typed with the keyboard layout half-switched is itself mixed: its spelling, in one script
+      for (i = 0; i < names.length; i++) if (names[i] && (m = rx.exec(names[i]))) return oneScript(m[2]);
+      // a word stem («ДИЗЕЛ»): the whole word of the name it starts
+      if (letters >= 4 && /^[А-ЯЁа-яё]+$/.test(tok)) {
+        rx = tokenRx(tok, true);
+        for (i = 0; i < names.length; i++) if (names[i] && (m = rx.exec(names[i]))) return oneScript(m[2]);
+      }
+    }
+    return oneScript(tok);
+  }
+  /** A drop / changed label of a parser, readable: its tokens as the names spell them, country codes named. */
+  function label(s, names) {
+    var t = String(s == null ? '' : s);
+    var c = /^страна ([A-Z]{2}(?:\/[A-Z]{2})*)$/.exec(t);
+    if (c) return 'страна ' + c[1].split('/').map(function (x) { return COUNTRY[x] || x; }).join(', ');
+    return t.replace(TOKEN, function (tok) { return spell(tok, names || []); });
+  }
+  function labels(list, names) {
+    var out = [];
+    for (var i = 0; i < (list || []).length; i++) { var x = label(list[i], names); if (out.indexOf(x) < 0) out.push(x); }
+    return out;
+  }
+
+  /* ------------------------------------------------------------------ the document */
   /* an issuer written in lower-case Latin words only is the extractor's note that the document names none
-     («unknown», «not stated …»), not a name */
-  var NOTE = /^[a-z][a-z\s(),.;:-]*$/;
+     («unknown», «not given …», «a price catalogue of …»), not a name; so is a part of a number that starts with a
+     lower-case Latin word («calc …», «temp. …») and a parenthesis holding one («(prices)», «(second digit …)») */
+  var NOTE = /^[a-z][a-z\s(),.;:'"«»-]*$/;
+  var NOTE_PAREN = /\s*\([^()]*[a-z]{3}[^()]*\)/g;
+  var NOTE_PART = /^[a-z]{2,}\.?(\s|$)/;
+
+  /** Cut at a word, with «…». */
+  function cut(s, max) {
+    if (s.length <= max) return s;
+    var c = s.slice(0, max), sp = c.lastIndexOf(' ');
+    return (sp > max * 0.6 ? c.slice(0, sp) : c).replace(/[\s,;:«(—–-]+$/, '') + '…';
+  }
+  /** Who issued the document, without the extractor's notes; '' when it names nobody. */
+  function issuerText(src) {
+    var t = src && src.issuer ? String(src.issuer) : '';
+    t = t.replace(/\s*\(.*$/, '').replace(/\s+[—–]\s+[a-z].*$/, '').replace(/\s+/g, ' ').trim();
+    if (!t || NOTE.test(t)) return '';
+    return cut(t, 80);
+  }
+  /** The document's number, without the extractor's notes; '' when none is left. */
+  function docNoText(src) {
+    var t = src && src.doc_no ? String(src.doc_no) : '';
+    t = t.replace(NOTE_PAREN, '').split(/\s*;\s*/).filter(function (p) { return p && !NOTE_PART.test(p); }).join('; ');
+    t = t.replace(/\s+/g, ' ').trim();
+    return t && !NOTE.test(t) ? cut(t, 60) : '';
+  }
 
   /** «ООО … № …», «биржа», «каталог: <завод>», or the document type: never a source id. */
   function sourceLabel(src, group, plant, basis) {
     if (basis === 'exchange-spot' || basis === 'exchange-forward' || group === 'exchange') return 'биржа';
     if (group === 'catalogue' && plant) return 'каталог: ' + plant;
-    var t = src && src.issuer && !NOTE.test(String(src.issuer).trim()) ? String(src.issuer).replace(/\s*\(.*$/, '').slice(0, 80) : '';
+    var t = issuerText(src);
     if (!t) t = (src && RU.DOC[src.doc_type]) || 'документ';
-    if (src && src.doc_no) t += (/^№/.test(src.doc_no) ? ' ' : ' № ') + src.doc_no;
+    var no = docNoText(src);
+    if (no) t += (/^№/.test(no) ? ' ' : ' № ') + no;
     return t;
   }
 
   function evidence(l, ctx) {
     var ev = [];
-    var drop = l.drop || [], changed = l.changed || [];
+    var names = [l.name || '', (ctx && ctx.queryName) || ''];
+    var drop = labels(l.drop, names), changed = labels(l.changed, names);
     if (l.how === 'wage') {
       ev.push(['таблица ставок', regionName(ctx, l.region), quarter(l.price_date), l.published ? 'опубл. ' + ruDate(l.published) : '']
         .filter(function (x) { return x; }).join(' · '));
@@ -2264,11 +2375,17 @@ var S = (typeof S !== 'undefined' && S) || {};
     return Math.round(days / 30.44) + ' мес. назад';
   }
 
+  /** «за 1 м», but «за 100 м» for a unit that carries its own multiplier (never «за 1 100 м»). */
+  function per(u) {
+    var s = String(u || '?').trim();
+    var m = /^(\d+(?:[.,]\d+)?)\s*(.*)$/.exec(s);
+    return m ? 'за ' + m[1] + (m[2] ? ' ' + m[2] : '') : 'за 1 ' + s;
+  }
   function convText(l, unit) {
     var raw = l.raw;
     // a median line has no single conversion: its components carry their own documents
     if (l.summary || !raw || raw.factor === 1 || raw.factor == null) return '';
-    var t = whole(raw.price) + ' за 1 ' + (raw.unit || '?') + ' → ' + money(l.price) + ' за 1 ' + (unit || l.unit || '?');
+    var t = whole(raw.price) + ' ' + per(raw.unit) + ' → ' + money(l.price) + ' ' + per(unit || l.unit);
     if (has(l.flags, 'derived-unit') || l.tier === 'estimate') t += ' (по данным изделия)';
     return t;
   }
@@ -2309,7 +2426,11 @@ var S = (typeof S !== 'undefined' && S) || {};
     var l = line;
     var src = l.summary ? null : srcOf(c, l.src);
     var flags = [];
-    for (var i = 0; i < (l.flags || []).length; i++) { var t = flagText(l.flags[i]); if (t && flags.indexOf(t) < 0) flags.push(t); }
+    for (var i = 0; i < (l.flags || []).length; i++) {
+      if (l.summary && /^median-of-/.test(l.flags[i])) continue;   // the summary says how many lines and documents
+      var t = flagText(l.flags[i]);
+      if (t && flags.indexOf(t) < 0) flags.push(t);
+    }
     var out = {
       price: money(l.price),
       badge: RU.TIER[l.tier] || 'Похожий',
@@ -2325,7 +2446,14 @@ var S = (typeof S !== 'undefined' && S) || {};
       components: []
     };
     if (l.summary && l.components) {
-      out.summary = 'Медиана ' + l.components.length + ' документов' + (l.spread ? ' (разброс ×' + dec(l.spread, 2) + ')' : '');
+      // lines of one document count once: «Медиана: 4 строки из 2 документов», «Медиана: 3 документа»
+      var seen = {}, nd = 0, n = l.components.length;
+      for (var j = 0; j < n; j++) {
+        var sk = l.components[j].src ? 's:' + l.components[j].src : 'i:' + j;
+        if (!seen[sk]) { seen[sk] = true; nd++; }
+      }
+      out.summary = 'Медиана: ' + (nd < n ? lines(n) + ' из ' + plural(nd, 'документа', 'документов', 'документов')
+        : plural(n, 'документ', 'документа', 'документов')) + (l.spread ? ' (разброс ×' + dec(l.spread, 2) + ')' : '');
       out.components = l.components.map(function (x) { return component(x, c); });
     }
     if (c.smetaPrice > 0 && l.price > 0) {
@@ -2337,7 +2465,8 @@ var S = (typeof S !== 'undefined' && S) || {};
 
   R.RU = RU;
   R.view = view;
-  R.viewParts = { money: money, ruDate: ruDate, sourceLabel: sourceLabel, regionName: regionName, ageText: ageText };
+  R.viewParts = { money: money, ruDate: ruDate, sourceLabel: sourceLabel, regionName: regionName, ageText: ageText,
+    issuerText: issuerText, docNoText: docNoText, label: label, per: per };
 })(S);
 
 ;
@@ -3499,7 +3628,8 @@ var S = (typeof S !== 'undefined' && S) || {};
         .catch(function (e) { toast((e && e.response && e.response.message) || S.pbErr(e), true); });
     },
 
-    /** The documents of a package, from its manifest: type, issuer, number, date, region. */
+    /** The documents of a package, from its manifest: type, issuer, number, date, region (issuer and number without the
+     *  extractor's notes, as the popover shows them; the full text is in the cell's title). */
     docs: function (id) {
       var box = $('refsDocs');
       var x = this.items.filter(function (i) { return i.id === id; })[0];
@@ -3509,7 +3639,10 @@ var S = (typeof S !== 'undefined' && S) || {};
       box.dataset.id = id;
       box.innerHTML = '<h3>Документы пакета ' + S.esc(x.package_id) + '</h3><table class="tbl"><thead><tr><th>Вид</th><th>Кто выдал</th>' +
         '<th>№</th><th>Дата</th><th>Регион</th></tr></thead><tbody>' + src.map(function (d) {
-          return '<tr><td>' + S.esc(DOC[d.doc_type] || 'документ') + '</td><td>' + S.esc(d.issuer || '') + '</td><td>' + S.esc(d.doc_no || '') +
+          var V = S.refs.viewParts;
+          var iss = V.issuerText(d) || 'не указан', no = V.docNoText(d);
+          return '<tr><td>' + S.esc(DOC[d.doc_type] || 'документ') + '</td><td title="' + S.esc(d.issuer || '') + '">' + S.esc(iss) +
+            '</td><td title="' + S.esc(d.doc_no || '') + '">' + S.esc(no) +
             '</td><td>' + S.esc(day(d.issue_date || d.as_of_date)) + '</td><td>' +
             S.esc(d.region === 'national' ? 'вся республика' : (d.region && S.regionLabel ? S.regionLabel(d.region) : '')) + '</td></tr>';
         }).join('') + '</tbody></table>';

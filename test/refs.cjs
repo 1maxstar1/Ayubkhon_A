@@ -291,6 +291,16 @@ ok(!('price' in q1) && Object.keys(q1).sort().join(',') === 'asof,exclude_src,id
 ok(q1.id === R.queryOf(res('КАБЕЛЬ ВВГ 3Х2,5', 'м', 'materials'), qc).id, 'two spellings of one name and unit ask once');
 
 
+/* ------------------------------------------------------------------ builds */
+section('builds');
+{
+  const single = fs.readFileSync(path.join(ROOT, 'dist/smeta-taqqoslash.html'), 'utf8');
+  ok(single.indexOf('S.refs') < 0 && single.indexOf('__REFS_WORKER__') < 0, 'the single-file page carries no reference-price code');
+  const pages = ['smeta-taqqoslash.html', 'index.html', 'admin.html'].map((f) => fs.readFileSync(path.join(ROOT, 'dist', f), 'utf8'));
+  ok(pages.every((t) => t.indexOf('fake-src-') < 0 && t.indexOf('Тест-Поставщик') < 0), 'no fixture data in any built page');
+  ok(pages[2].indexOf('S.refs.pkg') >= 0 || /R\.pkg = \{/.test(pages[2]), 'the admin page carries the package validator');
+}
+
 /* ------------------------------------------------------------------ ES5 */
 section('ES5 syntax of src/lib/refs');
 {

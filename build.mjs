@@ -2,6 +2,7 @@
 // No runtime dependencies, no network — the output opens by double-click.
 import { readFileSync, writeFileSync, mkdirSync, watch, existsSync, copyFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const root = dirname(fileURLToPath(import.meta.url));
@@ -62,17 +63,59 @@ const SERVER_SCRIPTS = [
   'src/ui/registry.js',
   'src/ui/sync.js',
   'src/ui/hints.js',
+  // reference prices: the main thread only shows the lines (Russian texts) and keeps the as-of date; the pool, the
+  // parsers and the suggester run in their own worker (REFS_WORKER_LIBS below)
+  'src/lib/refs/view.js',
+  'src/lib/refs/query.js',
+  'src/ui/refs.js',
 ].filter((p) => existsSync(join(root, p)));
 
-function page(scripts, screens) {
+// The reference-price worker of the server page (src/refs-worker.js): the whole-country pool, the family parsers and
+// the suggester, off the main thread. Never in the single-file page — it has no server to take a package from.
+const REFS_FAMILIES = ['machines', 'cable', 'steel', 'mineral', 'electro'].map((f) => `src/lib/refs/families/${f}.js`);
+const REFS_WORKER_LIBS = [
+  'src/vendor/fflate.umd.js',
+  'src/lib/normalize.js',
+  'src/lib/match.js',
+  'src/lib/sections.js',
+  'src/lib/util.js',
+  'src/lib/refs/package.js',
+  'src/lib/refs/units.js',
+  ...REFS_FAMILIES,
+  'src/lib/refs/index.js',
+  'src/lib/refs/view.js',
+  'src/lib/refs/query.js',
+  'src/lib/refs/pool.js',
+  'src/lib/refs/retrieve.js',
+  'src/lib/refs/suggest.js',
+  'src/lib/refs/cache.js',
+];
+// Everything a derived pool record depends on. Its hash is the stamp the worker's IndexedDB cache is kept under, so a
+// release that changes how keys are derived derives them again by itself, once.
+const REFS_KEYS_FILES = [
+  'src/lib/normalize.js', 'src/lib/match.js', 'src/lib/refs/package.js', 'src/lib/refs/units.js', ...REFS_FAMILIES,
+  'src/lib/refs/index.js', 'src/lib/refs/pool.js', 'src/lib/refs/cache.js',
+];
+function refsWorkerSrc() {
+  if (!existsSync(join(root, 'src/refs-worker.js'))) return null;
+  const keys = createHash('sha256').update(REFS_KEYS_FILES.map(read).join('\n;\n')).digest('hex').slice(0, 16);
+  // first line: `S` does not exist yet here (index.js copies the stamp into S.refs.KEYS)
+  return "self.REFS_KEYS = '" + keys + "';\n" + REFS_WORKER_LIBS.map(read).join('\n;\n') + '\n;\n' + read('src/refs-worker.js');
+}
+
+function page(scripts, server) {
   const css = read('src/app.css');
   const workerSrc = WORKER_LIBS.map(read).join('\n;\n') + '\n;\n' + read('src/worker.js');
   const js = scripts.map(read).join('\n;\n');
+  const refs = server ? refsWorkerSrc() : null;
   return read('src/index.html')
     .replace('/*__VERSION__*/', () => VERSION)
     .replace('/*__CSS__*/', () => css)
-    .replace('<!--__SCREENS__-->', () => (screens && existsSync(join(root, 'src/screens.html')) ? read('src/screens.html') : ''))
+    .replace('<!--__SCREENS__-->', () => (server && existsSync(join(root, 'src/screens.html')) ? read('src/screens.html') : ''))
     .replace('/*__WORKER__*/', () => JSON.stringify(workerSrc))
+    // the single-file page carries no reference-price code at all, not even the empty slot
+    .replace(/<script>window\.__REFS_WORKER_SRC__ = \/\*__REFS_WORKER__\*\/;<\/script>\n?/, () =>
+      (refs ? '<script>window.__REFS_WORKER_SRC__ = ' + JSON.stringify(refs) + ';</script>\n' : ''))
     .replace('/*__JS__*/', () => js);
 }
 

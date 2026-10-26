@@ -24,3 +24,7 @@ server/deploy/.target
 refs-*.json.gz
 *.json.gz
 test/.refs/
+*.jsonl
+refs*.json
+sources-all.json
+private/

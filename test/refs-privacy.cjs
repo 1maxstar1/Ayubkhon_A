@@ -2,6 +2,7 @@
  * Privacy gate of the reference-price work: nothing of the owner's data may enter this public repository.
  *
  *   node test/refs-privacy.cjs                       the branch against its base (default 6561791)
+ *   node test/refs-privacy.cjs --head <rev>          the history and messages of another head (an old branch tip)
  *   node test/refs-privacy.cjs --staged --msg <f>    before a commit: the staged change and its message
  *   REFS_KIT=<private kit> node test/refs-privacy.cjs …   adds the checks against the real package
  *
@@ -10,13 +11,18 @@
  *   A  the added lines of the diff (not dist, not src/vendor) and every file of the reference-price work
  *      (src/lib/refs/**, src/refs-worker.js, src/ui/refs*.js, test/refs*, docs/spravochnik.md);
  *   B  the commit messages (and --msg);
+ *   H  every line ADDED by any commit of the branch, also when a later commit removed it again: the net diff (A) does
+ *      not see a string that came and went, and a public push publishes every commit. dist lines are read with the
+ *      reference worker's source decoded from its string literal, for the string kinds only (a dist build holds
+ *      vendor numbers and hashes);
  *   C  dist equals a fresh build of src (build.mjs has no clock or random input), and src/vendor is unchanged.
  * Always: no tracked package or data file (*.json.gz, *.jsonl, refs-*.json); no 12-hex token (a source id) in A or B;
  * every number of five or more digits in test/refs-fixture.cjs is one of its declared synthetic prices.
- * With REFS_KIT (the package): in A and B no source id, document number, issuer or plant string (≥ 6 chars), none
+ * With REFS_KIT (the package): in A, B and H no source id, document number, issuer or plant string (≥ 6 chars), none
  * of the 2k longest record names and no number of five or more digits equal to a rounded package price (or with VAT);
- * on the whole tree including dist the string kinds; and no synthetic fixture price equal to a real one (exact,
- * rounded or truncated) — the fixture is never allow-listed: pick another invented number.
+ * no document file name either, when the kit has REFS_KIT/doc-strings.txt (one per line; the package itself carries
+ * no file names); on the whole tree including dist the string kinds; and no synthetic fixture price equal to a real
+ * one (exact, rounded or truncated) — the fixture is never allow-listed: pick another invented number.
  * A hit that is generic code (a rounding constant, a common word) is allow-listed in test/refs-privacy.allow by the
  * hash of its line text, never by its value: «<sha256-16 of the trimmed line>  <kind>  <reason>».
  * Output: kinds and file:line (or commit:<hash>) only, never a value. Exit 1 on any hit.
@@ -33,6 +39,7 @@ const ROOT = path.dirname(__dirname);
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const BASE = opt('--base', '6561791');
+const HEAD = opt('--head', 'HEAD');
 const STAGED = args.includes('--staged');
 const MSG = opt('--msg');
 const KIT = process.env.REFS_KIT;
@@ -75,7 +82,7 @@ const A = new Map();   // 'file:line' -> text
 /* ------------------------------------------------------------------ scope B: messages */
 const B = new Map();
 if (!STAGED) {
-  const log = git('log', BASE + '..HEAD', '--format=%H%n%B%n<<END>>');
+  const log = git('log', BASE + '..' + HEAD, '--format=%H%n%B%n<<END>>');
   let hash = null, i = 0;
   for (const l of log.split('\n')) {
     if (l === '<<END>>') { hash = null; continue; }
@@ -85,11 +92,35 @@ if (!STAGED) {
 }
 if (MSG) fs.readFileSync(MSG, 'utf8').split('\n').forEach((t, i) => B.set('message:' + (i + 1), t));
 
+/* ------------------------------------------------------------------ scope H: every line any commit added */
+/** A dist line, with the reference worker's source (a JSON string literal) read back as the lines it was built from. */
+function distLines(t) {
+  const m = /^<script>window\.__REFS_WORKER_SRC__ = ("(?:[^"\\]|\\.)*");<\/script>$/.exec(t.trim());
+  if (!m) return [t];
+  try { return JSON.parse(m[1]).split('\n'); } catch (e) { return [t]; }
+}
+const H = new Map(), HD = new Map();   // code lines (every rule) and dist lines (string kinds)
+if (!STAGED) {
+  const log = git('log', '-p', '-U0', '--no-color', '--format=<<C>>%H', BASE + '..' + HEAD, '--', '.', ':!src/vendor');
+  let hash = '', file = null, ln = 0;
+  for (const l of log.split('\n')) {
+    if (l.startsWith('<<C>>')) { hash = l.slice(5, 17); file = null; continue; }
+    if (l.startsWith('+++ ')) { file = l.slice(4).replace(/^b\//, ''); continue; }
+    const h = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(l);
+    if (h) { ln = +h[1]; continue; }
+    if (!file || file === '/dev/null' || !l.startsWith('+')) continue;
+    const where = 'history:' + hash + ':' + file + ':' + ln;
+    if (/^dist\//.test(file)) distLines(l.slice(1)).forEach((x, i) => HD.set(where + (i ? '.' + i : ''), x));
+    else H.set(where, l.slice(1));
+    ln++;
+  }
+}
+
 /* ------------------------------------------------------------------ always */
 for (const f of git('ls-files').split('\n')) {
   if (/\.json\.gz$|\.jsonl$|(^|\/)refs-[^/]*\.json$/.test(f)) hit('tracked-data-file', f);
 }
-for (const [where, t] of [...A, ...B]) {
+for (const [where, t] of [...A, ...B, ...H]) {
   if (/(^|[^0-9a-f])[0-9a-f]{12}([^0-9a-f]|$)/.test(t) && /\b[0-9a-f]{12}\b/.test(t)) hit('hex12', where, t);
 }
 const FIXTURE = path.join(ROOT, 'test/refs-fixture.cjs');
@@ -156,13 +187,25 @@ if (KIT) {
   }
   const longest = [...allNames].sort((a, b) => b.length - a.length || (a < b ? -1 : 1)).slice(0, 2 * 1000);
   const idList = [...ids], strList = [...strings];
+  // the documents' file names: the package has none, the kit may list them
+  const docNames = new Set();
+  const DOCS = path.join(KIT, 'doc-strings.txt');
+  if (fs.existsSync(DOCS)) {
+    for (const l of fs.readFileSync(DOCS, 'utf8').split('\n')) {
+      const v = l.replace(/\s+/g, ' ').trim().toUpperCase();
+      if (v.length >= 6 && !STOP.has(v)) docNames.add(v);
+    }
+  }
+  const docList = [...docNames];
   function scanStrings(where, t) {
     const up = t.toUpperCase();
     for (const id of idList) if (t.indexOf(id) >= 0) { hit('source-id', where, t); break; }
     for (const s of strList) if (up.indexOf(s) >= 0) { hit('issuer-or-plant', where, t); break; }
+    for (const s of docList) if (up.indexOf(s) >= 0) { hit('document-name', where, t); break; }
     if (up.length >= 20) for (const n of longest) if (up.indexOf(n) >= 0) { hit('record-name', where, t); break; }
   }
-  for (const [where, t] of [...A, ...B]) {
+  for (const [where, t] of HD) scanStrings(where, t);
+  for (const [where, t] of [...A, ...B, ...H]) {
     scanStrings(where, t);
     for (const v of numbers(t)) if (v >= FIVE && prices.has(Math.round(v))) { hit('real-price', where, t); break; }
   }
@@ -171,7 +214,9 @@ if (KIT) {
   for (const f of tree) {
     const p = path.join(ROOT, f);
     if (!fs.existsSync(p) || fs.statSync(p).size > 8 << 20) continue;
-    fs.readFileSync(p, 'utf8').split('\n').forEach((t, i) => scanStrings(f + ':' + (i + 1), t));
+    fs.readFileSync(p, 'utf8').split('\n').forEach((t, i) => {
+      (/^dist\//.test(f) ? distLines(t) : [t]).forEach((x, j) => scanStrings(f + ':' + (i + 1) + (j ? '.' + j : ''), x));
+    });
   }
   // the synthetic prices are not real ones
   for (const x of fixturePrices) {
@@ -180,9 +225,10 @@ if (KIT) {
   dataChecked = true;
 }
 
-const scope = STAGED ? 'staged change' : 'branch ' + BASE + '..HEAD';
-console.log('scope: ' + scope + '; A ' + A.size + ' lines, B ' + B.size + ' message lines; data rules ' +
-  (dataChecked ? 'ON (REFS_KIT)' : 'off (no REFS_KIT)') + '; allow-listed ' + allowUsed);
+const scope = STAGED ? 'staged change' : 'branch ' + BASE + '..' + HEAD;
+console.log('scope: ' + scope + '; A ' + A.size + ' lines, B ' + B.size + ' message lines, H ' + H.size + ' + ' + HD.size +
+  ' dist lines added in history; data rules ' + (dataChecked ? 'ON (REFS_KIT)' : 'off (no REFS_KIT)') +
+  '; allow-listed ' + allowUsed);
 for (const h of hits) console.log('HIT  ' + h);
 console.log(hits.length ? 'FAILED: ' + hits.length + ' hits' : 'ok: 0 hits');
 process.exit(hits.length ? 1 : 0);

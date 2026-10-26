@@ -92,6 +92,7 @@ run dedupe           node test/dedupe.mjs
 run mail-otp         node test/mail-otp.mjs
 run match-keys       node test/match-keys.mjs
 run corrections-bulk node test/corrections-bulk.mjs
+run refs-api         node test/refs-api.mjs
 run ownership        node test/ownership.mjs
 run disable-user     node test/disable-user.mjs
 both_run  browser        node test/browser.mjs "$S1" "$S2"

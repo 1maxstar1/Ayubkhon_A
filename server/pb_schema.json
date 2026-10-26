@@ -479,6 +479,15 @@
           "type": "text"
         },
         {
+          "name": "source",
+          "type": "text",
+          "max": 200
+        },
+        {
+          "name": "source_price",
+          "type": "number"
+        },
+        {
           "name": "by",
           "type": "relation",
           "collectionId": "_pb_users_auth_",
@@ -629,6 +638,108 @@
         }
       ],
       "indexes": [],
+      "listRule": "@request.auth.id != \"\"",
+      "viewRule": "@request.auth.id != \"\"",
+      "createRule": "@request.auth.role = \"admin\"",
+      "updateRule": "@request.auth.role = \"admin\"",
+      "deleteRule": "@request.auth.role = \"admin\""
+    },
+    {
+      "id": "c_ref_packages_",
+      "name": "ref_packages",
+      "type": "base",
+      "fields": [
+        {
+          "name": "package_id",
+          "type": "text",
+          "required": true,
+          "max": 64,
+          "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$"
+        },
+        {
+          "name": "sha256",
+          "type": "text",
+          "required": true,
+          "min": 64,
+          "max": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "name": "file",
+          "type": "file",
+          "required": true,
+          "maxSelect": 1,
+          "maxSize": 52428800,
+          "mimeTypes": [
+            "application/gzip",
+            "application/x-gzip",
+            "application/octet-stream"
+          ],
+          "protected": true
+        },
+        {
+          "name": "manifest",
+          "type": "json",
+          "maxSize": 1048576
+        },
+        {
+          "name": "records",
+          "type": "number",
+          "onlyInt": true,
+          "min": 0
+        },
+        {
+          "name": "sources",
+          "type": "number",
+          "onlyInt": true,
+          "min": 0
+        },
+        {
+          "name": "date_min",
+          "type": "text",
+          "max": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        {
+          "name": "date_max",
+          "type": "text",
+          "max": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        {
+          "name": "active",
+          "type": "bool"
+        },
+        {
+          "name": "note",
+          "type": "text",
+          "max": 500
+        },
+        {
+          "name": "by",
+          "type": "relation",
+          "collectionId": "_pb_users_auth_",
+          "maxSelect": 1,
+          "required": false,
+          "cascadeDelete": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "onCreate": true
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "onCreate": true,
+          "onUpdate": true
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_ref_packages_pid ON ref_packages (package_id)",
+        "CREATE UNIQUE INDEX idx_ref_packages_sha ON ref_packages (sha256)",
+        "CREATE INDEX idx_ref_packages_active ON ref_packages (active)"
+      ],
       "listRule": "@request.auth.id != \"\"",
       "viewRule": "@request.auth.id != \"\"",
       "createRule": "@request.auth.role = \"admin\"",

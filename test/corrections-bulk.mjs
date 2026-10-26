@@ -133,6 +133,26 @@ const after = (await api(`/api/collections/corrections/records?filter=${
 check(after.region === 'buxoro' && after.by === me.id && after.application === app1.id,
   'and none of it is believed');
 
+/* --------------------------------------------- where an applied price came from */
+// «Применить» on a reference line sends the line's source and the price it gave; a page of an older version sends
+// neither, and the row says nothing about its origin rather than something wrong.
+const withSource = await raw('/api/corrections/bulk', {
+  workspace: ws.id,
+  set: [{ ...resource(5), source: 'ref:fake-20260101-1:2', source_price: 2005 },
+    { ...resource(7), source: 'ref:fake-20260101-1:median:' + '1,'.repeat(150), source_price: 2007 }]
+}, tok);
+check(withSource.status === 200, 'a correction carrying its source is accepted');
+const c5 = (await api(`/api/collections/corrections/records?filter=${
+  encodeURIComponent(`workspace='${ws.id}' && res_key='k5'`)}`, {}, su)).items[0];
+check(c5.source === 'ref:fake-20260101-1:2' && c5.source_price === 2005, 'the source and the price it gave are stored');
+const c7 = (await api(`/api/collections/corrections/records?filter=${
+  encodeURIComponent(`workspace='${ws.id}' && res_key='k7'`)}`, {}, su)).items[0];
+check(c7.source.length === 200, `a source is cut at 200 characters (${c7.source.length})`);
+const oldPage = await raw('/api/corrections/bulk', { workspace: ws.id, set: [resource(5)] }, tok);
+const c5b = (await api(`/api/collections/corrections/records?filter=${
+  encodeURIComponent(`workspace='${ws.id}' && res_key='k5'`)}`, {}, su)).items[0];
+check(oldPage.status === 200 && c5b.source === '' && !c5b.source_price, 'a row from an older page has no source (unknown, never a stale one)');
+
 /* ------------------------------------------------- writing the same twice */
 const again = await raw('/api/corrections/bulk', {
   workspace: ws.id, set: [{ ...resource(2), market_price: 99999 }]

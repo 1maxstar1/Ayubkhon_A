@@ -93,6 +93,10 @@ module.exports = {
         rec.set("smeta_price", money(row.smeta_price));
         rec.set("market_price", money(row.market_price));
         rec.set("note", text(row.note));
+        // where the price came from: «ref:<package>:<record>», «hint:<correction>» or «typed»; empty from older pages.
+        // It holds only while market_price equals source_price — a price typed over an applied one is «typed» again.
+        rec.set("source", text(row.source).slice(0, 200));
+        rec.set("source_price", money(row.source_price));
         rec.set("by", by);
         tx.save(rec);
         ids[key] = rec.id;

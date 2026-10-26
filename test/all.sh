@@ -66,6 +66,7 @@ run normalize        node test/normalize.cjs
 run xlsx-guard       node test/xlsx-guard.cjs
 run sections         node test/sections.cjs
 run regions          node test/regions.cjs
+run refs             node test/refs.cjs
 smeta_run pipeline       node test/pipeline.cjs "$S1" "$S2" --out test/out.xlsx
 smeta_run hints          node test/hints.cjs "$S1" "$S2"
 run registry-parse   node test/registry.cjs

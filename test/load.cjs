@@ -54,7 +54,16 @@ const FILE = {
   assemble: 'src/lib/assemble.js',
   report: 'src/lib/report.js',
   export: 'src/lib/export.js',
-  'registry-parse': 'src/lib/registry-parse.js'
+  'registry-parse': 'src/lib/registry-parse.js',
+  // reference prices (src/lib/refs/): the unit table and the family parsers are plain scripts that leave one global
+  // each; index.js collects them into S.refs
+  'refs-units': 'src/lib/refs/units.js',
+  'refs-machines': 'src/lib/refs/families/machines.js',
+  'refs-cable': 'src/lib/refs/families/cable.js',
+  'refs-steel': 'src/lib/refs/families/steel.js',
+  'refs-mineral': 'src/lib/refs/families/mineral.js',
+  'refs-electro': 'src/lib/refs/families/electro.js',
+  refs: 'src/lib/refs/index.js'
 };
 
 /**
@@ -63,7 +72,8 @@ const FILE = {
  */
 const ORDER = ['fflate', 'xlsx', 'normalize', 'match', 'sections', 'regions', 'util',
   'formula', 'xlsx-read', 'xlsx-write', 'smeta', 'assemble', 'report', 'export',
-  'registry-parse'];
+  'registry-parse', 'refs-units', 'refs-machines', 'refs-cable', 'refs-steel', 'refs-mineral',
+  'refs-electro', 'refs'];
 
 /** Everything needed to read a workbook and build the comparison document. */
 const PIPELINE = ['fflate', 'normalize', 'match', 'sections', 'util', 'formula',
@@ -72,6 +82,8 @@ const PIPELINE = ['fflate', 'normalize', 'match', 'sections', 'util', 'formula',
 const CORE = ['normalize', 'match', 'sections', 'util'];
 /** Reading a registry export (.xls / .xlsx) with SheetJS. */
 const REGISTRY = ['xlsx', 'normalize', 'util', 'registry-parse'];
+/** Reference prices: the unit table and the family parsers, collected into S.refs (with CORE). */
+const REFS = ['refs-units', 'refs-machines', 'refs-cable', 'refs-steel', 'refs-mineral', 'refs-electro', 'refs'];
 
 function load(...names) {
   const wanted = new Set(names.flat());
@@ -94,6 +106,7 @@ function load(...names) {
 load.CORE = CORE;
 load.PIPELINE = PIPELINE;
 load.REGISTRY = REGISTRY;
+load.REFS = REFS;
 load.ROOT = ROOT;
 load.FILE = FILE;
 

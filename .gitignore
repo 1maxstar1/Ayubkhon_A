@@ -18,3 +18,9 @@ server/pb_data_walk/
 server/.env
 test/.book.json
 server/deploy/.target
+
+# reference-price packages are private data: never in the repository
+*.refs.json*
+refs-*.json.gz
+*.json.gz
+test/.refs/

@@ -31,6 +31,9 @@ sh test/laptop-windows.sh                             # Windows ishga tushirgich
 sh test/pb-smoke.sh; node test/e2e-workspace.mjs      # server rejimi testlari
 node test/normalize.cjs; node test/sections.cjs; node test/regions.cjs   # NLP o'lchovlari
 node test/hints.cjs a.xlsx b.xlsx                      # o'xshash resurs takliflari o'lchovi
+node test/refs.cjs                                    # справочные цены: yadro, sintetik ma'lumotda
+REFS_KIT=<kit> node test/refs-parity.cjs               # dastur o'lchangan natijani aynan qaytaradimi (kit — maxfiy, repoda emas)
+REFS_KIT=<kit> node test/refs-privacy.cjs              # repo va dist da haqiqiy narx/hujjat yo'qligi (commit oldidan)
 node test/fixtures.cjs --smeta a.xlsx --registry r.xls  # o'lchov ma'lumotini yangilash
 sh server/deploy/find-server.sh; sh server/deploy/find-server.sh 1   # server manzilini topib eslab qolish (bir marta)
 sh server/deploy/pull-backup.sh && sh server/deploy/push.sh          # zaxira + chiqarish (manzil eslab qolingan)
@@ -63,6 +66,13 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   **o'lchovsiz o'zgartirilmaydi**: har bir o'zgarish `test/sections.cjs` /
   `test/regions.cjs` / `test/hints.cjs` raqamlari bilan asoslanadi.
   Bir necha viloyatda uchraydigan joy nomi hech kimga berilmaydi.
+* **Справочные цены** (`src/lib/refs/`, v2.5.0): narx hujjatlaridan olingan
+  ma'lumot (paket `.json.gz`, hujjat nomlari, narxlar) **hech qachon repoga
+  tushmaydi** — u egasining kompyuterida, admin sahifasi orqali yuklanadi;
+  testlar faqat sintetik ma'lumotda. `src/lib/refs` jadvallari va qoidalari
+  faqat `test/refs-parity.cjs` o'lchovi bilan o'zgaradi (`REFS_KIT` siz
+  `test/all.sh` «NOT MEASURED» deydi). Taklif faqat «Применить» bosilganda
+  qo'yiladi; ekspert yozgan narx doim ustun.
 * Raqamlar hech qachon yo'qolmaydi: `АНКЕР М5` ≠ `АНКЕР М8`, `4.1.1` ≠ `4.11`;
   ikki raqam orasidagi ajratgich o'chirilmaydi.
 * **Xavfsizlik bo'limi hozircha o'chirilgan (egasining qarori, 2026-10-24).**

@@ -8,3 +8,4 @@
 # reaches the owner's computer by itself. Lines that do not look like this one
 # are ignored.
 v2.4.1 a3ef5f8d539805c9634093d33ecf62d0b6993978 o'zi yangilanadi; zaxira Google Drive'da
+v2.5.0 b23dad2a3c173948b6d9d1f292428253682be596 hujjatlardagi narxlar (sprav. takliflari)

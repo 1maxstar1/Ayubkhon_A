@@ -101,8 +101,12 @@ function build() {
       .replace('/*__VERSION__*/', () => VERSION)
       .replace('/*__CSS__*/', () => read('src/app.css'))
       .replace('<!--__SCREENS__-->', () => read('src/screens.html'))
-      .replace('/*__JS__*/', () => ['src/vendor/pocketbase.umd.js', 'src/vendor/xlsx.full.min.js',
-        'src/lib/normalize.js', 'src/lib/match.js', 'src/lib/util.js', 'src/lib/pb.js', 'src/lib/regions.js', 'src/lib/registry-parse.js', 'src/ui/auth.js', 'src/ui/apps-admin.js', 'src/ui/admin.js']
+      // the reference-price importer checks a package in the browser before it uploads it: fflate when the browser
+      // has no DecompressionStream, the package format and its validator, and the Russian document labels
+      .replace('/*__JS__*/', () => ['src/vendor/pocketbase.umd.js', 'src/vendor/xlsx.full.min.js', 'src/vendor/fflate.umd.js',
+        'src/lib/normalize.js', 'src/lib/match.js', 'src/lib/util.js', 'src/lib/pb.js', 'src/lib/regions.js', 'src/lib/registry-parse.js',
+        'src/lib/refs/package.js', 'src/lib/refs/view.js',
+        'src/ui/auth.js', 'src/ui/apps-admin.js', 'src/ui/admin.js', 'src/ui/refs-admin.js']
         .filter((p) => existsSync(join(root, p))).map(read).join('\n;\n'));
     emit('admin.html', admin);
   }

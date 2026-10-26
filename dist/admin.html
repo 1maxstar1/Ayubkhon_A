@@ -342,6 +342,28 @@ ul.files .mute{color:var(--mute)}
     <p class="lead" id="healthNote" style="margin:4px 0 0"></p>
   </section>
 
+  <section class="panel" id="refsPanel">
+    <h2>Справочник цен (документы)</h2>
+    <p class="lead">Пакет цен из документов — заключений экспертизы, прайс-листов, биржевых котировок, таблиц ставок
+      (<code>.json.gz</code>). Эксперты видят цены активного пакета рядом со сметной ценой; ни одна цена не применяется
+      без нажатия «Применить». Файл проверяется здесь, в браузере, и только потом отправляется на сервер.</p>
+    <label class="btn file primary">
+      <input type="file" id="refsFile" accept=".gz,application/gzip">
+      <span class="ic">↑</span> Выбрать файл .json.gz
+    </label>
+    <div class="progress" id="refsProgress" hidden><div class="bar-fill" id="refsBar"></div><span id="refsText"></span></div>
+    <p class="err" id="refsErr" hidden></p>
+    <div class="stat" id="refsStat"></div>
+    <div id="refsReady" hidden style="margin-top:8px">
+      <button class="btn primary" type="button" id="refsUpload">Загрузить</button>
+      <button class="btn" type="button" id="refsActivateDup" hidden>Сделать активным</button>
+      <button class="btn" type="button" id="refsCancel">Отмена</button>
+    </div>
+    <h3>Пакеты</h3>
+    <table class="tbl" id="refsTable"><thead><tr><th>Пакет</th><th>Создан</th><th>Загружен</th><th>Записей</th><th>Документов</th><th>Даты цен</th><th>Активен</th><th></th></tr></thead><tbody></tbody></table>
+    <div id="refsDocs" hidden></div>
+  </section>
+
   <section class="panel">
     <h2>Рабочие области</h2>
     <p class="lead">Заявки, открытые сотрудниками. <b>Очистить</b> — удаляются загруженные сметы, правки цен и экспорты,
@@ -520,6 +542,8 @@ var o=Math.min(a.sheetRows||1e7,f.length);var l={s:{r:0,c:0},e:{r:n,c:i}};if(e["
 var o=((a=s[17])==null?void 0:a[0])?Ob(e,e[_b(s[17][0].data)][0]):[];var l=vb(s[3][0].data);var c=0;l[1].forEach(function(r){var a=vb(r.data);var n=e[_b(a[2][0].data)][0];var i=db(n.meta[1][0].data);if(i!=6002)throw new Error("6001 unexpected reference to ".concat(i));var s=Ib(e,n);s.data.forEach(function(e,r){e.forEach(function(e,a){var n=Ra({r:c+r,c:a});var i=Sb(e,f,o);if(i)t[n]=i})});c+=s.nrows})}function Db(e,r){var t=vb(r.data);var a={"!ref":"A1"};var n=e[_b(t[2][0].data)];var i=db(n[0].meta[1][0].data);if(i!=6001)throw new Error("6000 unexpected reference to ".concat(i));Nb(e,n[0],a);return a}function Fb(e,r){var t;var a=vb(r.data);var n={name:((t=a[1])==null?void 0:t[0])?nb(a[1][0].data):"",sheets:[]};var i=gb(a[2],_b);i.forEach(function(r){e[r].forEach(function(r){var t=db(r.meta[1][0].data);if(t==6e3)n.sheets.push(Db(e,r))})});return n}function Pb(e,r){var t=Nw();var a=vb(r.data);var n=gb(a[1],_b);n.forEach(function(r){e[r].forEach(function(r){var a=db(r.meta[1][0].data);if(a==2){var n=Fb(e,r);n.sheets.forEach(function(e,r){Dw(t,e,r==0?n.name:n.name+"_"+r,true)})}})});if(t.SheetNames.length==0)throw new Error("Empty NUMBERS file");return t}function Lb(e){var r,t,a,n;var i={},s=[];e.FullPaths.forEach(function(e){if(e.match(/\.iwpv2/))throw new Error("Unsupported password protection")});e.FileIndex.forEach(function(e){if(!e.name.match(/\.iwa$/))return;var r;try{r=kb(e.content)}catch(t){return console.log("?? "+e.content.length+" "+(t.message||t))}var a;try{a=mb(r)}catch(t){return console.log("## "+(t.message||t))}a.forEach(function(e){i[e.id]=e.messages;s.push(e.id)})});if(!s.length)throw new Error("File has no messages");var f=((n=(a=(t=(r=i==null?void 0:i[1])==null?void 0:r[0])==null?void 0:t.meta)==null?void 0:a[1])==null?void 0:n[0].data)&&db(i[1][0].meta[1][0].data)==1&&i[1][0];if(!f)s.forEach(function(e){i[e].forEach(function(e){var r=db(e.meta[1][0].data)>>>0;if(r==1){if(!f)f=e;else throw new Error("Document has multiple roots")}})});if(!f)throw new Error("Cannot find Document root");return Pb(i,f)}function Mb(e,r,t){var a,n,i,s;if(!((a=e[6])==null?void 0:a[0])||!((n=e[7])==null?void 0:n[0]))throw"Mutation only works on post-BNC storages!";var f=((s=(i=e[8])==null?void 0:i[0])==null?void 0:s.data)&&db(e[8][0].data)>0||false;if(f)throw"Math only works with normal offsets";var o=0;var l=ab(e[7][0].data),c=0,h=[];var u=ab(e[4][0].data),d=0,v=[];for(var p=0;p<r.length;++p){if(r[p]==null){l.setUint16(p*2,65535,true);u.setUint16(p*2,65535);continue}l.setUint16(p*2,c,true);u.setUint16(p*2,d,true);var g,m;switch(typeof r[p]){case"string":g=Cb({t:"s",v:r[p]},t);m=yb({t:"s",v:r[p]},t);break;case"number":g=Cb({t:"n",v:r[p]},t);m=yb({t:"n",v:r[p]},t);break;case"boolean":g=Cb({t:"b",v:r[p]},t);m=yb({t:"b",v:r[p]},t);break;default:throw new Error("Unsupported value "+r[p]);}h.push(g);c+=g.length;v.push(m);d+=m.length;++o}e[2][0].data=ub(o);for(;p<e[7][0].data.length/2;++p){l.setUint16(p*2,65535,true);u.setUint16(p*2,65535,true)}e[6][0].data=fb(h);e[3][0].data=fb(v);return o}function Ub(e,r){if(!r||!r.numbers)throw new Error("Must pass a `numbers` option -- check the README");var t=e.Sheets[e.SheetNames[0]];if(e.SheetNames.length>1)console.error("The Numbers writer currently writes only the first table");var a=Ia(t["!ref"]);a.s.r=a.s.c=0;var n=false;if(a.e.c>9){n=true;a.e.c=9}if(a.e.r>49){n=true;a.e.r=49}if(n)console.error("The Numbers writer is currently limited to ".concat(Na(a)));var i=Aw(t,{range:a,header:1});var s=["~Sh33tJ5~"];i.forEach(function(e){return e.forEach(function(e){if(typeof e=="string")s.push(e)})});var f={};var o=[];var l=Ke.read(r.numbers,{type:"base64"});l.FileIndex.map(function(e,r){return[e,l.FullPaths[r]]}).forEach(function(e){var r=e[0],t=e[1];if(r.type!=2)return;if(!r.name.match(/\.iwa/))return;var a=r.content;var n=kb(a);var i=mb(n);i.forEach(function(e){o.push(e.id);f[e.id]={deps:[],location:t,type:db(e.messages[0].meta[1][0].data)}})});o.sort(function(e,r){return e-r});var c=o.filter(function(e){return e>1}).map(function(e){return[e,ub(e)]});l.FileIndex.map(function(e,r){return[e,l.FullPaths[r]]}).forEach(function(e){var r=e[0],t=e[1];if(!r.name.match(/\.iwa/))return;var a=mb(kb(r.content));a.forEach(function(e){e.messages.forEach(function(r){c.forEach(function(r){if(e.messages.some(function(e){return db(e.meta[1][0].data)!=11006&&sb(e.data,r[1])})){f[r[0]].deps.push(e.id)}})})})});function h(){for(var e=927262;e<2e6;++e)if(!f[e])return e;throw new Error("Too many messages")}var u=Ke.find(l,f[1].location);var d=mb(kb(u.content));var v;for(var p=0;p<d.length;++p){var g=d[p];if(g.id==1)v=g}var m=_b(vb(v.messages[0].data)[1][0].data);u=Ke.find(l,f[m].location);d=mb(kb(u.content));for(p=0;p<d.length;++p){g=d[p];if(g.id==m)v=g}m=_b(vb(v.messages[0].data)[2][0].data);u=Ke.find(l,f[m].location);d=mb(kb(u.content));for(p=0;p<d.length;++p){g=d[p];if(g.id==m)v=g}m=_b(vb(v.messages[0].data)[2][0].data);u=Ke.find(l,f[m].location);d=mb(kb(u.content));for(p=0;p<d.length;++p){g=d[p];if(g.id==m)v=g}var b=vb(v.messages[0].data);{b[6][0].data=ub(a.e.r+1);b[7][0].data=ub(a.e.c+1);var w=_b(b[46][0].data);var k=Ke.find(l,f[w].location);var T=mb(kb(k.content));{for(var A=0;A<T.length;++A){if(T[A].id==w)break}if(T[A].id!=w)throw"Bad ColumnRowUIDMapArchive";var E=vb(T[A].messages[0].data);E[1]=[];E[2]=[],E[3]=[];for(var C=0;C<=a.e.c;++C){var y=[];y[1]=y[2]=[{type:0,data:ub(C+420690)}];E[1].push({type:2,data:pb(y)});E[2].push({type:0,data:ub(C)});E[3].push({type:0,data:ub(C)})}E[4]=[];E[5]=[],E[6]=[];for(var S=0;S<=a.e.r;++S){y=[];y[1]=y[2]=[{type:0,data:ub(S+726270)}];E[4].push({type:2,data:pb(y)});E[5].push({type:0,data:ub(S)});E[6].push({type:0,data:ub(S)})}T[A].messages[0].data=pb(E)}k.content=Tb(bb(T));k.size=k.content.length;delete b[46];var _=vb(b[4][0].data);{_[7][0].data=ub(a.e.r+1);var x=vb(_[1][0].data);var O=_b(x[2][0].data);k=Ke.find(l,f[O].location);T=mb(kb(k.content));{if(T[0].id!=O)throw"Bad HeaderStorageBucket";var R=vb(T[0].messages[0].data);for(S=0;S<i.length;++S){var I=vb(R[2][0].data);I[1][0].data=ub(S);I[4][0].data=ub(i[S].length);R[2][S]={type:R[2][0].type,data:pb(I)}}T[0].messages[0].data=pb(R)}k.content=Tb(bb(T));k.size=k.content.length;var N=_b(_[2][0].data);k=Ke.find(l,f[N].location);T=mb(kb(k.content));{if(T[0].id!=N)throw"Bad HeaderStorageBucket";R=vb(T[0].messages[0].data);for(C=0;C<=a.e.c;++C){I=vb(R[2][0].data);I[1][0].data=ub(C);I[4][0].data=ub(a.e.r+1);R[2][C]={type:R[2][0].type,data:pb(I)}}T[0].messages[0].data=pb(R)}k.content=Tb(bb(T));k.size=k.content.length;var D=_b(_[4][0].data);(function(){var e=Ke.find(l,f[D].location);var r=mb(kb(e.content));var t;for(var a=0;a<r.length;++a){var n=r[a];if(n.id==D)t=n}var i=vb(t.messages[0].data);{i[3]=[];var o=[];s.forEach(function(e,r){o[1]=[{type:0,data:ub(r)}];o[2]=[{type:0,data:ub(1)}];o[3]=[{type:2,data:ib(e)}];i[3].push({type:2,data:pb(o)})})}t.messages[0].data=pb(i);var c=bb(r);var h=Tb(c);e.content=h;e.size=e.content.length})();var F=vb(_[3][0].data);{var P=F[1][0];delete F[2];var L=vb(P.data);{var M=_b(L[2][0].data);(function(){var e=Ke.find(l,f[M].location);var r=mb(kb(e.content));var t;for(var n=0;n<r.length;++n){var o=r[n];if(o.id==M)t=o}var c=vb(t.messages[0].data);{delete c[6];delete F[7];var h=new Uint8Array(c[5][0].data);c[5]=[];var u=0;for(var d=0;d<=a.e.r;++d){var v=vb(h);u+=Mb(v,i[d],s);v[1][0].data=ub(d);c[5].push({data:pb(v),type:2})}c[1]=[{type:0,data:ub(a.e.c+1)}];c[2]=[{type:0,data:ub(a.e.r+1)}];c[3]=[{type:0,data:ub(u)}];c[4]=[{type:0,data:ub(a.e.r+1)}]}t.messages[0].data=pb(c);var p=bb(r);var g=Tb(p);e.content=g;e.size=e.content.length})()}P.data=pb(L)}_[3][0].data=pb(F)}b[4][0].data=pb(_)}v.messages[0].data=pb(b);var U=bb(d);var B=Tb(U);u.content=B;u.size=u.content.length;return l}function Bb(e){return function r(t){for(var a=0;a!=e.length;++a){var n=e[a];if(t[n[0]]===undefined)t[n[0]]=n[1];if(n[2]==="n")t[n[0]]=Number(t[n[0]])}}}function Wb(e){Bb([["cellNF",false],["cellHTML",true],["cellFormula",true],["cellStyles",false],["cellText",true],["cellDates",false],["sheetStubs",false],["sheetRows",0,"n"],["bookDeps",false],["bookSheets",false],["bookProps",false],["bookFiles",false],["bookVBA",false],["password",""],["WTF",false]])(e)}function Hb(e){Bb([["cellDates",false],["bookSST",false],["bookType","xlsx"],["compression",false],["WTF",false]])(e)}function zb(e){if(qn.WS.indexOf(e)>-1)return"sheet";if(qn.CS&&e==qn.CS)return"chart";if(qn.DS&&e==qn.DS)return"dialog";if(qn.MS&&e==qn.MS)return"macro";return e&&e.length?e:"sheet"}function Vb(e,r){if(!e)return 0;try{e=r.map(function a(r){if(!r.id)r.id=r.strRelID;return[r.name,e["!id"][r.id].Target,zb(e["!id"][r.id].Type)]})}catch(t){return null}return!e||e.length===0?null:e}function Gb(e,r,t,a,n,i,s,f,o,l,c,h){try{i[a]=Qn(Rr(e,t,true),r);var u=Or(e,r);var d;switch(f){case"sheet":d=pg(u,r,n,o,i[a],l,c,h);break;case"chart":d=gg(u,r,n,o,i[a],l,c,h);if(!d||!d["!drawel"])break;var v=Lr(d["!drawel"].Target,r);var p=Zn(v);var g=th(Rr(e,v,true),Qn(Rr(e,p,true),v));var m=Lr(g,v);var b=Zn(m);d=Pp(Rr(e,m,true),m,o,Qn(Rr(e,b,true),m),l,d);break;case"macro":d=mg(u,r,n,o,i[a],l,c,h);break;case"dialog":d=bg(u,r,n,o,i[a],l,c,h);break;default:throw new Error("Unrecognized sheet type "+f);}s[a]=d;var w=[];if(i&&i[a])rr(i[a]).forEach(function(t){var n="";if(i[a][t].Type==qn.CMNT){n=Lr(i[a][t].Target,r);var s=Ag(Or(e,n,true),n,o);if(!s||!s.length)return;ih(d,s,false)}if(i[a][t].Type==qn.TCMNT){n=Lr(i[a][t].Target,r);w=w.concat(oh(Or(e,n,true),o))}});if(w&&w.length)ih(d,w,true,o.people||[])}catch(k){if(o.WTF)throw k}}function jb(e){return e.charAt(0)=="/"?e.slice(1):e}function Xb(e,r){ze();r=r||{};Wb(r);if(_r(e,"META-INF/manifest.xml"))return Zm(e,r);if(_r(e,"objectdata.xml"))return Zm(e,r);if(_r(e,"Index/Document.iwa")){if(typeof Uint8Array=="undefined")throw new Error("NUMBERS file parsing requires Uint8Array support");if(typeof Lb!="undefined"){if(e.FileIndex)return Lb(e);var t=Ke.utils.cfb_new();Nr(e).forEach(function(r){Dr(t,r,Ir(e,r))});return Lb(t)}throw new Error("Unsupported NUMBERS file")}if(!_r(e,"[Content_Types].xml")){if(_r(e,"index.xml.gz"))throw new Error("Unsupported NUMBERS 08 file");if(_r(e,"index.xml"))throw new Error("Unsupported NUMBERS 09 file");throw new Error("Unsupported ZIP file")}var a=Nr(e);var n=Kn(Rr(e,"[Content_Types].xml"));var i=false;var s,f;if(n.workbooks.length===0){f="xl/workbook.xml";if(Or(e,f,true))n.workbooks.push(f)}if(n.workbooks.length===0){f="xl/workbook.bin";if(!Or(e,f,true))throw new Error("Could not find workbook");n.workbooks.push(f);i=true}if(n.workbooks[0].slice(-3)=="bin")i=true;var o={};var l={};if(!r.bookSheets&&!r.bookProps){xd=[];if(n.sst)try{xd=Tg(Or(e,jb(n.sst)),n.sst,r)}catch(c){if(r.WTF)throw c}if(r.cellStyles&&n.themes.length)o=kg(Rr(e,n.themes[0].replace(/^\//,""),true)||"",n.themes[0],r);if(n.style)l=wg(Or(e,jb(n.style)),n.style,o,r)}n.links.map(function(t){try{var a=Qn(Rr(e,Zn(jb(t))),t);return Cg(Or(e,jb(t)),a,t,r)}catch(n){}});var h=vg(Or(e,jb(n.workbooks[0])),n.workbooks[0],r);var u={},d="";if(n.coreprops.length){d=Or(e,jb(n.coreprops[0]),true);if(d)u=hi(d);if(n.extprops.length!==0){d=Or(e,jb(n.extprops[0]),true);if(d)mi(d,u,r)}}var v={};if(!r.bookSheets||r.bookProps){if(n.custprops.length!==0){d=Rr(e,jb(n.custprops[0]),true);if(d)v=ki(d,r)}}var p={};if(r.bookSheets||r.bookProps){if(h.Sheets)s=h.Sheets.map(function I(e){return e.name});else if(u.Worksheets&&u.SheetNames.length>0)s=u.SheetNames;if(r.bookProps){p.Props=u;p.Custprops=v}if(r.bookSheets&&typeof s!=="undefined")p.SheetNames=s;if(r.bookSheets?p.SheetNames:r.bookProps)return p}s={};var g={};if(r.bookDeps&&n.calcchain)g=Eg(Or(e,jb(n.calcchain)),n.calcchain,r);var m=0;var b={};var w,k;{var T=h.Sheets;u.Worksheets=T.length;u.SheetNames=[];for(var A=0;A!=T.length;++A){u.SheetNames[A]=T[A].name}}var E=i?"bin":"xml";var C=n.workbooks[0].lastIndexOf("/");var y=(n.workbooks[0].slice(0,C+1)+"_rels/"+n.workbooks[0].slice(C+1)+".rels").replace(/^\//,"");if(!_r(e,y))y="xl/_rels/workbook."+E+".rels";var S=Qn(Rr(e,y,true),y.replace(/_rels.*/,"s5s"));if((n.metadata||[]).length>=1){r.xlmeta=yg(Or(e,jb(n.metadata[0])),n.metadata[0],r)}if((n.people||[]).length>=1){r.people=ch(Or(e,jb(n.people[0])),r)}if(S)S=Vb(S,h.Sheets);var _=Or(e,"xl/worksheets/sheet.xml",true)?1:0;e:for(m=0;m!=u.Worksheets;++m){var x="sheet";if(S&&S[m]){w="xl/"+S[m][1].replace(/[\/]?xl\//,"");if(!_r(e,w))w=S[m][1];if(!_r(e,w))w=y.replace(/_rels\/.*$/,"")+S[m][1];x=S[m][2]}else{w="xl/worksheets/sheet"+(m+1-_)+"."+E;w=w.replace(/sheet0\./,"sheet.")}k=w.replace(/^(.*)(\/)([^\/]*)$/,"$1/_rels/$3.rels");if(r&&r.sheets!=null)switch(typeof r.sheets){case"number":if(m!=r.sheets)continue e;break;case"string":if(u.SheetNames[m].toLowerCase()!=r.sheets.toLowerCase())continue e;break;default:if(Array.isArray&&Array.isArray(r.sheets)){var O=false;for(var R=0;R!=r.sheets.length;++R){if(typeof r.sheets[R]=="number"&&r.sheets[R]==m)O=1;if(typeof r.sheets[R]=="string"&&r.sheets[R].toLowerCase()==u.SheetNames[m].toLowerCase())O=1}if(!O)continue e};}Gb(e,w,k,u.SheetNames[m],m,b,s,x,r,h,o,l)}p={Directory:n,Workbook:h,Props:u,Custprops:v,Deps:g,Sheets:s,SheetNames:u.SheetNames,Strings:xd,Styles:l,Themes:o,SSF:br(X)};if(r&&r.bookFiles){if(e.files){p.keys=a;p.files=e.files}else{p.keys=[];p.files={};e.FullPaths.forEach(function(r,t){r=r.replace(/^Root Entry[\/]/,"");p.keys.push(r);p.files[r]=e.FileIndex[t]})}}if(r&&r.bookVBA){if(n.vba.length>0)p.vbaraw=Or(e,jb(n.vba[0]),true);else if(n.defaults&&n.defaults.bin===bh)p.vbaraw=Or(e,"xl/vbaProject.bin",true)}return p}function $b(e,r){var t=r||{};var a="Workbook",n=Ke.find(e,a);try{a="/!DataSpaces/Version";n=Ke.find(e,a);if(!n||!n.content)throw new Error("ECMA-376 Encrypted file missing "+a);Ko(n.content);a="/!DataSpaces/DataSpaceMap";n=Ke.find(e,a);if(!n||!n.content)throw new Error("ECMA-376 Encrypted file missing "+a);var i=qo(n.content);if(i.length!==1||i[0].comps.length!==1||i[0].comps[0].t!==0||i[0].name!=="StrongEncryptionDataSpace"||i[0].comps[0].v!=="EncryptedPackage")throw new Error("ECMA-376 Encrypted file bad "+a);a="/!DataSpaces/DataSpaceInfo/StrongEncryptionDataSpace";n=Ke.find(e,a);if(!n||!n.content)throw new Error("ECMA-376 Encrypted file missing "+a);var s=Zo(n.content);if(s.length!=1||s[0]!="StrongEncryptionTransform")throw new Error("ECMA-376 Encrypted file bad "+a);a="/!DataSpaces/TransformInfo/StrongEncryptionTransform/!Primary";n=Ke.find(e,a);if(!n||!n.content)throw new Error("ECMA-376 Encrypted file missing "+a);el(n.content)}catch(f){}a="/EncryptionInfo";n=Ke.find(e,a);if(!n||!n.content)throw new Error("ECMA-376 Encrypted file missing "+a);var o=al(n.content);a="/EncryptedPackage";n=Ke.find(e,a);if(!n||!n.content)throw new Error("ECMA-376 Encrypted file missing "+a);if(o[0]==4&&typeof decrypt_agile!=="undefined")return decrypt_agile(o[1],n.content,t.password||"",t);if(o[0]==2&&typeof decrypt_std76!=="undefined")return decrypt_std76(o[1],n.content,t.password||"",t);throw new Error("File is password-protected")}function Yb(e,r){if(r.bookType=="ods")return tb(e,r);if(r.bookType=="numbers")return Ub(e,r);if(r.bookType=="xlsb")return Kb(e,r);return Jb(e,r)}function Kb(e,r){ah=1024;if(e&&!e.SSF){e.SSF=br(X)}if(e&&e.SSF){ze();He(e.SSF);r.revssf=nr(e.SSF);r.revssf[e.SSF[65535]]=0;r.ssf=e.SSF}r.rels={};r.wbrels={};r.Strings=[];r.Strings.Count=0;r.Strings.Unique=0;if(Rd)r.revStrings=new Map;else{r.revStrings={};r.revStrings.foo=[];delete r.revStrings.foo}var t=r.bookType=="xlsb"?"bin":"xml";var a=Th.indexOf(r.bookType)>-1;var n=Yn();Hb(r=r||{});var i=Fr();var s="",f=0;r.cellXfs=[];Fd(r.cellXfs,{},{revssf:{General:0}});if(!e.Props)e.Props={};s="docProps/core.xml";Dr(i,s,di(e.Props,r));n.coreprops.push(s);ri(r.rels,2,s,qn.CORE_PROPS);s="docProps/app.xml";if(e.Props&&e.Props.SheetNames){}else if(!e.Workbook||!e.Workbook.Sheets)e.Props.SheetNames=e.SheetNames;else{var o=[];for(var l=0;l<e.SheetNames.length;++l)if((e.Workbook.Sheets[l]||{}).Hidden!=2)o.push(e.SheetNames[l]);e.Props.SheetNames=o}e.Props.Worksheets=e.Props.SheetNames.length;Dr(i,s,bi(e.Props,r));n.extprops.push(s);ri(r.rels,3,s,qn.EXT_PROPS);if(e.Custprops!==e.Props&&rr(e.Custprops||{}).length>0){s="docProps/custom.xml";Dr(i,s,Ti(e.Custprops,r));n.custprops.push(s);ri(r.rels,4,s,qn.CUST_PROPS)}for(f=1;f<=e.SheetNames.length;++f){var c={"!id":{}};var h=e.Sheets[e.SheetNames[f-1]];var u=(h||{})["!type"]||"sheet";switch(u){case"chart":;default:s="xl/worksheets/sheet"+f+"."+t;Dr(i,s,_g(f-1,s,r,e,c));n.sheets.push(s);ri(r.wbrels,-1,"worksheets/sheet"+f+"."+t,qn.WS[0]);}if(h){var d=h["!comments"];var v=false;var p="";if(d&&d.length>0){p="xl/comments"+f+"."+t;Dr(i,p,Ig(d,p,r));n.comments.push(p);ri(c,-1,"../comments"+f+"."+t,qn.CMNT);v=true}if(h["!legacy"]){if(v)Dr(i,"xl/drawings/vmlDrawing"+f+".vml",nh(f,h["!comments"]))}delete h["!comments"];delete h["!legacy"]}if(c["!id"].rId1)Dr(i,Zn(s),ei(c))}if(r.Strings!=null&&r.Strings.length>0){s="xl/sharedStrings."+t;Dr(i,s,Rg(r.Strings,s,r));n.strs.push(s);ri(r.wbrels,-1,"sharedStrings."+t,qn.SST)}s="xl/workbook."+t;Dr(i,s,Sg(e,s,r));n.workbooks.push(s);ri(r.rels,1,s,qn.WB);s="xl/theme/theme1.xml";Dr(i,s,Ic(e.Themes,r));n.themes.push(s);ri(r.wbrels,-1,"theme/theme1.xml",qn.THEME);s="xl/styles."+t;Dr(i,s,Og(e,s,r));n.styles.push(s);ri(r.wbrels,-1,"styles."+t,qn.STY);if(e.vbaraw&&a){s="xl/vbaProject.bin";Dr(i,s,e.vbaraw);n.vba.push(s);ri(r.wbrels,-1,"vbaProject.bin",qn.VBA)}s="xl/metadata."+t;Dr(i,s,Ng(s));n.metadata.push(s);ri(r.wbrels,-1,"metadata."+t,qn.XLMETA);Dr(i,"[Content_Types].xml",Jn(n,r));Dr(i,"_rels/.rels",ei(r.rels));Dr(i,"xl/_rels/workbook."+t+".rels",ei(r.wbrels));delete r.revssf;delete r.ssf;return i}function Jb(e,r){ah=1024;if(e&&!e.SSF){e.SSF=br(X)}if(e&&e.SSF){ze();He(e.SSF);r.revssf=nr(e.SSF);r.revssf[e.SSF[65535]]=0;r.ssf=e.SSF}r.rels={};r.wbrels={};r.Strings=[];r.Strings.Count=0;r.Strings.Unique=0;if(Rd)r.revStrings=new Map;else{r.revStrings={};r.revStrings.foo=[];delete r.revStrings.foo}var t="xml";var a=Th.indexOf(r.bookType)>-1;var n=Yn();Hb(r=r||{});var i=Fr();var s="",f=0;r.cellXfs=[];Fd(r.cellXfs,{},{revssf:{General:0}});if(!e.Props)e.Props={};s="docProps/core.xml";Dr(i,s,di(e.Props,r));n.coreprops.push(s);ri(r.rels,2,s,qn.CORE_PROPS);s="docProps/app.xml";if(e.Props&&e.Props.SheetNames){}else if(!e.Workbook||!e.Workbook.Sheets)e.Props.SheetNames=e.SheetNames;else{var o=[];for(var l=0;l<e.SheetNames.length;++l)if((e.Workbook.Sheets[l]||{}).Hidden!=2)o.push(e.SheetNames[l]);e.Props.SheetNames=o}e.Props.Worksheets=e.Props.SheetNames.length;Dr(i,s,bi(e.Props,r));n.extprops.push(s);ri(r.rels,3,s,qn.EXT_PROPS);if(e.Custprops!==e.Props&&rr(e.Custprops||{}).length>0){s="docProps/custom.xml";Dr(i,s,Ti(e.Custprops,r));n.custprops.push(s);ri(r.rels,4,s,qn.CUST_PROPS)}var c=["SheetJ5"];r.tcid=0;for(f=1;f<=e.SheetNames.length;++f){var h={"!id":{}};var u=e.Sheets[e.SheetNames[f-1]];var d=(u||{})["!type"]||"sheet";switch(d){case"chart":;default:s="xl/worksheets/sheet"+f+"."+t;Dr(i,s,pv(f-1,r,e,h));n.sheets.push(s);ri(r.wbrels,-1,"worksheets/sheet"+f+"."+t,qn.WS[0]);}if(u){var v=u["!comments"];var p=false;var g="";if(v&&v.length>0){var m=false;v.forEach(function(e){e[1].forEach(function(e){if(e.T==true)m=true})});if(m){g="xl/threadedComments/threadedComment"+f+"."+t;Dr(i,g,lh(v,c,r));n.threadedcomments.push(g);ri(h,-1,"../threadedComments/threadedComment"+f+"."+t,qn.TCMNT)}g="xl/comments"+f+"."+t;Dr(i,g,fh(v,r));n.comments.push(g);ri(h,-1,"../comments"+f+"."+t,qn.CMNT);p=true}if(u["!legacy"]){if(p)Dr(i,"xl/drawings/vmlDrawing"+f+".vml",nh(f,u["!comments"]))}delete u["!comments"];delete u["!legacy"]}if(h["!id"].rId1)Dr(i,Zn(s),ei(h))}if(r.Strings!=null&&r.Strings.length>0){s="xl/sharedStrings."+t;Dr(i,s,Ho(r.Strings,r));n.strs.push(s);ri(r.wbrels,-1,"sharedStrings."+t,qn.SST)}s="xl/workbook."+t;Dr(i,s,rg(e,r));n.workbooks.push(s);ri(r.rels,1,s,qn.WB);s="xl/theme/theme1.xml";Dr(i,s,Ic(e.Themes,r));n.themes.push(s);ri(r.wbrels,-1,"theme/theme1.xml",qn.THEME);s="xl/styles."+t;Dr(i,s,$l(e,r));n.styles.push(s);ri(r.wbrels,-1,"styles."+t,qn.STY);if(e.vbaraw&&a){s="xl/vbaProject.bin";Dr(i,s,e.vbaraw);n.vba.push(s);ri(r.wbrels,-1,"vbaProject.bin",qn.VBA)}s="xl/metadata."+t;Dr(i,s,Jc());n.metadata.push(s);ri(r.wbrels,-1,"metadata."+t,qn.XLMETA);if(c.length>1){s="xl/persons/person.xml";Dr(i,s,hh(c,r));n.people.push(s);ri(r.wbrels,-1,"persons/person.xml",qn.PEOPLE)}Dr(i,"[Content_Types].xml",Jn(n,r));Dr(i,"_rels/.rels",ei(r.rels));Dr(i,"xl/_rels/workbook."+t+".rels",ei(r.wbrels));delete r.revssf;delete r.ssf;return i}function qb(e,r){var t="";switch((r||{}).type||"base64"){case"buffer":return[e[0],e[1],e[2],e[3],e[4],e[5],e[6],e[7]];case"base64":t=k(e.slice(0,12));break;case"binary":t=e;break;case"array":return[e[0],e[1],e[2],e[3],e[4],e[5],e[6],e[7]];default:throw new Error("Unrecognized type "+(r&&r.type||"undefined"));}return[t.charCodeAt(0),t.charCodeAt(1),t.charCodeAt(2),t.charCodeAt(3),t.charCodeAt(4),t.charCodeAt(5),t.charCodeAt(6),t.charCodeAt(7)]}function Zb(e,r){if(Ke.find(e,"EncryptedPackage"))return $b(e,r);return vm(e,r)}function Qb(e,r){var t,a=e;var n=r||{};if(!n.type)n.type=T&&Buffer.isBuffer(e)?"buffer":"base64";t=Pr(a,n);return Xb(t,n)}function ew(e,r){var t=0;e:while(t<e.length)switch(e.charCodeAt(t)){case 10:;case 13:;case 32:++t;break;case 60:return jg(e.slice(t),r);default:break e;}return So.to_workbook(e,r)}function rw(e,r){var t="",a=qb(e,r);switch(r.type){case"base64":t=k(e);break;case"binary":t=e;break;case"buffer":t=e.toString("binary");break;case"array":t=mr(e);break;default:throw new Error("Unrecognized type "+r.type);}if(a[0]==239&&a[1]==187&&a[2]==191)t=lt(t);r.type="binary";return ew(t,r)}function tw(e,r){var t=e;if(r.type=="base64")t=k(t);t=a.utils.decode(1200,t.slice(2),"str");r.type="binary";return ew(t,r)}function aw(e){return!e.match(/[^\x00-\x7F]/)?e:ct(e)}function nw(e,r,t,a){if(a){t.type="string";return So.to_workbook(e,t)}return So.to_workbook(r,t)}function iw(e,r){l();var t=r||{};if(typeof ArrayBuffer!=="undefined"&&e instanceof ArrayBuffer)return iw(new Uint8Array(e),(t=br(t),t.type="array",t));if(typeof Uint8Array!=="undefined"&&e instanceof Uint8Array&&!t.type)t.type=typeof Deno!=="undefined"?"buffer":"array";var a=e,n=[0,0,0,0],i=false;if(t.cellStyles){t.cellNF=true;t.sheetStubs=true}Od={};if(t.dateNF)Od.dateNF=t.dateNF;if(!t.type)t.type=T&&Buffer.isBuffer(e)?"buffer":"base64";if(t.type=="file"){t.type=T?"buffer":"binary";a=er(e);if(typeof Uint8Array!=="undefined"&&!T)t.type="array"}if(t.type=="string"){i=true;t.type="binary";t.codepage=65001;a=aw(e)}if(t.type=="array"&&typeof Uint8Array!=="undefined"&&e instanceof Uint8Array&&typeof ArrayBuffer!=="undefined"){var s=new ArrayBuffer(3),f=new Uint8Array(s);f.foo="bar";if(!f.foo){t=br(t);t.type="array";return iw(O(a),t)}}switch((n=qb(a,t))[0]){case 208:if(n[1]===207&&n[2]===17&&n[3]===224&&n[4]===161&&n[5]===177&&n[6]===26&&n[7]===225)return Zb(Ke.read(a,t),t);break;case 9:if(n[1]<=8)return vm(a,t);break;case 60:return jg(a,t);case 73:if(n[1]===73&&n[2]===42&&n[3]===0)throw new Error("TIFF Image File is not a spreadsheet");if(n[1]===68)return _o(a,t);break;case 84:if(n[1]===65&&n[2]===66&&n[3]===76)return Co.to_workbook(a,t);break;case 80:return n[1]===75&&n[2]<9&&n[3]<9?Qb(a,t):nw(e,a,t,i);case 239:return n[3]===60?jg(a,t):nw(e,a,t,i);case 255:if(n[1]===254){return tw(a,t)}else if(n[1]===0&&n[2]===2&&n[3]===0)return xo.to_workbook(a,t);break;case 0:if(n[1]===0){if(n[2]>=2&&n[3]===0)return xo.to_workbook(a,t);if(n[2]===0&&(n[3]===8||n[3]===9))return xo.to_workbook(a,t)}break;case 3:;case 131:;case 139:;case 140:return Ao.to_workbook(a,t);case 123:if(n[1]===92&&n[2]===114&&n[3]===116)return gl.to_workbook(a,t);break;case 10:;case 13:;case 32:return rw(a,t);case 137:if(n[1]===80&&n[2]===78&&n[3]===71)throw new Error("PNG Image File is not a spreadsheet");break;}if(To.indexOf(n[0])>-1&&n[2]<=12&&n[3]<=31)return Ao.to_workbook(a,t);return nw(e,a,t,i)}function sw(e,r){var t=r||{};t.type="file";return iw(e,t)}function fw(e,r){switch(r.type){case"base64":;case"binary":break;case"buffer":;case"array":r.type="";break;case"file":return Qe(r.file,Ke.write(e,{type:T?"buffer":""}));case"string":throw new Error("'string' output type invalid for '"+r.bookType+"' files");default:throw new Error("Unrecognized type "+r.type);}return Ke.write(e,r)}function ow(e,r){var t=br(r||{});var a=Yb(e,t);return cw(a,t)}function lw(e,r){var t=br(r||{});var a=Jb(e,t);return cw(a,t)}function cw(e,r){var t={};var a=T?"nodebuffer":typeof Uint8Array!=="undefined"?"array":"string";if(r.compression)t.compression="DEFLATE";if(r.password)t.type=a;else switch(r.type){case"base64":t.type="base64";break;case"binary":t.type="string";break;case"string":throw new Error("'string' output type invalid for '"+r.bookType+"' files");case"buffer":;case"file":t.type=a;break;default:throw new Error("Unrecognized type "+r.type);}var n=e.FullPaths?Ke.write(e,{fileType:"zip",type:{nodebuffer:"buffer",string:"binary"}[t.type]||t.type,compression:!!r.compression}):e.generate(t);if(typeof Deno!=="undefined"){if(typeof n=="string"){if(r.type=="binary"||r.type=="base64")return n;n=new Uint8Array(S(n))}}if(r.password&&typeof encrypt_agile!=="undefined")return fw(encrypt_agile(n,r.password),r);if(r.type==="file")return Qe(r.file,n);return r.type=="string"?lt(n):n}function hw(e,r){var t=r||{};var a=pm(e,t);return fw(a,t)}function uw(e,r,t){if(!t)t="";var a=t+e;switch(r.type){case"base64":return w(ct(a));case"binary":return ct(a);case"string":return e;case"file":return Qe(r.file,a,"utf8");case"buffer":{if(T)return A(a,"utf8");else if(typeof TextEncoder!=="undefined")return(new TextEncoder).encode(a);else return uw(a,{type:"binary"}).split("").map(function(e){return e.charCodeAt(0)})};}throw new Error("Unrecognized type "+r.type)}function dw(e,r){switch(r.type){case"base64":return w(e);case"binary":return e;case"string":return e;case"file":return Qe(r.file,e,"binary");case"buffer":{if(T)return A(e,"binary");else return e.split("").map(function(e){return e.charCodeAt(0)})};}throw new Error("Unrecognized type "+r.type)}function vw(e,r){switch(r.type){case"string":;case"base64":;case"binary":var t="";for(var a=0;a<e.length;++a)t+=String.fromCharCode(e[a]);return r.type=="base64"?w(t):r.type=="string"?lt(t):t;case"file":return Qe(r.file,e);case"buffer":return e;default:throw new Error("Unrecognized type "+r.type);}}function pw(e,r){l();Zp(e);var t=br(r||{});if(t.cellStyles){t.cellNF=true;t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=pw(e,t);t.type="array";return S(a)}return lw(e,t)}function gw(e,r){l();Zp(e);var t=br(r||{});if(t.cellStyles){t.cellNF=true;t.sheetStubs=true}if(t.type=="array"){t.type="binary";var a=gw(e,t);t.type="array";return S(a)}var n=0;if(t.sheet){if(typeof t.sheet=="number")n=t.sheet;else n=e.SheetNames.indexOf(t.sheet);if(!e.SheetNames[n])throw new Error("Sheet not found: "+t.sheet+" : "+typeof t.sheet)}switch(t.bookType||"xlsb"){case"xml":;case"xlml":return uw(nm(e,t),t);case"slk":;case"sylk":return uw(Eo.from_sheet(e.Sheets[e.SheetNames[n]],t),t);case"htm":;case"html":return uw(Vm(e.Sheets[e.SheetNames[n]],t),t);case"txt":return dw(Sw(e.Sheets[e.SheetNames[n]],t),t);case"csv":return uw(yw(e.Sheets[e.SheetNames[n]],t),t,"\ufeff");case"dif":return uw(Co.from_sheet(e.Sheets[e.SheetNames[n]],t),t);case"dbf":return vw(Ao.from_sheet(e.Sheets[e.SheetNames[n]],t),t);case"prn":return uw(So.from_sheet(e.Sheets[e.SheetNames[n]],t),t);case"rtf":return uw(gl.from_sheet(e.Sheets[e.SheetNames[n]],t),t);case"eth":return uw(yo.from_sheet(e.Sheets[e.SheetNames[n]],t),t);case"fods":return uw(tb(e,t),t);case"wk1":return vw(xo.sheet_to_wk1(e.Sheets[e.SheetNames[n]],t),t);case"wk3":return vw(xo.book_to_wk3(e,t),t);case"biff2":if(!t.biff)t.biff=2;case"biff3":if(!t.biff)t.biff=3;case"biff4":if(!t.biff)t.biff=4;return vw(Lm(e,t),t);case"biff5":if(!t.biff)t.biff=5;case"biff8":;case"xla":;case"xls":if(!t.biff)t.biff=8;return hw(e,t);case"xlsx":;case"xlsm":;case"xlam":;case"xlsb":;case"numbers":;case"ods":return ow(e,t);default:throw new Error("Unrecognized bookType |"+t.bookType+"|");}}function mw(e){if(e.bookType)return;var r={xls:"biff8",htm:"html",slk:"sylk",socialcalc:"eth",Sh33tJS:"WTF"};var t=e.file.slice(e.file.lastIndexOf(".")).toLowerCase();if(t.match(/^\.[a-z]+$/))e.bookType=t.slice(1);e.bookType=r[e.bookType]||e.bookType}function bw(e,r,t){var a=t||{};a.type="file";a.file=r;mw(a);return gw(e,a)}function ww(e,r,t){var a=t||{};a.type="file";a.file=r;mw(a);return pw(e,a)}function kw(e,r,t,a){var n=t||{};n.type="file";n.file=e;mw(n);n.type="buffer";var i=a;if(!(i instanceof Function))i=t;return Je.writeFile(e,gw(r,n),i)}function Tw(e,r,t,a,n,i,s,f){var o=Ta(t);var l=f.defval,c=f.raw||!Object.prototype.hasOwnProperty.call(f,"raw");var h=true;var u=n===1?[]:{};if(n!==1){if(Object.defineProperty)try{Object.defineProperty(u,"__rowNum__",{value:t,enumerable:false})}catch(d){u.__rowNum__=t}else u.__rowNum__=t}if(!s||e[t])for(var v=r.s.c;v<=r.e.c;++v){var p=s?e[t][v]:e[a[v]+o];if(p===undefined||p.t===undefined){if(l===undefined)continue;if(i[v]!=null){u[i[v]]=l}continue}var g=p.v;switch(p.t){case"z":if(g==null)break;continue;case"e":g=g==0?null:void 0;break;case"s":;case"d":;case"b":;case"n":break;default:throw new Error("unrecognized type "+p.t);}if(i[v]!=null){if(g==null){if(p.t=="e"&&g===null)u[i[v]]=null;else if(l!==undefined)u[i[v]]=l;else if(c&&g===null)u[i[v]]=null;else continue}else{u[i[v]]=c&&(p.t!=="n"||p.t==="n"&&f.rawNumbers!==false)?g:Pa(p,g,f)}if(g!=null)h=false}}return{row:u,isempty:h}}function Aw(e,r){if(e==null||e["!ref"]==null)return[];var t={t:"n",v:0},a=0,n=1,i=[],s=0,f="";var o={s:{r:0,c:0},e:{r:0,c:0}};var l=r||{};var c=l.range!=null?l.range:e["!ref"];if(l.header===1)a=1;else if(l.header==="A")a=2;else if(Array.isArray(l.header))a=3;else if(l.header==null)a=0;switch(typeof c){case"string":o=Da(c);break;case"number":o=Da(e["!ref"]);o.s.r=c;break;default:o=c;}if(a>0)n=0;var h=Ta(o.s.r);var u=[];var d=[];var v=0,p=0;var g=Array.isArray(e);var m=o.s.r,b=0;var w={};if(g&&!e[m])e[m]=[];var k=l.skipHidden&&e["!cols"]||[];var T=l.skipHidden&&e["!rows"]||[];for(b=o.s.c;b<=o.e.c;++b){if((k[b]||{}).hidden)continue;u[b]=ya(b);t=g?e[m][b]:e[u[b]+h];switch(a){case 1:i[b]=b-o.s.c;break;case 2:i[b]=u[b];break;case 3:i[b]=l.header[b-o.s.c];break;default:if(t==null)t={w:"__EMPTY",t:"s"};f=s=Pa(t,null,l);p=w[s]||0;if(!p)w[s]=1;else{do{f=s+"_"+p++}while(w[f]);w[s]=p;w[f]=1}i[b]=f;}}for(m=o.s.r+n;m<=o.e.r;++m){if((T[m]||{}).hidden)continue;var A=Tw(e,o,m,u,a,i,g,l);if(A.isempty===false||(a===1?l.blankrows!==false:!!l.blankrows))d[v++]=A.row}d.length=v;return d}var Ew=/"/g;function Cw(e,r,t,a,n,i,s,f){var o=true;var l=[],c="",h=Ta(t);for(var u=r.s.c;u<=r.e.c;++u){if(!a[u])continue;var d=f.dense?(e[t]||[])[u]:e[a[u]+h];if(d==null)c="";else if(d.v!=null){o=false;c=""+(f.rawNumbers&&d.t=="n"?d.v:Pa(d,null,f));for(var v=0,p=0;v!==c.length;++v)if((p=c.charCodeAt(v))===n||p===i||p===34||f.forceQuotes){c='"'+c.replace(Ew,'""')+'"';break}if(c=="ID")c='"ID"'}else if(d.f!=null&&!d.F){o=false;c="="+d.f;if(c.indexOf(",")>=0)c='"'+c.replace(Ew,'""')+'"'}else c="";l.push(c)}if(f.blankrows===false&&o)return null;return l.join(s)}function yw(e,r){var t=[];var a=r==null?{}:r;if(e==null||e["!ref"]==null)return"";var n=Da(e["!ref"]);var i=a.FS!==undefined?a.FS:",",s=i.charCodeAt(0);var f=a.RS!==undefined?a.RS:"\n",o=f.charCodeAt(0);var l=new RegExp((i=="|"?"\\|":i)+"+$");var c="",h=[];a.dense=Array.isArray(e);var u=a.skipHidden&&e["!cols"]||[];var d=a.skipHidden&&e["!rows"]||[];for(var v=n.s.c;v<=n.e.c;++v)if(!(u[v]||{}).hidden)h[v]=ya(v);var p=0;for(var g=n.s.r;g<=n.e.r;++g){if((d[g]||{}).hidden)continue;c=Cw(e,n,g,h,s,o,i,a);if(c==null){continue}if(a.strip)c=c.replace(l,"");if(c||a.blankrows!==false)t.push((p++?f:"")+c)}delete a.dense;return t.join("")}function Sw(e,r){if(!r)r={};r.FS="\t";r.RS="\n";var t=yw(e,r);if(typeof a=="undefined"||r.type=="string")return t;var n=a.utils.encode(1200,t,"str");return String.fromCharCode(255)+String.fromCharCode(254)+n}function _w(e){var r="",t,a="";if(e==null||e["!ref"]==null)return[];var n=Da(e["!ref"]),i="",s=[],f;
 var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.s.r;c<=n.e.r;++c){i=Ta(c);for(f=n.s.c;f<=n.e.c;++f){r=s[f]+i;t=l?(e[c]||[])[f]:e[r];a="";if(t===undefined)continue;else if(t.F!=null){r=t.F;if(!t.f)continue;a=t.f;if(r.indexOf(":")==-1)r=r+":"+r}if(t.f!=null)a=t.f;else if(t.t=="z")continue;else if(t.t=="n"&&t.v!=null)a=""+t.v;else if(t.t=="b")a=t.v?"TRUE":"FALSE";else if(t.w!==undefined)a="'"+t.w;else if(t.v===undefined)continue;else if(t.t=="s")a="'"+t.v;else a=""+t.v;o[o.length]=r+"="+a}}return o}function xw(e,r,t){var a=t||{};var n=+!a.skipHeader;var i=e||{};var s=0,f=0;if(i&&a.origin!=null){if(typeof a.origin=="number")s=a.origin;else{var o=typeof a.origin=="string"?Oa(a.origin):a.origin;s=o.r;f=o.c}}var l;var c={s:{c:0,r:0},e:{c:f,r:s+r.length-1+n}};if(i["!ref"]){var h=Da(i["!ref"]);c.e.c=Math.max(c.e.c,h.e.c);c.e.r=Math.max(c.e.r,h.e.r);if(s==-1){s=h.e.r+1;c.e.r=s+r.length-1+n}}else{if(s==-1){s=0;c.e.r=r.length-1+n}}var u=a.header||[],d=0;r.forEach(function(e,r){rr(e).forEach(function(t){if((d=u.indexOf(t))==-1)u[d=u.length]=t;var o=e[t];var c="z";var h="";var v=Ra({c:f+d,r:s+r+n});l=Rw(i,v);if(o&&typeof o==="object"&&!(o instanceof Date)){i[v]=o}else{if(typeof o=="number")c="n";else if(typeof o=="boolean")c="b";else if(typeof o=="string")c="s";else if(o instanceof Date){c="d";if(!a.cellDates){c="n";o=fr(o)}h=a.dateNF||X[14]}else if(o===null&&a.nullError){c="e";o=0}if(!l)i[v]=l={t:c,v:o};else{l.t=c;l.v=o;delete l.w;delete l.R;if(h)l.z=h}if(h)l.z=h}})});c.e.c=Math.max(c.e.c,f+u.length-1);var v=Ta(s);if(n)for(d=0;d<u.length;++d)i[ya(d+f)+v]={t:"s",v:u[d]};i["!ref"]=Na(c);return i}function Ow(e,r){return xw(null,e,r)}function Rw(e,r,t){if(typeof r=="string"){if(Array.isArray(e)){var a=Oa(r);if(!e[a.r])e[a.r]=[];return e[a.r][a.c]||(e[a.r][a.c]={t:"z"})}return e[r]||(e[r]={t:"z"})}if(typeof r!="number")return Rw(e,Ra(r));return Rw(e,Ra({r:r,c:t||0}))}function Iw(e,r){if(typeof r=="number"){if(r>=0&&e.SheetNames.length>r)return r;throw new Error("Cannot find sheet # "+r)}else if(typeof r=="string"){var t=e.SheetNames.indexOf(r);if(t>-1)return t;throw new Error("Cannot find sheet name |"+r+"|")}else throw new Error("Cannot find sheet |"+r+"|")}function Nw(){return{SheetNames:[],Sheets:{}}}function Dw(e,r,t,a){var n=1;if(!t)for(;n<=65535;++n,t=undefined)if(e.SheetNames.indexOf(t="Sheet"+n)==-1)break;if(!t||e.SheetNames.length>=65535)throw new Error("Too many worksheets");if(a&&e.SheetNames.indexOf(t)>=0){var i=t.match(/(^.*?)(\d+)$/);n=i&&+i[2]||0;var s=i&&i[1]||t;for(++n;n<=65535;++n)if(e.SheetNames.indexOf(t=s+n)==-1)break}Jp(t);if(e.SheetNames.indexOf(t)>=0)throw new Error("Worksheet with name |"+t+"| already exists!");e.SheetNames.push(t);e.Sheets[t]=r;return t}function Fw(e,r,t){if(!e.Workbook)e.Workbook={};if(!e.Workbook.Sheets)e.Workbook.Sheets=[];var a=Iw(e,r);if(!e.Workbook.Sheets[a])e.Workbook.Sheets[a]={};switch(t){case 0:;case 1:;case 2:break;default:throw new Error("Bad sheet visibility setting "+t);}e.Workbook.Sheets[a].Hidden=t}function Pw(e,r){e.z=r;return e}function Lw(e,r,t){if(!r){delete e.l}else{e.l={Target:r};if(t)e.l.Tooltip=t}return e}function Mw(e,r,t){return Lw(e,"#"+r,t)}function Uw(e,r,t){if(!e.c)e.c=[];e.c.push({t:r,a:t||"SheetJS"})}function Bw(e,r,t,a){var n=typeof r!="string"?r:Da(r);var i=typeof r=="string"?r:Na(r);for(var s=n.s.r;s<=n.e.r;++s)for(var f=n.s.c;f<=n.e.c;++f){var o=Rw(e,s,f);o.t="n";o.F=i;delete o.v;if(s==n.s.r&&f==n.s.c){o.f=t;if(a)o.D=true}}return e}var Ww={encode_col:ya,encode_row:Ta,encode_cell:Ra,encode_range:Na,decode_col:Ca,decode_row:ka,split_cell:xa,decode_cell:Oa,decode_range:Ia,format_cell:Pa,sheet_add_aoa:Ma,sheet_add_json:xw,sheet_add_dom:Gm,aoa_to_sheet:Ua,json_to_sheet:Ow,table_to_sheet:jm,table_to_book:Xm,sheet_to_csv:yw,sheet_to_txt:Sw,sheet_to_json:Aw,sheet_to_html:Vm,sheet_to_formulae:_w,sheet_to_row_object_array:Aw,sheet_get_cell:Rw,book_new:Nw,book_append_sheet:Dw,book_set_sheet_visibility:Fw,cell_set_number_format:Pw,cell_set_hyperlink:Lw,cell_set_internal_link:Mw,cell_add_comment:Uw,sheet_set_array_formula:Bw,consts:{SHEET_VISIBLE:0,SHEET_HIDDEN:1,SHEET_VERY_HIDDEN:2}};var Hw;function zw(e){Hw=e}function Vw(e,r){var t=Hw();var a=r==null?{}:r;if(e==null||e["!ref"]==null){t.push(null);return t}var n=Da(e["!ref"]);var i=a.FS!==undefined?a.FS:",",s=i.charCodeAt(0);var f=a.RS!==undefined?a.RS:"\n",o=f.charCodeAt(0);var l=new RegExp((i=="|"?"\\|":i)+"+$");var c="",h=[];a.dense=Array.isArray(e);var u=a.skipHidden&&e["!cols"]||[];var d=a.skipHidden&&e["!rows"]||[];for(var v=n.s.c;v<=n.e.c;++v)if(!(u[v]||{}).hidden)h[v]=ya(v);var p=n.s.r;var g=false,m=0;t._read=function(){if(!g){g=true;return t.push("\ufeff")}while(p<=n.e.r){++p;if((d[p-1]||{}).hidden)continue;c=Cw(e,n,p-1,h,s,o,i,a);if(c!=null){if(a.strip)c=c.replace(l,"");if(c||a.blankrows!==false)return t.push((m++?f:"")+c)}}return t.push(null)};return t}function Gw(e,r){var t=Hw();var a=r||{};var n=a.header!=null?a.header:Bm;var i=a.footer!=null?a.footer:Wm;t.push(n);var s=Ia(e["!ref"]);a.dense=Array.isArray(e);t.push(zm(e,s,a));var f=s.s.r;var o=false;t._read=function(){if(f>s.e.r){if(!o){o=true;t.push("</table>"+i)}return t.push(null)}while(f<=s.e.r){t.push(Um(e,s,f,a));++f;break}};return t}function jw(e,r){var t=Hw({objectMode:true});if(e==null||e["!ref"]==null){t.push(null);return t}var a={t:"n",v:0},n=0,i=1,s=[],f=0,o="";var l={s:{r:0,c:0},e:{r:0,c:0}};var c=r||{};var h=c.range!=null?c.range:e["!ref"];if(c.header===1)n=1;else if(c.header==="A")n=2;else if(Array.isArray(c.header))n=3;switch(typeof h){case"string":l=Da(h);break;case"number":l=Da(e["!ref"]);l.s.r=h;break;default:l=h;}if(n>0)i=0;var u=Ta(l.s.r);var d=[];var v=0;var p=Array.isArray(e);var g=l.s.r,m=0;var b={};if(p&&!e[g])e[g]=[];var w=c.skipHidden&&e["!cols"]||[];var k=c.skipHidden&&e["!rows"]||[];for(m=l.s.c;m<=l.e.c;++m){if((w[m]||{}).hidden)continue;d[m]=ya(m);a=p?e[g][m]:e[d[m]+u];switch(n){case 1:s[m]=m-l.s.c;break;case 2:s[m]=d[m];break;case 3:s[m]=c.header[m-l.s.c];break;default:if(a==null)a={w:"__EMPTY",t:"s"};o=f=Pa(a,null,c);v=b[f]||0;if(!v)b[f]=1;else{do{o=f+"_"+v++}while(b[o]);b[f]=v;b[o]=1}s[m]=o;}}g=l.s.r+i;t._read=function(){while(g<=l.e.r){if((k[g-1]||{}).hidden)continue;var r=Tw(e,l,g,d,n,s,p,c);++g;if(r.isempty===false||(n===1?c.blankrows!==false:!!c.blankrows)){t.push(r.row);return}}return t.push(null)};return t}var Xw={to_json:jw,to_html:Gw,to_csv:Vw,set_readable:zw};if(typeof vm!=="undefined")e.parse_xlscfb=vm;e.parse_zip=Xb;e.read=iw;e.readFile=sw;e.readFileSync=sw;e.write=gw;e.writeFile=bw;e.writeFileSync=bw;e.writeFileAsync=kw;e.utils=Ww;e.writeXLSX=pw;e.writeFileXLSX=ww;e.SSF=Ve;if(typeof Xw!=="undefined")e.stream=Xw;if(typeof Ke!=="undefined")e.CFB=Ke;if(typeof require!=="undefined"){var $w=undefined;if(($w||{}).Readable)zw($w.Readable)}}if(typeof exports!=="undefined")make_xlsx_lib(exports);else if(typeof module!=="undefined"&&module.exports)make_xlsx_lib(module.exports);else if(typeof define==="function"&&define.amd)define("xlsx",function(){if(!XLSX.version)make_xlsx_lib(XLSX);return XLSX});else make_xlsx_lib(XLSX);if(typeof window!=="undefined"&&!window.XLSX)try{window.XLSX=XLSX}catch(e){}
 
+;
+!function(f){typeof module!='undefined'&&typeof exports=='object'?module.exports=f():typeof define!='undefined'&&define.amd?define(f):(typeof self!='undefined'?self:this).fflate=f()}(function(){var _e={};"use strict";var t=(typeof module!='undefined'&&typeof exports=='object'?function(_f){"use strict";var e,t=";var __w=require('worker_threads');__w.parentPort.on('message',function(m){onmessage({data:m})}),postMessage=function(m,t){__w.parentPort.postMessage(m,t)},close=process.exit;self=global";try{e=require("worker_threads").Worker}catch(e){}exports.default=e?function(r,n,o,a,s){var u=!1,i=new e(r+t,{eval:!0}).on("error",(function(e){return s(e,null)})).on("message",(function(e){return s(null,e)})).on("exit",(function(e){e&&!u&&s(Error("exited with code "+e),null)}));return i.postMessage(o,a),i.terminate=function(){return u=!0,e.prototype.terminate.call(i)},i}:function(e,t,r,n,o){setImmediate((function(){return o(Error("async operations unsupported - update to Node 12+ (or Node 10-11 with the --experimental-worker CLI flag)"),null)}));var a=function(){};return{terminate:a,postMessage:a}};return _f}:function(_f){"use strict";var e={};_f.default=function(r,t,s,a,n){var o=new Worker(e[t]||(e[t]=URL.createObjectURL(new Blob([r+';addEventListener("error",function(e){e=e.error;postMessage({$e$:[e.message,e.code,e.stack]})})'],{type:"text/javascript"}))));return o.onmessage=function(e){var r=e.data,t=r.$e$;if(t){var s=Error(t[0]);s.code=t[1],s.stack=t[2],n(s,null)}else n(null,r)},o.postMessage(s,a),o};return _f})({}),n=Uint8Array,r=Uint16Array,e=Int32Array,i=new n([0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0,0,0,0]),o=new n([0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13,0,0]),s=new n([16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15]),a=function(t,n){for(var i=new r(31),o=0;o<31;++o)i[o]=n+=1<<t[o-1];var s=new e(i[30]);for(o=1;o<30;++o)for(var a=i[o];a<i[o+1];++a)s[a]=a-i[o]<<5|o;return{b:i,r:s}},u=a(i,2),h=u.b,f=u.r;h[28]=258,f[258]=28;for(var l=a(o,0),c=l.b,p=l.r,v=new r(32768),d=0;d<32768;++d){var g=(43690&d)>>1|(21845&d)<<1;v[d]=((65280&(g=(61680&(g=(52428&g)>>2|(13107&g)<<2))>>4|(3855&g)<<4))>>8|(255&g)<<8)>>1}var y=function(t,n,e){for(var i=t.length,o=0,s=new r(n);o<i;++o)t[o]&&++s[t[o]-1];var a,u=new r(n);for(o=1;o<n;++o)u[o]=u[o-1]+s[o-1]<<1;if(e){a=new r(1<<n);var h=15-n;for(o=0;o<i;++o)if(t[o])for(var f=o<<4|t[o],l=n-t[o],c=u[t[o]-1]++<<l,p=c|(1<<l)-1;c<=p;++c)a[v[c]>>h]=f}else for(a=new r(i),o=0;o<i;++o)t[o]&&(a[o]=v[u[t[o]-1]++]>>15-t[o]);return a},m=new n(288);for(d=0;d<144;++d)m[d]=8;for(d=144;d<256;++d)m[d]=9;for(d=256;d<280;++d)m[d]=7;for(d=280;d<288;++d)m[d]=8;var b=new n(32);for(d=0;d<32;++d)b[d]=5;var w=y(m,9,0),x=y(m,9,1),z=y(b,5,0),k=y(b,5,1),M=function(t){for(var n=t[0],r=1;r<t.length;++r)t[r]>n&&(n=t[r]);return n},S=function(t,n,r){var e=n/8|0;return(t[e]|t[e+1]<<8)>>(7&n)&r},A=function(t,n){var r=n/8|0;return(t[r]|t[r+1]<<8|t[r+2]<<16)>>(7&n)},T=function(t){return(t+7)/8|0},D=function(t,r,e){return(null==r||r<0)&&(r=0),(null==e||e>t.length)&&(e=t.length),new n(t.subarray(r,e))};_e.FlateErrorCode={UnexpectedEOF:0,InvalidBlockType:1,InvalidLengthLiteral:2,InvalidDistance:3,StreamFinished:4,NoStreamHandler:5,InvalidHeader:6,NoCallback:7,InvalidUTF8:8,ExtraFieldTooLong:9,InvalidDate:10,FilenameTooLong:11,StreamFinishing:12,InvalidZipData:13,UnknownCompressionMethod:14};var C=["unexpected EOF","invalid block type","invalid length/literal","invalid distance","stream finished","no stream handler",,"no callback","invalid UTF-8 data","extra field too long","date not in range 1980-2099","filename too long","stream finishing","invalid zip data"],I=function(t,n,r){var e=Error(n||C[t]);if(e.code=t,Error.captureStackTrace&&Error.captureStackTrace(e,I),!r)throw e;return e},U=function(t,r,e,a){var u=t.length,f=a?a.length:0;if(!u||r.f&&!r.l)return e||new n(0);var l=!e,p=l||2!=r.i,v=r.i;l&&(e=new n(3*u));var d=function(t){var r=e.length;if(t>r){var i=new n(Math.max(2*r,t));i.set(e),e=i}},g=r.f||0,m=r.p||0,b=r.b||0,w=r.l,z=r.d,C=r.m,U=r.n,F=8*u;do{if(!w){g=S(t,m,1);var E=S(t,m+1,3);if(m+=3,!E){var Z=t[(J=T(m)+4)-4]|t[J-3]<<8,q=J+Z;if(q>u){v&&I(0);break}p&&d(b+Z),e.set(t.subarray(J,q),b),r.b=b+=Z,r.p=m=8*q,r.f=g;continue}if(1==E)w=x,z=k,C=9,U=5;else if(2==E){var O=S(t,m,31)+257,G=S(t,m+10,15)+4,L=O+S(t,m+5,31)+1;m+=14;for(var H=new n(L),j=new n(19),N=0;N<G;++N)j[s[N]]=S(t,m+3*N,7);m+=3*G;var P=M(j),B=(1<<P)-1,Y=y(j,P,1);for(N=0;N<L;){var J,K=Y[S(t,m,B)];if(m+=15&K,(J=K>>4)<16)H[N++]=J;else{var Q=0,R=0;for(16==J?(R=3+S(t,m,3),m+=2,Q=H[N-1]):17==J?(R=3+S(t,m,7),m+=3):18==J&&(R=11+S(t,m,127),m+=7);R--;)H[N++]=Q}}var V=H.subarray(0,O),W=H.subarray(O);C=M(V),U=M(W),w=y(V,C,1),z=y(W,U,1)}else I(1);if(m>F){v&&I(0);break}}p&&d(b+131072);for(var X=(1<<C)-1,$=(1<<U)-1,_=m;;_=m){var tt=(Q=w[A(t,m)&X])>>4;if((m+=15&Q)>F){v&&I(0);break}if(Q||I(2),tt<256)e[b++]=tt;else{if(256==tt){_=m,w=null;break}var nt=tt-254;tt>264&&(nt=S(t,m,(1<<(it=i[N=tt-257]))-1)+h[N],m+=it);var rt=z[A(t,m)&$],et=rt>>4;if(rt||I(3),m+=15&rt,W=c[et],et>3){var it=o[et];W+=A(t,m)&(1<<it)-1,m+=it}if(m>F){v&&I(0);break}p&&d(b+131072);var ot=b+nt;if(b<W){var st=f-W,at=Math.min(W,ot);for(st+b<0&&I(3);b<at;++b)e[b]=a[st+b]}for(;b<ot;++b)e[b]=e[b-W]}}r.l=w,r.p=_,r.b=b,r.f=g,w&&(g=1,r.m=C,r.d=z,r.n=U)}while(!g);return b!=e.length&&l?D(e,0,b):e.subarray(0,b)},F=function(t,n,r){var e=n/8|0;t[e]|=r<<=7&n,t[e+1]|=r>>8},E=function(t,n,r){var e=n/8|0;t[e]|=r<<=7&n,t[e+1]|=r>>8,t[e+2]|=r>>16},Z=function(t,e){for(var i=[],o=0;o<t.length;++o)t[o]&&i.push({s:o,f:t[o]});var s=i.length,a=i.slice();if(!s)return{t:N,l:0};if(1==s){var u=new n(i[0].s+1);return u[i[0].s]=1,{t:u,l:1}}i.sort((function(t,n){return t.f-n.f})),i.push({s:-1,f:25001});var h=i[0],f=i[1],l=0,c=1,p=2;for(i[0]={s:-1,f:h.f+f.f,l:h,r:f};c!=s-1;)h=i[i[l].f<i[p].f?l++:p++],f=i[l!=c&&i[l].f<i[p].f?l++:p++],i[c++]={s:-1,f:h.f+f.f,l:h,r:f};var v=a[0].s;for(o=1;o<s;++o)a[o].s>v&&(v=a[o].s);var d=new r(v+1),g=q(i[c-1],d,0);if(g>e){o=0;var y=0,m=g-e,b=1<<m;for(a.sort((function(t,n){return d[n.s]-d[t.s]||t.f-n.f}));o<s;++o){var w=a[o].s;if(!(d[w]>e))break;y+=b-(1<<g-d[w]),d[w]=e}for(y>>=m;y>0;){var x=a[o].s;d[x]<e?y-=1<<e-d[x]++-1:++o}for(;o>=0&&y;--o){var z=a[o].s;d[z]==e&&(--d[z],++y)}g=e}return{t:new n(d),l:g}},q=function(t,n,r){return-1==t.s?Math.max(q(t.l,n,r+1),q(t.r,n,r+1)):n[t.s]=r},O=function(t){for(var n=t.length;n&&!t[--n];);for(var e=new r(++n),i=0,o=t[0],s=1,a=function(t){e[i++]=t},u=1;u<=n;++u)if(t[u]==o&&u!=n)++s;else{if(!o&&s>2){for(;s>138;s-=138)a(32754);s>2&&(a(s>10?s-11<<5|28690:s-3<<5|12305),s=0)}else if(s>3){for(a(o),--s;s>6;s-=6)a(8304);s>2&&(a(s-3<<5|8208),s=0)}for(;s--;)a(o);s=1,o=t[u]}return{c:e.subarray(0,i),n:n}},G=function(t,n){for(var r=0,e=0;e<n.length;++e)r+=t[e]*n[e];return r},L=function(t,n,r){var e=r.length,i=T(n+2);t[i]=255&e,t[i+1]=e>>8,t[i+2]=255^t[i],t[i+3]=255^t[i+1];for(var o=0;o<e;++o)t[i+o+4]=r[o];return 8*(i+4+e)},H=function(t,n,e,a,u,h,f,l,c,p,v){F(n,v++,e),++u[256];for(var d=Z(u,15),g=d.t,x=d.l,k=Z(h,15),M=k.t,S=k.l,A=O(g),T=A.c,D=A.n,C=O(M),I=C.c,U=C.n,q=new r(19),H=0;H<T.length;++H)++q[31&T[H]];for(H=0;H<I.length;++H)++q[31&I[H]];for(var j=Z(q,7),N=j.t,P=j.l,B=19;B>4&&!N[s[B-1]];--B);var Y,J,K,Q,R=p+5<<3,V=G(u,m)+G(h,b)+f,W=G(u,g)+G(h,M)+f+14+3*B+G(q,N)+2*q[16]+3*q[17]+7*q[18];if(c>=0&&R<=V&&R<=W)return L(n,v,t.subarray(c,c+p));if(F(n,v,1+(W<V)),v+=2,W<V){Y=y(g,x,0),J=g,K=y(M,S,0),Q=M;var X=y(N,P,0);for(F(n,v,D-257),F(n,v+5,U-1),F(n,v+10,B-4),v+=14,H=0;H<B;++H)F(n,v+3*H,N[s[H]]);v+=3*B;for(var $=[T,I],_=0;_<2;++_){var tt=$[_];for(H=0;H<tt.length;++H)F(n,v,X[rt=31&tt[H]]),v+=N[rt],rt>15&&(F(n,v,tt[H]>>5&127),v+=tt[H]>>12)}}else Y=w,J=m,K=z,Q=b;for(H=0;H<l;++H){var nt=a[H];if(nt>255){var rt;E(n,v,Y[257+(rt=nt>>18&31)]),v+=J[rt+257],rt>7&&(F(n,v,nt>>23&31),v+=i[rt]);var et=31&nt;E(n,v,K[et]),v+=Q[et],et>3&&(E(n,v,nt>>5&8191),v+=o[et])}else E(n,v,Y[nt]),v+=J[nt]}return E(n,v,Y[256]),v+J[256]},j=new e([65540,131080,131088,131104,262176,1048704,1048832,2114560,2117632]),N=new n(0),P=function(t,s,a,u,h,l){var c=l.z||t.length,v=new n(u+c+5*(1+Math.ceil(c/7e3))+h),d=v.subarray(u,v.length-h),g=l.l,y=7&(l.r||0);if(s){y&&(d[0]=l.r>>3);for(var m=j[s-1],b=m>>13,w=8191&m,x=(1<<a)-1,z=l.p||new r(32768),k=l.h||new r(x+1),M=Math.ceil(a/3),S=2*M,A=function(n){return(t[n]^t[n+1]<<M^t[n+2]<<S)&x},C=new e(25e3),I=new r(288),U=new r(32),F=0,E=0,Z=l.i||0,q=0,O=l.w||0,G=0;Z+2<c;++Z){var N=A(Z),P=32767&Z,B=k[N];if(z[P]=B,k[N]=P,O<=Z){var Y=c-Z;if((F>7e3||q>24576)&&(Y>423||!g)){y=H(t,d,0,C,I,U,E,q,G,Z-G,y),q=F=E=0,G=Z;for(var J=0;J<286;++J)I[J]=0;for(J=0;J<30;++J)U[J]=0}var K=2,Q=0,R=w,V=P-B&32767;if(Y>2&&N==A(Z-V))for(var W=Math.min(b,Y)-1,X=Math.min(32767,Z),$=Math.min(258,Y);V<=X&&--R&&P!=B;){if(t[Z+K]==t[Z+K-V]){for(var _=0;_<$&&t[Z+_]==t[Z+_-V];++_);if(_>K){if(K=_,Q=V,_>W)break;var tt=Math.min(V,_-2),nt=0;for(J=0;J<tt;++J){var rt=Z-V+J&32767,et=rt-z[rt]&32767;et>nt&&(nt=et,B=rt)}}}V+=(P=B)-(B=z[P])&32767}if(Q){C[q++]=268435456|f[K]<<18|p[Q];var it=31&f[K],ot=31&p[Q];E+=i[it]+o[ot],++I[257+it],++U[ot],O=Z+K,++F}else C[q++]=t[Z],++I[t[Z]]}}for(Z=Math.max(Z,O);Z<c;++Z)C[q++]=t[Z],++I[t[Z]];y=H(t,d,g,C,I,U,E,q,G,Z-G,y),g||(l.r=7&y|d[y/8|0]<<3,y-=7,l.h=k,l.p=z,l.i=Z,l.w=O)}else{for(Z=l.w||0;Z<c+g;Z+=65535){var st=Z+65535;st>=c&&(d[y/8|0]=g,st=c),y=L(d,y+1,t.subarray(Z,st))}l.i=c}return D(v,0,u+T(y)+h)},B=function(){for(var t=new Int32Array(256),n=0;n<256;++n){for(var r=n,e=9;--e;)r=(1&r&&-306674912)^r>>>1;t[n]=r}return t}(),Y=function(){var t=-1;return{p:function(n){for(var r=t,e=0;e<n.length;++e)r=B[255&r^n[e]]^r>>>8;t=r},d:function(){return~t}}},J=function(){var t=1,n=0;return{p:function(r){for(var e=t,i=n,o=0|r.length,s=0;s!=o;){for(var a=Math.min(s+2655,o);s<a;++s)i+=e+=r[s];e=(65535&e)+15*(e>>16),i=(65535&i)+15*(i>>16)}t=e,n=i},d:function(){return(255&(t%=65521))<<24|(65280&t)<<8|(255&(n%=65521))<<8|n>>8}}},K=function(t,r,e,i,o){if(!o&&(o={l:1},r.dictionary)){var s=r.dictionary.subarray(-32768),a=new n(s.length+t.length);a.set(s),a.set(t,s.length),t=a,o.w=s.length}return P(t,null==r.level?6:r.level,null==r.mem?o.l?Math.ceil(1.5*Math.max(8,Math.min(13,Math.log(t.length)))):20:12+r.mem,e,i,o)},Q=function(t,n){var r={};for(var e in t)r[e]=t[e];for(var e in n)r[e]=n[e];return r},R=function(t,n,r){for(var e=t(),i=""+t,o=i.slice(i.indexOf("[")+1,i.lastIndexOf("]")).replace(/\s+/g,"").split(","),s=0;s<e.length;++s){var a=e[s],u=o[s];if("function"==typeof a){n+=";"+u+"=";var h=""+a;if(a.prototype)if(-1!=h.indexOf("[native code]")){var f=h.indexOf(" ",8)+1;n+=h.slice(f,h.indexOf("(",f))}else for(var l in n+=h,a.prototype)n+=";"+u+".prototype."+l+"="+a.prototype[l];else n+=h}else r[u]=a}return n},V=[],W=function(t){var n=[];for(var r in t)t[r].buffer&&n.push((t[r]=new t[r].constructor(t[r])).buffer);return n},X=function(n,r,e,i){if(!V[e]){for(var o="",s={},a=n.length-1,u=0;u<a;++u)o=R(n[u],o,s);V[e]={c:R(n[a],o,s),e:s}}var h=Q({},V[e].e);return(0,t.default)(V[e].c+";onmessage=function(e){for(var k in e.data)self[k]=e.data[k];onmessage="+r+"}",e,h,W(h),i)},$=function(){return[n,r,e,i,o,s,h,c,x,k,v,C,y,M,S,A,T,D,I,U,Tt,it,ot]},_=function(){return[n,r,e,i,o,s,f,p,w,m,z,b,v,j,N,y,F,E,Z,q,O,G,L,H,T,D,P,K,kt,it]},tt=function(){return[pt,gt,ct,Y,B]},nt=function(){return[vt,dt]},rt=function(){return[yt,ct,J]},et=function(){return[mt]},it=function(t){return postMessage(t,[t.buffer])},ot=function(t){return t&&{out:t.size&&new n(t.size),dictionary:t.dictionary}},st=function(t,n,r,e,i,o){var s=X(r,e,i,(function(t,n){s.terminate(),o(t,n)}));return s.postMessage([t,n],n.consume?[t.buffer]:[]),function(){s.terminate()}},at=function(t){return t.ondata=function(t,n){return postMessage([t,n],[t.buffer])},function(n){n.data.length?(t.push(n.data[0],n.data[1]),postMessage([n.data[0].length])):t.flush()}},ut=function(t,n,r,e,i,o,s){var a,u=X(t,e,i,(function(t,r){t?(u.terminate(),n.ondata.call(n,t)):Array.isArray(r)?1==r.length?(n.queuedSize-=r[0],n.ondrain&&n.ondrain(r[0])):(r[1]&&u.terminate(),n.ondata.call(n,t,r[0],r[1])):s(r)}));u.postMessage(r),n.queuedSize=0,n.push=function(t,r){n.ondata||I(5),a&&n.ondata(I(4,0,1),null,!!r),n.queuedSize+=t.length,u.postMessage([t,a=r],[t.buffer])},n.terminate=function(){u.terminate()},o&&(n.flush=function(){u.postMessage([])})},ht=function(t,n){return t[n]|t[n+1]<<8},ft=function(t,n){return(t[n]|t[n+1]<<8|t[n+2]<<16|t[n+3]<<24)>>>0},lt=function(t,n){return ft(t,n)+4294967296*ft(t,n+4)},ct=function(t,n,r){for(;r;++n)t[n]=r,r>>>=8},pt=function(t,n){var r=n.filename;if(t[0]=31,t[1]=139,t[2]=8,t[8]=n.level<2?4:9==n.level?2:0,t[9]=3,0!=n.mtime&&ct(t,4,Math.floor(new Date(n.mtime||Date.now())/1e3)),r){t[3]=8;for(var e=0;e<=r.length;++e)t[e+10]=r.charCodeAt(e)}},vt=function(t){31==t[0]&&139==t[1]&&8==t[2]||I(6,"invalid gzip data");var n=t[3],r=10;4&n&&(r+=2+(t[10]|t[11]<<8));for(var e=(n>>3&1)+(n>>4&1);e>0;e-=!t[r++]);return r+(2&n)},dt=function(t){var n=t.length;return(t[n-4]|t[n-3]<<8|t[n-2]<<16|t[n-1]<<24)>>>0},gt=function(t){return 10+(t.filename?t.filename.length+1:0)},yt=function(t,n){var r=n.level,e=0==r?0:r<6?1:9==r?3:2;if(t[0]=120,t[1]=e<<6|(n.dictionary&&32),t[1]|=31-(t[0]<<8|t[1])%31,n.dictionary){var i=J();i.p(n.dictionary),ct(t,2,i.d())}},mt=function(t,n){return(8!=(15&t[0])||t[0]>>4>7||(t[0]<<8|t[1])%31)&&I(6,"invalid zlib data"),(t[1]>>5&1)==+!n&&I(6,"invalid zlib data: "+(32&t[1]?"need":"unexpected")+" dictionary"),2+(t[1]>>3&4)};function bt(t,n){return"function"==typeof t&&(n=t,t={}),this.ondata=n,t}var wt=function(){function t(t,r){if("function"==typeof t&&(r=t,t={}),this.ondata=r,this.o=t||{},this.s={l:0,i:32768,w:32768,z:32768},this.b=new n(98304),this.o.dictionary){var e=this.o.dictionary.subarray(-32768);this.b.set(e,32768-e.length),this.s.i=32768-e.length}}return t.prototype.p=function(t,n){this.ondata(K(t,this.o,0,0,this.s),n)},t.prototype.push=function(t,r){this.ondata||I(5),this.s.l&&I(4);var e=t.length+this.s.z;if(e>this.b.length){if(e>2*this.b.length-32768){var i=new n(-32768&e);i.set(this.b.subarray(0,this.s.z)),this.b=i}var o=this.b.length-this.s.z;this.b.set(t.subarray(0,o),this.s.z),this.s.z=this.b.length,this.p(this.b,!1),this.b.set(this.b.subarray(-32768)),this.b.set(t.subarray(o),32768),this.s.z=t.length-o+32768,this.s.i=32766,this.s.w=32768}else this.b.set(t,this.s.z),this.s.z+=t.length;this.s.l=1&r,(this.s.z>this.s.w+8191||r)&&(this.p(this.b,r||!1),this.s.w=this.s.i,this.s.i-=2)},t.prototype.flush=function(){this.ondata||I(5),this.s.l&&I(4),this.p(this.b,!1),this.s.w=this.s.i,this.s.i-=2},t}();_e.Deflate=wt;var xt=function(){return function(t,n){ut([_,function(){return[at,wt]}],this,bt.call(this,t,n),(function(t){var n=new wt(t.data);onmessage=at(n)}),6,1)}}();function zt(t,n,r){return r||(r=n,n={}),"function"!=typeof r&&I(7),st(t,n,[_],(function(t){return it(kt(t.data[0],t.data[1]))}),0,r)}function kt(t,n){return K(t,n||{},0,0)}_e.AsyncDeflate=xt,_e.deflate=zt,_e.deflateSync=kt;var Mt=function(){function t(t,r){"function"==typeof t&&(r=t,t={}),this.ondata=r;var e=t&&t.dictionary&&t.dictionary.subarray(-32768);this.s={i:0,b:e?e.length:0},this.o=new n(32768),this.p=new n(0),e&&this.o.set(e)}return t.prototype.e=function(t){if(this.ondata||I(5),this.d&&I(4),this.p.length){if(t.length){var r=new n(this.p.length+t.length);r.set(this.p),r.set(t,this.p.length),this.p=r}}else this.p=t},t.prototype.c=function(t){this.s.i=+(this.d=t||!1);var n=this.s.b,r=U(this.p,this.s,this.o);this.ondata(D(r,n,this.s.b),this.d),this.o=D(r,this.s.b-32768),this.s.b=this.o.length,this.p=D(this.p,this.s.p/8|0),this.s.p&=7},t.prototype.push=function(t,n){this.e(t),this.c(n)},t}();_e.Inflate=Mt;var St=function(){return function(t,n){ut([$,function(){return[at,Mt]}],this,bt.call(this,t,n),(function(t){var n=new Mt(t.data);onmessage=at(n)}),7,0)}}();function At(t,n,r){return r||(r=n,n={}),"function"!=typeof r&&I(7),st(t,n,[$],(function(t){return it(Tt(t.data[0],ot(t.data[1])))}),1,r)}function Tt(t,n){return U(t,{i:2},n&&n.out,n&&n.dictionary)}_e.AsyncInflate=St,_e.inflate=At,_e.inflateSync=Tt;var Dt=function(){function t(t,n){this.c=Y(),this.l=0,this.v=1,wt.call(this,t,n)}return t.prototype.push=function(t,n){this.c.p(t),this.l+=t.length,wt.prototype.push.call(this,t,n)},t.prototype.p=function(t,n){var r=K(t,this.o,this.v&&gt(this.o),n&&8,this.s);this.v&&(pt(r,this.o),this.v=0),n&&(ct(r,r.length-8,this.c.d()),ct(r,r.length-4,this.l)),this.ondata(r,n)},t.prototype.flush=function(){wt.prototype.flush.call(this)},t}();_e.Gzip=Dt,_e.Compress=Dt;var Ct=function(){return function(t,n){ut([_,tt,function(){return[at,wt,Dt]}],this,bt.call(this,t,n),(function(t){var n=new Dt(t.data);onmessage=at(n)}),8,1)}}();function It(t,n,r){return r||(r=n,n={}),"function"!=typeof r&&I(7),st(t,n,[_,tt,function(){return[Ut]}],(function(t){return it(Ut(t.data[0],t.data[1]))}),2,r)}function Ut(t,n){n||(n={});var r=Y(),e=t.length;r.p(t);var i=K(t,n,gt(n),8),o=i.length;return pt(i,n),ct(i,o-8,r.d()),ct(i,o-4,e),i}_e.AsyncGzip=Ct,_e.AsyncCompress=Ct,_e.gzip=It,_e.compress=It,_e.gzipSync=Ut,_e.compressSync=Ut;var Ft=function(){function t(t,n){this.v=1,this.r=0,Mt.call(this,t,n)}return t.prototype.push=function(t,r){if(Mt.prototype.e.call(this,t),this.r+=t.length,this.v){var e=this.p.subarray(this.v-1),i=e.length>3?vt(e):4;if(i>e.length){if(!r)return}else this.v>1&&this.onmember&&this.onmember(this.r-e.length);this.p=e.subarray(i),this.v=0}Mt.prototype.c.call(this,r),!this.s.f||this.s.l||r||(this.v=T(this.s.p)+9,this.s={i:0},this.o=new n(0),this.push(new n(0),r))},t}();_e.Gunzip=Ft;var Et=function(){return function(t,n){var r=this;ut([$,nt,function(){return[at,Mt,Ft]}],this,bt.call(this,t,n),(function(t){var n=new Ft(t.data);n.onmember=function(t){return postMessage(t)},onmessage=at(n)}),9,0,(function(t){return r.onmember&&r.onmember(t)}))}}();function Zt(t,n,r){return r||(r=n,n={}),"function"!=typeof r&&I(7),st(t,n,[$,nt,function(){return[qt]}],(function(t){return it(qt(t.data[0],t.data[1]))}),3,r)}function qt(t,r){var e=vt(t);return e+8>t.length&&I(6,"invalid gzip data"),U(t.subarray(e,-8),{i:2},r&&r.out||new n(dt(t)),r&&r.dictionary)}_e.AsyncGunzip=Et,_e.gunzip=Zt,_e.gunzipSync=qt;var Ot=function(){function t(t,n){this.c=J(),this.v=1,wt.call(this,t,n)}return t.prototype.push=function(t,n){this.c.p(t),wt.prototype.push.call(this,t,n)},t.prototype.p=function(t,n){var r=K(t,this.o,this.v&&(this.o.dictionary?6:2),n&&4,this.s);this.v&&(yt(r,this.o),this.v=0),n&&ct(r,r.length-4,this.c.d()),this.ondata(r,n)},t.prototype.flush=function(){wt.prototype.flush.call(this)},t}();_e.Zlib=Ot;var Gt=function(){return function(t,n){ut([_,rt,function(){return[at,wt,Ot]}],this,bt.call(this,t,n),(function(t){var n=new Ot(t.data);onmessage=at(n)}),10,1)}}();function Lt(t,n,r){return r||(r=n,n={}),"function"!=typeof r&&I(7),st(t,n,[_,rt,function(){return[Ht]}],(function(t){return it(Ht(t.data[0],t.data[1]))}),4,r)}function Ht(t,n){n||(n={});var r=J();r.p(t);var e=K(t,n,n.dictionary?6:2,4);return yt(e,n),ct(e,e.length-4,r.d()),e}_e.AsyncZlib=Gt,_e.zlib=Lt,_e.zlibSync=Ht;var jt=function(){function t(t,n){Mt.call(this,t,n),this.v=t&&t.dictionary?2:1}return t.prototype.push=function(t,n){if(Mt.prototype.e.call(this,t),this.v){if(this.p.length<6&&!n)return;this.p=this.p.subarray(mt(this.p,this.v-1)),this.v=0}n&&(this.p.length<4&&I(6,"invalid zlib data"),this.p=this.p.subarray(0,-4)),Mt.prototype.c.call(this,n)},t}();_e.Unzlib=jt;var Nt=function(){return function(t,n){ut([$,et,function(){return[at,Mt,jt]}],this,bt.call(this,t,n),(function(t){var n=new jt(t.data);onmessage=at(n)}),11,0)}}();function Pt(t,n,r){return r||(r=n,n={}),"function"!=typeof r&&I(7),st(t,n,[$,et,function(){return[Bt]}],(function(t){return it(Bt(t.data[0],ot(t.data[1])))}),5,r)}function Bt(t,n){return U(t.subarray(mt(t,n&&n.dictionary),-4),{i:2},n&&n.out,n&&n.dictionary)}_e.AsyncUnzlib=Nt,_e.unzlib=Pt,_e.unzlibSync=Bt;var Yt=function(){function t(t,n){this.o=bt.call(this,t,n)||{},this.G=Ft,this.I=Mt,this.Z=jt}return t.prototype.i=function(){var t=this;this.s.ondata=function(n,r){t.ondata(n,r)}},t.prototype.push=function(t,r){if(this.ondata||I(5),this.s)this.s.push(t,r);else{if(this.p&&this.p.length){var e=new n(this.p.length+t.length);e.set(this.p),e.set(t,this.p.length)}else this.p=t;this.p.length>2&&(this.s=31==this.p[0]&&139==this.p[1]&&8==this.p[2]?new this.G(this.o):8!=(15&this.p[0])||this.p[0]>>4>7||(this.p[0]<<8|this.p[1])%31?new this.I(this.o):new this.Z(this.o),this.i(),this.s.push(this.p,r),this.p=null)}},t}();_e.Decompress=Yt;var Jt=function(){function t(t,n){Yt.call(this,t,n),this.queuedSize=0,this.G=Et,this.I=St,this.Z=Nt}return t.prototype.i=function(){var t=this;this.s.ondata=function(n,r,e){t.ondata(n,r,e)},this.s.ondrain=function(n){t.queuedSize-=n,t.ondrain&&t.ondrain(n)}},t.prototype.push=function(t,n){this.queuedSize+=t.length,Yt.prototype.push.call(this,t,n)},t}();function Kt(t,n,r){return r||(r=n,n={}),"function"!=typeof r&&I(7),31==t[0]&&139==t[1]&&8==t[2]?Zt(t,n,r):8!=(15&t[0])||t[0]>>4>7||(t[0]<<8|t[1])%31?At(t,n,r):Pt(t,n,r)}function Qt(t,n){return 31==t[0]&&139==t[1]&&8==t[2]?qt(t,n):8!=(15&t[0])||t[0]>>4>7||(t[0]<<8|t[1])%31?Tt(t,n):Bt(t,n)}_e.AsyncDecompress=Jt,_e.decompress=Kt,_e.decompressSync=Qt;var Rt=function(t,r,e,i){for(var o in t){var s=t[o],a=r+o,u=i;Array.isArray(s)&&(u=Q(i,s[1]),s=s[0]),s instanceof n?e[a]=[s,u]:(e[a+="/"]=[new n(0),u],Rt(s,a,e,i))}},Vt="undefined"!=typeof TextEncoder&&new TextEncoder,Wt="undefined"!=typeof TextDecoder&&new TextDecoder,Xt=0;try{Wt.decode(N,{stream:!0}),Xt=1}catch(t){}var $t=function(t){for(var n="",r=0;;){var e=t[r++],i=(e>127)+(e>223)+(e>239);if(r+i>t.length)return{s:n,r:D(t,r-1)};i?3==i?(e=((15&e)<<18|(63&t[r++])<<12|(63&t[r++])<<6|63&t[r++])-65536,n+=String.fromCharCode(55296|e>>10,56320|1023&e)):n+=String.fromCharCode(1&i?(31&e)<<6|63&t[r++]:(15&e)<<12|(63&t[r++])<<6|63&t[r++]):n+=String.fromCharCode(e)}},_t=function(){function t(t){this.ondata=t,Xt?this.t=new TextDecoder:this.p=N}return t.prototype.push=function(t,r){if(this.ondata||I(5),r=!!r,this.t)return this.ondata(this.t.decode(t,{stream:!0}),r),void(r&&(this.t.decode().length&&I(8),this.t=null));this.p||I(4);var e=new n(this.p.length+t.length);e.set(this.p),e.set(t,this.p.length);var i=$t(e),o=i.s,s=i.r;r?(s.length&&I(8),this.p=null):this.p=s,this.ondata(o,r)},t}();_e.DecodeUTF8=_t;var tn=function(){function t(t){this.ondata=t}return t.prototype.push=function(t,n){this.ondata||I(5),this.d&&I(4),this.ondata(nn(t),this.d=n||!1)},t}();function nn(t,r){if(r){for(var e=new n(t.length),i=0;i<t.length;++i)e[i]=t.charCodeAt(i);return e}if(Vt)return Vt.encode(t);var o=t.length,s=new n(t.length+(t.length>>1)),a=0,u=function(t){s[a++]=t};for(i=0;i<o;++i){if(a+5>s.length){var h=new n(a+8+(o-i<<1));h.set(s),s=h}var f=t.charCodeAt(i);f<128||r?u(f):f<2048?(u(192|f>>6),u(128|63&f)):f>55295&&f<57344?(u(240|(f=65536+(1047552&f)|1023&t.charCodeAt(++i))>>18),u(128|f>>12&63),u(128|f>>6&63),u(128|63&f)):(u(224|f>>12),u(128|f>>6&63),u(128|63&f))}return D(s,0,a)}function rn(t,n){if(n){for(var r="",e=0;e<t.length;e+=16384)r+=String.fromCharCode.apply(null,t.subarray(e,e+16384));return r}if(Wt)return Wt.decode(t);var i=$t(t),o=i.s;return(r=i.r).length&&I(8),o}_e.EncodeUTF8=tn,_e.strToU8=nn,_e.strFromU8=rn;var en=function(t){return 1==t?3:t<6?2:9==t?1:0},on=function(t,n){return n+30+ht(t,n+26)+ht(t,n+28)},sn=function(t,n,r){var e=ht(t,n+28),i=rn(t.subarray(n+46,n+46+e),!(2048&ht(t,n+8))),o=n+46+e,s=ft(t,n+20),a=r&&4294967295==s?an(t,o):[s,ft(t,n+24),ft(t,n+42)],u=a[0],h=a[1],f=a[2];return[ht(t,n+10),u,h,i,o+ht(t,n+30)+ht(t,n+32),f]},an=function(t,n){for(;1!=ht(t,n);n+=4+ht(t,n+2));return[lt(t,n+12),lt(t,n+4),lt(t,n+20)]},un=function(t){var n=0;if(t)for(var r in t){var e=t[r].length;e>65535&&I(9),n+=e+4}return n},hn=function(t,n,r,e,i,o,s,a){var u=e.length,h=r.extra,f=a&&a.length,l=un(h);ct(t,n,null!=s?33639248:67324752),n+=4,null!=s&&(t[n++]=20,t[n++]=r.os),t[n]=20,n+=2,t[n++]=r.flag<<1|(o<0&&8),t[n++]=i&&8,t[n++]=255&r.compression,t[n++]=r.compression>>8;var c=new Date(null==r.mtime?Date.now():r.mtime),p=c.getFullYear()-1980;if((p<0||p>119)&&I(10),ct(t,n,p<<25|c.getMonth()+1<<21|c.getDate()<<16|c.getHours()<<11|c.getMinutes()<<5|c.getSeconds()>>1),n+=4,-1!=o&&(ct(t,n,r.crc),ct(t,n+4,o<0?-o-2:o),ct(t,n+8,r.size)),ct(t,n+12,u),ct(t,n+14,l),n+=16,null!=s&&(ct(t,n,f),ct(t,n+6,r.attrs),ct(t,n+10,s),n+=14),t.set(e,n),n+=u,l)for(var v in h){var d=h[v],g=d.length;ct(t,n,+v),ct(t,n+2,g),t.set(d,n+4),n+=4+g}return f&&(t.set(a,n),n+=f),n},fn=function(t,n,r,e,i){ct(t,n,101010256),ct(t,n+8,r),ct(t,n+10,r),ct(t,n+12,e),ct(t,n+16,i)},ln=function(){function t(t){this.filename=t,this.c=Y(),this.size=0,this.compression=0}return t.prototype.process=function(t,n){this.ondata(null,t,n)},t.prototype.push=function(t,n){this.ondata||I(5),this.c.p(t),this.size+=t.length,n&&(this.crc=this.c.d()),this.process(t,n||!1)},t}();_e.ZipPassThrough=ln;var cn=function(){function t(t,n){var r=this;n||(n={}),ln.call(this,t),this.d=new wt(n,(function(t,n){r.ondata(null,t,n)})),this.compression=8,this.flag=en(n.level)}return t.prototype.process=function(t,n){try{this.d.push(t,n)}catch(t){this.ondata(t,null,n)}},t.prototype.push=function(t,n){ln.prototype.push.call(this,t,n)},t}();_e.ZipDeflate=cn;var pn=function(){function t(t,n){var r=this;n||(n={}),ln.call(this,t),this.d=new xt(n,(function(t,n,e){r.ondata(t,n,e)})),this.compression=8,this.flag=en(n.level),this.terminate=this.d.terminate}return t.prototype.process=function(t,n){this.d.push(t,n)},t.prototype.push=function(t,n){ln.prototype.push.call(this,t,n)},t}();_e.AsyncZipDeflate=pn;var vn=function(){function t(t){this.ondata=t,this.u=[],this.d=1}return t.prototype.add=function(t){var r=this;if(this.ondata||I(5),2&this.d)this.ondata(I(4+8*(1&this.d),0,1),null,!1);else{var e=nn(t.filename),i=e.length,o=t.comment,s=o&&nn(o),a=i!=t.filename.length||s&&o.length!=s.length,u=i+un(t.extra)+30;i>65535&&this.ondata(I(11,0,1),null,!1);var h=new n(u);hn(h,0,t,e,a,-1);var f=[h],l=function(){for(var t=0,n=f;t<n.length;t++)r.ondata(null,n[t],!1);f=[]},c=this.d;this.d=0;var p=this.u.length,v=Q(t,{f:e,u:a,o:s,t:function(){t.terminate&&t.terminate()},r:function(){if(l(),c){var t=r.u[p+1];t?t.r():r.d=1}c=1}}),d=0;t.ondata=function(e,i,o){if(e)r.ondata(e,i,o),r.terminate();else if(d+=i.length,f.push(i),o){var s=new n(16);ct(s,0,134695760),ct(s,4,t.crc),ct(s,8,d),ct(s,12,t.size),f.push(s),v.c=d,v.b=u+d+16,v.crc=t.crc,v.size=t.size,c&&v.r(),c=1}else c&&l()},this.u.push(v)}},t.prototype.end=function(){var t=this;2&this.d?this.ondata(I(4+8*(1&this.d),0,1),null,!0):(this.d?this.e():this.u.push({r:function(){1&t.d&&(t.u.splice(-1,1),t.e())},t:function(){}}),this.d=3)},t.prototype.e=function(){for(var t=0,r=0,e=0,i=0,o=this.u;i<o.length;i++)e+=46+(h=o[i]).f.length+un(h.extra)+(h.o?h.o.length:0);for(var s=new n(e+22),a=0,u=this.u;a<u.length;a++){var h;hn(s,t,h=u[a],h.f,h.u,-h.c-2,r,h.o),t+=46+h.f.length+un(h.extra)+(h.o?h.o.length:0),r+=h.b}fn(s,t,this.u.length,e,r),this.ondata(null,s,!0),this.d=2},t.prototype.terminate=function(){for(var t=0,n=this.u;t<n.length;t++)n[t].t();this.d=2},t}();function dn(t,r,e){e||(e=r,r={}),"function"!=typeof e&&I(7);var i={};Rt(t,"",i,r);var o=Object.keys(i),s=o.length,a=0,u=0,h=s,f=Array(s),l=[],c=function(){for(var t=0;t<l.length;++t)l[t]()},p=function(t,n){xn((function(){e(t,n)}))};xn((function(){p=e}));var v=function(){var t=new n(u+22),r=a,e=u-a;u=0;for(var i=0;i<h;++i){var o=f[i];try{var s=o.c.length;hn(t,u,o,o.f,o.u,s);var l=30+o.f.length+un(o.extra),c=u+l;t.set(o.c,c),hn(t,a,o,o.f,o.u,s,u,o.m),a+=16+l+(o.m?o.m.length:0),u=c+s}catch(t){return p(t,null)}}fn(t,a,f.length,e,r),p(null,t)};s||v();for(var d=function(t){var n=o[t],r=i[n],e=r[0],h=r[1],d=Y(),g=e.length;d.p(e);var y=nn(n),m=y.length,b=h.comment,w=b&&nn(b),x=w&&w.length,z=un(h.extra),k=0==h.level?0:8,M=function(r,e){if(r)c(),p(r,null);else{var i=e.length;f[t]=Q(h,{size:g,crc:d.d(),c:e,f:y,m:w,u:m!=n.length||w&&b.length!=x,compression:k}),a+=30+m+z+i,u+=76+2*(m+z)+(x||0)+i,--s||v()}};if(m>65535&&M(I(11,0,1),null),k)if(g<16e4)try{M(null,kt(e,h))}catch(t){M(t,null)}else l.push(zt(e,h,M));else M(null,e)},g=0;g<h;++g)d(g);return c}function gn(t,r){r||(r={});var e={},i=[];Rt(t,"",e,r);var o=0,s=0;for(var a in e){var u=e[a],h=u[0],f=u[1],l=0==f.level?0:8,c=(M=nn(a)).length,p=f.comment,v=p&&nn(p),d=v&&v.length,g=un(f.extra);c>65535&&I(11);var y=l?kt(h,f):h,m=y.length,b=Y();b.p(h),i.push(Q(f,{size:h.length,crc:b.d(),c:y,f:M,m:v,u:c!=a.length||v&&p.length!=d,o:o,compression:l})),o+=30+c+g+m,s+=76+2*(c+g)+(d||0)+m}for(var w=new n(s+22),x=o,z=s-o,k=0;k<i.length;++k){var M;hn(w,(M=i[k]).o,M,M.f,M.u,M.c.length);var S=30+M.f.length+un(M.extra);w.set(M.c,M.o+S),hn(w,o,M,M.f,M.u,M.c.length,M.o,M.m),o+=16+S+(M.m?M.m.length:0)}return fn(w,o,i.length,z,x),w}_e.Zip=vn,_e.zip=dn,_e.zipSync=gn;var yn=function(){function t(){}return t.prototype.push=function(t,n){this.ondata(null,t,n)},t.compression=0,t}();_e.UnzipPassThrough=yn;var mn=function(){function t(){var t=this;this.i=new Mt((function(n,r){t.ondata(null,n,r)}))}return t.prototype.push=function(t,n){try{this.i.push(t,n)}catch(t){this.ondata(t,null,n)}},t.compression=8,t}();_e.UnzipInflate=mn;var bn=function(){function t(t,n){var r=this;n<32e4?this.i=new Mt((function(t,n){r.ondata(null,t,n)})):(this.i=new St((function(t,n,e){r.ondata(t,n,e)})),this.terminate=this.i.terminate)}return t.prototype.push=function(t,n){this.i.terminate&&(t=D(t,0)),this.i.push(t,n)},t.compression=8,t}();_e.AsyncUnzipInflate=bn;var wn=function(){function t(t){this.onfile=t,this.k=[],this.o={0:yn},this.p=N}return t.prototype.push=function(t,r){var e=this;if(this.onfile||I(5),this.p||I(4),this.c>0){var i=Math.min(this.c,t.length),o=t.subarray(0,i);if(this.c-=i,this.d?this.d.push(o,!this.c):this.k[0].push(o),(t=t.subarray(i)).length)return this.push(t,r)}else{var s=0,a=0,u=void 0,h=void 0;this.p.length?t.length?((h=new n(this.p.length+t.length)).set(this.p),h.set(t,this.p.length)):h=this.p:h=t;for(var f=h.length,l=this.c,c=l&&this.d,p=function(){var t,n=ft(h,a);if(67324752==n){s=1,u=a,v.d=null,v.c=0;var r=ht(h,a+6),i=ht(h,a+8),o=2048&r,c=8&r,p=ht(h,a+26),d=ht(h,a+28);if(f>a+30+p+d){var g=[];v.k.unshift(g),s=2;var y,m=ft(h,a+18),b=ft(h,a+22),w=rn(h.subarray(a+30,a+=30+p),!o);4294967295==m?(t=c?[-2]:an(h,a),m=t[0],b=t[1]):c&&(m=-1),a+=d,v.c=m;var x={name:w,compression:i,start:function(){if(x.ondata||I(5),m){var t=e.o[i];t||x.ondata(I(14,"unknown compression type "+i,1),null,!1),(y=m<0?new t(w):new t(w,m,b)).ondata=function(t,n,r){x.ondata(t,n,r)};for(var n=0,r=g;n<r.length;n++)y.push(r[n],!1);e.k[0]==g&&e.c?e.d=y:y.push(N,!0)}else x.ondata(null,N,!0)},terminate:function(){y&&y.terminate&&y.terminate()}};m>=0&&(x.size=m,x.originalSize=b),v.onfile(x)}return"break"}if(l){if(134695760==n)return u=a+=12+(-2==l&&8),s=3,v.c=0,"break";if(33639248==n)return u=a-=4,s=3,v.c=0,"break"}},v=this;a<f-4&&"break"!==p();++a);if(this.p=N,l<0){var d=h.subarray(0,s?u-12-(-2==l&&8)-(134695760==ft(h,u-16)&&4):a);c?c.push(d,!!s):this.k[+(2==s)].push(d)}if(2&s)return this.push(h.subarray(a),r);this.p=h.subarray(a)}r&&(this.c&&I(13),this.p=null)},t.prototype.register=function(t){this.o[t.compression]=t},t}();_e.Unzip=wn;var xn="function"==typeof queueMicrotask?queueMicrotask:"function"==typeof setTimeout?setTimeout:function(t){t()};function zn(t,r,e){e||(e=r,r={}),"function"!=typeof e&&I(7);var i=[],o=function(){for(var t=0;t<i.length;++t)i[t]()},s={},a=function(t,n){xn((function(){e(t,n)}))};xn((function(){a=e}));for(var u=t.length-22;101010256!=ft(t,u);--u)if(!u||t.length-u>65558)return a(I(13,0,1),null),o;var h=ht(t,u+8);if(h){var f=h,l=ft(t,u+16),c=4294967295==l||65535==f;if(c){var p=ft(t,u-12);(c=101075792==ft(t,p))&&(f=h=ft(t,p+32),l=ft(t,p+48))}for(var v=r&&r.filter,d=function(r){var e=sn(t,l,c),u=e[0],f=e[1],p=e[2],d=e[3],g=e[4],y=on(t,e[5]);l=g;var m=function(t,n){t?(o(),a(t,null)):(n&&(s[d]=n),--h||a(null,s))};if(!v||v({name:d,size:f,originalSize:p,compression:u}))if(u)if(8==u){var b=t.subarray(y,y+f);if(p<524288||f>.8*p)try{m(null,Tt(b,{out:new n(p)}))}catch(t){m(t,null)}else i.push(At(b,{size:p},m))}else m(I(14,"unknown compression type "+u,1),null);else m(null,D(t,y,y+f));else m(null,null)},g=0;g<f;++g)d()}else a(null,{});return o}function kn(t,r){for(var e={},i=t.length-22;101010256!=ft(t,i);--i)(!i||t.length-i>65558)&&I(13);var o=ht(t,i+8);if(!o)return{};var s=ft(t,i+16),a=4294967295==s||65535==o;if(a){var u=ft(t,i-12);(a=101075792==ft(t,u))&&(o=ft(t,u+32),s=ft(t,u+48))}for(var h=r&&r.filter,f=0;f<o;++f){var l=sn(t,s,a),c=l[0],p=l[1],v=l[2],d=l[3],g=l[4],y=on(t,l[5]);s=g,h&&!h({name:d,size:p,originalSize:v,compression:c})||(c?8==c?e[d]=Tt(t.subarray(y,y+p),{out:new n(v)}):I(14,"unknown compression type "+c):e[d]=D(t,y,y+p))}return e}_e.unzip=zn,_e.unzipSync=kn;return _e});
 ;
 /*
  * Turning what somebody typed into a key.
@@ -1765,6 +1789,512 @@ if (typeof self !== 'undefined') self.S = S;
 
 ;
 /*
+ * Reference price packages: the format, its limits and its validator. No dependencies: the admin page loads this
+ * file alone (with util.js) to check a package before it uploads it; the worker and the tests load it too.
+ *
+ *   S.refs.pkg.FORMAT, VERSION, FIELDS, LIMITS, FLAGS_READ, ATTRS_READ, SECTIONS, REGIONS, BASIS
+ *   S.refs.pkg.sha256(bytes) → hex                       pure JS (crypto.subtle is absent on plain-HTTP pages)
+ *   S.refs.pkg.sha256Stream() → { update(bytes), hex() } the same, in slices
+ *   S.refs.pkg.checkDecoded(textLength, byteLength) → null | message
+ *   S.refs.pkg.validate(obj, { bytes }) → { ok, errors: [{ row, field, msg }], rows, sources }
+ *   S.refs.pkg.validateAsync(obj, { bytes, progress, slice }, done)   the same in slices (default 20k rows)
+ *   S.refs.pkg.manifest(obj) → the package head without rows (stored next to the file on the server)
+ *   S.refs.pkg.rowsOf(obj) → [{ rid, name, … }]          rows as objects (missing trailing fields = null)
+ *
+ * Format «smeta-refs» version 1 (docs/spravochnik.md): one JSON object, gzipped —
+ *   { format, version, full: true, package_id, created, tool, rid_min, rid_max, counts: { records, sources },
+ *     date_min, date_max, sources: [{ id, doc_type, issuer, customer, doc_no, issue_date, as_of_date, region,
+ *     ships_nationally, vat_default, method }], fields: FIELDS, rows: [[…], …] }
+ * Prices are UZS without VAT per `unit`. Trailing nulls of a row may be dropped. Error messages are Russian (they
+ * are shown on the admin page) and never quote a value of the package: a row number, a field name and what is wrong.
+ */
+var S = (typeof S !== 'undefined' && S) || {};
+(function (S) {
+  'use strict';
+  var R = S.refs = S.refs || {};
+
+  var FIELDS = ['rid', 'name', 'name_raw', 'unit', 'unit_raw', 'section', 'price', 'price_date', 'avail', 'avail_src',
+    'region', 'src', 'group', 'basis', 'delivery', 'plant', 'code', 'flags', 'attrs'];
+  var MB = 1024 * 1024;
+  var LIMITS = { gzip: 50 * MB, bytes: 500 * MB, rows: 2 * 1000 * 1000, sources: 10 * 1000, name: 1000, text: 300, short: 40,
+    manifest: MB };
+  /* the record flags and item-data attributes the engine reads; a package carries no others */
+  var FLAGS_READ = ['forward', 'vat_inferred', 'non_construction', 'merge:excludes_pipe_cost', 'merge:checker_dup_of_forward_trade'];
+  var ATTRS_READ = ['km', 'with_fuel', 'kg_per_m', 'mass_kg_m', 'mass_theoretical_kg_m', 'm_per_t', 't_per_m3',
+    'density_t_per_unit', 'm3_per_piece', 'vol_m3', 'm_per_piece', 'length_m', 'kg_per_piece', 'mass_kg', 'pack_kg',
+    'pack_qty', 'pack_unit', 'pack_l', 'pack_pcs', 'bundle_pcs', 'roll_length_m'];
+  var SECTIONS = ['labor', 'machines', 'materials', 'equipment', 'transport'];
+  /* the program's 15 region keys (regions.js S.REGIONS) and `national` (valid in the whole country) */
+  var REGIONS = ['respublika', 'andijon', 'buxoro', 'fargona', 'jizzax', 'xorazm', 'namangan', 'navoiy', 'qashqadaryo',
+    'samarqand', 'sirdaryo', 'surxondaryo', 'toshkent_vil', 'qoraqalpogiston', 'toshkent_sh', 'national'];
+  var BASIS = ['catalogue', 'exchange-spot', 'exchange-forward', 'list', 'recommended', 'wage-12%', 'offer', 'declared',
+    'designer-memory', 'plant-calc', 'protocol', 'invoice'];
+  var ID_RE = /^[a-z0-9][a-z0-9._-]{2,63}$/;
+  var SRC_RE = /^[0-9a-z_-]{4,40}$/;
+  var DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+  /* ------------------------------------------------------------------ SHA-256 (FIPS 180-4), pure JS */
+  var K = [0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2];
+  var KI = new Int32Array(K);
+
+  function block(H, W, b, o) {
+    var i, t1, t2, a = H[0], bb = H[1], c = H[2], d = H[3], e = H[4], f = H[5], g = H[6], h = H[7];
+    for (i = 0; i < 16; i++) W[i] = (b[o + 4 * i] << 24) | (b[o + 4 * i + 1] << 16) | (b[o + 4 * i + 2] << 8) | b[o + 4 * i + 3];
+    for (i = 16; i < 64; i++) {
+      var x = W[i - 15], y = W[i - 2];
+      W[i] = (((x >>> 7) | (x << 25)) ^ ((x >>> 18) | (x << 14)) ^ (x >>> 3)) + W[i - 16] +
+             (((y >>> 17) | (y << 15)) ^ ((y >>> 19) | (y << 13)) ^ (y >>> 10)) + W[i - 7] | 0;
+    }
+    for (i = 0; i < 64; i++) {
+      t1 = h + (((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7))) + ((e & f) ^ (~e & g)) + KI[i] + W[i] | 0;
+      t2 = (((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10))) + ((a & bb) ^ (a & c) ^ (bb & c)) | 0;
+      h = g; g = f; f = e; e = d + t1 | 0; d = c; c = bb; bb = a; a = t1 + t2 | 0;
+    }
+    H[0] = H[0] + a | 0; H[1] = H[1] + bb | 0; H[2] = H[2] + c | 0; H[3] = H[3] + d | 0;
+    H[4] = H[4] + e | 0; H[5] = H[5] + f | 0; H[6] = H[6] + g | 0; H[7] = H[7] + h | 0;
+  }
+
+  function sha256Stream() {
+    var H = new Int32Array([0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]);
+    var W = new Int32Array(64), buf = new Uint8Array(64), fill = 0, total = 0, done = null;
+    function update(bytes) {
+      if (done) throw new Error('sha256: update after hex()');
+      var n = bytes.length, o = 0;
+      total += n;
+      if (fill) {
+        while (fill < 64 && o < n) buf[fill++] = bytes[o++];
+        if (fill < 64) return api;
+        block(H, W, buf, 0); fill = 0;
+      }
+      for (; o + 64 <= n; o += 64) block(H, W, bytes, o);
+      while (o < n) buf[fill++] = bytes[o++];
+      return api;
+    }
+    function hex() {
+      if (done) return done;
+      var tail = new Uint8Array(fill < 56 ? 64 : 128), i;
+      for (i = 0; i < fill; i++) tail[i] = buf[i];
+      tail[fill] = 0x80;
+      var L = tail.length, bits = total * 8, hi = Math.floor(total / 0x20000000);
+      tail[L - 1] = bits & 0xff; tail[L - 2] = (bits >>> 8) & 0xff; tail[L - 3] = (bits >>> 16) & 0xff; tail[L - 4] = (bits >>> 24) & 0xff;
+      tail[L - 5] = hi & 0xff; tail[L - 6] = (hi >>> 8) & 0xff; tail[L - 7] = (hi >>> 16) & 0xff; tail[L - 8] = (hi >>> 24) & 0xff;
+      for (var o = 0; o < L; o += 64) block(H, W, tail, o);
+      var s = '';
+      for (i = 0; i < 8; i++) s += ('00000000' + (H[i] >>> 0).toString(16)).slice(-8);
+      done = s;
+      return s;
+    }
+    var api = { update: update, hex: hex };
+    return api;
+  }
+  function sha256(bytes) { return sha256Stream().update(bytes).hex(); }
+
+  /* ------------------------------------------------------------------ checks */
+  function isDate(s) {
+    if (typeof s !== 'string') return false;
+    var m = DATE_RE.exec(s);
+    if (!m) return false;
+    var y = +m[1], mo = +m[2], d = +m[3];
+    if (mo < 1 || mo > 12 || d < 1) return false;
+    var dim = [31, (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    return d <= dim[mo - 1];
+  }
+  function isInt(v) { return typeof v === 'number' && isFinite(v) && Math.floor(v) === v; }
+  function str(v, max) { return typeof v === 'string' && v.length <= max; }
+  function strOrNull(v, max) { return v === null || str(v, max); }
+  function oneOf(list) { var o = {}; for (var i = 0; i < list.length; i++) o[list[i]] = true; return o; }
+  var IS_SECTION = oneOf(SECTIONS), IS_REGION = oneOf(REGIONS), IS_BASIS = oneOf(BASIS), IS_FLAG = oneOf(FLAGS_READ),
+    IS_ATTR = oneOf(ATTRS_READ);
+  var F = {};
+  for (var fi = 0; fi < FIELDS.length; fi++) F[FIELDS[fi]] = fi;
+  var MAX_ERRORS = 200;
+
+  /** A decoded text that is empty or shorter than bytes/3 UTF-16 units cannot be the whole package. */
+  function checkDecoded(len, bytes) {
+    if (bytes > LIMITS.bytes) return 'Пакет слишком велик (больше 500 МБ после распаковки)';
+    if (!len || len < bytes / 3) return 'Пакет повреждён или слишком велик';
+    return null;
+  }
+
+  function Checker(obj, opts) {
+    this.obj = obj;
+    this.o = opts || {};
+    this.errors = [];
+    this.next = 0;
+    this.prevRid = -1;
+    this.srcIds = {};
+    this.fatal = false;
+  }
+  Checker.prototype.err = function (row, field, msg) {
+    if (this.errors.length < MAX_ERRORS) this.errors.push({ row: row, field: field, msg: msg });
+    else this.errors.truncated = true;
+  };
+  Checker.prototype.head = function () {
+    var p = this.obj, self = this;
+    function e(field, msg) { self.err(null, field, msg); }
+    if (!p || typeof p !== 'object' || Object.prototype.toString.call(p) === '[object Array]') { e('format', 'не объект пакета'); this.fatal = true; return; }
+    if (p.format !== 'smeta-refs') { e('format', 'это не пакет справочника цен'); this.fatal = true; return; }
+    if (p.version !== 1) {
+      e('version', 'Версия пакета ' + (isInt(p.version) ? p.version : '?') + ' не поддерживается этой версией программы — обновите программу');
+      this.fatal = true; return;
+    }
+    if (p.full !== true) { e('full', 'частичные пакеты не поддерживаются: нужен полный'); this.fatal = true; }
+    if (!(typeof p.package_id === 'string' && ID_RE.test(p.package_id))) e('package_id', 'нужны латинские строчные буквы, цифры, . _ -, от 3 до 64 знаков');
+    if (!str(p.created, 40)) e('created', 'нет даты создания');
+    if (p.tool != null && !str(p.tool, 300)) e('tool', 'не строка');
+    if (!isInt(p.rid_min) || p.rid_min < 0) e('rid_min', 'не целое ≥ 0');
+    if (!isInt(p.rid_max) || p.rid_max < 0 || (isInt(p.rid_min) && p.rid_max < p.rid_min)) e('rid_max', 'не целое ≥ rid_min');
+    if (!isDate(p.date_min)) e('date_min', 'не дата ГГГГ-ММ-ДД');
+    if (!isDate(p.date_max) || (isDate(p.date_min) && p.date_max < p.date_min)) e('date_max', 'не дата ГГГГ-ММ-ДД не раньше date_min');
+    var fields = p.fields;
+    var okFields = Object.prototype.toString.call(fields) === '[object Array]' && fields.length === FIELDS.length;
+    for (var i = 0; okFields && i < FIELDS.length; i++) if (fields[i] !== FIELDS[i]) okFields = false;
+    if (!okFields) { e('fields', 'список полей не тот, что у версии 1'); this.fatal = true; }
+    if (Object.prototype.toString.call(p.rows) !== '[object Array]') { e('rows', 'нет строк'); this.fatal = true; }
+    else if (p.rows.length > LIMITS.rows) { e('rows', 'больше ' + LIMITS.rows + ' строк'); this.fatal = true; }
+    if (this.o.bytes != null && this.o.bytes > LIMITS.bytes) { e('size', 'Пакет слишком велик (больше 500 МБ после распаковки)'); this.fatal = true; }
+    var srcs = p.sources;
+    if (Object.prototype.toString.call(srcs) !== '[object Array]') { e('sources', 'нет списка документов'); this.fatal = true; srcs = []; }
+    else if (srcs.length > LIMITS.sources) { e('sources', 'больше ' + LIMITS.sources + ' документов'); this.fatal = true; srcs = []; }
+    for (var s = 0; s < srcs.length; s++) {
+      var d = srcs[s], where = 'sources[' + (s + 1) + '].';
+      if (!d || typeof d !== 'object') { e('sources[' + (s + 1) + ']', 'не объект'); continue; }
+      if (!(typeof d.id === 'string' && SRC_RE.test(d.id))) { e(where + 'id', 'нужен код документа: 4–40 знаков a-z 0-9 _ -'); continue; }
+      if (this.srcIds[d.id]) e(where + 'id', 'код документа повторяется');
+      this.srcIds[d.id] = true;
+      if (d.vat_default != null && typeof d.vat_default !== 'boolean' && !str(d.vat_default, LIMITS.short)) e(where + 'vat_default', 'не да/нет');
+      var longs = ['doc_type', 'method', 'issuer', 'customer', 'doc_no'];
+      for (var u = 0; u < longs.length; u++) if (d[longs[u]] != null && !str(d[longs[u]], LIMITS.text)) e(where + longs[u], 'не строка до ' + LIMITS.text + ' знаков');
+      if (d.issue_date != null && !isDate(d.issue_date)) e(where + 'issue_date', 'не дата ГГГГ-ММ-ДД');
+      if (d.as_of_date != null && !isDate(d.as_of_date)) e(where + 'as_of_date', 'не дата ГГГГ-ММ-ДД');
+      if (d.region != null && !IS_REGION[d.region]) e(where + 'region', 'неизвестный регион');
+      if (d.ships_nationally != null && typeof d.ships_nationally !== 'boolean') e(where + 'ships_nationally', 'не да/нет');
+    }
+    var c = p.counts;
+    if (!c || !isInt(c.records) || !isInt(c.sources)) e('counts', 'нет числа записей и документов');
+    else {
+      if (p.rows && c.records !== p.rows.length) e('counts.records', 'не равно числу строк');
+      if (p.sources && c.sources !== p.sources.length) e('counts.sources', 'не равно числу документов');
+    }
+  };
+  Checker.prototype.rows = function (from, to) {
+    var rows = this.obj.rows, p = this.obj;
+    for (var j = from; j < to; j++) {
+      var row = rows[j], n = j + 1;
+      if (Object.prototype.toString.call(row) !== '[object Array]' || row.length > FIELDS.length || row.length < F.basis + 1) {
+        this.err(n, 'row', 'не строка из ' + FIELDS.length + ' полей'); continue;
+      }
+      var get = function (f) { var v = row[F[f]]; return v === undefined ? null : v; };
+      var rid = get('rid');
+      if (!isInt(rid) || rid < 0) this.err(n, 'rid', 'не целое ≥ 0');
+      else {
+        if (rid <= this.prevRid) this.err(n, 'rid', 'номера записей должны строго возрастать');
+        if (rid < p.rid_min || rid > p.rid_max) this.err(n, 'rid', 'вне rid_min…rid_max');
+        this.prevRid = rid;
+      }
+      var name = get('name');
+      if (!(typeof name === 'string' && name.replace(/\s+/g, '') && name.length <= LIMITS.name)) this.err(n, 'name', 'пустое или длиннее ' + LIMITS.name + ' знаков');
+      if (!strOrNull(get('name_raw'), LIMITS.name)) this.err(n, 'name_raw', 'не строка до ' + LIMITS.name + ' знаков');
+      if (!strOrNull(get('unit'), LIMITS.short)) this.err(n, 'unit', 'не строка до ' + LIMITS.short + ' знаков');
+      if (!strOrNull(get('unit_raw'), LIMITS.text)) this.err(n, 'unit_raw', 'не строка до ' + LIMITS.text + ' знаков');
+      if (!IS_SECTION[get('section')]) this.err(n, 'section', 'неизвестный раздел');
+      var price = get('price');
+      if (typeof price !== 'number' || !isFinite(price)) this.err(n, 'price', 'не число');
+      else if (!(price > 0 && price < 1e13)) this.err(n, 'price', 'вне 0 … 10¹³');
+      var pd = get('price_date');
+      if (!isDate(pd)) this.err(n, 'price_date', 'не дата ГГГГ-ММ-ДД');
+      var av = get('avail');
+      if (av !== null && (!isDate(av) || (isDate(pd) && av < pd))) this.err(n, 'avail', 'не дата или раньше price_date');
+      var as = get('avail_src');
+      if (as !== null && !this.srcIds[as]) this.err(n, 'avail_src', 'нет такого документа в пакете');
+      var reg = get('region');
+      if (reg !== null && !IS_REGION[reg]) this.err(n, 'region', 'неизвестный регион');
+      if (!this.srcIds[get('src')]) this.err(n, 'src', 'нет такого документа в пакете');
+      if (!str(get('group'), LIMITS.short)) this.err(n, 'group', 'не строка до ' + LIMITS.short + ' знаков');
+      if (!IS_BASIS[get('basis')]) this.err(n, 'basis', 'неизвестное основание цены');
+      var texts = ['delivery', 'plant', 'code'];
+      for (var t = 0; t < texts.length; t++) if (!strOrNull(get(texts[t]), LIMITS.text)) this.err(n, texts[t], 'не строка до ' + LIMITS.text + ' знаков');
+      var fl = get('flags');
+      if (fl !== null) {
+        if (Object.prototype.toString.call(fl) !== '[object Array]') this.err(n, 'flags', 'не список');
+        else for (var k = 0; k < fl.length; k++) if (!(typeof fl[k] === 'string' && IS_FLAG[fl[k]])) { this.err(n, 'flags', 'флаг, который программа не читает'); break; }
+      }
+      var at = get('attrs');
+      if (at !== null) {
+        if (typeof at !== 'object' || Object.prototype.toString.call(at) === '[object Array]') this.err(n, 'attrs', 'не объект');
+        else {
+          for (var key in at) {
+            if (!Object.prototype.hasOwnProperty.call(at, key)) continue;
+            var v = at[key];
+            if (!IS_ATTR[key]) { this.err(n, 'attrs', 'свойство, которое программа не читает'); break; }
+            if (!((typeof v === 'number' && isFinite(v)) || typeof v === 'boolean' || str(v, LIMITS.short))) { this.err(n, 'attrs.' + key, 'не число, да/нет или короткая строка'); break; }
+          }
+        }
+      }
+    }
+  };
+  Checker.prototype.result = function () {
+    var rows = this.obj && this.obj.rows ? this.obj.rows.length : 0;
+    return { ok: !this.errors.length, errors: this.errors, truncated: !!this.errors.truncated, rows: rows,
+      sources: this.obj && this.obj.sources ? this.obj.sources.length : 0 };
+  };
+
+  function validate(obj, opts) {
+    var c = new Checker(obj, opts);
+    c.head();
+    if (!c.fatal) c.rows(0, obj.rows.length);
+    return c.result();
+  }
+
+  /** The same in slices (default 20k rows) with a setTimeout between them; progress(done, total). */
+  function validateAsync(obj, opts, done) {
+    var o = opts || {};
+    var c = new Checker(obj, o);
+    c.head();
+    if (c.fatal) { setTimeout(function () { done(c.result()); }, 0); return; }
+    var n = obj.rows.length, slice = o.slice || 20 * 1000, at = 0;
+    function step() {
+      var to = Math.min(n, at + slice);
+      c.rows(at, to);
+      at = to;
+      if (o.progress) o.progress(at, n);
+      if (at < n) setTimeout(step, 0); else done(c.result());
+    }
+    setTimeout(step, 0);
+  }
+
+  /** The package head without rows: what the server stores next to the file. */
+  function manifest(obj) {
+    var m = {};
+    for (var k in obj) if (Object.prototype.hasOwnProperty.call(obj, k) && k !== 'rows') m[k] = obj[k];
+    return m;
+  }
+
+  function rowsOf(obj) {
+    var out = new Array(obj.rows.length);
+    for (var j = 0; j < obj.rows.length; j++) {
+      var row = obj.rows[j], o = {};
+      for (var i = 0; i < FIELDS.length; i++) o[FIELDS[i]] = row[i] === undefined ? null : row[i];
+      out[j] = o;
+    }
+    return out;
+  }
+
+  R.pkg = {
+    FORMAT: 'smeta-refs', VERSION: 1, FIELDS: FIELDS, LIMITS: LIMITS, FLAGS_READ: FLAGS_READ, ATTRS_READ: ATTRS_READ,
+    SECTIONS: SECTIONS, REGIONS: REGIONS, BASIS: BASIS,
+    sha256: sha256, sha256Stream: sha256Stream, isDate: isDate, checkDecoded: checkDecoded,
+    validate: validate, validateAsync: validateAsync, manifest: manifest, rowsOf: rowsOf
+  };
+})(S);
+
+;
+/*
+ * Reference prices: what a suggestion line says to the expert, in Russian.
+ *
+ *   S.refs.RU = { TIER, FLAG, BASIS, DOC }      one table for the engine's `label` and the popover
+ *   S.refs.view(line, ctx) → { price, badge, summary, flags[], name, evidence[], source, conv, basis, age, vsSmeta,
+ *                              components[] }
+ *   ctx: { sources: { id: { doc_type, issuer, doc_no, issue_date, as_of_date, region } } | Map,
+ *          asof: 'YYYY-MM-DD', smetaPrice: number, unit: the smeta unit, regionLabel: function (key) → label }
+ *
+ * Everything shown is built from the structured fields of the line (tier, flags, name, how, sim, drop, changed,
+ * range, raw, published, price_date, src → ctx.sources, region → a region label, components). The engine's `why`
+ * texts are for measurement only and are never shown: they hold internal family keys and file ids. Neither is a
+ * source id or a raw region key ever printed — a source without an issuer shows its document type.
+ */
+var S = (typeof S !== 'undefined' && S) || {};
+(function (S) {
+  'use strict';
+  var R = S.refs = S.refs || {};
+
+  var RU = {
+    TIER: { exact: 'Ставка по таблице', document: 'Документ', similar: 'Похожий', estimate: 'Оценка' },
+    FLAG: {
+      stale: 'старше 13 нед.', forward: 'форвард', vat_inferred: 'НДС выведен', delivered: 'с доставкой',
+      'plant-calc': 'калькуляция завода', 'other-region': 'другой регион', 'non-construction': 'не строительный лот биржи',
+      'excludes-pipe-cost': 'без стоимости трубы', 'km-bands': 'медиана по расстояниям', 'older-quarter': 'прошлый квартал',
+      'issue-after-asof': 'издан после даты', declared: 'заявленная цена', 'document-states-more': 'документ подробнее',
+      'derived-unit': 'пересчёт по данным изделия', 'wide-spread': 'документы расходятся'
+    },
+    BASIS: {
+      offer: 'предложение', 'exchange-spot': 'биржа', 'exchange-forward': 'биржа, форвард', catalogue: 'каталог',
+      list: 'прайс-лист', recommended: 'рекомендовано', 'wage-12%': 'ставка с соцстрахом 12 %', declared: 'заявлено',
+      'plant-calc': 'калькуляция завода', protocol: 'протокол', invoice: 'счёт', 'designer-memory': 'цена проектировщика',
+      median: 'медиана'
+    },
+    DOC: {
+      'expert-conclusion': 'заключение экспертизы', 'exchange-quotes': 'биржевые котировки',
+      'manufacturer-list': 'прайс-лист производителя', 'supplier-offer': 'предложение поставщика',
+      'plant-calculation': 'калькуляция завода', 'regional-catalogue': 'региональный каталог цен',
+      'dealer-list': 'прайс-лист дилера', 'manufacturer-catalogue': 'каталог производителя', 'wage-table': 'таблица ставок',
+      'spec-sheet': 'спецификация', 'price-list': 'прайс-лист', brochure: 'буклет', 'company-profile': 'сведения о компании',
+      'price-proposal': 'ценовое предложение', 'supplier-list': 'прайс-лист поставщика', invoice: 'счёт',
+      'machine-hour-list': 'перечень стоимости машино-часа', offer: 'предложение'
+    }
+  };
+
+  var NF2 = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  var NF0 = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
+  function money(v) { return v == null || !isFinite(v) ? '' : NF2.format(Math.round(v * 100) / 100).replace(/ /g, ' '); }
+  function whole(v) { return v == null || !isFinite(v) ? '' : NF0.format(Math.round(v)).replace(/ /g, ' '); }
+  function dec(v, d) { return v.toFixed(d).replace('.', ','); }
+  function ruDate(d) { return typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d.slice(8, 10) + '.' + d.slice(5, 7) + '.' + d.slice(0, 4) : ''; }
+  function has(a, x) { return !!a && a.indexOf(x) >= 0; }
+
+  function srcOf(ctx, id) {
+    var s = ctx && ctx.sources;
+    if (!s || !id) return null;
+    if (typeof s.get === 'function') return s.get(id) || null;
+    return Object.prototype.hasOwnProperty.call(s, id) ? s[id] : null;
+  }
+  function regionName(ctx, key) {
+    if (!key) return '';
+    if (key === 'national') return 'вся республика';
+    var f = (ctx && ctx.regionLabel) || S.regionLabel;
+    var t = f ? f(key) : '';
+    // never a raw region key: an unknown key reads as «другой регион»
+    return t && t !== key ? t : 'другой регион';
+  }
+  function flagText(f) {
+    if (RU.FLAG[f]) return RU.FLAG[f];
+    var m = /^median-of-(\d+)-lines$/.exec(f);
+    if (m) return 'медиана ' + m[1] + ' строк';
+    m = /^median-of-(\d+)$/.exec(f);
+    if (m) return 'медиана ' + m[1] + ' записей';
+    return null;
+  }
+  /** 1 строка, 2 строки, 5 строк */
+  function lines(n) {
+    var m10 = n % 10, m100 = n % 100;
+    var w = m10 === 1 && m100 !== 11 ? 'строка' : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? 'строки' : 'строк';
+    return n + ' ' + w;
+  }
+  function quarter(d) { return d ? d.slice(0, 4) + ', ' + (Math.floor((+d.slice(5, 7) - 1) / 3) + 1) + ' кв.' : ''; }
+
+  /** «ООО … № …», «биржа», «каталог: <завод>», or the document type: never a source id. */
+  function sourceLabel(src, group, plant, basis) {
+    if (basis === 'exchange-spot' || basis === 'exchange-forward' || group === 'exchange') return 'биржа';
+    if (group === 'catalogue' && plant) return 'каталог: ' + plant;
+    var t = src && src.issuer ? String(src.issuer).replace(/\s*\(.*$/, '').slice(0, 80) : '';
+    if (!t) t = (src && RU.DOC[src.doc_type]) || 'документ';
+    if (src && src.doc_no) t += (/^№/.test(src.doc_no) ? ' ' : ' № ') + src.doc_no;
+    return t;
+  }
+
+  function evidence(l, ctx) {
+    var ev = [];
+    var drop = l.drop || [], changed = l.changed || [];
+    if (l.how === 'wage') {
+      ev.push(['таблица ставок', regionName(ctx, l.region), quarter(l.price_date), l.published ? 'опубл. ' + ruDate(l.published) : '']
+        .filter(function (x) { return x; }).join(' · '));
+    } else if (has(l.flags, 'document-states-more')) ev.push('то же изделие; документ указывает больше' + (drop.length ? ': ' + drop.join(', ') : ''));
+    else if (l.how === 'exact-key') ev.push('то же наименование');
+    else if (l.how === 'family') ev.push('те же характеристики');
+    else if (l.how === 'family-relaxed') {
+      ev.push('близкие характеристики' + (changed.length ? '; отличается: ' + changed.join(', ') : drop.length ? '; без: ' + drop.join(', ') : ''));
+    } else if (l.how === 'fuzzy') ev.push('похожее наименование' + (typeof l.sim === 'number' ? ' (сходство ' + dec(l.sim, 2) + ')' : ''));
+    else if (l.how === 'tariff') ev.push('тариф т·км по полосе расстояния');
+    else if (l.how === 'tariff-other-vehicle') ev.push('тариф т·км другой машины' + (drop.length ? '; ' + drop.join(', ') : ''));
+    if (l.range && l.range.n) ev.push('документы расходятся: ' + lines(l.range.n) + ', ' + money(l.range.min) + ' – ' + money(l.range.max));
+    return ev;
+  }
+
+  function ageText(asof, d) {
+    if (!asof || !d) return '';
+    var days = Math.round((Date.parse(asof) - Date.parse(d)) / 86400000);
+    if (!isFinite(days)) return '';
+    if (days < 0) return 'после даты';
+    if (days < 14) return days === 0 ? 'на эту дату' : days + ' дн. назад';
+    if (days < 63) return Math.round(days / 7) + ' нед. назад';
+    return Math.round(days / 30.44) + ' мес. назад';
+  }
+
+  function convText(l, unit) {
+    var raw = l.raw;
+    // a median line has no single conversion: its components carry their own documents
+    if (l.summary || !raw || raw.factor === 1 || raw.factor == null) return '';
+    var t = whole(raw.price) + ' за 1 ' + (raw.unit || '?') + ' → ' + money(l.price) + ' за 1 ' + (unit || l.unit || '?');
+    if (has(l.flags, 'derived-unit') || l.tier === 'estimate') t += ' (по данным изделия)';
+    return t;
+  }
+
+  /* the line names its source family (sfam): «exchange…», «catalogue|<plant>|<region>», else group|issuer|region */
+  function groupOf(l) {
+    var f = String(l.sfam || '');
+    if (/^exchange/.test(f)) return { group: 'exchange', plant: null };
+    var m = /^catalogue\|([^|]*)\|/.exec(f);
+    if (m) return { group: 'catalogue', plant: m[1] && m[1] !== '?' ? m[1] : null };
+    return { group: null, plant: null };
+  }
+
+  function sourceText(l, ctx, src) {
+    var g = groupOf(l);
+    var parts = [sourceLabel(src, g.group, g.plant, l.basis)];
+    var docDate = src ? (src.issue_date || src.as_of_date) : null;
+    if (docDate) parts.push('документ от ' + ruDate(docDate));
+    if (l.price_date) parts.push('цена на ' + ruDate(l.price_date));
+    var reg = regionName(ctx, l.region);
+    if (reg) parts.push(reg);
+    return parts.join(' · ');
+  }
+
+  function component(c, ctx) {
+    var src = srcOf(ctx, c.src);
+    return {
+      price: money(c.price),
+      name: c.name || '',
+      evidence: evidence(c, ctx),
+      source: sourceText({ basis: c.basis, price_date: c.price_date, region: c.region }, ctx, src),
+      date: ruDate(c.price_date)
+    };
+  }
+
+  function view(line, ctx) {
+    var c = ctx || {};
+    var l = line;
+    var src = l.summary ? null : srcOf(c, l.src);
+    var flags = [];
+    for (var i = 0; i < (l.flags || []).length; i++) { var t = flagText(l.flags[i]); if (t && flags.indexOf(t) < 0) flags.push(t); }
+    var out = {
+      price: money(l.price),
+      badge: RU.TIER[l.tier] || 'Похожий',
+      summary: '',
+      flags: flags,
+      name: l.name || '',
+      evidence: evidence(l, c),
+      source: l.summary ? 'несколько документов' : sourceText(l, c, src),
+      conv: convText(l, c.unit),
+      basis: RU.BASIS[l.basis] || '',
+      age: ageText(c.asof, l.price_date),
+      vsSmeta: '',
+      components: []
+    };
+    if (l.summary && l.components) {
+      out.summary = 'Медиана ' + l.components.length + ' документов' + (l.spread ? ' (разброс ×' + dec(l.spread, 2) + ')' : '');
+      out.components = l.components.map(function (x) { return component(x, c); });
+    }
+    if (c.smetaPrice > 0 && l.price > 0) {
+      var d = (l.price / c.smetaPrice - 1) * 100;
+      out.vsSmeta = 'к сметной цене: ' + (d > 0 ? '+' : d < 0 ? '−' : '') + dec(Math.abs(d), 1) + ' %';
+    }
+    return out;
+  }
+
+  R.RU = RU;
+  R.view = view;
+  R.viewParts = { money: money, ruDate: ruDate, sourceLabel: sourceLabel, regionName: regionName, ageText: ageText };
+})(S);
+
+;
+/*
  * Sign-in with email + one-time code, and the four-hour idle lock.
  * Nothing here runs without S.pb (offline build).
  */
@@ -2626,6 +3156,323 @@ if (typeof self !== 'undefined') self.S = S;
   S.Admin = Admin;
   document.addEventListener('DOMContentLoaded', function () { Admin.init(); });
   if (document.readyState !== 'loading') Admin.init();
+})(S);
+
+;
+/*
+ * Admin page: importing a reference-price package (format smeta-refs v1, src/lib/refs/package.js).
+ *
+ * The whole check runs here, in the browser, before anything is sent: the file is hashed (pure JS — crypto.subtle
+ * does not exist on the plain-HTTP pages of an office network or of a server reached by its IP), unpacked with a
+ * 500 MB cap, decoded, parsed and validated row by row in slices, with progress. Only a valid package is uploaded,
+ * as is, with its head (manifest) beside it; the server checks the head and stores the file. The first package
+ * becomes the active one; later ones wait for «Сделать активным». Errors name a row and a field, never a value.
+ */
+(function (S) {
+  'use strict';
+  if (!S.pb || !S.refs || !S.refs.pkg) return;
+  var P = S.refs.pkg;
+  var SLICE = 4 * 1024 * 1024;
+
+  function $(id) { return document.getElementById(id); }
+  function toast(msg, err) {
+    var t = $('toast');
+    t.textContent = msg; t.className = 'toast on' + (err ? ' err' : '');
+    clearTimeout(toast.h);
+    toast.h = setTimeout(function () { t.className = 'toast'; }, err ? 6000 : 3000);
+  }
+  var NF = new Intl.NumberFormat('ru-RU');
+  function n(v) { return NF.format(v); }
+  function day(d) { return d && /^\d{4}-\d{2}-\d{2}/.test(d) ? d.slice(8, 10) + '.' + d.slice(5, 7) + '.' + d.slice(0, 4) : ''; }
+  function when(d) {
+    if (!d) return '';
+    var x = new Date(d);
+    return isNaN(x) ? String(d) : x.toLocaleDateString('ru-RU') + ' ' + x.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  }
+  function later(f) { return new Promise(function (res) { setTimeout(function () { res(f ? f() : undefined); }, 0); }); }
+
+  /** sha256 of the file in slices of 4 MB, yielding between them (50 MB ≈ 0.6 s). */
+  function hash(bytes, progress) {
+    var s = P.sha256Stream(), at = 0;
+    function step() {
+      if (at >= bytes.length) return Promise.resolve(s.hex());
+      var to = Math.min(bytes.length, at + SLICE);
+      s.update(bytes.subarray(at, to));
+      at = to;
+      progress(at, bytes.length);
+      return later().then(step);
+    }
+    return step();
+  }
+
+  /** gunzip with a cap on the unpacked size, counted while streaming. */
+  function gunzip(bytes) {
+    var cap = P.LIMITS.bytes;
+    if (typeof DecompressionStream === 'undefined') {
+      var out = (S.__fflate || window.fflate).gunzipSync(bytes);
+      if (out.length > cap) throw new Error('Пакет слишком велик (больше 500 МБ после распаковки)');
+      return Promise.resolve(out);
+    }
+    var reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')).getReader();
+    var parts = [], total = 0;
+    function pump() {
+      return reader.read().then(function (r) {
+        if (r.done) {
+          var all = new Uint8Array(total), o = 0;
+          for (var i = 0; i < parts.length; i++) { all.set(parts[i], o); o += parts[i].length; }
+          return all;
+        }
+        total += r.value.length;
+        if (total > cap) {
+          reader.cancel();
+          throw new Error('Пакет слишком велик (больше 500 МБ после распаковки)');
+        }
+        parts.push(r.value);
+        return pump();
+      });
+    }
+    return pump().catch(function (e) {
+      if (/500 МБ/.test(e.message)) throw e;
+      throw new Error('Это не файл .json.gz или он повреждён');
+    });
+  }
+
+  function errorLines(res) {
+    var list = res.errors.slice(0, 20).map(function (e) {
+      return (e.row ? 'строка ' + n(e.row) + ', ' : '') + 'поле ' + e.field + ': ' + e.msg;
+    });
+    var cnt = res.errors.length + (res.truncated ? '+' : '');
+    var word = res.errors.length === 1 ? 'ошибка' : (res.errors.length < 5 ? 'ошибки' : 'ошибок');
+    return 'Пакет не принят: ' + cnt + ' ' + word + '\n' + list.join('\n');
+  }
+
+  var Refs = {
+    pending: null,          // { file, bytes, sha, pkg, manifest }
+    items: [],
+
+    init: function () {
+      var self = this;
+      if (!$('refsPanel')) return;
+      document.addEventListener('auth:signedin', function () { self.open(); });
+      $('refsFile').addEventListener('change', function (e) {
+        var f = e.target.files[0];
+        e.target.value = '';
+        if (f) self.check(f);
+      });
+      $('refsUpload').addEventListener('click', function () { self.upload(); });
+      $('refsCancel').addEventListener('click', function () { self.reset(); });
+      $('refsActivateDup').addEventListener('click', function () {
+        if (self.dup) self.activate(self.dup);
+      });
+      if (S.pb.authStore.isValid) this.open();
+    },
+
+    open: function () {
+      if (!S.isAdmin()) return;
+      this.load();
+    },
+
+    progress: function (done, total, text) {
+      $('refsProgress').hidden = false;
+      $('refsBar').style.width = (total ? Math.round(done / total * 100) : 0) + '%';
+      $('refsText').textContent = text;
+    },
+    fail: function (msg) {
+      $('refsProgress').hidden = true;
+      $('refsErr').textContent = msg;
+      $('refsErr').hidden = false;
+      $('refsStat').textContent = '';
+      $('refsReady').hidden = true;
+      this.pending = null;
+    },
+    reset: function () {
+      this.pending = null; this.dup = null;
+      $('refsProgress').hidden = true; $('refsErr').hidden = true;
+      $('refsStat').textContent = ''; $('refsReady').hidden = true;
+    },
+
+    /** Everything up to «Загрузить»: hash, unpack, decode, parse, validate, look for the same package. */
+    check: function (file) {
+      var self = this;
+      this.reset();
+      if (file.size > P.LIMITS.gzip) { this.fail('Файл больше 50 МБ — это не пакет справочника'); return; }
+      var st = { file: file };
+      this.progress(0, 1, 'Чтение файла…');
+      var read = file.arrayBuffer ? file.arrayBuffer() : new Promise(function (res, rej) {
+        var fr = new FileReader();
+        fr.onload = function () { res(fr.result); };
+        fr.onerror = function () { rej(fr.error); };
+        fr.readAsArrayBuffer(file);
+      });
+      read.then(function (buf) {
+        st.bytes = new Uint8Array(buf);
+        return hash(st.bytes, function (d, t) { self.progress(d, t, 'Контрольная сумма ' + Math.round(d / t * 100) + ' %'); });
+      }).then(function (sha) {
+        st.sha = sha;
+        self.progress(0, 1, 'Распаковка…');
+        return later(function () { return gunzip(st.bytes); });
+      }).then(function (raw) {
+        self.progress(0, 1, 'Чтение пакета…');
+        return later(function () {
+          var text = new TextDecoder('utf-8').decode(raw);
+          var bad = P.checkDecoded(text.length, raw.length);
+          if (bad) throw new Error(bad);
+          var obj;
+          try { obj = JSON.parse(text); } catch (e) { throw new Error('Пакет повреждён: это не JSON'); }
+          st.unpacked = raw.length;
+          return obj;
+        });
+      }).then(function (obj) {
+        st.pkg = obj;
+        return new Promise(function (res) {
+          P.validateAsync(obj, {
+            bytes: st.unpacked,
+            progress: function (d, t) { self.progress(d, t, 'Проверка ' + Math.round(d / t * 100) + ' %'); }
+          }, res);
+        });
+      }).then(function (res) {
+        if (!res.ok) { self.fail(errorLines(res)); return; }
+        st.manifest = P.manifest(st.pkg);
+        st.pkg = null;              // the rows are not needed any more; the file goes as it is
+        self.pending = st;
+        $('refsProgress').hidden = true;
+        var m = st.manifest;
+        $('refsStat').textContent = 'Пакет ' + m.package_id + ' · записей ' + n(m.counts.records) + ' · документов ' +
+          n(m.counts.sources) + ' · цены ' + day(m.date_min) + ' … ' + day(m.date_max);
+        return self.findSame(m.package_id, st.sha);
+      }).catch(function (e) {
+        self.fail(e && e.message ? e.message : 'Не удалось прочитать файл');
+      });
+    },
+
+    /** The same file uploaded before (by hash), or another file under the same number. */
+    findSame: function (pid, sha) {
+      var self = this;
+      return S.pb.collection('ref_packages').getList(1, 2, {
+        filter: S.pb.filter('sha256 = {:s} || package_id = {:p}', { s: sha, p: pid }), fields: 'id,package_id,sha256,active,created'
+      }).then(function (r) {
+        $('refsReady').hidden = false;
+        $('refsUpload').hidden = false;
+        $('refsActivateDup').hidden = true;
+        self.dup = null;
+        for (var i = 0; i < r.items.length; i++) {
+          var x = r.items[i];
+          if (x.sha256 === sha) {
+            $('refsStat').textContent += ' — этот пакет уже загружен ' + when(x.created) + (x.active ? ' и активен' : '');
+            $('refsUpload').hidden = true;
+            if (!x.active) { self.dup = x.id; $('refsActivateDup').hidden = false; }
+            return;
+          }
+          $('refsErr').textContent = 'Пакет с таким номером уже есть, но содержимое другое — проверьте файл';
+          $('refsErr').hidden = false;
+          $('refsUpload').hidden = true;
+          return;
+        }
+      });
+    },
+
+    upload: function () {
+      var self = this, st = this.pending;
+      if (!st) return;
+      var m = st.manifest;
+      var fd = new FormData();
+      fd.append('package_id', m.package_id);
+      fd.append('sha256', st.sha);
+      fd.append('manifest', JSON.stringify(m));
+      fd.append('records', String(m.counts.records));
+      fd.append('sources', String(m.counts.sources));
+      fd.append('date_min', m.date_min);
+      fd.append('date_max', m.date_max);
+      fd.append('file', st.file, m.package_id + '.json.gz');
+      $('refsUpload').disabled = true;
+      this.progress(1, 1, 'Отправка…');
+      S.pb.collection('ref_packages').create(fd).then(function (rec) {
+        self.reset();
+        toast('Пакет ' + rec.package_id + ' загружен' + (rec.active ? ' и сделан активным' : ''));
+        self.load();
+      }).catch(function (e) {
+        var d = e && e.response && e.response.data;
+        if (d && ((d.sha256 && d.sha256.code === 'validation_not_unique') || (d.package_id && d.package_id.code === 'validation_not_unique'))) {
+          self.fail(d.sha256 ? 'Этот пакет уже загружен' : 'Пакет с таким номером уже есть, но содержимое другое — проверьте файл');
+        } else self.fail('Не удалось загрузить: ' + ((e && e.response && e.response.message) || S.pbErr(e)));
+      }).then(function () { $('refsUpload').disabled = false; });
+    },
+
+    load: function () {
+      var self = this;
+      S.pb.collection('ref_packages').getFullList({
+        sort: '-created', expand: 'by',
+        fields: 'id,package_id,records,sources,date_min,date_max,active,note,created,manifest,expand.by.name,expand.by.email'
+      }).then(function (items) { self.items = items; self.render(); })
+        .catch(function (e) { toast(S.pbErr(e), true); });
+    },
+
+    render: function () {
+      var self = this;
+      var tb = $('refsTable').querySelector('tbody');
+      tb.innerHTML = this.items.map(function (x) {
+        var by = x.expand && x.expand.by;
+        var m = x.manifest || {};
+        return '<tr data-id="' + x.id + '">' +
+          '<td class="mono"><b>' + S.esc(x.package_id) + '</b>' + (x.note ? '<br><span class="mute">' + S.esc(x.note) + '</span>' : '') + '</td>' +
+          '<td>' + S.esc(day(m.created)) + '</td>' +
+          '<td>' + when(x.created) + (by ? '<br><span class="mute">' + S.esc(by.name || by.email) + '</span>' : '') + '</td>' +
+          '<td>' + n(x.records || 0) + '</td>' +
+          '<td>' + n(x.sources || 0) + '</td>' +
+          '<td>' + S.esc(day(x.date_min)) + ' … ' + S.esc(day(x.date_max)) + '</td>' +
+          '<td>' + (x.active ? '<b>✓ активен</b>' : '') + '</td>' +
+          '<td class="act"><button class="btn sm" data-act="docs">Документы</button>' +
+          (x.active ? '' : '<button class="btn sm" data-act="activate">Сделать активным</button>' +
+            '<button class="btn sm danger" data-act="delete">✕ Удалить</button>') + '</td></tr>';
+      }).join('') || '<tr><td colspan="8" class="mute">Пакетов ещё нет</td></tr>';
+      tb.querySelectorAll('button[data-act]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var id = b.closest('tr').dataset.id;
+          if (b.dataset.act === 'activate') self.activate(id);
+          else if (b.dataset.act === 'delete') self.remove(id);
+          else self.docs(id);
+        });
+      });
+    },
+
+    activate: function (id) {
+      var self = this;
+      S.pb.send('/api/refs/' + id + '/activate', { method: 'POST' }).then(function () {
+        toast('Активный пакет сменён');
+        self.reset();
+        self.load();
+      }).catch(function (e) { toast(S.pbErr(e), true); });
+    },
+
+    remove: function (id) {
+      var self = this;
+      var x = this.items.filter(function (i) { return i.id === id; })[0];
+      if (!x || !confirm('Удалить пакет ' + x.package_id + '?\n\nЦены, уже применённые экспертами, останутся.')) return;
+      S.pb.collection('ref_packages').delete(id).then(function () { toast('Пакет удалён'); self.load(); })
+        .catch(function (e) { toast((e && e.response && e.response.message) || S.pbErr(e), true); });
+    },
+
+    /** The documents of a package, from its manifest: type, issuer, number, date, region. */
+    docs: function (id) {
+      var box = $('refsDocs');
+      var x = this.items.filter(function (i) { return i.id === id; })[0];
+      if (!x || (box.dataset.id === id && !box.hidden)) { box.hidden = true; return; }
+      var DOC = (S.refs.RU && S.refs.RU.DOC) || {};
+      var src = (x.manifest && x.manifest.sources) || [];
+      box.dataset.id = id;
+      box.innerHTML = '<h3>Документы пакета ' + S.esc(x.package_id) + '</h3><table class="tbl"><thead><tr><th>Вид</th><th>Кто выдал</th>' +
+        '<th>№</th><th>Дата</th><th>Регион</th></tr></thead><tbody>' + src.map(function (d) {
+          return '<tr><td>' + S.esc(DOC[d.doc_type] || 'документ') + '</td><td>' + S.esc(d.issuer || '') + '</td><td>' + S.esc(d.doc_no || '') +
+            '</td><td>' + S.esc(day(d.issue_date || d.as_of_date)) + '</td><td>' +
+            S.esc(d.region === 'national' ? 'вся республика' : (d.region && S.regionLabel ? S.regionLabel(d.region) : '')) + '</td></tr>';
+        }).join('') + '</tbody></table>';
+      box.hidden = false;
+    }
+  };
+
+  S.RefsAdmin = Refs;
+  document.addEventListener('DOMContentLoaded', function () { Refs.init(); });
+  if (document.readyState !== 'loading') Refs.init();
 })(S);
 </script>
 </body>

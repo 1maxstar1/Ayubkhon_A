@@ -39,6 +39,28 @@
     <p class="lead" id="healthNote" style="margin:4px 0 0"></p>
   </section>
 
+  <section class="panel" id="refsPanel">
+    <h2>Справочник цен (документы)</h2>
+    <p class="lead">Пакет цен из документов — заключений экспертизы, прайс-листов, биржевых котировок, таблиц ставок
+      (<code>.json.gz</code>). Эксперты видят цены активного пакета рядом со сметной ценой; ни одна цена не применяется
+      без нажатия «Применить». Файл проверяется здесь, в браузере, и только потом отправляется на сервер.</p>
+    <label class="btn file primary">
+      <input type="file" id="refsFile" accept=".gz,application/gzip">
+      <span class="ic">↑</span> Выбрать файл .json.gz
+    </label>
+    <div class="progress" id="refsProgress" hidden><div class="bar-fill" id="refsBar"></div><span id="refsText"></span></div>
+    <p class="err" id="refsErr" hidden></p>
+    <div class="stat" id="refsStat"></div>
+    <div id="refsReady" hidden style="margin-top:8px">
+      <button class="btn primary" type="button" id="refsUpload">Загрузить</button>
+      <button class="btn" type="button" id="refsActivateDup" hidden>Сделать активным</button>
+      <button class="btn" type="button" id="refsCancel">Отмена</button>
+    </div>
+    <h3>Пакеты</h3>
+    <table class="tbl" id="refsTable"><thead><tr><th>Пакет</th><th>Создан</th><th>Загружен</th><th>Записей</th><th>Документов</th><th>Даты цен</th><th>Активен</th><th></th></tr></thead><tbody></tbody></table>
+    <div id="refsDocs" hidden></div>
+  </section>
+
   <section class="panel">
     <h2>Рабочие области</h2>
     <p class="lead">Заявки, открытые сотрудниками. <b>Очистить</b> — удаляются загруженные сметы, правки цен и экспорты,

@@ -1,0 +1,11 @@
+{
+ "code": "39c77efb04e961e1",
+ "date": "2026-10-26",
+ "policies": [
+  "p1",
+  "p2",
+  "p3"
+ ],
+ "queries": 1571,
+ "result": "identical"
+}

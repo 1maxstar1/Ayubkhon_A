@@ -1,0 +1,8 @@
+# test/refs-privacy.cjs allow-list: <sha256-16 of the trimmed line>  <kind>  <reason>. Keyed by the line text, never by a value;
+# an edited line drops out of the list by itself. The synthetic fixture is never listed here.
+ae44709746b60f29  real-price  rounding constant of the cable parser (four decimals), not a price
+139301db4290b96e  real-price  table of standard cable voltages in volts (10 kV), not a price
+ae44709746b60f29  real-price  rounding constant of the parser (four decimals), not a price
+f201b8daaec6b927  real-price  rounding constant of the parser (four decimals), not a price
+3bde81aa244979ca  issuer-or-plant  pre-existing public NLP fixture (before this branch): a resource name that names a steel-structure maker
+b7278d9b50da9049  issuer-or-plant  pre-existing public NLP fixture (before this branch): the same resource name

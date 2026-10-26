@@ -67,6 +67,19 @@ run xlsx-guard       node test/xlsx-guard.cjs
 run sections         node test/sections.cjs
 run regions          node test/regions.cjs
 run refs             node test/refs.cjs
+run refs-privacy     node test/refs-privacy.cjs
+# The reference-price tables change only with measurement (CLAUDE.md). The measurement needs the private kit
+# (REFS_KIT: the owner's package and the goldens, never in the repository); without it the stamp of the last
+# measurement must still match the code — a change that was never measured is a failure, not a skip.
+if [ -n "$REFS_KIT" ]; then
+  run refs-parity    node test/refs-parity.cjs
+elif PARITY=$(node test/refs-parity.cjs --check-stamp 2>&1); then
+  skip refs-parity "$PARITY"
+else
+  printf '%-22s %-12s %s\n' refs-parity "NOT MEASURED" "$PARITY"
+  printf 'refs-parity\tFAIL\t0\n' >> "$OUT"
+fi
+if [ -n "$REFS_KIT" ] && [ -n "$S1" ]; then run refs-measure node test/refs-measure.cjs "$S1"; else skip refs-measure "REFS_KIT yoki smeta berilmagan"; fi
 smeta_run pipeline       node test/pipeline.cjs "$S1" "$S2" --out test/out.xlsx
 smeta_run hints          node test/hints.cjs "$S1" "$S2"
 run registry-parse   node test/registry.cjs

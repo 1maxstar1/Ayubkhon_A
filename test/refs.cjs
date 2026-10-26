@@ -335,6 +335,12 @@ ok(q1.id === R.queryOf(res('КАБЕЛЬ ВВГ 3Х2,5', 'м', 'materials'), qc)
 /* ------------------------------------------------------------------ builds */
 section('builds');
 {
+  // the format document shows the example the fixture makes, never one written (or pasted) by hand
+  const doc = fs.readFileSync(path.join(ROOT, 'docs/spravochnik.md'), 'utf8');
+  const m = /<!-- doc-example:start -->\n```json\n([\s\S]*?)\n```\n<!-- doc-example:end -->/.exec(doc);
+  ok(!!m && m[1] === F.docExample(), 'docs/spravochnik.md shows the example of node test/refs-fixture.cjs --doc-example');
+}
+{
   const single = fs.readFileSync(path.join(ROOT, 'dist/smeta-taqqoslash.html'), 'utf8');
   ok(single.indexOf('S.refs') < 0 && single.indexOf('__REFS_WORKER__') < 0, 'the single-file page carries no reference-price code');
   const pages = ['smeta-taqqoslash.html', 'index.html', 'admin.html'].map((f) => fs.readFileSync(path.join(ROOT, 'dist', f), 'utf8'));

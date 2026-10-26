@@ -503,3 +503,80 @@ Settings → Mail). Zaxira: Settings → Backups, keyin `pb_data/backups/` ni
 boshqa diskka nusxalab turing.
 
 Joylashtirish (VPS, HTTPS, SMTP, zaxira) — `server/deploy/README.md`.
+
+## Справочные цены — hujjatlardagi narxlar
+
+Faqat server rejimida (noutbuk, ofis, VPS); bitta-fayl sahifada yo'q. Narx
+hujjatlaridan — ekspertiza xulosalari, birja kotirovkalari, prays-listlar,
+zavod kalkulyatsiyalari, ish haqi jadvallari — olingan narxlar paketi har bir
+resurs yonida «справ.» tegi bilan ko'rinadi: hujjat bu resurs (yoki unga
+o'xshash resurs) uchun qancha narx aytgan, qaysi hujjat, qaysi sanaga.
+
+**Hech narsa o'zi qo'yilmaydi.** Narx faqat «Применить» bosilganda tushadi;
+ekspert o'zi yozgan narx ustiga esa faqat so'rab («Заменить вашу цену …?»).
+Paket yuklanishi, sana o'zgarishi, qayta hisoblash narxlarga tegmaydi.
+
+### Qanday ishlatiladi
+
+1. **Paket.** Administrator `admin.html` → «Справочник цен (документы)» →
+   «Выбрать файл .json.gz». Fayl shu brauzerning o'zida tekshiriladi (xato
+   bo'lsa — qator raqami va maydon), keyin «Загрузить». Birinchi paket o'zi
+   faol bo'ladi; keyingisi jadvaldagi «Сделать активным» bilan. «Документы» —
+   paketdagi hujjatlar ro'yxati. Format — `docs/spravochnik.md`.
+2. **Ekspert.** Ish maydonini ochganda brauzer faol paketni bir marta yuklab
+   oladi va tayyorlaydi (birinchi marta yarim daqiqacha — holat qatorida
+   «справочник: подготовка N %»; keyingi safar IndexedDB dan bir necha soniyada).
+   «Цены» oynasida:
+   * **«справ. 123 457 +2»** — eng yaxshi qator va yana nechta; uzuq chiziqli
+     teg («справ. ≈…») — eng yaxshi qator boshqa resursning narxi, tekshiring;
+   * tegni bosing — 6 tagacha qator: narx, daraja (**Ставка по таблице**,
+     **Документ**, **Похожий** — boshqa resurs, **Оценка**), topilgan yozuvning
+     o'z nomi, nimasi farq qiladi, hujjat va sanalar, birlik qayta hisoblangan
+     bo'lsa — qanday, sizning smeta narxingizdan farqi; har qatorda «Применить»;
+   * filtrlar: «Со справочными ценами», «Только похожие справочные».
+3. **Sana.** Narxlar arizaning ro'yxatga olingan sanasiga beriladi: undan
+   keyin chiqqan hujjat taklif qilinmaydi. Amaldagi sana panelda turadi —
+   «справочник на ДД.ММ.ГГГГ»; uni bosib boshqa sana tanlash mumkin (2019 dan
+   bir yil oldinga qadar, «Применить дату» yoki Enter bilan). Qo'lda tanlangan
+   sana ish maydonida saqlanadi va sariq rangda «выбрана вручную · сбросить»
+   bo'lib turadi; ish maydoni qayta ochilganda bu haqda xabar chiqadi.
+4. **Iz.** «Применить» bilan qo'yilgan narx tuzatish yozuvida qayerdan
+   kelganini saqlaydi (`ref:<paket>:<yozuv>`); boshqa loyihadagi eslatmada u
+   «из справочника» deb ko'rinadi. Keyin qo'lda yozilgan (Escape dan keyin
+   o'sha son bo'lsa ham) narx — `typed`.
+
+### Ma'lumot qayerda turadi (muhim)
+
+* **Paket egasining ma'lumoti — repozitoriyga hech qachon qo'shilmaydi.** U
+  repozitoriydan tashqarida, yopiq to'plamda (`KIT`) yasaladi; `.gitignore`
+  `*.json.gz`, `*.jsonl`, `refs*.json`, `private/` ni ushlaydi;
+  `node test/refs-privacy.cjs` har commitdan oldin (va butun shox tarixini)
+  tekshiradi.
+* **Serverda paket `pb_data/storage` ichida turadi, shuning uchun u har bir
+  zaxiraga tushadi:** noutbukdagi kunlik zaxiralarga (oxirgi 14 tasi,
+  `~/Backups/smeta`, Windows'da `%USERPROFILE%\Backups\smeta`), `laptop.cmd
+  drive` yoqilgan bo'lsa — Google Drive'dagi `Smeta zaxira` papkasiga ham,
+  VPS da — `server/deploy/pull-backup.sh` olib keladigan zaxiraga ham. Zaxirani
+  kimga bersangiz, paket ham unda. Har bir paket — bir necha MB; eski nofaol
+  paketlarni «Пакеты» jadvalida «✕ Удалить» bilan o'chirib turing (eski
+  zaxiralardan ular navbatdagi 14 kunda chiqib ketadi).
+* **Ekspertning brauzeri** paketdan hosil qilgan pulni IndexedDB da saqlaydi
+  va «Выйти» bosilganda o'chiradi. Noutbuk rejimida «Выйти» yo'q (kirish
+  vaqtincha o'chirilgan) — u yerda pul brauzer profilida qoladi.
+* Fon oqimi (worker) ish maydoni yopiq turganda 3 daqiqadan, varaq yashirin
+  turganda 15 daqiqadan keyin to'xtaydi va xotirani bo'shatadi; kerak bo'lganda
+  keshdan bir necha soniyada qaytadi.
+
+### Testlar
+
+```sh
+node test/refs.cjs             # parserlar, dvigatel, matnlar (soxta paket bilan)
+node test/refs-api.mjs         # server: yuklash, faol paket, huquqlar
+node test/e2e-refs.mjs         # brauzer: admin yuklashi, teglar, «Применить», sana, iz
+REFS_KIT=<KIT> node test/refs-parity.cjs    # o'lchov: dastur kodi = o'lchangan dvigatel (1 571 so'rov)
+REFS_KIT=<KIT> node test/refs-privacy.cjs   # haqiqiy paketga qarshi maxfiylik tekshiruvi
+```
+
+`src/lib/refs` dagi jadvallar faqat o'lchov bilan o'zgaradi: `KIT` siz
+`test/all.sh` oxirgi o'lchov shtampini tekshiradi va o'lchanmagan o'zgarishni
+«NOT MEASURED» deb xato qiladi.

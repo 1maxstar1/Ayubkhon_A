@@ -132,10 +132,14 @@
       this.hide();
     },
 
+    /** Sign-out: the worker goes, and the derived pool (the documents' prices) leaves this browser's storage. */
     forget: function () {
       this.stop();
       if (this.worker) { try { this.worker.postMessage({ cmd: 'forget' }); } catch (e) { /* gone */ } this.kill(); }
+      try { if (window.indexedDB) indexedDB.deleteDatabase('smeta-refs'); } catch (e) { /* storage blocked: nothing kept */ }
       this.state = 'off';
+      this.rec = null;
+      this.filters(false);
     },
 
     kill: function () {

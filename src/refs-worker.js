@@ -49,7 +49,11 @@
       var rq;
       try { rq = indexedDB.open(DB, 1); } catch (e) { reject(e); return; }
       rq.onupgradeneeded = function () { rq.result.createObjectStore(STORE); };
-      rq.onsuccess = function () { resolve(rq.result); };
+      rq.onsuccess = function () {
+        var db = rq.result;
+        db.onversionchange = function () { db.close(); };   // a sign-out on another page deletes it
+        resolve(db);
+      };
       rq.onerror = function () { reject(rq.error || new Error('IndexedDB')); };
       rq.onblocked = function () { reject(new Error('IndexedDB blocked')); };
     });
@@ -187,6 +191,8 @@
         return stored.then(function () { return { recs: R.decodeCache(enc), sources: sources, skipped: value.skipped }; });
       });
     }).then(function (got) {
+      // the cache is written (or read): no connection is kept, so a sign-out can delete the database at once
+      if (db) { try { db.close(); } catch (e) { /* already closed */ } db = null; }
       phase = 'index';
       progress('index', 0, 1);
       var h = R.open(got.recs);
@@ -201,6 +207,7 @@
       st.queue = [];
       for (var i = 0; i < q.length; i++) suggest(q[i]);
     }).catch(function (e) {
+      if (db) { try { db.close(); } catch (x) { /* already closed */ } db = null; }
       fail(phase, (e && /[А-Яа-я]/.test(e.message || '')) ? e.message : 'Справочник не подготовлен (' + phase + ')');
     });
   }

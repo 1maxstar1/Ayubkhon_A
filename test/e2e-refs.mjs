@@ -378,6 +378,12 @@ const kept2 = await ep.evaluate(() => {
 check(kept2.both && kept2.pin, 'a repaint keeps the focus in the price field of a row that has a hint tag and a «справ.» tag');
 await ep.evaluate(() => document.activeElement && document.activeElement.blur());
 
+/* ------------------------------------------------------------- sign-out: the derived pool leaves the browser */
+check(await ep.evaluate(async () => (await indexedDB.databases()).some((d) => d.name === 'smeta-refs')), 'the derived pool is kept in IndexedDB while signed in');
+await ep.click('#signOut');
+await ep.waitForFunction(async () => !(await indexedDB.databases()).some((d) => d.name === 'smeta-refs'), null, { timeout: 15 * SEC })
+  .then(() => check(true, 'signing out deletes it'), () => check(false, 'signing out deletes it'));
+
 /* ------------------------------------------------------------- builds */
 const single = readFileSync(join(ROOT, 'dist/smeta-taqqoslash.html'), 'utf8');
 check(single.indexOf('S.refs') < 0 && single.indexOf('__REFS_WORKER') < 0 && single.indexOf('Справочные цены') < 0,

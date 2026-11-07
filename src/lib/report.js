@@ -105,6 +105,30 @@
     ];
   }
 
+  /**
+   * Equipment the contractor must justify: a line of a band titled
+   * ОБОРУДОВАНИЕ… / Jihoz… whose smeta amount (quantity × smeta price, the
+   * whole project's quantity of that resource) is above the threshold.
+   */
+  var EQUIP_LIMIT = 20000000;
+  function equipLimit(opts) {
+    var n = opts.equipLimit;
+    return typeof n === 'number' && isFinite(n) && n >= 0 ? n : EQUIP_LIMIT;
+  }
+  function bigEquipment(model, span, opts) {
+    var keys = {};
+    if (!opts.equipNote) return keys;
+    var sums = {};
+    for (var i = span.from - 1; i < span.to; i++) {
+      var r = model.rows[i];
+      if (r.kind !== 'item' || r.section !== 'equipment') continue;
+      sums[r.key] = (sums[r.key] || 0) + (r.qty || 0) * (r.price || 0);
+    }
+    var limit = equipLimit(opts);
+    for (var k in sums) if (sums[k] > limit) keys[k] = true;
+    return keys;
+  }
+
   function nameCmp(a, b) {
     var x = a.nm || '', y = b.nm || '';
     return x < y ? -1 : x > y ? 1 : 0;
@@ -139,6 +163,7 @@
 
     var map = colMap(model.nExtra);
     var mapRow = function (n) { return rowOf.get(n) || null; };
+    var big = bigEquipment(model, span, opts);
 
     body.forEach(function (r) {
       var cells = {};
@@ -154,7 +179,7 @@
       var moved = r.kind === 'item' && !S.near(r.price, r.market);
       // The note column doubles as the sheet's first helper column, exactly as
       // in the reference workbook — never overwrite a value carried across.
-      if (r.kind === 'item' && r.section === 'equipment' && opts.equipNote && !cells[R_NOTE]) cells[R_NOTE] = { v: opts.equipNote };
+      if (r.kind === 'item' && big[r.key] && !cells[R_NOTE]) cells[R_NOTE] = { v: opts.equipNote };
       else if (moved && opts.autoNote && opts.noteText && !cells[R_NOTE]) cells[R_NOTE] = { v: opts.noteText };
       rows.push({
         kind: r.kind, section: r.section, nm: r.nm, unit: r.unit,
@@ -171,6 +196,7 @@
 
   function buildDedup(model, span, opts) {
     var onlyChanged = opts.mode !== 'dedup';
+    var big = bigEquipment(model, span, opts);
     var groups = {};
     SECTION_ORDER.forEach(function (s) { groups[s] = new Map(); });
 
@@ -179,9 +205,9 @@
       if (r.kind !== 'item') continue;
       var changed = !S.near(r.price, r.market);
       var sec = groups[r.section] ? r.section : guessSection(r);
-      // Equipment is listed whether its price moved or not: its note asks the
-      // contractor for the parameters and two commercial offers either way.
-      if (onlyChanged && !changed && !(sec === 'equipment' && opts.equipNote)) continue;
+      // Large equipment is listed whether its price moved or not: its note asks
+      // the contractor for the parameters and two commercial offers either way.
+      if (onlyChanged && !changed && !big[r.key]) continue;
       var g = groups[sec];
       // "One line when name and price are the same; every line when the name
       // repeats with a different price."
@@ -189,7 +215,7 @@
       var rec = g.get(k);
       if (!rec) {
         rec = { nm: r.nm, unit: r.unit, key: r.key, price: r.price, market: r.market,
-                qty: 0, count: 0, changed: changed, note: '' };
+                qty: 0, count: 0, changed: changed, note: '', big: !!big[r.key] };
         g.set(k, rec);
       }
       rec.qty += r.qty || 0;
@@ -219,7 +245,7 @@
         cells[R_MPRICE] = { v: rec.market };
         cells[R_MSUM] = { f: '=F' + rr + '*I' + rr };
         cells[R_DIFF] = { f: '=+H' + rr + '-J' + rr };
-        if (sec === 'equipment' && opts.equipNote) cells[R_NOTE] = { v: opts.equipNote };
+        if (rec.big) cells[R_NOTE] = { v: opts.equipNote };
         else if (opts.autoNote && rec.changed && opts.noteText) cells[R_NOTE] = { v: opts.noteText };
         rows.push({ kind: 'item', section: sec, nm: rec.nm, unit: rec.unit, key: rec.key,
                     price: rec.price, market: rec.market, qty: rec.qty,

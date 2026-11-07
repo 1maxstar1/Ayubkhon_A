@@ -119,8 +119,10 @@
         <label class="row"><input type="checkbox" id="optAutoNote" checked>
           Ставить примечание в каждую изменённую строку автоматически</label>
         <label class="row"><input type="checkbox" id="optEquipOn" checked>
-          Включать в отчёт всё оборудование (раздел «ОБОРУДОВАНИЕ») с примечанием ниже,
-          даже если цена не изменена</label>
+          Включать в отчёт оборудование (разделы «ОБОРУДОВАНИЕ…» / «Jihoz…») дороже порога
+          с примечанием ниже, даже если цена не изменена</label>
+        <label>Порог: сумма оборудования по смете больше, сум
+          <input id="optEquipLimit" type="number" step="1000000" value="20000000"></label>
         <label>Примечание для оборудования
           <textarea id="optEquipNote" rows="3"></textarea></label>
         <label class="row"><input type="checkbox" id="optHideSums" checked>

@@ -46,7 +46,7 @@
   var LABOR = /^(ЗАТРАТЫ ТРУДА|ТРУДОЗАТРАТЫ|ТРУДОВЫЕ РЕСУРСЫ|МЕҲНАТ|MEHNAT|ISHCHILAR)/;
   var MACH = /^((СТРОИТЕЛЬНЫЕ )?МАШИНЫ|МЕХАНИЗМЫ|(ҚУРИЛИШ )?МАШИНА|МЕХАНИЗМ|(QURILISH )?MASHINA|MEXANIZM)/;
   var MAT = /^((СТРОИТЕЛЬНЫЕ )?МАТЕРИАЛЫ|(ҚУРИЛИШ )?МАТЕРИАЛ|(QURILISH )?MATERIAL)/;
-  var EQUIP = /^(ОБОРУДОВАНИ|УСКУНА|ЖИҲОЗ|USKUNA|JIHOZ|ASBOB)/;
+  var EQUIP = /^(ОБОРУДОВАНИ|УСКУНА|ЖИҲОЗ|ЖИХОЗ|USKUNA|JIHOZ|ASBOB)/;
 
   function isSection(t) {
     var u = up(t);

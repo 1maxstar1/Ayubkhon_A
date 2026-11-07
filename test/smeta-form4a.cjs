@@ -144,8 +144,9 @@ const C = S.report.cols;
 const repItems = (rep) => rep.rows.filter((r) => r.kind === 'item');
 const plain = repItems(S.report.build(asm, asm.spans[0], { mode: 'changed', autoNote: true, noteText: 'X' }));
 check(plain.length === 0, 'without the equipment note an unchanged project lists nothing («changed» mode)');
+// the synthetic shield costs 29: above a threshold of 20, below the real 20 000 000
 for (const mode of ['changed', 'dedup', 'full']) {
-  const rep = repItems(S.report.build(asm, asm.spans[0], { mode, autoNote: true, noteText: 'X', equipNote: NOTE }));
+  const rep = repItems(S.report.build(asm, asm.spans[0], { mode, autoNote: true, noteText: 'X', equipNote: NOTE, equipLimit: 20 }));
   const eq = rep.filter((r) => r.section === 'equipment');
   check(eq.length === 1 && eq[0].nm === 'ТЕСТОВЫЙ ЩИТ' && eq[0].cells[C.NOTE] && eq[0].cells[C.NOTE].v === NOTE,
     mode + ': the equipment line is listed with its note');
@@ -155,8 +156,22 @@ for (const mode of ['changed', 'dedup', 'full']) {
 // a re-priced equipment line still carries the equipment note, not the generic one
 const key = asm.resources.find((r) => r.name === 'ТЕСТОВЫЙ ЩИТ').key;
 const asm3 = S.assemble([{ id: 'p1', title: objs[0].title, objects: objs }], { [key]: 31 });
-const moved = repItems(S.report.build(asm3, asm3.spans[0], { mode: 'changed', autoNote: true, noteText: 'X', equipNote: NOTE }));
+const moved = repItems(S.report.build(asm3, asm3.spans[0], { mode: 'changed', autoNote: true, noteText: 'X', equipNote: NOTE, equipLimit: 20 }));
 check(moved.length === 1 && moved[0].cells[C.NOTE].v === NOTE && moved[0].market === 31, 'a re-priced equipment line keeps the equipment note');
+
+// only equipment whose smeta amount is above the threshold: 20 000 000 unless set
+const under = repItems(S.report.build(asm, asm.spans[0], { mode: 'changed', autoNote: true, noteText: 'X', equipNote: NOTE }));
+check(under.length === 0, 'equipment at or under 20 000 000 is not added (amount 29)');
+const atLimit = repItems(S.report.build(asm, asm.spans[0], { mode: 'changed', autoNote: true, noteText: 'X', equipNote: NOTE, equipLimit: 29 }));
+check(atLimit.length === 0, 'the amount has to be above the threshold, not equal to it');
+const fullUnder = repItems(S.report.build(asm, asm.spans[0], { mode: 'full', autoNote: true, noteText: 'X', equipNote: NOTE }));
+check(fullUnder.every((r) => !r.cells[C.NOTE] || r.cells[C.NOTE].v !== NOTE), 'full mode: no note on equipment under the threshold');
+const movedUnder = repItems(S.report.build(asm3, asm3.spans[0], { mode: 'changed', autoNote: true, noteText: 'X', equipNote: NOTE }));
+check(movedUnder.length === 1 && movedUnder[0].cells[C.NOTE].v === 'X', 're-priced equipment under the threshold gets the usual note');
+
+// the band may be written «Jihozlar», «Жиҳозлар» or «Жихозлар»
+for (const t of ['ОБОРУДОВАНИЕ, МЕБЕЛЬ И ИНВЕНТАРЬ (ПОСТАВКА ПОДРЯДЧИКА)', 'Jihozlar', 'ЖИҲОЗЛАР', 'Жихозлар'])
+  check(S.smeta.sectionOf(t) === 'equipment', '«' + t + '» is an equipment band');
 
 console.log(fail ? `\nFAILED (${fail})` : '\nsmeta-form4a OK');
 process.exit(fail ? 1 : 0);

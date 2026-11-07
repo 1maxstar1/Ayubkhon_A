@@ -120,14 +120,16 @@ bir xilda tegishli.
 | **Barcha resurslar (tozalangan)** | Yuqoridagi bilan bir xil, lekin narxi o'zgarmaganlar ham qoladi. |
 | **To'liq nusxa** | Loyihaning har bir qatori, hech narsa tashlanmaydi. Narxi o'zgargan qatorlar o'z o'rnida alifbo tartibida saralanadi — ya'ni Excelda `фарқ ≠ 0` bo'yicha filtr qo'yib, nom bo'yicha saralaganda chiqadigan natijaning aynan o'zi. |
 
-**Jihozlar (v2.5.2).** `ОБОРУДОВАНИЕ` bo'limidagi har bir resurs (masalan
-`ОБОРУДОВАНИЕ, МЕБЕЛЬ И ИНВЕНТАРЬ (ПОСТАВКА ПОДРЯДЧИКА)`) hisobotga **har uch
+**Jihozlar (v2.5.3).** Bo'lim nomi `ОБОРУДОВАНИЕ…` yoki `Jihoz…` (`Жиҳоз…`,
+`Жихоз…`) bilan boshlanadigan resurs, agar uning smeta summasi (loyiha bo'yicha
+miqdor × smeta narxi) **20 000 000 so'mdan katta** bo'lsa, hisobotga **har uch
 rejimda ham kiradi** — narxi o'zgarmagan bo'lsa ham — va `Eslatma` ustuniga
 izoh yoziladi: «Для полноценного изучения стоимости данного оборудования
 необходимо представить дополнительные технические параметры, а также
 обосновать цену оборудования не менее чем двумя коммерческими предложениями.»
-Matnni va uni yoqish/o'chirishni «Настройки документа» bo'limidan
-o'zgartirasiz («Примечание для оборудования»).
+Undan arzon jihoz avvalgidek: faqat narxi o'zgarsa, umumiy izoh bilan. Matn,
+chegara va yoqish/o'chirish — «Настройки документа» («Примечание для
+оборудования», «Порог»).
 
 Hisobot varag'ining ustunlari va ko'rinishi namunaviy fayldan olingan:
 `A`, `КОЛ-ВО` va summa ustunlari yashirin, chop etish gorizontal, `75%`,

@@ -154,7 +154,8 @@
       var moved = r.kind === 'item' && !S.near(r.price, r.market);
       // The note column doubles as the sheet's first helper column, exactly as
       // in the reference workbook — never overwrite a value carried across.
-      if (moved && opts.autoNote && opts.noteText && !cells[R_NOTE]) cells[R_NOTE] = { v: opts.noteText };
+      if (r.kind === 'item' && r.section === 'equipment' && opts.equipNote && !cells[R_NOTE]) cells[R_NOTE] = { v: opts.equipNote };
+      else if (moved && opts.autoNote && opts.noteText && !cells[R_NOTE]) cells[R_NOTE] = { v: opts.noteText };
       rows.push({
         kind: r.kind, section: r.section, nm: r.nm, unit: r.unit,
         key: r.key, price: r.price, market: r.market, qty: r.qty,
@@ -177,8 +178,10 @@
       var r = model.rows[i];
       if (r.kind !== 'item') continue;
       var changed = !S.near(r.price, r.market);
-      if (onlyChanged && !changed) continue;
       var sec = groups[r.section] ? r.section : guessSection(r);
+      // Equipment is listed whether its price moved or not: its note asks the
+      // contractor for the parameters and two commercial offers either way.
+      if (onlyChanged && !changed && !(sec === 'equipment' && opts.equipNote)) continue;
       var g = groups[sec];
       // "One line when name and price are the same; every line when the name
       // repeats with a different price."
@@ -216,7 +219,8 @@
         cells[R_MPRICE] = { v: rec.market };
         cells[R_MSUM] = { f: '=F' + rr + '*I' + rr };
         cells[R_DIFF] = { f: '=+H' + rr + '-J' + rr };
-        if (opts.autoNote && rec.changed && opts.noteText) cells[R_NOTE] = { v: opts.noteText };
+        if (sec === 'equipment' && opts.equipNote) cells[R_NOTE] = { v: opts.equipNote };
+        else if (opts.autoNote && rec.changed && opts.noteText) cells[R_NOTE] = { v: opts.noteText };
         rows.push({ kind: 'item', section: sec, nm: rec.nm, unit: rec.unit, key: rec.key,
                     price: rec.price, market: rec.market, qty: rec.qty,
                     changed: rec.changed, cells: cells });

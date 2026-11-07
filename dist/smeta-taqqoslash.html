@@ -365,7 +365,7 @@ ul.files .mute{color:var(--mute)}
 
 <header class="bar">
   <div class="brand">
-    <b>Таблица сопоставления №2</b><i class="ver" title="Версия программы">v2.5.1</i>
+    <b>Таблица сопоставления №2</b><i class="ver" title="Версия программы">v2.5.2</i>
     <span>проверка и сбор рыночных цен ресурсов сметы</span>
   </div>
   <div class="wsbox" id="wsBox" hidden></div>
@@ -473,6 +473,11 @@ ul.files .mute{color:var(--mute)}
           <input id="optNote" type="text"></label>
         <label class="row"><input type="checkbox" id="optAutoNote" checked>
           Ставить примечание в каждую изменённую строку автоматически</label>
+        <label class="row"><input type="checkbox" id="optEquipOn" checked>
+          Включать в отчёт всё оборудование (раздел «ОБОРУДОВАНИЕ») с примечанием ниже,
+          даже если цена не изменена</label>
+        <label>Примечание для оборудования
+          <textarea id="optEquipNote" rows="3"></textarea></label>
         <label class="row"><input type="checkbox" id="optHideSums" checked>
           Скрывать столбцы сумм (для печати)</label>
         <label class="row"><input type="checkbox" id="optHideQty" checked>
@@ -2908,7 +2913,8 @@ if (typeof self !== 'undefined') self.S = S;
       var moved = r.kind === 'item' && !S.near(r.price, r.market);
       // The note column doubles as the sheet's first helper column, exactly as
       // in the reference workbook — never overwrite a value carried across.
-      if (moved && opts.autoNote && opts.noteText && !cells[R_NOTE]) cells[R_NOTE] = { v: opts.noteText };
+      if (r.kind === 'item' && r.section === 'equipment' && opts.equipNote && !cells[R_NOTE]) cells[R_NOTE] = { v: opts.equipNote };
+      else if (moved && opts.autoNote && opts.noteText && !cells[R_NOTE]) cells[R_NOTE] = { v: opts.noteText };
       rows.push({
         kind: r.kind, section: r.section, nm: r.nm, unit: r.unit,
         key: r.key, price: r.price, market: r.market, qty: r.qty,
@@ -2931,8 +2937,10 @@ if (typeof self !== 'undefined') self.S = S;
       var r = model.rows[i];
       if (r.kind !== 'item') continue;
       var changed = !S.near(r.price, r.market);
-      if (onlyChanged && !changed) continue;
       var sec = groups[r.section] ? r.section : guessSection(r);
+      // Equipment is listed whether its price moved or not: its note asks the
+      // contractor for the parameters and two commercial offers either way.
+      if (onlyChanged && !changed && !(sec === 'equipment' && opts.equipNote)) continue;
       var g = groups[sec];
       // "One line when name and price are the same; every line when the name
       // repeats with a different price."
@@ -2970,7 +2978,8 @@ if (typeof self !== 'undefined') self.S = S;
         cells[R_MPRICE] = { v: rec.market };
         cells[R_MSUM] = { f: '=F' + rr + '*I' + rr };
         cells[R_DIFF] = { f: '=+H' + rr + '-J' + rr };
-        if (opts.autoNote && rec.changed && opts.noteText) cells[R_NOTE] = { v: opts.noteText };
+        if (sec === 'equipment' && opts.equipNote) cells[R_NOTE] = { v: opts.equipNote };
+        else if (opts.autoNote && rec.changed && opts.noteText) cells[R_NOTE] = { v: opts.noteText };
         rows.push({ kind: 'item', section: sec, nm: rec.nm, unit: rec.unit, key: rec.key,
                     price: rec.price, market: rec.market, qty: rec.qty,
                     changed: rec.changed, cells: cells });
@@ -3775,6 +3784,10 @@ if (typeof self !== 'undefined') self.S = S;
     stamp: '2026 y.  "____"_______________ dagi   \n\n  №________________________ xulosaga \n2-qo\'yilma',
     docTitle: 'TAQQOSLASH JADVALI  №2',
     noteText: 'Пересмотреть стоимость по всему проекту',
+    equipNote: 'Для полноценного изучения стоимости данного оборудования необходимо представить ' +
+      'дополнительные технические параметры, а также обосновать цену оборудования не менее чем ' +
+      'двумя коммерческими предложениями.',
+    equipOn: true,
     autoNote: true, hideSums: true, hideQty: true, contents: true,
     cfLimit: 10000000, sheetName: 'Лист1'
   };
@@ -3888,6 +3901,8 @@ if (typeof self !== 'undefined') self.S = S;
     bindOpt(this, 'optSheetName', 'sheetName');
     bindOpt(this, 'optCf', 'cfLimit', true);
     bindChk(this, 'optAutoNote', 'autoNote');
+    bindOpt(this, 'optEquipNote', 'equipNote');
+    bindChk(this, 'optEquipOn', 'equipOn');
     bindChk(this, 'optHideSums', 'hideSums');
     bindChk(this, 'optHideQty', 'hideQty');
     bindChk(this, 'optContents', 'contents');
@@ -4004,6 +4019,8 @@ if (typeof self !== 'undefined') self.S = S;
     document.getElementById('optSheetName').value = this.opts.sheetName;
     document.getElementById('optCf').value = this.opts.cfLimit;
     document.getElementById('optAutoNote').checked = !!this.opts.autoNote;
+    document.getElementById('optEquipNote').value = this.opts.equipNote;
+    document.getElementById('optEquipOn').checked = this.opts.equipOn !== false;
     document.getElementById('optHideSums').checked = !!this.opts.hideSums;
     document.getElementById('optHideQty').checked = !!this.opts.hideQty;
     document.getElementById('optContents').checked = this.opts.contents !== false;
@@ -4501,6 +4518,7 @@ if (typeof self !== 'undefined') self.S = S;
       mode: document.getElementById('reportMode').value,
       stamp: this.opts.stamp, docTitle: this.opts.docTitle, noteText: this.opts.noteText,
       autoNote: this.opts.autoNote, hideSums: this.opts.hideSums, hideQty: this.opts.hideQty,
+      equipNote: this.opts.equipOn !== false ? this.opts.equipNote : '',
       cfLimit: this.opts.cfLimit, sheetName: this.opts.sheetName,
       contents: this.opts.contents !== false
     };

@@ -10,6 +10,10 @@
     stamp: '2026 y.  "____"_______________ dagi   \n\n  №________________________ xulosaga \n2-qo\'yilma',
     docTitle: 'TAQQOSLASH JADVALI  №2',
     noteText: 'Пересмотреть стоимость по всему проекту',
+    equipNote: 'Для полноценного изучения стоимости данного оборудования необходимо представить ' +
+      'дополнительные технические параметры, а также обосновать цену оборудования не менее чем ' +
+      'двумя коммерческими предложениями.',
+    equipOn: true,
     autoNote: true, hideSums: true, hideQty: true, contents: true,
     cfLimit: 10000000, sheetName: 'Лист1'
   };
@@ -123,6 +127,8 @@
     bindOpt(this, 'optSheetName', 'sheetName');
     bindOpt(this, 'optCf', 'cfLimit', true);
     bindChk(this, 'optAutoNote', 'autoNote');
+    bindOpt(this, 'optEquipNote', 'equipNote');
+    bindChk(this, 'optEquipOn', 'equipOn');
     bindChk(this, 'optHideSums', 'hideSums');
     bindChk(this, 'optHideQty', 'hideQty');
     bindChk(this, 'optContents', 'contents');
@@ -239,6 +245,8 @@
     document.getElementById('optSheetName').value = this.opts.sheetName;
     document.getElementById('optCf').value = this.opts.cfLimit;
     document.getElementById('optAutoNote').checked = !!this.opts.autoNote;
+    document.getElementById('optEquipNote').value = this.opts.equipNote;
+    document.getElementById('optEquipOn').checked = this.opts.equipOn !== false;
     document.getElementById('optHideSums').checked = !!this.opts.hideSums;
     document.getElementById('optHideQty').checked = !!this.opts.hideQty;
     document.getElementById('optContents').checked = this.opts.contents !== false;
@@ -736,6 +744,7 @@
       mode: document.getElementById('reportMode').value,
       stamp: this.opts.stamp, docTitle: this.opts.docTitle, noteText: this.opts.noteText,
       autoNote: this.opts.autoNote, hideSums: this.opts.hideSums, hideQty: this.opts.hideQty,
+      equipNote: this.opts.equipOn !== false ? this.opts.equipNote : '',
       cfLimit: this.opts.cfLimit, sheetName: this.opts.sheetName,
       contents: this.opts.contents !== false
     };

@@ -19,7 +19,7 @@
 'use strict';
 const { load } = require('./load.cjs');
 
-const S = load('normalize', 'match', 'sections', 'util', 'formula', 'smeta', 'assemble');
+const S = load('normalize', 'match', 'sections', 'util', 'formula', 'smeta', 'assemble', 'report');
 
 let fail = 0;
 const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) fail++; };
@@ -135,6 +135,28 @@ check(sub && sub.cells[8].v === 'на единицу' && sub.cells[9].v === 'о�
 check(asm.resources.length === 6, 'resources by name, unit and price across both estimates (' + asm.resources.length + ')');
 const labour = asm.resources.find((r) => r.name === 'ЗАТРАТЫ ТРУДА РАБОЧИХ-СТРОИТЕЛЕЙ');
 check(labour && labour.count === 2 && labour.qty === 15, 'one resource in two estimates is one line with both quantities');
+
+// the report: equipment is always listed, with the note asking for parameters and two offers
+const NOTE = 'Для полноценного изучения стоимости данного оборудования необходимо представить ' +
+  'дополнительные технические параметры, а также обосновать цену оборудования не менее чем ' +
+  'двумя коммерческими предложениями.';
+const C = S.report.cols;
+const repItems = (rep) => rep.rows.filter((r) => r.kind === 'item');
+const plain = repItems(S.report.build(asm, asm.spans[0], { mode: 'changed', autoNote: true, noteText: 'X' }));
+check(plain.length === 0, 'without the equipment note an unchanged project lists nothing («changed» mode)');
+for (const mode of ['changed', 'dedup', 'full']) {
+  const rep = repItems(S.report.build(asm, asm.spans[0], { mode, autoNote: true, noteText: 'X', equipNote: NOTE }));
+  const eq = rep.filter((r) => r.section === 'equipment');
+  check(eq.length === 1 && eq[0].nm === 'ТЕСТОВЫЙ ЩИТ' && eq[0].cells[C.NOTE] && eq[0].cells[C.NOTE].v === NOTE,
+    mode + ': the equipment line is listed with its note');
+  check(rep.filter((r) => r.section !== 'equipment').every((r) => !r.cells[C.NOTE] || r.cells[C.NOTE].v !== NOTE),
+    mode + ': no other line gets the equipment note');
+}
+// a re-priced equipment line still carries the equipment note, not the generic one
+const key = asm.resources.find((r) => r.name === 'ТЕСТОВЫЙ ЩИТ').key;
+const asm3 = S.assemble([{ id: 'p1', title: objs[0].title, objects: objs }], { [key]: 31 });
+const moved = repItems(S.report.build(asm3, asm3.spans[0], { mode: 'changed', autoNote: true, noteText: 'X', equipNote: NOTE }));
+check(moved.length === 1 && moved[0].cells[C.NOTE].v === NOTE && moved[0].market === 31, 'a re-priced equipment line keeps the equipment note');
 
 console.log(fail ? `\nFAILED (${fail})` : '\nsmeta-form4a OK');
 process.exit(fail ? 1 : 0);

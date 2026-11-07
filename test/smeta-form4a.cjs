@@ -189,6 +189,14 @@ check(movedUnder.length === 1 && movedUnder[0].cells[C.NOTE].v === 'X', 're-pric
   void kEq;
 }
 
+// a local estimate «на … ОБОРУДОВАНИЕ»: every line of it counts, whatever its band
+{
+  check(objs[1].equipTitle === true && !objs[0].equipTitle, 'the estimate «на ТЕСТОВОЕ ОБОРУДОВАНИЕ» is an equipment estimate, «ОБЩЕСТРОИТЕЛЬНЫЕ РАБОТЫ» is not');
+  const got = repItems(S.report.build(asm, asm.spans[0], { mode: 'changed', equipNote: NOTE, equipLimit: 10 })).map((r) => r.nm).sort().join(',');
+  check(got === 'ЗАТРАТЫ ТРУДА РАБОЧИХ-СТРОИТЕЛЕЙ,ТЕСТОВЫЙ ЩИТ',
+    'above the threshold (10): the labour line of the equipment estimate (11) and the shield (29), not the crane (13) or anchors of the other estimate (' + got + ')');
+}
+
 // the band may be written «Jihozlar», «Жиҳозлар» or «Жихозлар»
 for (const t of ['ОБОРУДОВАНИЕ, МЕБЕЛЬ И ИНВЕНТАРЬ (ПОСТАВКА ПОДРЯДЧИКА)', 'ТЕХНОЛОГИЧЕСКОЕ ОБОРУДОВАНИЕ', 'ИНЖЕНЕРНОЕ ОБОРУДОВАНИЕ ЗДАНИЯ',
   'Jihozlar', 'ЖИҲОЗЛАР', 'Жихозлар', 'QURILISH JIHOZLARI'])

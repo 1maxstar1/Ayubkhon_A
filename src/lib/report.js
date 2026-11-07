@@ -107,7 +107,8 @@
 
   /**
    * Equipment the contractor must justify: a line of a band whose title has
-   * the word ОБОРУДОВАНИЕ (or Jihoz…) and whose smeta unit price is above the
+   * the word ОБОРУДОВАНИЕ (or Jihoz…), or any line of a local estimate «на
+   * ТЕХНОЛОГИЧЕСКОЕ ОБОРУДОВАНИЕ», whose smeta unit price is above the
    * threshold. Keyed by the resource key, which carries the price.
    */
   var EQUIP_LIMIT = 20000000;
@@ -121,7 +122,7 @@
     var limit = equipLimit(opts);
     for (var i = span.from - 1; i < span.to; i++) {
       var r = model.rows[i];
-      if (r.kind === 'item' && r.section === 'equipment' && (r.price || 0) > limit) keys[r.key] = true;
+      if (r.kind === 'item' && (r.section === 'equipment' || r.equipBlock) && (r.price || 0) > limit) keys[r.key] = true;
     }
     return keys;
   }

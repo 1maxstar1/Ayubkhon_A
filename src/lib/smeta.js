@@ -330,6 +330,8 @@
       var meta = blockMeta(rows, prevEnd + 1, heads[i] - 1);
       if (!stroika) stroika = meta.stroika;
       var o = parseRange(sheet, Li, heads[i], end, meta);
+      // a local estimate «на ТЕХНОЛОГИЧЕСКОЕ ОБОРУДОВАНИЕ»: every line of it counts as equipment for the report's note
+      if (o) o.equipTitle = EQUIP_WORD.test(up(meta.work)) || EQUIP.test(up(meta.work));
       prevEnd = end;
       if (o) out.push(o);
     }

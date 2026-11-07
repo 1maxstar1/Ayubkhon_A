@@ -129,7 +129,9 @@ o'zgargan resurslar). Qolgan ikki rejimga ta'sir qilmaydi.
 
 **Jihozlar (v2.5.4).** Nomida **`ОБОРУДОВАНИЕ`** so'zi bor har qanday bo'lim
 (`ОБОРУДОВАНИЕ, МЕБЕЛЬ И ИНВЕНТАРЬ`, `ТЕХНОЛОГИЧЕСКОЕ ОБОРУДОВАНИЕ`, …) yoki
-`Jihoz…` / `Жиҳоз…` / `Жихоз…` bo'limidagi resurs, agar uning smeta **narxi**
+`Jihoz…` / `Жиҳоз…` / `Жихоз…` bo'limidagi resurs — shuningdek 4А shaklidagi
+**«на … ОБОРУДОВАНИЕ»** sarlavhali lokal smetaning (masalan «на ТЕХНОЛОГИЧЕСКОЕ
+ОБОРУДОВАНИЕ») **har qanday** qatori (v2.5.7) — agar uning smeta **narxi**
 (bir birlik narxi) **20 mln so'mdan yuqori** bo'lsa, hisobotga **har uch
 rejimda ham kiradi** — narxi o'zgarmagan bo'lsa ham — va `Eslatma` ustuniga
 izoh yoziladi: «Для полноценного изучения стоимости данного оборудования

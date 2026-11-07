@@ -174,6 +174,7 @@
             var mp = prices[key];
             if (mp == null) mp = sp;
             row.key = key; row.qty = sr.qty; row.price = sp; row.market = mp;
+            if (obj.equipTitle) row.equipBlock = true;
             cells[C_PRICE] = { v: sp };
             cells[C_QTY] = { v: sr.qty };
             cells[C_SUM] = { f: '=E' + target + '*F' + target };

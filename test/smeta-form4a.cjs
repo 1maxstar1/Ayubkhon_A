@@ -84,12 +84,14 @@ const second = estimate(null, 'ТЕСТОВОЕ ОБОРУДОВАНИЕ', 'ТЕ
   [1, 'АВС 000001', 'ЗАТРАТЫ ТРУДА РАБОЧИХ-СТРОИТЕЛЕЙ', 'ЧЕЛ.-Ч', 5, 11, '=E1*F1'],
   [null, null, 'ИТОГО ТРУДОВЫЕ РЕСУРСЫ', 'СУМ', null, null, 55],
   [],
-  [null, null, 'ОБОРУДОВАНИЕ, МЕБЕЛЬ И ИНВЕНТАРЬ (ПОСТАВКА ПОДРЯДЧИКА)'],
+  // the word anywhere in the band title makes it an equipment band
+  [null, null, 'ТЕХНОЛОГИЧЕСКОЕ ОБОРУДОВАНИЕ'],
   [1, null, 'ТЕСТОВЫЙ ЩИТ', 'ШТ', 1, 29, 29],
-  [null, null, 'ИТОГО ОБОРУДОВАНИЕ, МЕБЕЛЬ И ИНВЕНТАРЬ', 'СУМ', null, null, 29],
+  [2, null, 'ТЕСТОВЫЙ ДАТЧИК', 'ШТ', 3, 10, 30],
+  [null, null, 'ИТОГО ТЕХНОЛОГИЧЕСКОЕ ОБОРУДОВАНИЕ', 'СУМ', null, null, 59],
   [],
   [null, null, 'ЗАТРАТЫ ТРУДА РАБОЧИХ', 'ЧЕЛ.-Ч', 5],
-  [null, null, 'ИТОГО ПРЯМЫЕ ЗАТРАТЫ', 'СУМ', null, null, 84]
+  [null, null, 'ИТОГО ПРЯМЫЕ ЗАТРАТЫ', 'СУМ', null, null, 114]
 ]);
 second[0] = [];
 
@@ -112,9 +114,9 @@ check(objs[1].subtitle === 'ТЕСТОВОЕ ОБОРУДОВАНИЕ — ТЕС
 
 const items = (o) => o.rows.filter((r) => r.kind === 'item');
 const a = items(objs[0]), b = items(objs[1]);
-check(a.length === 5 && b.length === 2, 'every numbered line is a resource, and only those (' + a.length + ', ' + b.length + ')');
+check(a.length === 5 && b.length === 3, 'every numbered line is a resource, and only those (' + a.length + ', ' + b.length + ')');
 check(a.map((r) => r.section).join(',') === 'labor,labor,machines,materials,materials', 'bands written in the name column set the section (' + a.map((r) => r.section) + ')');
-check(b[1].section === 'equipment', 'equipment band');
+check(b[1].section === 'equipment' && b[2].section === 'equipment', '«ТЕХНОЛОГИЧЕСКОЕ ОБОРУДОВАНИЕ» is an equipment band');
 check(!objs[0].rows.some((r) => r.kind === 'item' && /В Т\.Ч\.|^ЗАТРАТЫ ТРУДА РАБОЧИХ$/.test(r.nm)), '«В Т.Ч. …» and «ЗАТРАТЫ ТРУДА РАБОЧИХ» are not resources');
 check(a[2].nm === 'ТЕСТОВЫЙ КРАН 10 Т' && a[2].qty === 2 && a[2].price === 13 && a[2].unit === 'МАШ.-Ч', 'name, unit, quantity and price come from their own columns, not from «Шифр»');
 check(a[0].no === 1, 'the number column is «№ п/п», not the code beside it');
@@ -132,7 +134,7 @@ const num = asm.rows.find((r) => r.kind === 'numbering');
 check(num && [2, 3, 4, 5, 6, 7].map((c) => num.cells[c].v).join(' ') === '1 2 3 4 5 6', 'the numbering row counts 1..6 (' + (num && [2, 3, 4, 5, 6, 7].map((c) => num.cells[c] && num.cells[c].v).join(' ')) + ')');
 const sub = asm.rows.find((r) => r.kind === 'header' && r.cells[6] && r.cells[6].v === 'на единицу');
 check(sub && sub.cells[8].v === 'на единицу' && sub.cells[9].v === 'общая', 'the second header line is mirrored on the market side');
-check(asm.resources.length === 6, 'resources by name, unit and price across both estimates (' + asm.resources.length + ')');
+check(asm.resources.length === 7, 'resources by name, unit and price across both estimates (' + asm.resources.length + ')');
 const labour = asm.resources.find((r) => r.name === 'ЗАТРАТЫ ТРУДА РАБОЧИХ-СТРОИТЕЛЕЙ');
 check(labour && labour.count === 2 && labour.qty === 15, 'one resource in two estimates is one line with both quantities');
 
@@ -142,15 +144,17 @@ const NOTE = 'Для полноценного изучения стоимост�
   'двумя коммерческими предложениями.';
 const C = S.report.cols;
 const repItems = (rep) => rep.rows.filter((r) => r.kind === 'item');
+// the sensor: 3 × 10 = 30 is above 20, but its price 10 is not — the price decides
+const cheap = repItems(S.report.build(asm, asm.spans[0], { mode: 'changed', autoNote: true, noteText: 'X', equipNote: NOTE, equipLimit: 20 }));
+check(cheap.length === 1 && cheap[0].nm === 'ТЕСТОВЫЙ ЩИТ', 'the unit price decides, not quantity × price (' + cheap.map((r) => r.nm) + ')');
 const plain = repItems(S.report.build(asm, asm.spans[0], { mode: 'changed', autoNote: true, noteText: 'X' }));
 check(plain.length === 0, 'without the equipment note an unchanged project lists nothing («changed» mode)');
 // the synthetic shield costs 29: above a threshold of 20, below the default threshold
 for (const mode of ['changed', 'dedup', 'full']) {
   const rep = repItems(S.report.build(asm, asm.spans[0], { mode, autoNote: true, noteText: 'X', equipNote: NOTE, equipLimit: 20 }));
-  const eq = rep.filter((r) => r.section === 'equipment');
-  check(eq.length === 1 && eq[0].nm === 'ТЕСТОВЫЙ ЩИТ' && eq[0].cells[C.NOTE] && eq[0].cells[C.NOTE].v === NOTE,
-    mode + ': the equipment line is listed with its note');
-  check(rep.filter((r) => r.section !== 'equipment').every((r) => !r.cells[C.NOTE] || r.cells[C.NOTE].v !== NOTE),
+  const shield = rep.find((r) => r.nm === 'ТЕСТОВЫЙ ЩИТ');
+  check(shield && shield.cells[C.NOTE] && shield.cells[C.NOTE].v === NOTE, mode + ': equipment priced above the threshold is listed with its note');
+  check(rep.filter((r) => r.nm !== 'ТЕСТОВЫЙ ЩИТ').every((r) => !r.cells[C.NOTE] || r.cells[C.NOTE].v !== NOTE),
     mode + ': no other line gets the equipment note');
 }
 // a re-priced equipment line still carries the equipment note, not the generic one
@@ -161,7 +165,7 @@ check(moved.length === 1 && moved[0].cells[C.NOTE].v === NOTE && moved[0].market
 
 // only equipment whose smeta amount is above the threshold: the default one unless set
 const under = repItems(S.report.build(asm, asm.spans[0], { mode: 'changed', autoNote: true, noteText: 'X', equipNote: NOTE }));
-check(under.length === 0, 'equipment at or under the default threshold is not added (amount 29)');
+check(under.length === 0, 'equipment priced at or under the default threshold is not added (price 29)');
 const atLimit = repItems(S.report.build(asm, asm.spans[0], { mode: 'changed', autoNote: true, noteText: 'X', equipNote: NOTE, equipLimit: 29 }));
 check(atLimit.length === 0, 'the amount has to be above the threshold, not equal to it');
 const fullUnder = repItems(S.report.build(asm, asm.spans[0], { mode: 'full', autoNote: true, noteText: 'X', equipNote: NOTE }));
@@ -170,8 +174,11 @@ const movedUnder = repItems(S.report.build(asm3, asm3.spans[0], { mode: 'changed
 check(movedUnder.length === 1 && movedUnder[0].cells[C.NOTE].v === 'X', 're-priced equipment under the threshold gets the usual note');
 
 // the band may be written «Jihozlar», «Жиҳозлар» or «Жихозлар»
-for (const t of ['ОБОРУДОВАНИЕ, МЕБЕЛЬ И ИНВЕНТАРЬ (ПОСТАВКА ПОДРЯДЧИКА)', 'Jihozlar', 'ЖИҲОЗЛАР', 'Жихозлар'])
+for (const t of ['ОБОРУДОВАНИЕ, МЕБЕЛЬ И ИНВЕНТАРЬ (ПОСТАВКА ПОДРЯДЧИКА)', 'ТЕХНОЛОГИЧЕСКОЕ ОБОРУДОВАНИЕ', 'ИНЖЕНЕРНОЕ ОБОРУДОВАНИЕ ЗДАНИЯ',
+  'Jihozlar', 'ЖИҲОЗЛАР', 'Жихозлар', 'QURILISH JIHOZLARI'])
   check(S.smeta.sectionOf(t) === 'equipment', '«' + t + '» is an equipment band');
+for (const t of ['МОНТАЖ ОБОРУДОВАНИЯ', 'СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ', 'СТРОИТЕЛЬНЫЕ МАШИНЫ И МЕХАНИЗМЫ'])
+  check(S.smeta.sectionOf(t) !== 'equipment', '«' + t + '» is not');
 
 console.log(fail ? `\nFAILED (${fail})` : '\nsmeta-form4a OK');
 process.exit(fail ? 1 : 0);

@@ -106,9 +106,9 @@
   }
 
   /**
-   * Equipment the contractor must justify: a line of a band titled
-   * ОБОРУДОВАНИЕ… / Jihoz… whose smeta amount (quantity × smeta price, the
-   * whole project's quantity of that resource) is above the threshold.
+   * Equipment the contractor must justify: a line of a band whose title has
+   * the word ОБОРУДОВАНИЕ (or Jihoz…) and whose smeta unit price is above the
+   * threshold. Keyed by the resource key, which carries the price.
    */
   var EQUIP_LIMIT = 20000000;
   function equipLimit(opts) {
@@ -118,14 +118,11 @@
   function bigEquipment(model, span, opts) {
     var keys = {};
     if (!opts.equipNote) return keys;
-    var sums = {};
+    var limit = equipLimit(opts);
     for (var i = span.from - 1; i < span.to; i++) {
       var r = model.rows[i];
-      if (r.kind !== 'item' || r.section !== 'equipment') continue;
-      sums[r.key] = (sums[r.key] || 0) + (r.qty || 0) * (r.price || 0);
+      if (r.kind === 'item' && r.section === 'equipment' && (r.price || 0) > limit) keys[r.key] = true;
     }
-    var limit = equipLimit(opts);
-    for (var k in sums) if (sums[k] > limit) keys[k] = true;
     return keys;
   }
 

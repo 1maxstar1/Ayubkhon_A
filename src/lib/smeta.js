@@ -47,18 +47,21 @@
   var MACH = /^((СТРОИТЕЛЬНЫЕ )?МАШИНЫ|МЕХАНИЗМЫ|(ҚУРИЛИШ )?МАШИНА|МЕХАНИЗМ|(QURILISH )?MASHINA|MEXANIZM)/;
   var MAT = /^((СТРОИТЕЛЬНЫЕ )?МАТЕРИАЛЫ|(ҚУРИЛИШ )?МАТЕРИАЛ|(QURILISH )?MATERIAL)/;
   var EQUIP = /^(ОБОРУДОВАНИ|УСКУНА|ЖИҲОЗ|ЖИХОЗ|USKUNA|JIHOZ|ASBOB)/;
+  // A band that names equipment anywhere in its title is an equipment band
+  // too: «ТЕХНОЛОГИЧЕСКОЕ ОБОРУДОВАНИЕ», «ИНЖЕНЕРНОЕ ОБОРУДОВАНИЕ», «… JIHOZLAR».
+  var EQUIP_WORD = /(^|\s)(ОБОРУДОВАНИЕ|ЖИҲОЗ\S*|ЖИХОЗ\S*|JIHOZ\S*)(\s|$)/;
 
   function isSection(t) {
     var u = up(t);
     for (var i = 0; i < SECTIONS.length; i++) if (u === SECTIONS[i]) return true;
-    return LABOR.test(u) || MACH.test(u) || MAT.test(u) || EQUIP.test(u);
+    return LABOR.test(u) || MACH.test(u) || MAT.test(u) || EQUIP.test(u) || EQUIP_WORD.test(u);
   }
   function sectionOf(t) {
     var u = up(t);
     if (LABOR.test(u)) return 'labor';
     if (MACH.test(u)) return 'machines';
     if (MAT.test(u)) return 'materials';
-    if (EQUIP.test(u)) return 'equipment';
+    if (EQUIP.test(u) || EQUIP_WORD.test(u)) return 'equipment';
     return 'other';
   }
 

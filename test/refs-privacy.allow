@@ -6,3 +6,12 @@ ae44709746b60f29  real-price  rounding constant of the parser (four decimals), n
 f201b8daaec6b927  real-price  rounding constant of the parser (four decimals), not a price
 3bde81aa244979ca  issuer-or-plant  pre-existing public NLP fixture (before this branch): a resource name that names a steel-structure maker
 b7278d9b50da9049  issuer-or-plant  pre-existing public NLP fixture (before this branch): the same resource name
+a9e93be04c07de30  real-price  default of the equipment threshold the owner set (a round business rule), not a document price
+5b240b760e248c71  real-price  the owner's equipment threshold (a round business rule), not a document price
+9cbee5782d80b58d  real-price  settings field of the owner's equipment threshold, not a document price
+e41bbe3ca73b6148  real-price  README: the owner's equipment threshold, not a document price
+6b320db7ad2194d1  real-price  commit ce60cc4 message: the owner's equipment threshold, not a document price
+9f82bf0acebf0d66  real-price  commit ce60cc4 message: the owner's equipment threshold, not a document price
+8ea0146c9fd6f8ed  real-price  commit ce60cc4 test comment naming the owner's equipment threshold (pushed; reworded since), not a fixture price
+ef1329442e0607ed  real-price  commit ce60cc4 test comment naming the owner's equipment threshold (pushed; reworded since), not a fixture price
+e0b4409ca51148fd  real-price  commit ce60cc4 test comment naming the owner's equipment threshold (pushed; reworded since), not a fixture price

@@ -144,7 +144,7 @@ const C = S.report.cols;
 const repItems = (rep) => rep.rows.filter((r) => r.kind === 'item');
 const plain = repItems(S.report.build(asm, asm.spans[0], { mode: 'changed', autoNote: true, noteText: 'X' }));
 check(plain.length === 0, 'without the equipment note an unchanged project lists nothing («changed» mode)');
-// the synthetic shield costs 29: above a threshold of 20, below the real 20 000 000
+// the synthetic shield costs 29: above a threshold of 20, below the default threshold
 for (const mode of ['changed', 'dedup', 'full']) {
   const rep = repItems(S.report.build(asm, asm.spans[0], { mode, autoNote: true, noteText: 'X', equipNote: NOTE, equipLimit: 20 }));
   const eq = rep.filter((r) => r.section === 'equipment');
@@ -159,9 +159,9 @@ const asm3 = S.assemble([{ id: 'p1', title: objs[0].title, objects: objs }], { [
 const moved = repItems(S.report.build(asm3, asm3.spans[0], { mode: 'changed', autoNote: true, noteText: 'X', equipNote: NOTE, equipLimit: 20 }));
 check(moved.length === 1 && moved[0].cells[C.NOTE].v === NOTE && moved[0].market === 31, 'a re-priced equipment line keeps the equipment note');
 
-// only equipment whose smeta amount is above the threshold: 20 000 000 unless set
+// only equipment whose smeta amount is above the threshold: the default one unless set
 const under = repItems(S.report.build(asm, asm.spans[0], { mode: 'changed', autoNote: true, noteText: 'X', equipNote: NOTE }));
-check(under.length === 0, 'equipment at or under 20 000 000 is not added (amount 29)');
+check(under.length === 0, 'equipment at or under the default threshold is not added (amount 29)');
 const atLimit = repItems(S.report.build(asm, asm.spans[0], { mode: 'changed', autoNote: true, noteText: 'X', equipNote: NOTE, equipLimit: 29 }));
 check(atLimit.length === 0, 'the amount has to be above the threshold, not equal to it');
 const fullUnder = repItems(S.report.build(asm, asm.spans[0], { mode: 'full', autoNote: true, noteText: 'X', equipNote: NOTE }));

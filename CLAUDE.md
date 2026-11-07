@@ -22,6 +22,7 @@ sarlavha, ikki tilli sarlavha qatori) 321.xlsx namunasidagidek rus/o'zbek.
 node build.mjs                                        # dist/smeta-taqqoslash.html + index.html + admin.html
 node build.mjs --serve                                # ... va server/pb_public ga nusxa
 node test/pipeline.cjs a.xlsx b.xlsx --out out.xlsx   # brauzersiz tekshiruv
+node test/smeta-form4a.cjs                            # 4А shakli (АВС-4): bir varaqda ko'p lokal smeta
 node test/browser.mjs a.xlsx b.xlsx                   # haqiqiy brauzerda (bitta-fayl rejim)
 sh server/setup.sh && sh server/run.sh                # PocketBase (server rejimi), README «Server rejimi»
 sh server/laptop.sh [autostart|status|backup|update|stop]   # noutbuk rejimi: bitta odam, baza shu diskda

@@ -10,6 +10,15 @@
  *   row 4   N п/п | НАИМЕНОВАНИЕ | ЕД. ИЗМ. | КОЛ-ВО | ЦЕНА ЗА ЕД. | СУММА (сум)
  *   row 5   1 | 2 | 3 | 4 | 5 | 6
  *   row 6+  ЗАТРАТЫ ТРУДА / СТРОИТЕЛЬНЫЕ МАШИНЫ … sections, items, ИТОГО lines
+ *
+ * and the local resource estimate of form 4А (АВС-4), many of them stacked on
+ * one sheet, each under its own title block:
+ *
+ *   № п/п | Шифр ресурсов | Наименование | Единица измерения | Количество единиц | Сметная стоимость
+ *                                                                                | на единицу | общая
+ *   1 | 2 | 3 | 4 | 5 | 6 | 7
+ *   ТРУДОВЫЕ РЕСУРСЫ / СТРОИТЕЛЬНЫЕ МАШИНЫ … in the name column, numbered items,
+ *   «В Т.Ч. …» lines, ИТОГО lines, ИТОГО ПРЯМЫЕ ЗАТРАТЫ
  */
 (function (S) {
   'use strict';
@@ -34,7 +43,7 @@
   }
   // The four bands, as they are actually written in the wild: Russian, and
   // Uzbek in both alphabets.
-  var LABOR = /^(ЗАТРАТЫ ТРУДА|ТРУДОЗАТРАТЫ|МЕҲНАТ|MEHNAT|ISHCHILAR)/;
+  var LABOR = /^(ЗАТРАТЫ ТРУДА|ТРУДОЗАТРАТЫ|ТРУДОВЫЕ РЕСУРСЫ|МЕҲНАТ|MEHNAT|ISHCHILAR)/;
   var MACH = /^((СТРОИТЕЛЬНЫЕ )?МАШИНЫ|МЕХАНИЗМЫ|(ҚУРИЛИШ )?МАШИНА|МЕХАНИЗМ|(QURILISH )?MASHINA|MEXANIZM)/;
   var MAT = /^((СТРОИТЕЛЬНЫЕ )?МАТЕРИАЛЫ|(ҚУРИЛИШ )?МАТЕРИАЛ|(QURILISH )?MATERIAL)/;
   var EQUIP = /^(ОБОРУДОВАНИ|УСКУНА|ЖИҲОЗ|USKUNA|JIHOZ|ASBOB)/;
@@ -60,34 +69,72 @@
    */
   var LETTER = /[A-Za-z\u00C0-\u024F\u0400-\u04FF]/;
 
+  /**
+   * The header row at r and the six meaningful columns, or null.
+   *
+   * Two spellings of the header are known. The resource sheets: НАИМЕНОВАНИЕ ·
+   * КОЛ-ВО · ЦЕНА · СУММА on one row. The local resource estimate of form 4А
+   * (АВС-4): «Шифр ресурсов» between № and the name, «Количество единиц», and
+   * «Сметная стоимость» split on the next row into «на единицу» and «общая».
+   */
+  function layoutAt(rows, r) {
+    var cells = rows[r];
+    if (!cells) return null;
+    var L = null, noRaw = 0;
+    for (var c = 1; c < cells.length; c++) {
+      var raw = txt(cells[c]);
+      var u = up(raw);
+      if (!u) continue;
+      if (!noRaw && /^\s*№/.test(raw)) noRaw = c;
+      if (u.indexOf('НАИМЕНОВАНИЕ') >= 0) { L = L || {}; L.name = c; }
+      else if (/^N\s*П\/П$|^№/.test(u) || u === 'N П/П') { L = L || {}; L.no = c; }
+      else if (u.indexOf('ЕД') === 0 && u.indexOf('ИЗМ') > 0) { L = L || {}; L.unit = c; }
+      else if (u.indexOf('КОЛ-ВО') >= 0 || u.indexOf('КОЛВО') >= 0 || u.indexOf('КОЛИЧЕСТВО') === 0) { L = L || {}; L.qty = c; }
+      else if (u.indexOf('ЦЕНА') >= 0) { L = L || {}; if (!L.price) L.price = c; }
+      else if (u.indexOf('СУММА') >= 0) { L = L || {}; if (!L.sum) L.sum = c; }
+      else if (u.indexOf('ШИФР') === 0) { L = L || {}; L.code = c; }
+    }
+    if (!L || !L.name || !L.qty) return null;
+    if (!L.price || !L.sum) {
+      var sub = rows[r + 1] || [];
+      for (var k = 1; k < sub.length; k++) {
+        var s = up(txt(sub[k]));
+        if (!L.price && s.indexOf('НА ЕДИНИЦУ') === 0) L.price = k;
+        else if (!L.sum && (s === 'ОБЩАЯ' || s === 'ВСЕГО')) L.sum = k;
+      }
+      if (!L.price || !L.sum) return null;
+      L.subRow = r + 1;
+    }
+    // «№ п/п» folds to «П П», so with a code column in between the number
+    // column is found by its raw «№», never guessed as the one left of the name.
+    if (L.code && !L.no) L.no = noRaw && noRaw !== L.code ? noRaw : (L.code - 1 || 1);
+    if (!L.no) L.no = L.name - 1 || 1;
+    if (!L.unit) L.unit = L.name + 1;
+    L.headerRow = r;
+    // The "1 2 3 4 5 6" row directly beneath the header, when present.
+    var nr = (L.subRow || r) + 1, nxt = rows[nr];
+    L.numRow = nxt && S.num(nxt[L.name] && nxt[L.name].v) != null ? nr : 0;
+    L.lastCol = Math.max(L.sum, L.price, L.qty, L.unit, L.name, L.no);
+    return L;
+  }
+
   /** Locate the header row and the six meaningful columns. */
   function findLayout(rows) {
     for (var r = 1; r < Math.min(rows.length, 40); r++) {
-      var cells = rows[r];
-      if (!cells) continue;
-      var L = null;
-      for (var c = 1; c < cells.length; c++) {
-        var u = up(txt(cells[c]));
-        if (!u) continue;
-        if (u.indexOf('НАИМЕНОВАНИЕ') >= 0) { L = L || {}; L.name = c; }
-        else if (/^N\s*П\/П$|^№/.test(u) || u === 'N П/П') { L = L || {}; L.no = c; }
-        else if (u.indexOf('ЕД') === 0 && u.indexOf('ИЗМ') > 0) { L = L || {}; L.unit = c; }
-        else if (u.indexOf('КОЛ-ВО') >= 0 || u.indexOf('КОЛВО') >= 0) { L = L || {}; L.qty = c; }
-        else if (u.indexOf('ЦЕНА') >= 0) { L = L || {}; if (!L.price) L.price = c; }
-        else if (u.indexOf('СУММА') >= 0) { L = L || {}; if (!L.sum) L.sum = c; }
-      }
-      if (L && L.name && L.qty && L.price && L.sum) {
-        if (!L.no) L.no = L.name - 1 || 1;
-        if (!L.unit) L.unit = L.name + 1;
-        L.headerRow = r;
-        // The "1 2 3 4 5 6" row directly beneath the header, when present.
-        var nxt = rows[r + 1];
-        L.numRow = nxt && S.num(nxt[L.name] && nxt[L.name].v) != null ? r + 1 : 0;
-        L.lastCol = Math.max(L.sum, L.price, L.qty, L.unit, L.name, L.no);
-        return L;
-      }
+      var L = layoutAt(rows, r);
+      if (L) return L;
     }
     return null;
+  }
+
+  /** Every row of the sheet that repeats the header found first. */
+  function headerRows(rows, L) {
+    var out = [];
+    for (var r = L.headerRow; r < rows.length; r++) {
+      var M = rows[r] && layoutAt(rows, r);
+      if (M && M.name === L.name && M.qty === L.qty) out.push(r);
+    }
+    return out;
   }
 
   /**
@@ -139,26 +186,70 @@
     return 0;
   }
 
+  /** The last ИТОГО / ВСЕГО line in rows a..b, or 0. */
+  function lastTotalRow(rows, L, a, b) {
+    for (var r = b; r >= a; r--) {
+      var cells = rows[r];
+      if (cells && (isTotal(txt(cells[L.name])) || isTotal(txt(cells[L.no])))) return r;
+    }
+    return 0;
+  }
+
+  /** The text after the first filled cell of a row: «Наименование объекта - | ПАССАЖИРСКИЙ ЛИФТ». */
+  function labelled(cells) {
+    var first = 0;
+    for (var c = 1; c < cells.length; c++) {
+      var t = txt(cells[c]).replace(/^\s+|\s+$/g, '');
+      if (!t) continue;
+      if (!first) { first = c; continue; }
+      return t;
+    }
+    return '';
+  }
+
+  /**
+   * The title block above one local estimate of form 4А: the construction
+   * («Наименование стройки»), the estimate number («ЛОКАЛЬНЫЙ РЕСУРСНЫЙ СМЕТНЫЙ
+   * РАСЧЕТ | № 06-05-01»), the works («на | ОБЩЕСТРОИТЕЛЬНЫЕ РАБОТЫ») and the
+   * object («Наименование объекта»).
+   */
+  function blockMeta(rows, a, b) {
+    var m = { stroika: '', number: '', work: '', object: '' };
+    for (var r = a; r <= b; r++) {
+      var cells = rows[r];
+      if (!cells) continue;
+      var head = '';
+      for (var c = 1; c < cells.length && !head; c++) head = up(txt(cells[c]));
+      if (!head) continue;
+      if (head.indexOf('НАИМЕНОВАНИЕ СТРОЙКИ') === 0) m.stroika = labelled(cells);
+      else if (head.indexOf('НАИМЕНОВАНИЕ ОБ') === 0) m.object = labelled(cells);
+      else if (head.indexOf('ЛОКАЛЬНЫЙ') === 0) m.number = labelled(cells);
+      else if (head === 'НА') m.work = labelled(cells);
+    }
+    return m;
+  }
+
   /**
    * @returns {?{name, title, subtitle, layout, rows: Array<Row>, maxCol:number}}
    *   Row = {r, kind, section, no, nm, unit, qty, price, sum, cells}
    */
-  function parseSheet(sheet) {
-    var L = findLayout(sheet.rows) || inferLayout(sheet.rows);
-    if (!L) return null;
-    var start = L.headerRow || firstBodyRow(sheet.rows, L);
-
-    var last = lastContentRow(sheet.rows);
+  function parseRange(sheet, L, start, last, meta) {
     if (last <= start) return null;
 
     var title = '', subtitle = '';
-    for (var r0 = 1; r0 < start; r0++) {
-      var cs = sheet.rows[r0];
-      if (!cs) continue;
-      var t = '';
-      for (var c0 = 1; c0 <= L.lastCol; c0++) { t = txt(cs[c0]); if (t) break; }
-      if (!t) continue;
-      if (!title) title = t; else if (!subtitle) subtitle = t;
+    if (meta) {
+      title = meta.stroika;
+      var obj = meta.object && meta.object.length > 3 && meta.object !== meta.work ? meta.object : '';
+      subtitle = [meta.number, meta.work, obj].filter(function (t) { return t; }).join(' — ');
+    } else {
+      for (var r0 = 1; r0 < start; r0++) {
+        var cs = sheet.rows[r0];
+        if (!cs) continue;
+        var t = '';
+        for (var c0 = 1; c0 <= L.lastCol; c0++) { t = txt(cs[c0]); if (t) break; }
+        if (!t) continue;
+        if (!title) title = t; else if (!subtitle) subtitle = t;
+      }
     }
 
     var out = [], section = '', items = 0, sections = 0, wide = L.lastCol;
@@ -172,11 +263,15 @@
       var sum = S.num(cells[L.sum] && cells[L.sum].v);
       var kind;
 
-      if (r === L.headerRow) kind = 'header';
+      if (r === L.headerRow || r === L.subRow) kind = 'header';
       else if (r === L.numRow) kind = 'numbering';
       else if (isTotal(noTxt) || isTotal(nm)) kind = 'total';
       else if (noTxt && isSection(noTxt) && qty == null) { kind = 'section'; section = sectionOf(noTxt); sections++; }
-      else if (nm && LETTER.test(nm) && qty != null) { kind = 'item'; items++; }
+      // Form 4А writes its bands in the name column, and its resources are the
+      // numbered lines only: «В Т.Ч. ЗАТРАТЫ ТРУДА МАШИНИСТОВ» and the closing
+      // «ЗАТРАТЫ ТРУДА РАБОЧИХ» carry a quantity but are not resources.
+      else if (L.code && !noTxt && nm && qty == null && isSection(nm)) { kind = 'section'; section = sectionOf(nm); sections++; }
+      else if (nm && LETTER.test(nm) && qty != null && (!L.code || S.num(noCell && noCell.v) != null)) { kind = 'item'; items++; }
       else if (nm) kind = 'extra';
       else if (noTxt) kind = 'section';
       else kind = 'blank';
@@ -186,7 +281,7 @@
       }
 
       out.push({
-        r: r, kind: kind, section: section,
+        r: r, kind: kind, section: section, sub: r === L.subRow,
         no: S.num(noCell && noCell.v), noTxt: noTxt,
         nm: nm, unit: txt(cells[L.unit]),
         qty: qty, price: price, sum: sum,
@@ -206,14 +301,59 @@
     };
   }
 
-  /** Every sheet in a workbook that looks like a resource sheet, in file order. */
+  /**
+   * Every resource object on one sheet. Usually one; a form 4А export stacks
+   * many local estimates on a single sheet, each with its own title block and
+   * header, and each becomes an object of its own («РА · 1», «РА · 2» …) that
+   * ends at its last ИТОГО line, so the «СОСТАВИЛ» signature and the next
+   * estimate's title block stay out.
+   */
+  function parseSheetObjects(sheet) {
+    var rows = sheet.rows;
+    var L = findLayout(rows) || inferLayout(rows);
+    if (!L) return [];
+    // Only form 4А is split: an ordinary resource sheet that repeats its header
+    // on every printed page stays one object, as it always was.
+    if (!L.code) {
+      var one = parseRange(sheet, L, L.headerRow || firstBodyRow(rows, L), lastContentRow(rows), null);
+      return one ? [one] : [];
+    }
+    var heads = headerRows(rows, L);
+    var out = [], last = lastContentRow(rows), prevEnd = 0, stroika = '';
+    for (var i = 0; i < heads.length; i++) {
+      var Li = layoutAt(rows, heads[i]);
+      var limit = i + 1 < heads.length ? heads[i + 1] - 1 : last;
+      var end = lastTotalRow(rows, Li, heads[i], limit) || limit;
+      var meta = blockMeta(rows, prevEnd + 1, heads[i] - 1);
+      if (!stroika) stroika = meta.stroika;
+      var o = parseRange(sheet, Li, heads[i], end, meta);
+      prevEnd = end;
+      if (o) out.push(o);
+    }
+    out.forEach(function (o, k) {
+      if (!o.title) o.title = stroika;
+      if (out.length > 1) o.name = sheet.name + ' · ' + (k + 1);
+      if (o.subtitle === sheet.name) o.subtitle = o.name;
+    });
+    return out;
+  }
+
+  /** The first resource object of a sheet, or null. */
+  function parseSheet(sheet) {
+    return parseSheetObjects(sheet)[0] || null;
+  }
+
+  /** Every resource object of a workbook, in file order. */
   function parseWorkbook(wb, fileName) {
     var objects = [];
     for (var i = 0; i < wb.sheets.length; i++) {
       var sh = wb.sheets[i];
       if (sh.hidden) continue;
-      var p = parseSheet(sh);
-      if (p) { p.file = fileName; p.index = i; objects.push(p); }
+      var list = parseSheetObjects(sh);
+      for (var k = 0; k < list.length; k++) {
+        list[k].file = fileName; list[k].index = i;
+        objects.push(list[k]);
+      }
     }
     return objects;
   }

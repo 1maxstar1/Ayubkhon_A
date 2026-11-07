@@ -55,6 +55,9 @@
     var t = {};
     t[L.no] = C_NO; t[L.name] = C_NAME; t[L.unit] = C_UNIT;
     t[L.qty] = C_QTY; t[L.price] = C_PRICE; t[L.sum] = C_SUM;
+    // Form 4А's «Шифр ресурсов» sits between № and the name, where the
+    // comparison table has no column for it: it is left out, not written over №.
+    if (L.code) t[L.code] = 0;
     return function (c) {
       var m = t[c];
       if (m !== undefined) return m;
@@ -78,6 +81,7 @@
       var cell = srcCells[c];
       if (!cell) continue;
       var tc = colMap(c);
+      if (!tc) continue;
       // Formulas pointing at sheets we do not carry over (VLOOKUP into a price
       // book sheet, say) would export as #REF!, so keep their cached result.
       if (cell.f && cell.f.indexOf('!') < 0) into[tc] = { f: S.formula.translate(cell.f, colMap, rowDelta) };
@@ -149,12 +153,19 @@
             src: sr.r, cells: cells, nm: sr.nm, unit: sr.unit
           };
 
-          if (sr.kind === 'header') {
+          if (sr.kind === 'header' && sr.sub) {
+            // the second header line of form 4А: «на единицу | общая» on both sides
+            if (cells[C_PRICE]) cells[C_MPRICE] = { v: cells[C_PRICE].v };
+            if (cells[C_SUM]) cells[C_MSUM] = { v: cells[C_SUM].v };
+          } else if (sr.kind === 'header') {
             cells[C_MPRICE] = { v: H_PRICE };
             cells[C_MSUM] = { v: H_SUM };
             if (!cells[C_PRICE]) cells[C_PRICE] = { v: H_PRICE };
             if (!cells[C_SUM]) cells[C_SUM] = { v: H_SUM };
           } else if (sr.kind === 'numbering') {
+            // form 4А numbers its code column too («1 2 3 4 5 6 7»); without
+            // that column the table counts 1..6 like every other smeta
+            if (L.code) for (var nc = C_NO; nc <= C_SUM; nc++) cells[nc] = { v: nc - C_NO + 1 };
             cells[C_MPRICE] = { v: 5 };
             cells[C_MSUM] = { v: 6 };
           } else if (sr.kind === 'item') {

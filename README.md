@@ -27,6 +27,15 @@ fayllar kompyuterdan chiqmaydi.
    kamida bittasi bo'lishi shart (o'zbekcha nomlari ham tanib olinadi).
    Narxlari `ВПР`/`VLOOKUP` formulasi bilan qo'yilgan bo'lsa ham o'qiladi.
 
+   **4А shakli (АВС-4, «Локальный ресурсный сметный расчет»)** ham o'qiladi
+   (v2.5.1): sarlavhasi `№ п/п · Шифр ресурсов · Наименование · Единица
+   измерения · Количество единиц · Сметная стоимость (на единицу / общая)`.
+   Bitta varaqda ketma-ket turgan har bir lokal smeta alohida obyekt bo'ladi
+   (`РА · 1`, `РА · 2` …, nomi — smeta raqami, «на …» va «Наименование
+   объекта»), loyiha nomi — «Наименование стройки». Resurs — faqat raqamli
+   qatorlar; `В Т.Ч. ЗАТРАТЫ ТРУДА МАШИНИСТОВ …` va yakuniy `ЗАТРАТЫ ТРУДА
+   РАБОЧИХ` resurs emas. `Шифр` ustuni taqqoslash jadvaliga o'tmaydi.
+
 2. **Yig'ish.** Barcha obyekt varaqlari bitta uzluksiz `Лист1` ga ketma-ket
    qo'yiladi, ustunlar bir pozitsiyaga suriladi va `ЦЕНА ЗА ЕД.` / `СУММА`
    ustunlarining nusxasi — bozor narxi uchun — yoniga qo'shiladi:

@@ -64,6 +64,7 @@ echo "-----------------------------------"
 run build            node build.mjs
 run normalize        node test/normalize.cjs
 run xlsx-guard       node test/xlsx-guard.cjs
+run smeta-form4a     node test/smeta-form4a.cjs
 run sections         node test/sections.cjs
 run regions          node test/regions.cjs
 run refs             node test/refs.cjs

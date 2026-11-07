@@ -489,7 +489,8 @@ await ep.evaluate(() => document.activeElement && document.activeElement.blur())
     const snap = () => Object.fromEntries(m.resources.map((x) => [x.key, x.market]));
     const was = snap();
     const typed = m.resources.filter((x) => !S.near(x.market, x.price)).map((x) => x.key);
-    const want = m.resources.filter((x) => { const t = R.lines(x)[0]; return t && !NEAR[t.tier] && S.near(x.market, x.price) && !S.near(r2(t.price), x.price); }).map((x) => x.key);
+    const want = m.resources.filter((x) => { const t = R.lines(x)[0]; return t && !NEAR[t.tier] && S.near(x.market, x.price) && r2(t.price) < x.price && !S.near(r2(t.price), x.price); }).map((x) => x.key);
+    const dearer = m.resources.filter((x) => { const t = R.lines(x)[0]; return t && !NEAR[t.tier] && S.near(x.market, x.price) && r2(t.price) > x.price; }).map((x) => x.key);
     const near = m.resources.filter((x) => { const t = R.lines(x)[0]; return t && NEAR[t.tier] && S.near(x.market, x.price); }).map((x) => x.key);
     const conf = window.confirm; let asked = 0;
     window.confirm = () => { asked++; return false; };
@@ -502,10 +503,12 @@ await ep.evaluate(() => document.activeElement && document.activeElement.blur())
     return { asked, declined, want: want.length,
       applied: want.filter((k) => S.near(now[k], r2(R.lines(m.resources.find((x) => x.key === k))[0].price))).length,
       typedKept: typed.every((k) => S.near(now[k], was[k])), nearKept: near.every((k) => S.near(now[k], was[k])),
+      dearer: dearer.length, dearerKept: dearer.every((k) => S.near(now[k], was[k])),
       others: Object.keys(was).filter((k) => !want.includes(k) && !S.near(now[k], was[k])).length };
   });
+  check(res.dearer > 0 && res.dearerKept, `a green line dearer than the smeta is not applied (${res.dearer})`);
   check(res.asked === 2 && res.declined === 0, '«Автоподбор» asks first, and a «no» changes nothing');
-  check(res.want > 0 && res.applied === res.want, `it applies every green line that differs from the smeta (${res.applied} of ${res.want})`);
+  check(res.want > 0 && res.applied === res.want, `it applies every green line cheaper than the smeta (${res.applied} of ${res.want})`);
   check(res.typedKept && res.nearKept && res.others === 0, 'a typed price and a «Похожий» line are left alone');
 }
 

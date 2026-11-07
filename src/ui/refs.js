@@ -584,8 +584,8 @@
     bar.innerHTML = 'справочник на <button class="link ra-date" title="Дата, на которую предлагаются справочные цены — изменить"></button>' +
       '<span class="ra-man" hidden>· выбрана вручную · <button class="link" data-ra-reset title="Вернуть дату регистрации заявки">сбросить</button></span>' +
       '<span class="ra-edit" hidden></span>' +
-      ' <button class="btn sm ra-auto" title="Применить все зелёные справочные цены («Документ» / «Ставка по таблице»); ' +
-      'вашу цену не трогает">Автоподбор</button>';
+      ' <button class="btn sm ra-auto" title="Применить зелёные справочные цены («Документ» / «Ставка по таблице») там, ' +
+      'где цена по смете выше справочной; вашу цену не трогает">Автоподбор</button>';
     count.parentNode.insertBefore(bar, count);
     this.bar = bar;
     bar.querySelector('.ra-auto').addEventListener('click', function () { self.autoApply(); });
@@ -601,7 +601,7 @@
   };
   /**
    * «Автоподбор»: every resource whose top line is green («Документ», «Ставка по таблице» — the same document or
-   * table row, not a similar resource) and whose price nobody typed gets that line's price, after one confirm, with
+   * table row, not a similar resource), lower than the smeta price, and whose price nobody typed gets that line's price, after one confirm, with
    * its source marked as «Применить» marks it. A typed price is never replaced. Which of the changes go on to the
    * report sheet for the smeta's author is the report's own rule (its threshold on the difference).
    */
@@ -613,13 +613,14 @@
       var top = self.lines(rec)[0];
       if (!top || NEAR[top.tier] || !(top.price > 0) || !S.near(rec.market, rec.price)) return;
       var price = round2(top.price);
-      if (S.near(price, rec.price)) return;
+      // only where the smeta is dearer than the document: a cheaper smeta price is the contractor's own risk
+      if (!(price < rec.price) || S.near(price, rec.price)) return;
       pick.push({ rec: rec, line: top, price: price });
       total += (rec.qty || 0) * (rec.price - price);
     });
-    if (!pick.length) { app.toast('Автоподбор: нет зелёных справочных цен, отличных от сметы'); return; }
+    if (!pick.length) { app.toast('Автоподбор: нет зелёных справочных цен ниже сметной'); return; }
     if (!window.confirm('Автоподбор: ' + pick.length + ' ресурс(ов) с зелёной справочной ценой (уровень «Документ» / ' +
-      '«Ставка по таблице»). Разница по смете: ' + S.money(total) + ' сум.\n\nПрименить справочные цены?')) return;
+      '«Ставка по таблице»), где цена по смете выше справочной. Разница по смете: ' + S.money(total) + ' сум.\n\nПрименить справочные цены?')) return;
     var map = {};
     pick.forEach(function (p) {
       if (S.markSource) S.markSource(p.rec.key, p.price, self.sourceOf(p.line));

@@ -542,7 +542,8 @@ o'xshash resurs) uchun qancha narx aytgan, qaysi hujjat, qaysi sanaga.
 
 **«Автоподбор» (v2.5.5).** «Цены» sahifasidagi «справочник на …» yonidagi
 tugma: eng yuqori taklifi yashil («Документ» / «Ставка по таблице» — aynan shu
-resurs hujjatda) va narxini hech kim yozmagan har bir resursga o'sha narxni
+resurs hujjatda), **smeta narxidan arzon** (v2.5.6: smeta qimmat bo'lsa — muammo,
+arzon bo'lsa — joyida qoladi) va narxini hech kim yozmagan har bir resursga o'sha narxni
 bitta tasdiq bilan qo'yadi; siz yozgan narxga va «Похожий» takliflarga tegmaydi.
 Qaysilari smeta tuzuvchiga yuboriladigan varaqqa tushishini yuqoridagi farq
 chegarasi hal qiladi.

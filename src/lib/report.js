@@ -219,6 +219,15 @@
       rec.count++;
     }
 
+    // «changed» mode is the sheet for the smeta's author: a re-priced resource goes on it only when its
+    // difference over the project (quantity × (smeta − market)) is larger than the threshold either way.
+    var minDiff = onlyChanged && typeof opts.minDiff === 'number' && opts.minDiff > 0 ? opts.minDiff : 0;
+    if (minDiff) SECTION_ORDER.forEach(function (s) {
+      groups[s].forEach(function (rec, k) {
+        if (!rec.big && Math.abs(rec.qty * (rec.price - rec.market)) <= minDiff) groups[s].delete(k);
+      });
+    });
+
     var rows = head(opts, span.project).concat(headerRows());
     var firstBody = rows.length + 1;
     var totalRefs = [];

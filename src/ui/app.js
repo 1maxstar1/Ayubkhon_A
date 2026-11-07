@@ -14,6 +14,7 @@
       'дополнительные технические параметры, а также обосновать цену оборудования не менее чем ' +
       'двумя коммерческими предложениями.',
     equipOn: true, equipLimit: 20000000,
+    minDiff: 5 * 1000 * 1000,
     autoNote: true, hideSums: true, hideQty: true, contents: true,
     cfLimit: 10000000, sheetName: 'Лист1'
   };
@@ -130,6 +131,7 @@
     bindOpt(this, 'optEquipNote', 'equipNote');
     bindChk(this, 'optEquipOn', 'equipOn');
     bindOpt(this, 'optEquipLimit', 'equipLimit', true);
+    bindOpt(this, 'optMinDiff', 'minDiff', true);
     bindChk(this, 'optHideSums', 'hideSums');
     bindChk(this, 'optHideQty', 'hideQty');
     bindChk(this, 'optContents', 'contents');
@@ -249,6 +251,7 @@
     document.getElementById('optEquipNote').value = this.opts.equipNote;
     document.getElementById('optEquipOn').checked = this.opts.equipOn !== false;
     document.getElementById('optEquipLimit').value = this.opts.equipLimit;
+    document.getElementById('optMinDiff').value = this.opts.minDiff;
     document.getElementById('optHideSums').checked = !!this.opts.hideSums;
     document.getElementById('optHideQty').checked = !!this.opts.hideQty;
     document.getElementById('optContents').checked = this.opts.contents !== false;
@@ -747,7 +750,7 @@
       stamp: this.opts.stamp, docTitle: this.opts.docTitle, noteText: this.opts.noteText,
       autoNote: this.opts.autoNote, hideSums: this.opts.hideSums, hideQty: this.opts.hideQty,
       equipNote: this.opts.equipOn !== false ? this.opts.equipNote : '',
-      equipLimit: this.opts.equipLimit,
+      equipLimit: this.opts.equipLimit, minDiff: this.opts.minDiff,
       cfLimit: this.opts.cfLimit, sheetName: this.opts.sheetName,
       contents: this.opts.contents !== false
     };

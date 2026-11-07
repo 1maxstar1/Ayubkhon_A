@@ -173,6 +173,22 @@ check(fullUnder.every((r) => !r.cells[C.NOTE] || r.cells[C.NOTE].v !== NOTE), 'f
 const movedUnder = repItems(S.report.build(asm3, asm3.spans[0], { mode: 'changed', autoNote: true, noteText: 'X', equipNote: NOTE }));
 check(movedUnder.length === 1 && movedUnder[0].cells[C.NOTE].v === 'X', 're-priced equipment under the threshold gets the usual note');
 
+// the sheet for the smeta's author lists a re-priced resource only above the difference threshold
+{
+  const kEq = asm.resources.find((r) => r.name === 'ТЕСТОВЫЙ ЩИТ').key;
+  const kM5 = asm.resources.find((r) => r.name === 'ТЕСТОВЫЙ АНКЕР М5').key;     // 4 × (17 − 7) = 40
+  const kM8 = asm.resources.find((r) => r.name === 'ТЕСТОВЫЙ АНКЕР М8').key;     // 3 × (19 − 25) = −18
+  const asm4 = S.assemble([{ id: 'p1', title: objs[0].title, objects: objs }], { [kM5]: 7, [kM8]: 25 });
+  const names = (o) => repItems(S.report.build(asm4, asm4.spans[0], Object.assign({ mode: 'changed', autoNote: true, noteText: 'X' }, o))).map((r) => r.nm).sort().join(',');
+  check(names({}) === 'ТЕСТОВЫЙ АНКЕР М5,ТЕСТОВЫЙ АНКЕР М8', 'without a threshold every re-priced resource is on the sheet');
+  check(names({ minDiff: 20 }) === 'ТЕСТОВЫЙ АНКЕР М5', 'with a threshold only a difference above it (40 > 20; 18 is not)');
+  check(names({ minDiff: 10 }) === 'ТЕСТОВЫЙ АНКЕР М5,ТЕСТОВЫЙ АНКЕР М8', 'a difference counts either way (−18 is above 10)');
+  check(names({ minDiff: 40 }) === '', 'equal to the threshold is not above it');
+  check(names({ minDiff: 1000, equipNote: NOTE, equipLimit: 20 }) === 'ТЕСТОВЫЙ ЩИТ', 'equipment above its own price threshold stays regardless');
+  check(repItems(S.report.build(asm4, asm4.spans[0], { mode: 'dedup', minDiff: 1000 })).length === 7, '«all resources» mode keeps every line');
+  void kEq;
+}
+
 // the band may be written «Jihozlar», «Жиҳозлар» or «Жихозлар»
 for (const t of ['ОБОРУДОВАНИЕ, МЕБЕЛЬ И ИНВЕНТАРЬ (ПОСТАВКА ПОДРЯДЧИКА)', 'ТЕХНОЛОГИЧЕСКОЕ ОБОРУДОВАНИЕ', 'ИНЖЕНЕРНОЕ ОБОРУДОВАНИЕ ЗДАНИЯ',
   'Jihozlar', 'ЖИҲОЗЛАР', 'Жихозлар', 'QURILISH JIHOZLARI'])

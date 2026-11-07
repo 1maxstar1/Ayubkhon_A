@@ -120,6 +120,13 @@ bir xilda tegishli.
 | **Barcha resurslar (tozalangan)** | Yuqoridagi bilan bir xil, lekin narxi o'zgarmaganlar ham qoladi. |
 | **To'liq nusxa** | Loyihaning har bir qatori, hech narsa tashlanmaydi. Narxi o'zgargan qatorlar o'z o'rnida alifbo tartibida saralanadi — ya'ni Excelda `фарқ ≠ 0` bo'yicha filtr qo'yib, nom bo'yicha saralaganda chiqadigan natijaning aynan o'zi. |
 
+**Smeta tuzuvchiga yuboriladigan varaq (v2.5.5).** «Faqat o'zgargan narxlar»
+rejimida resurs hisobotga faqat uning farqi (loyiha bo'yicha miqdor × (smeta
+narxi − bozor narxi), ishorasidan qat'i nazar) **5 mln so'mdan katta**
+bo'lsa yoziladi; kichik farqlar narxlar varag'ida qoladi, hisobotga
+tushmaydi. Chegara «Настройки документа» da (`0` — avvalgidek, barcha
+o'zgargan resurslar). Qolgan ikki rejimga ta'sir qilmaydi.
+
 **Jihozlar (v2.5.4).** Nomida **`ОБОРУДОВАНИЕ`** so'zi bor har qanday bo'lim
 (`ОБОРУДОВАНИЕ, МЕБЕЛЬ И ИНВЕНТАРЬ`, `ТЕХНОЛОГИЧЕСКОЕ ОБОРУДОВАНИЕ`, …) yoki
 `Jihoz…` / `Жиҳоз…` / `Жихоз…` bo'limidagi resurs, agar uning smeta **narxi**
@@ -532,6 +539,13 @@ hujjatlaridan — ekspertiza xulosalari, birja kotirovkalari, prays-listlar,
 zavod kalkulyatsiyalari, ish haqi jadvallari — olingan narxlar paketi har bir
 resurs yonida «справ.» tegi bilan ko'rinadi: hujjat bu resurs (yoki unga
 o'xshash resurs) uchun qancha narx aytgan, qaysi hujjat, qaysi sanaga.
+
+**«Автоподбор» (v2.5.5).** «Цены» sahifasidagi «справочник на …» yonidagi
+tugma: eng yuqori taklifi yashil («Документ» / «Ставка по таблице» — aynan shu
+resurs hujjatda) va narxini hech kim yozmagan har bir resursga o'sha narxni
+bitta tasdiq bilan qo'yadi; siz yozgan narxga va «Похожий» takliflarga tegmaydi.
+Qaysilari smeta tuzuvchiga yuboriladigan varaqqa tushishini yuqoridagi farq
+chegarasi hal qiladi.
 
 **Hech narsa o'zi qo'yilmaydi.** Narx faqat «Применить» bosilganda tushadi;
 ekspert o'zi yozgan narx ustiga esa faqat so'rab («Заменить вашу цену …?»).

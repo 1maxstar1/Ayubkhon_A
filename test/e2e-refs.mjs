@@ -480,6 +480,35 @@ const kept2 = await ep.evaluate(() => {
 check(kept2.both && kept2.pin, 'a repaint keeps the focus in the price field of a row that has a hint tag and a «справ.» tag');
 await ep.evaluate(() => document.activeElement && document.activeElement.blur());
 
+/* ------------------------------------------------------------- «Автоподбор» */
+{
+  await refsReady();
+  const res = await ep.evaluate(() => {
+    const m = app.model, R = S.Refs, NEAR = { similar: 1, estimate: 1 };
+    const r2 = (v) => Math.round(v * 100) / 100;
+    const snap = () => Object.fromEntries(m.resources.map((x) => [x.key, x.market]));
+    const was = snap();
+    const typed = m.resources.filter((x) => !S.near(x.market, x.price)).map((x) => x.key);
+    const want = m.resources.filter((x) => { const t = R.lines(x)[0]; return t && !NEAR[t.tier] && S.near(x.market, x.price) && !S.near(r2(t.price), x.price); }).map((x) => x.key);
+    const near = m.resources.filter((x) => { const t = R.lines(x)[0]; return t && NEAR[t.tier] && S.near(x.market, x.price); }).map((x) => x.key);
+    const conf = window.confirm; let asked = 0;
+    window.confirm = () => { asked++; return false; };
+    R.autoApply();
+    const declined = Object.keys(was).filter((k) => !S.near(snap()[k], was[k])).length;
+    window.confirm = () => { asked++; return true; };
+    R.autoApply();
+    window.confirm = conf;
+    const now = snap();
+    return { asked, declined, want: want.length,
+      applied: want.filter((k) => S.near(now[k], r2(R.lines(m.resources.find((x) => x.key === k))[0].price))).length,
+      typedKept: typed.every((k) => S.near(now[k], was[k])), nearKept: near.every((k) => S.near(now[k], was[k])),
+      others: Object.keys(was).filter((k) => !want.includes(k) && !S.near(now[k], was[k])).length };
+  });
+  check(res.asked === 2 && res.declined === 0, '«Автоподбор» asks first, and a «no» changes nothing');
+  check(res.want > 0 && res.applied === res.want, `it applies every green line that differs from the smeta (${res.applied} of ${res.want})`);
+  check(res.typedKept && res.nearKept && res.others === 0, 'a typed price and a «Похожий» line are left alone');
+}
+
 /* ------------------------------------------------------------- a package whose file is not the one its hash names */
 {
   const p9 = F.makePackage({ id: 'fake-20260101-3' }), g9 = F.gzip(p9);

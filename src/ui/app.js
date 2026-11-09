@@ -39,6 +39,10 @@
     this.fillSettings();
     this.renderSide();
     this.ledger();
+    // back on the tab the page was reloaded on
+    var tab = S.hashGet('tab');
+    var btn = tab && document.querySelector('.tab[data-pane="' + tab.replace(/[^\w-]/g, '') + '"]');
+    if (btn) btn.click();
   }
 
   function makeWorker() {
@@ -88,6 +92,7 @@
         document.querySelectorAll('.pane').forEach(function (x) { x.classList.remove('on'); });
         t.classList.add('on');
         document.getElementById('pane-' + t.dataset.pane).classList.add('on');
+        S.hashSet('tab', t.dataset.pane === 'prices' ? '' : t.dataset.pane);
         if (t.dataset.pane === 'sheet') self.sheetList.refresh();
         if (t.dataset.pane === 'report') self.buildReportPreview();
       });

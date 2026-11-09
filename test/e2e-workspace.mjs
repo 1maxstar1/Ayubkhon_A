@@ -136,9 +136,25 @@ check(split.none === 0, 'nothing to say means no request at all');
 const w1 = (await api('/api/collections/workspaces/records?perPage=1', {}, su)).items[0];
 check(w1.changed === 1 && w1.state.projects.length === 2 && Object.keys(w1.state.files).length === 2, 'workspace state: 2 projects, 2 files, changed=1');
 
-// reload -> list -> continue -> everything back
+// reload (Cmd+R / F5) inside a workspace comes back to the same workspace and tab, not the list
+await page.click('.tab[data-pane="sheet"]');
+check(/[#&]ws=[a-z0-9]+/.test(page.url()) && /tab=sheet/.test(page.url()), 'the address holds the open workspace and tab (' + page.url().replace(/^.*#/, '#') + ')');
+await page.reload();
+await page.waitForFunction(() => window.app && window.app.model && window.app.model.rows.length > 100 && !S.Sync.loading, null, { timeout: 120 * 1000 });
+check(await page.isVisible('#wsBox') && (await page.textContent('#wsBox')).includes('67159') && await page.isHidden('#screen-list'),
+  'after a reload the same workspace is open again, not the list');
+check(await page.isVisible('#pane-sheet'), 'and on the same tab');
+const reloaded = await page.evaluate((k) => app.prices[k], first.key);
+check(reloaded === Math.round(first.price * 1.1), 'with its prices');
+await page.click('.tab[data-pane="prices"]');
+
+// back to the list -> continue -> everything back
+await page.click('#wsList');
+await page.waitForSelector('#screen-list:not([hidden])');
+check(!/ws=/.test(page.url()), 'leaving the workspace takes it out of the address');
 await page.reload();
 await page.waitForSelector('#screen-list:not([hidden])');
+check(await page.isHidden('#wsBox'), 'a reload on the list stays on the list');
 await page.fill('#appQ', '67159');
 await page.waitForFunction(() => document.querySelectorAll('#appTable tbody tr').length === 1);
 check((await page.textContent('#appTable tbody tr')).includes('в работе'), 'list shows the application as in progress');

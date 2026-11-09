@@ -75,9 +75,30 @@
       $('regionSel').innerHTML = '<option value="">— выберите —</option>' + S.REGIONS.map(function (r) {
         return '<option value="' + r[0] + '">' + S.esc(r[1]) + '</option>';
       }).join('');
-      document.addEventListener('auth:signedin', function () { if (!S.Sync || !S.Sync.ws) self.show(); });
+      document.addEventListener('auth:signedin', function () { if (!S.Sync || !S.Sync.ws) self.start(); });
       // Auth may already have fired the event before this module registered.
-      if (S.pb.authStore.isValid) this.show();
+      if (S.pb.authStore.isValid) this.start();
+    },
+
+    /**
+     * After sign-in: the workspace the page was reloaded in (#ws=… in the address), else the list.
+     * A workspace that is gone or not readable any more falls back to the list, quietly.
+     */
+    start: function () {
+      var self = this, id = S.hashGet('ws');
+      if (!id || !/^[a-z0-9]{5,32}$/.test(id) || this.starting) { if (!this.starting) this.show(); return; }
+      this.starting = true;
+      S.pb.collection('workspaces').getOne(id, { expand: 'updated_by,application.contragent' }).then(function (w) {
+        self.starting = false;
+        var a = w.expand && w.expand.application;
+        if (!a) throw new Error('no application');
+        self.hide();
+        S.Sync.open(w, a);
+      }).catch(function () {
+        self.starting = false;
+        S.hashSet('ws', '');
+        if (!S.Sync || !S.Sync.ws) self.show();
+      });
     },
 
     show: function () {

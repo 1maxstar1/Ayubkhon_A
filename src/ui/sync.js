@@ -78,6 +78,7 @@
       var mine = ++this.seq;
       var current = function () { return self.seq === mine; };
       this.ws = w; this.app = a;
+      S.hashSet('ws', w.id);
       this.files = (w.state && w.state.files) || {};
       this.corr = {};
       this.loading = true;
@@ -555,6 +556,7 @@
         }
       }).then(function () {
         self.ws = null; self.app = null; self.files = {}; self.corr = {}; self.marks = {};
+        S.hashSet('ws', '');
         self.loading = true;
         app.projects = []; app.prices = {}; app.looseBook = null; app.queue = [];
         app.rebuild(); app.renderSide();

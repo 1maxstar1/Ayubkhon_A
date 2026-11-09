@@ -74,6 +74,22 @@ var S = (typeof S !== 'undefined' && S) || {};
     };
   }
 
+  /**
+   * Where the page is, kept in the address (#ws=…&tab=…) so a reload (Cmd+R / F5) comes back to
+   * the same workspace and tab. replaceState: moving around adds nothing to the back button.
+   */
+  function hashGet(k) {
+    var m = new RegExp('(?:^|[#&])' + k + '=([^&]*)').exec(location.hash || '');
+    return m ? decodeURIComponent(m[1]) : '';
+  }
+  function hashSet(k, v) {
+    var parts = (location.hash || '').replace(/^#/, '').split('&').filter(function (x) { return x && x.split('=')[0] !== k; });
+    if (v) parts.push(k + '=' + encodeURIComponent(v));
+    var h = parts.length ? '#' + parts.join('&') : '';
+    try { history.replaceState(null, '', location.pathname + location.search + h); } catch (e) { location.hash = h; }
+  }
+  S.hashGet = hashGet; S.hashSet = hashSet;
+
   S.col = col; S.colIndex = colIndex; S.esc = esc;
   S.near = near; S.num = num;
   S.money = money; S.price = price; S.qty = qty; S.debounce = debounce;

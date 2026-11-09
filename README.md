@@ -457,6 +457,12 @@ yuborila boshlaydi.
 
 ## Server rejimi (2-bosqich)
 
+> **Qayta yuklash (v2.8.1).** Ochiq zayavka va yorliq sahifa manzilida turadi
+> (`…/#ws=<id>&tab=compare`), shuning uchun Cmd+R / F5 dan keyin dastur o'sha
+> zayavkani, o'sha yorliqni o'zi qayta ochadi (narxlar serverdan). «‹ Заявки» bilan
+> ro'yxatga qaytilganda manzil tozalanadi; zayavka o'chirilgan yoki ochib bo'lmasa —
+> ro'yxat. Faqat «Сравнение версий» ga yuklangan qaytgan fayl saqlanmaydi: uni qayta tanlang.
+
 Bir necha xodim bitta bazada ishlaydi: kirish — email + bir martalik kod,
 4 soat harakat bo'lmasa qulf, arizalar reyestri, ish maydonlari serverda,
 oldingi loyihalardan narx eslatmalari. Backend — [PocketBase](https://pocketbase.io)

@@ -89,6 +89,24 @@ try {
   const m5 = await page.$$eval('#cmpBody tr', (trs) => trs.map((t) => t.className + ':' + t.cells[0].textContent));
   check(m5.length === 2 && /^t-good:№ 1 — ОБЩЕСТРОИТЕЛЬНЫЕ/.test(m5[0]) && /^t-bad:ТЕСТОВОЕ ОБОРУДОВАНИЕ/.test(m5[1]),
     'a click on a resource lists its lines: fixed in one estimate, left in the other (' + m5.join(' | ') + ')');
+  check(await page.isVisible('[data-back]') && /АНКЕР М5/.test(await page.textContent('#cmpHead')), 'a back button names the resource');
+  await page.click('[data-back]');
+  check(await page.inputValue('#cmpView') === 'res' && (await page.$$('#cmpBody tr[data-k]')).length > 2, 'the back button returns to the resource list');
+  await page.click('#cmpBody tr[data-k]:has-text("ТЕСТОВЫЙ АНКЕР М5")');
+  await page.keyboard.press('Escape');
+  check((await page.$$('#cmpBody tr[data-k]')).length > 2, 'Esc returns too');
+
+  // the pane scrolls to its last line in a small window; the page itself does not grow
+  await page.setViewportSize({ width: 1000, height: 560 });
+  const box = await page.evaluate(() => {
+    const p = document.getElementById('pane-compare');
+    p.scrollTop = p.scrollHeight;
+    const rows = document.querySelectorAll('#cmpBody tr');
+    return { scrolls: p.scrollHeight > p.clientHeight, last: rows[rows.length - 1].getBoundingClientRect().bottom, h: innerHeight,
+             doc: document.documentElement.scrollHeight };
+  });
+  check(box.scrolls && box.last <= box.h + 1 && box.doc <= box.h + 1, 'the table scrolls inside its pane down to the last line (' + JSON.stringify(box) + ')');
+  await page.setViewportSize({ width: 1500, height: 950 });
 
   // a price edited after the file was read changes what was asked: the tab reads the table again
   await page.click('.tab[data-pane="prices"]');

@@ -378,8 +378,6 @@ ul.files .mute{color:var(--mute)}
 .cmp-chip.part,.cmp tr.t-part td{background:#fff3cc}
 .cmp-chip.bad,.cmp tr.t-bad td{background:#fde3e5}
 .cmp tr.t-info td{background:var(--sf2)}
-.cmp-head{overflow:hidden;border-bottom:1px solid var(--rule2);background:var(--band)}
-.cmp-scroll{flex:1;overflow:auto;min-height:0}
 table.cmp{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12.5px}
 table.cmp th{font-weight:600;text-align:left;padding:5px 6px;font-size:12px}
 table.cmp td{padding:4px 6px;border-bottom:1px solid var(--rule);vertical-align:top;overflow-wrap:anywhere}
@@ -396,13 +394,20 @@ table.cmp tr.t-head td{background:var(--sf2);border-top:1px solid var(--rule2)}
 table.cmp s.mute{text-decoration:line-through}
 .cmp-miss{font-size:12px;color:var(--mute);margin-top:4px}
 .cmp-miss ul{margin:4px 0 0 18px;padding:0;max-height:140px;overflow:auto}
+/* the whole pane scrolls (cards, then the table); the table head stays on top */
+#pane-compare{overflow:auto;contain:strict}
+#pane-compare>*{flex-shrink:0}
+.cmp-head{position:sticky;top:0;z-index:3;border-bottom:1px solid var(--rule2);background:var(--band)}
+.cmp-head table.cmp th{background:var(--band)}
+.cmp-back{display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--accent-w);border-bottom:1px solid var(--rule)}
+.cmp-back b{font-weight:600}
 </style>
 </head>
 <body class="admin">
 
 <header class="bar">
   <div class="brand">
-    <b>Администратор</b><i class="ver" title="Версия программы">v2.8.2</i>
+    <b>Администратор</b><i class="ver" title="Версия программы">v2.8.3</i>
     <span>реестр, рабочие области и пользователи</span>
   </div>
   <div class="grow"></div>

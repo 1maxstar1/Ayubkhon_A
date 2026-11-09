@@ -378,8 +378,6 @@ ul.files .mute{color:var(--mute)}
 .cmp-chip.part,.cmp tr.t-part td{background:#fff3cc}
 .cmp-chip.bad,.cmp tr.t-bad td{background:#fde3e5}
 .cmp tr.t-info td{background:var(--sf2)}
-.cmp-head{overflow:hidden;border-bottom:1px solid var(--rule2);background:var(--band)}
-.cmp-scroll{flex:1;overflow:auto;min-height:0}
 table.cmp{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12.5px}
 table.cmp th{font-weight:600;text-align:left;padding:5px 6px;font-size:12px}
 table.cmp td{padding:4px 6px;border-bottom:1px solid var(--rule);vertical-align:top;overflow-wrap:anywhere}
@@ -396,13 +394,20 @@ table.cmp tr.t-head td{background:var(--sf2);border-top:1px solid var(--rule2)}
 table.cmp s.mute{text-decoration:line-through}
 .cmp-miss{font-size:12px;color:var(--mute);margin-top:4px}
 .cmp-miss ul{margin:4px 0 0 18px;padding:0;max-height:140px;overflow:auto}
+/* the whole pane scrolls (cards, then the table); the table head stays on top */
+#pane-compare{overflow:auto;contain:strict}
+#pane-compare>*{flex-shrink:0}
+.cmp-head{position:sticky;top:0;z-index:3;border-bottom:1px solid var(--rule2);background:var(--band)}
+.cmp-head table.cmp th{background:var(--band)}
+.cmp-back{display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--accent-w);border-bottom:1px solid var(--rule)}
+.cmp-back b{font-weight:600}
 </style>
 </head>
 <body>
 
 <header class="bar">
   <div class="brand">
-    <b>Таблица сопоставления №2</b><i class="ver" title="Версия программы">v2.8.2</i>
+    <b>Таблица сопоставления №2</b><i class="ver" title="Версия программы">v2.8.3</i>
     <span>проверка и сбор рыночных цен ресурсов сметы</span>
   </div>
   <div class="wsbox" id="wsBox" hidden></div>
@@ -5073,15 +5078,36 @@ if (typeof self !== 'undefined') self.S = S;
     $('cmpBody').addEventListener('click', function (e) {
       var tr = e.target.closest && e.target.closest('tr[data-k]');
       if (!tr) return;
+      // one resource's lines; where the list was is kept for the way back
+      self.back = { q: $('cmpQ').value, view: $('cmpView').value, top: $('pane-compare').scrollTop };
       $('cmpQ').value = '';
       $('cmpView').value = 'rows';
       self.only = tr.dataset.k;
       self.render();
+      // straight to the lines, the back button on top (the cards stay above, a scroll away)
+      var pane = $('pane-compare');
+      pane.scrollTop += $('cmpHead').getBoundingClientRect().top - pane.getBoundingClientRect().top;
+    });
+    $('cmpHead').addEventListener('click', function (e) {
+      if (e.target.closest && e.target.closest('[data-back]')) self.goBack();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && self.only && $('pane-compare').classList.contains('on')) self.goBack();
     });
     document.querySelectorAll('.tab[data-pane="compare"]').forEach(function (t) {
       // prices may have been edited since: the table we sent is read again every time
       t.addEventListener('click', function () { self.fillOld(); self.run(); });
     });
+  };
+
+  /** From one resource's lines back to the list, where it was. */
+  Compare.prototype.goBack = function () {
+    var b = this.back || { q: '', view: 'res', top: 0 };
+    this.only = null;
+    $('cmpQ').value = b.q;
+    $('cmpView').value = b.view === 'rows' ? 'rows' : 'res';
+    this.render();
+    $('pane-compare').scrollTop = b.top;
   };
 
   /** The projects changed (loaded, restored, removed): the «Было» list follows, and an open tab recomputes. */
@@ -5349,7 +5375,11 @@ if (typeof self !== 'undefined') self.S = S;
       body.innerHTML = '<table class="cmp"><colgroup>' + COLS_RES + '</colgroup>' + html.join('') + '</table>';
       cnt.textContent = res(n);
     } else {
-      head.innerHTML = '<table class="cmp"><colgroup>' + COLS_ROW + '</colgroup><tr><th>Лист</th><th>№</th><th>Наименование</th>' +
+      var g = only ? this.res.resources.filter(function (r) { return r.key === only; })[0] : null;
+      head.innerHTML = (g ? '<div class="cmp-back"><button class="btn sm" data-back>‹ Назад к ресурсам</button>' +
+          '<span>Строки ресурса: <b>' + S.esc(g.nm) + '</b> · ' + S.esc(g.unit) + ' · ' + S.esc(S.compare.statusText(g)) +
+          '</span><span class="count">Esc — назад</span></div>' : '') +
+        '<table class="cmp"><colgroup>' + COLS_ROW + '</colgroup><tr><th>Лист</th><th>№</th><th>Наименование</th>' +
         '<th>Ед.</th><th>Кол-во было → стало</th><th>Цена было</th><th>Наша цена</th><th>Цена стало</th>' +
         '<th>Сумма было</th><th>Сумма стало</th><th>Разница</th><th>Статус</th></tr></table>';
       this.res.objects.forEach(function (o) {
@@ -5367,7 +5397,7 @@ if (typeof self !== 'undefined') self.S = S;
         });
       });
       body.innerHTML = '<table class="cmp"><colgroup>' + COLS_ROW + '</colgroup>' + html.join('') + '</table>';
-      cnt.textContent = lines(n) + (only ? ' одного ресурса · выберите вид, чтобы вернуться' : '');
+      cnt.textContent = lines(n) + (only ? ' одного ресурса' : '');
     }
     if (!n && view !== 'sheets') body.innerHTML = '<div class="cmp-empty">Нет строк для этого фильтра.</div>';
   };

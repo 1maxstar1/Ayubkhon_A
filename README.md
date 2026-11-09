@@ -147,6 +147,17 @@ fayllar kompyuterdan chiqmaydi.
      (5% → 7%); bo'limning «ИТОГО» si o'z qatorlari yig'indisiga teng emas,
      va bu farq faqat qaytgan versiyada paydo bo'lgan (raqam qo'lda yozilgan).
      Ikkala versiyada bir xil turgan eski farq belgilanmaydi.
+   * **«Наш ответ (Excel)»** (v2.8.0) — biz yuborgan jadval fayl sifatida: dasturning
+     o'z eksporti (321.xlsx dagi «TAQQOSLASH JADVALI №2» varag'i) yoki eski PDF javobdan
+     yasalgan Excel (ustunlari `№ · Наименование · Ед. изм. · Цена по смете · Рыночная
+     цена · Примечание`; o'zbekcha sarlavhalar ham tanib olinadi). Har bir qator smetadagi
+     resursga nom + birlik + smeta narxi bo'yicha (narx so'mgacha yaxlitlangan bo'lsa ham)
+     topiladi; nomi boshqacha bo'lingan bo'lsa — bo'sh joy va tinish belgilarisiz, bo'lmasa
+     shu birlik va narxdagi eng yaqin nom (≥ 0,9). Topilgan narxlar «Было» loyihasiga
+     qo'yiladi — avval yozilgan yoki avtomatik qo'yilgan narx ustidan, chunki yuborilgan
+     narx aynan shu; faylda yo'q resursga tegilmaydi. Solishtirishda zamechaniye — aynan
+     shu fayldagi qatorlar; smetada topilmaganlari ro'yxat bo'lib ko'rsatiladi. Xuddi shu
+     fayl «Книга цен» orqali yuklansa ham narxlar shu tartibda qo'yiladi.
    * **«Скачать сравнение»** — uch varaqli `.xlsx` («По ресурсам», «По
      строкам» — «По нашему замечанию: да/нет» ustuni bilan, «Итоги листов»),
      xuddi shu ranglar bilan.

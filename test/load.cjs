@@ -59,6 +59,7 @@ const FILE = {
   // table and the family parsers (plain scripts that leave one global each), index.js that collects them into
   // S.refs, and the engine
   compare: 'src/lib/compare.js',
+  reply: 'src/lib/reply.js',
   'refs-package': 'src/lib/refs/package.js',
   'refs-units': 'src/lib/refs/units.js',
   'refs-machines': 'src/lib/refs/families/machines.js',
@@ -80,7 +81,7 @@ const FILE = {
  * `S` and defines the name key that assemble.js keys every row by.
  */
 const ORDER = ['fflate', 'xlsx', 'normalize', 'match', 'sections', 'regions', 'util',
-  'formula', 'xlsx-read', 'xlsx-write', 'smeta', 'assemble', 'report', 'export', 'compare',
+  'formula', 'xlsx-read', 'xlsx-write', 'smeta', 'assemble', 'report', 'export', 'compare', 'reply',
   'registry-parse', 'refs-package', 'refs-units', 'refs-machines', 'refs-cable', 'refs-steel',
   'refs-mineral', 'refs-electro', 'refs', 'refs-view', 'refs-query', 'refs-pool', 'refs-retrieve',
   'refs-suggest', 'refs-cache'];

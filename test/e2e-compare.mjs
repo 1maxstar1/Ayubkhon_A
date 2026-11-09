@@ -18,7 +18,7 @@ const require = createRequire(import.meta.url);
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const { load } = require('./load.cjs');
 const S = load('fflate', 'normalize', 'match', 'sections', 'util', 'formula', 'xlsx-read', 'xlsx-write', 'smeta', 'assemble');
-const { book, prices, xlsx } = require('./compare-books.cjs');
+const { book, prices, xlsx, replyBook } = require('./compare-books.cjs');
 
 let fail = 0;
 const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) fail++; };
@@ -27,6 +27,8 @@ const dir = mkdtempSync(join(tmpdir(), 'cmp-'));
 const f1 = join(dir, 'Тест_v1.xlsx'), f2 = join(dir, 'Тест_v2.xlsx');
 writeFileSync(f1, xlsx(S, book(1)));
 writeFileSync(f2, xlsx(S, book(2)));
+const f3 = join(dir, 'Наш_ответ.xlsx');
+writeFileSync(f3, xlsx(S, replyBook()));
 
 const browser = await chromium.launch(launchOpts);
 const page = await browser.newPage({ viewport: { width: 1500, height: 950 }, acceptDownloads: true });
@@ -106,6 +108,42 @@ try {
   check(dl.suggestedFilename() === 'Тест_v2_sravnenie.xlsx', 'the export is named after the returned file (' + dl.suggestedFilename() + ')');
   const back = S.readXlsx(new Uint8Array(readFileSync(out)));
   check(back.sheets.map((s) => s.name).join('|') === 'По ресурсам|По строкам|Итоги листов', 'the export has its three sheets');
+
+  // «Наш ответ (Excel)»: a fresh page, the first version without any price typed; the reply file
+  // puts its prices on the project and becomes what is judged
+  await page.goto('file://' + join(root, 'dist/smeta-taqqoslash.html'));
+  await page.setInputFiles('#pick', f1);
+  await page.waitForFunction(() => window.app && app.model && app.model.rows.length > 0, null, { timeout: 30 * 1000 });
+  await page.click('.tab[data-pane="compare"]');
+  await page.setInputFiles('#cmpReplyFile', f3);
+  await page.waitForFunction(() => app.compare_ui.reply, null, { timeout: 30 * 1000 });
+  const priced = await page.evaluate(() => {
+    const r = app.model.resources.find((x) => x.name === 'ТЕСТОВЫЙ АНКЕР М8');
+    return r && r.market;
+  });
+  check(priced === 16, 'the reply\'s price is now the project\'s market price (' + priced + ')');
+  await page.setInputFiles('#cmpNewFile', f2);
+  await page.waitForFunction(() => app.compare_ui.res, null, { timeout: 30 * 1000 });
+  const files = await page.textContent('.cmp-files');
+  check(/замечания из файла «Наш_ответ\.xlsx»: 6 \(строк в файле 7\)/.test(files), 'the summary says the remarks come from the file (' + files + ')');
+  check(/Не найдено в смете: 1/.test(await page.textContent('#cmpSummary')), 'the line the smeta does not have is listed');
+  await page.selectOption('#cmpView', 'res');
+  await page.selectOption('#cmpFilter', 'changed');
+  const rtones = await page.$$eval('#cmpBody tr[data-k]', (trs) => trs.map((t) => t.className + ':' + t.cells[0].textContent));
+  check(rtones.includes('t-good:ТЕСТОВЫЙ КРАН 10 Т') && rtones.includes('t-part:ТЕСТОВЫЙ АНКЕР М5'), 'judged against the reply: crane fixed, М5 partial');
+
+  // the same file through «Книга цен» puts the same prices on the project
+  await page.goto('file://' + join(root, 'dist/smeta-taqqoslash.html'));
+  await page.setInputFiles('#pick', f1);
+  await page.waitForFunction(() => window.app && app.model && app.model.rows.length > 0, null, { timeout: 30 * 1000 });
+  await page.setInputFiles('#bookInput', f3);
+  await page.waitForFunction(() => {
+    const r = app.model.resources.find((x) => x.name === 'ТЕСТОВЫЙ АНКЕР М8');
+    return r && r.market === 16;
+  }, null, { timeout: 30 * 1000 }).then(() => check(true, '«Книга цен» reads the reply by smeta price too'),
+    () => check(false, '«Книга цен» reads the reply by smeta price too'));
+  const m5book = await page.evaluate(() => app.model.resources.filter((x) => x.name === 'ТЕСТОВЫЙ АНКЕР М5').map((x) => x.price + '→' + x.market).join(' '));
+  check(m5book === '17→15', 'only the line of the smeta price the reply names is priced (' + m5book + ')');
 
   check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' / ') : ''));
 } finally {

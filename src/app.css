@@ -388,3 +388,5 @@ table.cmp{min-width:1180px}
 .cmp-card.go:hover{box-shadow:0 0 0 2px var(--accent-w)}
 table.cmp tr.t-head td{background:var(--sf2);border-top:1px solid var(--rule2)}
 table.cmp s.mute{text-decoration:line-through}
+.cmp-miss{font-size:12px;color:var(--mute);margin-top:4px}
+.cmp-miss ul{margin:4px 0 0 18px;padding:0;max-height:140px;overflow:auto}

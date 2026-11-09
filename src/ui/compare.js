@@ -23,14 +23,20 @@
     $('cmpOld').addEventListener('change', function () {
       if (this.value === 'file') { $('cmpOldFile').click(); return; }
       self.oldFile = null;
+      self.reply = null;
       self.run();
     });
     $('cmpOldFile').addEventListener('change', function (e) {
       var f = e.target.files[0]; e.target.value = '';
       if (!f) { self.fillOld(); return; }
-      self.read(f, function (objs) { self.oldFile = { name: f.name, objects: objs }; self.fillOld(); self.run(); });
+      self.read(f, function (objs) { self.oldFile = { name: f.name, objects: objs }; self.reply = null; self.fillOld(); self.run(); });
     });
     $('cmpNewBtn').addEventListener('click', function () { $('cmpNewFile').click(); });
+    $('cmpReplyBtn').addEventListener('click', function () { $('cmpReplyFile').click(); });
+    $('cmpReplyFile').addEventListener('change', function (e) {
+      var f = e.target.files[0]; e.target.value = '';
+      if (f) self.loadReply(f);
+    });
     $('cmpNewFile').addEventListener('change', function (e) {
       var f = e.target.files[0]; e.target.value = '';
       if (!f) return;
@@ -109,16 +115,53 @@
     else if (!this.app.projects.length && !this.oldFile) sel.value = 'file';
   };
 
+  /**
+   * «Наш ответ»: the table we sent, as a spreadsheet (our export, or an older PDF reply turned
+   * into Excel). Its prices go onto the «Было» project — over whatever was typed or auto-applied:
+   * the reply is what was actually sent — and its lines become what the comparison judges.
+   */
+  Compare.prototype.loadReply = function (file) {
+    var self = this, app = this.app;
+    var b = $('cmpOld').value;
+    var objects = b === 'file' && this.oldFile ? this.oldFile.objects :
+      (app.projects[+String(b).slice(1)] || {}).objects;
+    if (!objects) { app.toast('Сначала выберите первую версию сметы («Было»)', true); return; }
+    var reader = new FileReader();
+    reader.onerror = function () { app.toast('Не удалось прочитать файл', true); };
+    reader.onload = function () {
+      var parsed;
+      try { parsed = S.reply.parse(S.readXlsx(new Uint8Array(reader.result))); }
+      catch (e) { app.toast(file.name + ': ' + (e.message || e), true); return; }
+      if (!parsed.entries.length) {
+        app.toast(file.name + ': не найдена таблица с колонками «Наименование» и «Рыночная цена» ' +
+          '(или «Bozor ma\'lumotlariga ko\'ra»)', true);
+        return;
+      }
+      var m = S.reply.match(parsed.entries, objects);
+      self.reply = { base: b, name: file.name, entries: parsed.entries, match: m };
+      var n = Object.keys(m.prices).length;
+      if (b !== 'file' && n) app.setPrices(m.prices);
+      app.toast('Наш ответ: строк ' + parsed.entries.length + ', найдено в смете ' + m.found.length +
+        (m.missing.length ? ', не найдено ' + m.missing.length : '') + (b !== 'file' ? ' · цен проекта обновлено: ' + n : ''));
+      self.run();
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
   /** The first version and what we asked of it. */
   Compare.prototype.base = function () {
     var v = $('cmpOld').value;
-    if (v === 'file' && this.oldFile) return { label: this.oldFile.name, objects: this.oldFile.objects, requested: {}, known: {} };
+    var reply = this.reply && this.reply.base === v ? this.reply : null;
+    if (v === 'file' && this.oldFile) {
+      return { label: this.oldFile.name, objects: this.oldFile.objects, requested: reply ? reply.match.requested : {}, known: {} };
+    }
     var p = this.app.projects[+String(v).slice(1)];
     if (!p) return null;
-    // the project on its own, every sheet in, priced as it is now — the table we sent
+    // the project on its own, every sheet in, priced as it is now — the table we sent; or, when our
+    // reply was loaded as a file, exactly its lines
     var proj = Object.assign({}, p, { enabled: true });
     var model = S.assemble([proj], this.app.prices);
-    var requested = S.compare.requested(model, this.app.reportOpts()), known = {};
+    var requested = reply ? reply.match.requested : S.compare.requested(model, this.app.reportOpts()), known = {};
     model.resources.forEach(function (r) {
       if (!requested[r.key] && Math.abs((r.market || 0) - (r.price || 0)) >= 1) known[r.key] = r.market;
     });
@@ -131,7 +174,8 @@
     if (!b || !this.newFile) { this.res = null; this.render(); return; }
     var t0 = performance.now();
     this.res = S.compare.versions(b.objects, this.newFile.objects, b.requested, b.known);
-    this.labels = { oldLabel: b.label, newLabel: this.newFile.name, asked: Object.keys(b.requested).length };
+    this.labels = { oldLabel: b.label, newLabel: this.newFile.name, asked: Object.keys(b.requested).length,
+                    reply: this.reply && this.reply.base === $('cmpOld').value ? this.reply : null };
     this.ms = Math.round(performance.now() - t0);
     this.render();
   };
@@ -226,7 +270,13 @@
         'изменилась сумма: ' + lines(T.amountRows) + ' · текст/процент и «итог ≠ сумма строк» — красным', 'sheets') +
       '</div>' +
       '<div class="cmp-files">Было: <b>' + S.esc(L.oldLabel) + '</b> · Стало: <b>' + S.esc(L.newLabel) + '</b> · ' +
-      'замечаний в нашей таблице: ' + L.asked + ' · ' + lines(T.rows) + ' · ' + this.ms + ' мс</div>';
+      (L.reply ? 'замечания из файла «' + S.esc(L.reply.name) + '»: ' + L.asked + ' (строк в файле ' + L.reply.entries.length + ')' :
+        'замечаний в нашей таблице: ' + L.asked) + ' · ' + lines(T.rows) + ' · ' + this.ms + ' мс</div>' +
+      (L.reply && L.reply.match.missing.length ? '<details class="cmp-miss"><summary>Не найдено в смете: ' +
+        L.reply.match.missing.length + ' строк ответа</summary><ul>' + L.reply.match.missing.map(function (e) {
+          return '<li>' + S.esc((e.no ? e.no + '. ' : '') + e.name + ' · ' + e.unit + ' · ' + (e.price != null ? S.price(e.price) : '—') +
+            ' → ' + S.price(e.market)) + '</li>';
+        }).join('') + '</ul></details>' : '');
 
     var view = $('cmpView').value, filter = $('cmpFilter').value;
     var q = S.nameKey($('cmpQ').value || '');

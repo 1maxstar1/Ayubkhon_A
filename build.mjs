@@ -35,6 +35,7 @@ const SCRIPTS = [
   'src/lib/report.js',
   'src/lib/export.js',
   'src/lib/compare.js',
+  'src/lib/reply.js',
   'src/ui/grid.js',
   'src/ui/prices.js',
   'src/ui/compare.js',

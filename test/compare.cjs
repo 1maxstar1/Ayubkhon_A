@@ -13,12 +13,12 @@
 const { load } = require('./load.cjs');
 
 const S = load('fflate', 'normalize', 'match', 'sections', 'util', 'formula', 'xlsx-read', 'xlsx-write',
-  'smeta', 'assemble', 'report', 'compare');
+  'smeta', 'assemble', 'report', 'export', 'compare', 'reply');
 
 let fail = 0;
 const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) fail++; };
 
-const { book, prices: pricesFor, xlsx } = require('./compare-books.cjs');
+const { book, prices: pricesFor, xlsx, replyBook } = require('./compare-books.cjs');
 
 const v1 = S.smeta.parseWorkbook(book(1), 'v1.xlsx');
 const v2 = S.smeta.parseWorkbook(book(2), 'v2.xlsx');
@@ -128,6 +128,27 @@ check(statusCol.some((s) => /Не исправлено|частично/i.test(s
 const plain = S.compare.versions(v1, v2, {}, {});
 check(plain.totals.askedSaving === 0 && plain.objects[0].rows.find((r) => r.nm === 'ТЕСТОВЫЙ КРАН 10 Т').st === 'lowered',
   'without our table a lowered price is «lowered», never «fixed»');
+
+// «Наш ответ» as a spreadsheet: a plain table (a PDF reply turned into Excel)
+const rp = S.reply.parse(replyBook());
+check(rp.entries.length === 7 && rp.cols.price === 4 && rp.cols.market === 5, 'the reply table is found by its header; the band row is skipped (' + rp.entries.length + ')');
+const rm = S.reply.match(rp.entries, v1);
+check(rm.found.length === 6 && rm.missing.length === 1 && /КОТОРОГО НЕТ/.test(rm.missing[0].name), 'six lines found in the smeta, one is not');
+check(rm.prices[k('ТЕСТОВЫЙ АНКЕР М8', 'ШТ', 19)] === 16, 'a name broken differently («АНКЕР  М 8») still lands on its line');
+check(rm.prices[k('ТЕСТОВЫЙ ДЮБЕЛЬ', 'ШТ', 1)] === 0.5, 'a small price change is a change (1 → 0,5)');
+check(!rm.prices[k('ТЕСТОВЫЙ ЩИТ', 'ШТ', 29)] && rm.requested[k('ТЕСТОВЫЙ ЩИТ', 'ШТ', 29)].note, 'an unchanged price with a note is the note only');
+check(!rm.prices[k('ТЕСТОВЫЙ АНКЕР М5', 'ШТ', 15)], 'the reply never prices a line it does not name');
+const viaReply = S.compare.versions(v1, v2, rm.requested, {});
+const stR = (nm, oi) => (viaReply.objects[oi || 0].rows.find((r) => r.nm === nm) || {}).st;
+check(stR('ТЕСТОВЫЙ КРАН 10 Т') === 'fixed' && stR('ТЕСТОВЫЙ АНКЕР М5', 1) === 'notfixed' && stR('ТЕСТОВЫЙ БОЛТ') === 'worse',
+  'judged against the reply file: crane fixed, М5 left in the second estimate, bolt raised');
+check(stR('ТЕСТОВЫЙ ГВОЗДЬ') === 'lowered', 'what the reply does not mention is «без нашего замечания»');
+// our own export read back as a reply gives back exactly the prices it was made from
+const ownModel = S.assemble([{ id: 'p1', name: 'T', title: 'T', objects: v1, enabled: true }], rm.prices);
+const own = S.reply.parse(S.readXlsx(S.buildWorkbook(ownModel, { mode: 'changed', minDiff: 0, autoNote: true, noteText: 'X' })));
+const ownM = S.reply.match(own.entries, v1);
+check(own.entries.length > 0 && ownM.missing.length === 0 &&
+  Object.keys(rm.prices).every((kk) => ownM.prices[kk] === rm.prices[kk]), 'our own export (321.xlsx sheet) read back gives the same prices');
 
 console.log(fail ? '\nFAILED: ' + fail : '\nall compare checks passed');
 process.exit(fail ? 1 : 0);

@@ -862,6 +862,23 @@
     var isJson = /\.json$/i.test(file.name);
     reader.onload = function () {
       var entries;
+      // our reply (a smeta price next to a market price): each line lands on the line of that smeta
+      // price, matched the way «Сравнение версий» matches it, over any price set before
+      if (!isJson && S.reply && self.projects.length) {
+        try {
+          var rp = S.reply.parse(S.readXlsx(new Uint8Array(reader.result)));
+          if (rp.entries.length && rp.cols.price) {
+            var all = [];
+            self.projects.forEach(function (p) { all = all.concat(p.objects); });
+            var m = S.reply.match(rp.entries, all);
+            self.setPrices(m.prices);
+            self.toast('Наш ответ: строк ' + rp.entries.length + ', найдено в сметах ' + m.found.length +
+              (m.missing.length ? ', не найдено ' + m.missing.length : '') + ' · цен поставлено: ' + Object.keys(m.prices).length,
+              m.missing.length > 0);
+            return;
+          }
+        } catch (e) { /* not a reply: read as a plain price list below */ }
+      }
       try {
         entries = isJson ? JSON.parse(reader.result) : bookFromXlsx(new Uint8Array(reader.result));
       } catch (e) {

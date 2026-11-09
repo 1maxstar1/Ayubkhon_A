@@ -394,13 +394,15 @@ table.cmp{min-width:1180px}
 .cmp-card.go:hover{box-shadow:0 0 0 2px var(--accent-w)}
 table.cmp tr.t-head td{background:var(--sf2);border-top:1px solid var(--rule2)}
 table.cmp s.mute{text-decoration:line-through}
+.cmp-miss{font-size:12px;color:var(--mute);margin-top:4px}
+.cmp-miss ul{margin:4px 0 0 18px;padding:0;max-height:140px;overflow:auto}
 </style>
 </head>
 <body>
 
 <header class="bar">
   <div class="brand">
-    <b>Таблица сопоставления №2</b><i class="ver" title="Версия программы">v2.7.0</i>
+    <b>Таблица сопоставления №2</b><i class="ver" title="Версия программы">v2.8.0</i>
     <span>проверка и сбор рыночных цен ресурсов сметы</span>
   </div>
   <div class="wsbox" id="wsBox" hidden></div>
@@ -503,6 +505,8 @@ table.cmp s.mute{text-decoration:line-through}
         <label class="count">Было</label>
         <select id="cmpOld" title="Первая версия: проект с вашими рыночными ценами (то, что мы отправили) или файл"></select>
         <input type="file" id="cmpOldFile" accept=".xlsx,.xlsm" hidden>
+        <button class="btn sm" id="cmpReplyBtn" title="Таблица, которую мы отправили (наш экспорт или PDF, переведённый в Excel): её цены ставятся в проект и считаются замечаниями">Наш ответ (Excel)</button>
+        <input type="file" id="cmpReplyFile" accept=".xlsx,.xlsm" hidden>
         <button class="btn sm" id="cmpNewBtn" title="Смета, которую отправитель прислал после исправления">Загрузить исправленную смету</button>
         <input type="file" id="cmpNewFile" accept=".xlsx,.xlsm" hidden>
         <span class="count where" id="cmpNewName"></span>
@@ -3947,6 +3951,135 @@ if (typeof self !== 'undefined') self.S = S;
 
 ;
 /*
+ * «Наш ответ»: the comparison table we sent, read back from a spreadsheet — our own export
+ * (the TAQQOSLASH JADVALI №2 sheet of 321.xlsx) or any table with the columns name, unit,
+ * smeta price, market price and note (a PDF of an older reply, turned into Excel). Its prices
+ * are put on the smeta they were written for, and its lines are what the comparison of
+ * versions judges as asked.
+ *
+ *   S.reply.parse(wb)              → { entries: [{ no, name, unit, price, market, note }], sheet, cols }
+ *   S.reply.match(entries, objects) → { prices: key → market, requested: key → { market | note },
+ *                                       found: [{ entry, keys }], missing: [entry] }
+ */
+(function (S) {
+  'use strict';
+
+  /** What a header cell names. First match wins, in this order: «Loyiha smeta … birligi» is a price, not a unit. */
+  var ROLES = [
+    ['note', /ESLATMA|ПРИМЕЧ|IZOH|ИЗОХ|NOTE/],
+    ['market', /BOZOR|РЫН|MARKET/],
+    ['price', /LOYIHA|СМЕТ|SMETA/],
+    ['name', /NOMI|НАИМЕН|NAME/],
+    ['unit', /O.?LCHOV|ЕД\.?\s*ИЗМ|^ЕД\.?$|UNIT|BIRLIK/],
+    ['no', /^№|^N(\s|$)|T\/R|П\/П/]
+  ];
+  var SKIP = /СУММ|SUMMA|ОБЩАЯ|JAMI|РАЗН|FARQ|КОЛ-?ВО|MIQDOR/;
+
+  function text(c) { return c && c.v != null ? String(c.v) : ''; }
+  function key(s) { return S.nameKey(s).replace(/[ʻʼ‘’`´]/g, "'"); }
+
+  /** The header row: the first row (in the first 40) that names a name column and a market price column. */
+  function header(rows) {
+    for (var r = 1; r < Math.min(rows.length, 41); r++) {
+      var cells = rows[r] || [], cols = {};
+      for (var c = 1; c < cells.length; c++) {
+        var t = key(text(cells[c]));
+        if (!t) continue;
+        for (var k = 0; k < ROLES.length; k++) {
+          var role = ROLES[k][0];
+          if (cols[role] || !ROLES[k][1].test(t)) continue;
+          if ((role === 'market' || role === 'price') && SKIP.test(t)) continue;
+          cols[role] = c;
+          break;
+        }
+      }
+      if (cols.name && cols.market) return { row: r, cols: cols };
+    }
+    return null;
+  }
+
+  function parse(wb) {
+    for (var s = 0; s < wb.sheets.length; s++) {
+      var rows = wb.sheets[s].rows || [];
+      var h = header(rows);
+      if (!h) continue;
+      var C = h.cols, out = [];
+      for (var r = h.row + 1; r < rows.length; r++) {
+        var row = rows[r];
+        if (!row) continue;
+        var name = text(row[C.name]).replace(/\s+/g, ' ').trim();
+        var market = S.num(text(row[C.market]));
+        if (!name || market == null || /^\d+$/.test(name)) continue;   // section, total and numbering rows
+        out.push({
+          no: C.no ? text(row[C.no]).trim() : '',
+          name: name,
+          unit: C.unit ? text(row[C.unit]).trim() : '',
+          price: C.price ? S.num(text(row[C.price])) : null,
+          market: market,
+          note: C.note ? text(row[C.note]).trim() : ''
+        });
+      }
+      if (out.length) return { entries: out, sheet: wb.sheets[s].name, cols: C };
+    }
+    return { entries: [], sheet: null, cols: null };
+  }
+
+  /* -------------------------------------------------------------- matching */
+
+  /** Prices printed in a table are rounded to the sum: «12 346» stands for the smeta's 12 345,6789. */
+  function samePrice(a, b) { return Math.abs(a - b) <= Math.max(1, Math.abs(a) * 1e-3); }
+  /** Our market price equals the smeta price up to its rounding: 0.1 %, at most one sum (as in S.compare). */
+  function unchanged(p, m) { return Math.abs(p - m) < Math.min(1, Math.max(1e-6, Math.abs(p) * 1e-3)); }
+  function bare(s) { return S.nameKey(s).replace(/[\s.,;:()"'«»-]+/g, ''); }
+
+  /**
+   * Each line of the reply to the smeta's resources: name and unit, and the smeta price when the
+   * table gives one. A name broken over lines («2-» / «3,75 М») is matched without its spaces and
+   * punctuation; failing that, the closest name of the same unit and price (similarity ≥ 0.9).
+   */
+  function match(entries, objects) {
+    var res = new Map();
+    objects.forEach(function (o) {
+      (o.rows || []).forEach(function (r) {
+        if (r.kind !== 'item') return;
+        var k = S.resKey(r.nm || '', r.unit || '', r.price == null ? 0 : r.price);
+        if (!res.has(k)) res.set(k, { key: k, nm: r.nm || '', nk: S.nameKey(r.nm || ''), bk: bare(r.nm || ''),
+                                       uk: S.unitKey(r.unit || ''), price: r.price || 0 });
+      });
+    });
+    var all = Array.from(res.values());
+    var out = { prices: {}, requested: {}, found: [], missing: [] };
+    entries.forEach(function (e) {
+      var uk = S.unitKey(e.unit || ''), nk = S.nameKey(e.name), bk = bare(e.name);
+      var fits = function (x) { return (!uk || x.uk === uk) && (e.price == null || samePrice(x.price, e.price)); };
+      var hit = all.filter(function (x) { return x.nk === nk && fits(x); });
+      if (!hit.length) hit = all.filter(function (x) { return x.bk === bk && fits(x); });
+      if (!hit.length && e.price != null) {
+        var best = null, bs = 0.9;
+        all.forEach(function (x) {
+          if (!fits(x)) return;
+          var sim = S.charSimilarity(x.nm, e.name);
+          if (sim >= bs) { bs = sim; best = x; }
+        });
+        if (best) hit = [best];
+      }
+      if (!hit.length) { out.missing.push(e); return; }
+      hit.forEach(function (x) {
+        if (!unchanged(x.price, e.market)) {                // a price we changed (our figure, exact)
+          out.prices[x.key] = e.market;
+          out.requested[x.key] = { market: e.market };
+        } else if (e.note) out.requested[x.key] = { note: e.note };
+      });
+      out.found.push({ entry: e, keys: hit.map(function (x) { return x.key; }) });
+    });
+    return out;
+  }
+
+  S.reply = { parse: parse, match: match };
+})(S);
+
+;
+/*
  * Fixed-height row virtualiser.
  *
  * The whole reason the drafts crawled: six thousand rows were rendered as six
@@ -4356,14 +4489,20 @@ if (typeof self !== 'undefined') self.S = S;
     $('cmpOld').addEventListener('change', function () {
       if (this.value === 'file') { $('cmpOldFile').click(); return; }
       self.oldFile = null;
+      self.reply = null;
       self.run();
     });
     $('cmpOldFile').addEventListener('change', function (e) {
       var f = e.target.files[0]; e.target.value = '';
       if (!f) { self.fillOld(); return; }
-      self.read(f, function (objs) { self.oldFile = { name: f.name, objects: objs }; self.fillOld(); self.run(); });
+      self.read(f, function (objs) { self.oldFile = { name: f.name, objects: objs }; self.reply = null; self.fillOld(); self.run(); });
     });
     $('cmpNewBtn').addEventListener('click', function () { $('cmpNewFile').click(); });
+    $('cmpReplyBtn').addEventListener('click', function () { $('cmpReplyFile').click(); });
+    $('cmpReplyFile').addEventListener('change', function (e) {
+      var f = e.target.files[0]; e.target.value = '';
+      if (f) self.loadReply(f);
+    });
     $('cmpNewFile').addEventListener('change', function (e) {
       var f = e.target.files[0]; e.target.value = '';
       if (!f) return;
@@ -4442,16 +4581,53 @@ if (typeof self !== 'undefined') self.S = S;
     else if (!this.app.projects.length && !this.oldFile) sel.value = 'file';
   };
 
+  /**
+   * «Наш ответ»: the table we sent, as a spreadsheet (our export, or an older PDF reply turned
+   * into Excel). Its prices go onto the «Было» project — over whatever was typed or auto-applied:
+   * the reply is what was actually sent — and its lines become what the comparison judges.
+   */
+  Compare.prototype.loadReply = function (file) {
+    var self = this, app = this.app;
+    var b = $('cmpOld').value;
+    var objects = b === 'file' && this.oldFile ? this.oldFile.objects :
+      (app.projects[+String(b).slice(1)] || {}).objects;
+    if (!objects) { app.toast('Сначала выберите первую версию сметы («Было»)', true); return; }
+    var reader = new FileReader();
+    reader.onerror = function () { app.toast('Не удалось прочитать файл', true); };
+    reader.onload = function () {
+      var parsed;
+      try { parsed = S.reply.parse(S.readXlsx(new Uint8Array(reader.result))); }
+      catch (e) { app.toast(file.name + ': ' + (e.message || e), true); return; }
+      if (!parsed.entries.length) {
+        app.toast(file.name + ': не найдена таблица с колонками «Наименование» и «Рыночная цена» ' +
+          '(или «Bozor ma\'lumotlariga ko\'ra»)', true);
+        return;
+      }
+      var m = S.reply.match(parsed.entries, objects);
+      self.reply = { base: b, name: file.name, entries: parsed.entries, match: m };
+      var n = Object.keys(m.prices).length;
+      if (b !== 'file' && n) app.setPrices(m.prices);
+      app.toast('Наш ответ: строк ' + parsed.entries.length + ', найдено в смете ' + m.found.length +
+        (m.missing.length ? ', не найдено ' + m.missing.length : '') + (b !== 'file' ? ' · цен проекта обновлено: ' + n : ''));
+      self.run();
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
   /** The first version and what we asked of it. */
   Compare.prototype.base = function () {
     var v = $('cmpOld').value;
-    if (v === 'file' && this.oldFile) return { label: this.oldFile.name, objects: this.oldFile.objects, requested: {}, known: {} };
+    var reply = this.reply && this.reply.base === v ? this.reply : null;
+    if (v === 'file' && this.oldFile) {
+      return { label: this.oldFile.name, objects: this.oldFile.objects, requested: reply ? reply.match.requested : {}, known: {} };
+    }
     var p = this.app.projects[+String(v).slice(1)];
     if (!p) return null;
-    // the project on its own, every sheet in, priced as it is now — the table we sent
+    // the project on its own, every sheet in, priced as it is now — the table we sent; or, when our
+    // reply was loaded as a file, exactly its lines
     var proj = Object.assign({}, p, { enabled: true });
     var model = S.assemble([proj], this.app.prices);
-    var requested = S.compare.requested(model, this.app.reportOpts()), known = {};
+    var requested = reply ? reply.match.requested : S.compare.requested(model, this.app.reportOpts()), known = {};
     model.resources.forEach(function (r) {
       if (!requested[r.key] && Math.abs((r.market || 0) - (r.price || 0)) >= 1) known[r.key] = r.market;
     });
@@ -4464,7 +4640,8 @@ if (typeof self !== 'undefined') self.S = S;
     if (!b || !this.newFile) { this.res = null; this.render(); return; }
     var t0 = performance.now();
     this.res = S.compare.versions(b.objects, this.newFile.objects, b.requested, b.known);
-    this.labels = { oldLabel: b.label, newLabel: this.newFile.name, asked: Object.keys(b.requested).length };
+    this.labels = { oldLabel: b.label, newLabel: this.newFile.name, asked: Object.keys(b.requested).length,
+                    reply: this.reply && this.reply.base === $('cmpOld').value ? this.reply : null };
     this.ms = Math.round(performance.now() - t0);
     this.render();
   };
@@ -4559,7 +4736,13 @@ if (typeof self !== 'undefined') self.S = S;
         'изменилась сумма: ' + lines(T.amountRows) + ' · текст/процент и «итог ≠ сумма строк» — красным', 'sheets') +
       '</div>' +
       '<div class="cmp-files">Было: <b>' + S.esc(L.oldLabel) + '</b> · Стало: <b>' + S.esc(L.newLabel) + '</b> · ' +
-      'замечаний в нашей таблице: ' + L.asked + ' · ' + lines(T.rows) + ' · ' + this.ms + ' мс</div>';
+      (L.reply ? 'замечания из файла «' + S.esc(L.reply.name) + '»: ' + L.asked + ' (строк в файле ' + L.reply.entries.length + ')' :
+        'замечаний в нашей таблице: ' + L.asked) + ' · ' + lines(T.rows) + ' · ' + this.ms + ' мс</div>' +
+      (L.reply && L.reply.match.missing.length ? '<details class="cmp-miss"><summary>Не найдено в смете: ' +
+        L.reply.match.missing.length + ' строк ответа</summary><ul>' + L.reply.match.missing.map(function (e) {
+          return '<li>' + S.esc((e.no ? e.no + '. ' : '') + e.name + ' · ' + e.unit + ' · ' + (e.price != null ? S.price(e.price) : '—') +
+            ' → ' + S.price(e.market)) + '</li>';
+        }).join('') + '</ul></details>' : '');
 
     var view = $('cmpView').value, filter = $('cmpFilter').value;
     var q = S.nameKey($('cmpQ').value || '');
@@ -5532,6 +5715,23 @@ if (typeof self !== 'undefined') self.S = S;
     var isJson = /\.json$/i.test(file.name);
     reader.onload = function () {
       var entries;
+      // our reply (a smeta price next to a market price): each line lands on the line of that smeta
+      // price, matched the way «Сравнение версий» matches it, over any price set before
+      if (!isJson && S.reply && self.projects.length) {
+        try {
+          var rp = S.reply.parse(S.readXlsx(new Uint8Array(reader.result)));
+          if (rp.entries.length && rp.cols.price) {
+            var all = [];
+            self.projects.forEach(function (p) { all = all.concat(p.objects); });
+            var m = S.reply.match(rp.entries, all);
+            self.setPrices(m.prices);
+            self.toast('Наш ответ: строк ' + rp.entries.length + ', найдено в сметах ' + m.found.length +
+              (m.missing.length ? ', не найдено ' + m.missing.length : '') + ' · цен поставлено: ' + Object.keys(m.prices).length,
+              m.missing.length > 0);
+            return;
+          }
+        } catch (e) { /* not a reply: read as a plain price list below */ }
+      }
       try {
         entries = isJson ? JSON.parse(reader.result) : bookFromXlsx(new Uint8Array(reader.result));
       } catch (e) {

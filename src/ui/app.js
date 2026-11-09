@@ -483,6 +483,7 @@
     // had taken away — «660 строк · 637 ресурсов» over a document that had 657
     // and 634.
     if (document.getElementById('pane-report').classList.contains('on')) this.buildReportPreview();
+    if (this.compare_ui) this.compare_ui.refresh();
     this.ledger();
     this._buildMs = Math.round(performance.now() - t0);
     document.getElementById('sheetCount').textContent =

@@ -145,6 +145,23 @@ try {
   const m5book = await page.evaluate(() => app.model.resources.filter((x) => x.name === 'ТЕСТОВЫЙ АНКЕР М5').map((x) => x.price + '→' + x.market).join(' '));
   check(m5book === '17→15', 'only the line of the smeta price the reply names is priced (' + m5book + ')');
 
+  // the tab open before the project is there (a reload on «Сравнение версий»: the workspace brings its
+  // projects back after the tab is shown) — «Было» must follow, and the returned file must still compare
+  await page.goto('about:blank');
+  await page.goto('file://' + join(root, 'dist/smeta-taqqoslash.html') + '#tab=compare');
+  await page.waitForFunction(() => window.app && document.getElementById('pane-compare').classList.contains('on'));
+  check(await page.inputValue('#cmpOld') === 'file', 'with no project yet, «Было» can only be a file');
+  await page.setInputFiles('#pick', f1);
+  await page.waitForFunction(() => app.model && app.model.rows.length > 0, null, { timeout: 30 * 1000 });
+  check(await page.inputValue('#cmpOld') === 'p0', '«Было» turns to the project once it arrives');
+  await page.setInputFiles('#cmpNewFile', f2);
+  await page.waitForFunction(() => app.compare_ui.res, null, { timeout: 30 * 1000 });
+  check(true, 'and the returned file compares');
+  await page.evaluate(() => { app.compare_ui.res = null; });
+  await page.setInputFiles('#cmpNewFile', f2);
+  await page.waitForFunction(() => app.compare_ui.res, null, { timeout: 30 * 1000 })
+    .then(() => check(true, 'the same file can be chosen again'), () => check(false, 'the same file can be chosen again'));
+
   check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' / ') : ''));
 } finally {
   await browser.close();

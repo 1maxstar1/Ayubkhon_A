@@ -70,6 +70,13 @@
     });
   };
 
+  /** The projects changed (loaded, restored, removed): the «Было» list follows, and an open tab recomputes. */
+  Compare.prototype.refresh = function () {
+    this.fillOld();
+    var pane = $('pane-compare');
+    if (pane && pane.classList.contains('on') && this.newFile) this.run();
+  };
+
   /** Parse a workbook off the main thread when the worker is there, the same way projects are read. */
   Compare.prototype.read = function (file, done) {
     var app = this.app;
@@ -106,6 +113,10 @@
     var sel = $('cmpOld');
     if (!sel) return;
     var cur = this.oldFile ? 'file' : sel.value;
+    // «Другой файл…» without a file chosen is no first version: the project, as soon as there is one
+    // (after a reload the tab can open before the workspace has brought its projects back)
+    if (cur === 'file' && !this.oldFile) cur = '';
+    if (!cur || !/^p\d+$/.test(cur) || +cur.slice(1) >= this.app.projects.length) cur = this.app.projects.length ? 'p0' : cur;
     var html = this.app.projects.map(function (p, i) {
       return '<option value="p' + i + '">Проект: ' + S.esc(p.name) + '</option>';
     }).join('');

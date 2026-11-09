@@ -353,3 +353,34 @@ ul.files .mute{color:var(--mute)}
 .card-foot{margin-top:16px;text-align:right}
 .tbl.apps button.link.num{font-weight:600;padding:0;color:var(--accent)}
 .screen#screen-card{z-index:65}
+
+/* «Сравнение версий» */
+#pane-compare .toolbar{flex-wrap:wrap;row-gap:4px}
+#cmpSummary{padding:8px 10px;border-bottom:1px solid var(--rule)}
+.cmp-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}
+.cmp-card{background:var(--sf);border:1px solid var(--rule);border-left:4px solid var(--rule2);border-radius:8px;padding:7px 10px}
+.cmp-card.good{border-left-color:var(--green2)}
+.cmp-card.part{border-left-color:#d9a400}
+.cmp-card.bad{border-left-color:var(--pink2)}
+.cmp-card .t{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
+.cmp-card .b{font-size:14px;font-weight:600;margin-top:2px}
+.cmp-card .s{font-size:12px;color:var(--mute);margin-top:1px}
+.cmp-files{font-size:12px;color:var(--mute);margin-top:6px}
+.cmp-empty{padding:16px;color:var(--mute);line-height:1.7}
+.cmp-chip{display:inline-block;padding:0 7px;border-radius:9px;font-size:12px}
+.cmp-chip.good,.cmp tr.t-good td{background:#e2f4e6}
+.cmp-chip.part,.cmp tr.t-part td{background:#fff3cc}
+.cmp-chip.bad,.cmp tr.t-bad td{background:#fde3e5}
+.cmp tr.t-info td{background:var(--sf2)}
+.cmp-head{overflow:hidden;border-bottom:1px solid var(--rule2);background:var(--band)}
+.cmp-scroll{flex:1;overflow:auto;min-height:0}
+table.cmp{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12.5px}
+table.cmp th{font-weight:600;text-align:left;padding:5px 6px;font-size:12px}
+table.cmp td{padding:4px 6px;border-bottom:1px solid var(--rule);vertical-align:top;overflow-wrap:anywhere}
+table.cmp td.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+table.cmp tr[data-k]{cursor:pointer}
+table.cmp tr[data-k]:hover td{filter:brightness(.97)}
+table.cmp .up{color:var(--bad);font-weight:600}
+table.cmp .down{color:var(--good);font-weight:600}
+table.cmp .mute{color:var(--mute)}
+table.cmp{min-width:1180px}

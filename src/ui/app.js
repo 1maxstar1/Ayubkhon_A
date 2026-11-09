@@ -29,6 +29,7 @@
     this.worker = makeWorker();
     this.bind();
     this.prices_ui = new S.Prices(this);
+    this.compare_ui = S.Compare ? new S.Compare(this) : null;
     this.sheetList = new S.VList(document.getElementById('sheetScroll'), {
       render: this.renderSheet.bind(this)
     });
@@ -937,4 +938,5 @@
   if (document.readyState !== 'loading' && !window.app) window.app = new App();
 
   S.App = App;
+  S.download = download;
 })(S);

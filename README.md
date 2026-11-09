@@ -106,6 +106,36 @@ fayllar kompyuterdan chiqmaydi.
      `TAQQOSLASH JADVALI №2`;
    * `Mundarija` — qator raqamlari indeksi (sozlamalardan o'chirsa ham bo'ladi).
 
+6. **Tuzatilgan smetani solishtiring («Сравнение версий», v2.6.0).** Smeta
+   tuzuvchi bizning jadvalimiz bo'yicha tuzatib, faylni qayta yuborganda:
+   «Сравнение версий» yorlig'ida **«Было»** — birinchi versiya (bozor narxlari
+   yozilgan loyiha; boshqa faylni ham tanlasa bo'ladi), **«Загрузить
+   исправленную смету»** — qaytgan fayl. Qaytgan fayl loyihalarga qo'shilmaydi,
+   faqat solishtiriladi.
+
+   * Qatorlar har bir varaq ichida nom + o'lchov birligi bo'yicha, tartibi bilan
+     juftlanadi (eng uzun umumiy ketma-ketlik): qo'shilgan yoki o'chirilgan qator
+     keyingi qatorlarni surib yubormaydi. Varaqlar nomi bo'yicha, bo'lmasa
+     tartibi bo'yicha juftlanadi.
+   * **«So'ralgan narx»** — jadvalimizda yuborilgan narx: hisobot o'zining
+     rejimi va chegarasi bilan qayta o'qiladi (Excel'dagidek). Chegaradan past
+     qolib, jadvalga tushmagan narxlarimiz kulrang, faqat ma'lumot uchun
+     ko'rsatiladi — ular so'ralmagan hisoblanadi.
+   * Ranglar: 🟩 **исправлено** (narx biznikiga yetdi yoki undan past) va
+     so'ralmagan pasaytirish; 🟨 **частично** (pasaygan, lekin biznikiga
+     yetmagan; yoki bitta resurs bir qatorlarda tuzatilgan, boshqalarida yo'q),
+     o'chirilgan qator; 🟥 **не исправлено**, so'rovga qarshi oshirilgan,
+     so'ralmagan oshirish, miqdor oshgan, yangi qator. Narx 0,1 % gacha (ko'pi
+     bilan 1 so'm) farq qilsa — yaxlitlash, o'zgarmagan hisoblanadi.
+   * Yuqorida: smeta summasi bo'lgan → bo'ldi, so'ralgan pasayishdan qanchasi
+     olindi, to'liq tuzatilgan va **qolgan** resurslar (eski narxda qolgan
+     qatorlar soni bilan).
+   * Ko'rinish: «По ресурсам» (resurs ustiga bosilsa — uning barcha qatorlari)
+     yoki «По строкам»; filtr «Требуют внимания» / «Все изменения» / «Все
+     строки».
+   * **«Скачать сравнение»** — ikki varaqli `.xlsx` («По ресурсам», «По
+     строкам»), xuddi shu ranglar bilan.
+
 ---
 
 ## Hisobot varaqining uch rejimi

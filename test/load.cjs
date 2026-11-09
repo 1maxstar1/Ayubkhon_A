@@ -58,6 +58,7 @@ const FILE = {
   // reference prices (src/lib/refs/): the package format first (it loads alone on the admin page), then the unit
   // table and the family parsers (plain scripts that leave one global each), index.js that collects them into
   // S.refs, and the engine
+  compare: 'src/lib/compare.js',
   'refs-package': 'src/lib/refs/package.js',
   'refs-units': 'src/lib/refs/units.js',
   'refs-machines': 'src/lib/refs/families/machines.js',
@@ -79,14 +80,14 @@ const FILE = {
  * `S` and defines the name key that assemble.js keys every row by.
  */
 const ORDER = ['fflate', 'xlsx', 'normalize', 'match', 'sections', 'regions', 'util',
-  'formula', 'xlsx-read', 'xlsx-write', 'smeta', 'assemble', 'report', 'export',
+  'formula', 'xlsx-read', 'xlsx-write', 'smeta', 'assemble', 'report', 'export', 'compare',
   'registry-parse', 'refs-package', 'refs-units', 'refs-machines', 'refs-cable', 'refs-steel',
   'refs-mineral', 'refs-electro', 'refs', 'refs-view', 'refs-query', 'refs-pool', 'refs-retrieve',
   'refs-suggest', 'refs-cache'];
 
 /** Everything needed to read a workbook and build the comparison document. */
 const PIPELINE = ['fflate', 'normalize', 'match', 'sections', 'util', 'formula',
-  'xlsx-read', 'xlsx-write', 'smeta', 'assemble', 'report', 'export'];
+  'xlsx-read', 'xlsx-write', 'smeta', 'assemble', 'report', 'export', 'compare'];
 /** Just the name keys and the matching layer. */
 const CORE = ['normalize', 'match', 'sections', 'util'];
 /** Reading a registry export (.xls / .xlsx) with SheetJS. */

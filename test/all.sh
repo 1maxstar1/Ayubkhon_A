@@ -65,6 +65,7 @@ run build            node build.mjs
 run normalize        node test/normalize.cjs
 run xlsx-guard       node test/xlsx-guard.cjs
 run smeta-form4a     node test/smeta-form4a.cjs
+run compare          node test/compare.cjs
 run sections         node test/sections.cjs
 run regions          node test/regions.cjs
 run refs             node test/refs.cjs
@@ -102,6 +103,7 @@ browser_run laptop       node test/laptop.mjs
 pwsh_run  laptop-windows sh test/laptop-windows.sh
 browser_run e2e-admin    node test/e2e-admin.mjs
 browser_run e2e-refs     node test/e2e-refs.mjs
+browser_run e2e-compare  node test/e2e-compare.mjs
 browser_run upload-order node test/upload-order.mjs
 both_run  e2e-workspace  node test/e2e-workspace.mjs "$S1" "$S2"
 both_run  e2e-hints      node test/e2e-hints.mjs "$S1"

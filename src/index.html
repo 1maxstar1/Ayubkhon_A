@@ -53,6 +53,7 @@
       <button class="tab on" data-pane="prices">Проверка цен</button>
       <button class="tab" data-pane="sheet">Сводная таблица</button>
       <button class="tab" data-pane="report">Вид отчёта</button>
+      <button class="tab" data-pane="compare" title="Что отправитель исправил после нашей таблицы">Сравнение версий</button>
       <button class="tab" data-pane="settings">Настройки документа</button>
     </nav>
 
@@ -105,6 +106,33 @@
       </div>
       <div class="thead" id="reportHead"></div>
       <div class="vscroll" id="reportScroll"><div class="vspace"><div class="vbody"></div></div></div>
+    </div>
+
+    <div class="pane" id="pane-compare">
+      <div class="toolbar">
+        <label class="count">Было</label>
+        <select id="cmpOld" title="Первая версия: проект с вашими рыночными ценами (то, что мы отправили) или файл"></select>
+        <input type="file" id="cmpOldFile" accept=".xlsx,.xlsm" hidden>
+        <button class="btn sm" id="cmpNewBtn" title="Смета, которую отправитель прислал после исправления">Загрузить исправленную смету</button>
+        <input type="file" id="cmpNewFile" accept=".xlsx,.xlsm" hidden>
+        <span class="count where" id="cmpNewName"></span>
+        <select id="cmpView">
+          <option value="res">По ресурсам</option>
+          <option value="rows">По строкам</option>
+        </select>
+        <select id="cmpFilter">
+          <option value="problems">Требуют внимания</option>
+          <option value="changed" selected>Все изменения</option>
+          <option value="all">Все строки</option>
+        </select>
+        <input type="search" id="cmpQ" placeholder="Поиск…" spellcheck="false">
+        <div class="grow"></div>
+        <span class="count" id="cmpCount"></span>
+        <button class="btn sm" id="cmpExport" disabled>Скачать сравнение</button>
+      </div>
+      <div id="cmpSummary"></div>
+      <div class="cmp-head" id="cmpHead"></div>
+      <div class="cmp-scroll" id="cmpBody"></div>
     </div>
 
     <div class="pane" id="pane-settings">

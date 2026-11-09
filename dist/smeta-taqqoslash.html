@@ -359,13 +359,44 @@ ul.files .mute{color:var(--mute)}
 .card-foot{margin-top:16px;text-align:right}
 .tbl.apps button.link.num{font-weight:600;padding:0;color:var(--accent)}
 .screen#screen-card{z-index:65}
+
+/* «Сравнение версий» */
+#pane-compare .toolbar{flex-wrap:wrap;row-gap:4px}
+#cmpSummary{padding:8px 10px;border-bottom:1px solid var(--rule)}
+.cmp-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}
+.cmp-card{background:var(--sf);border:1px solid var(--rule);border-left:4px solid var(--rule2);border-radius:8px;padding:7px 10px}
+.cmp-card.good{border-left-color:var(--green2)}
+.cmp-card.part{border-left-color:#d9a400}
+.cmp-card.bad{border-left-color:var(--pink2)}
+.cmp-card .t{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
+.cmp-card .b{font-size:14px;font-weight:600;margin-top:2px}
+.cmp-card .s{font-size:12px;color:var(--mute);margin-top:1px}
+.cmp-files{font-size:12px;color:var(--mute);margin-top:6px}
+.cmp-empty{padding:16px;color:var(--mute);line-height:1.7}
+.cmp-chip{display:inline-block;padding:0 7px;border-radius:9px;font-size:12px}
+.cmp-chip.good,.cmp tr.t-good td{background:#e2f4e6}
+.cmp-chip.part,.cmp tr.t-part td{background:#fff3cc}
+.cmp-chip.bad,.cmp tr.t-bad td{background:#fde3e5}
+.cmp tr.t-info td{background:var(--sf2)}
+.cmp-head{overflow:hidden;border-bottom:1px solid var(--rule2);background:var(--band)}
+.cmp-scroll{flex:1;overflow:auto;min-height:0}
+table.cmp{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12.5px}
+table.cmp th{font-weight:600;text-align:left;padding:5px 6px;font-size:12px}
+table.cmp td{padding:4px 6px;border-bottom:1px solid var(--rule);vertical-align:top;overflow-wrap:anywhere}
+table.cmp td.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+table.cmp tr[data-k]{cursor:pointer}
+table.cmp tr[data-k]:hover td{filter:brightness(.97)}
+table.cmp .up{color:var(--bad);font-weight:600}
+table.cmp .down{color:var(--good);font-weight:600}
+table.cmp .mute{color:var(--mute)}
+table.cmp{min-width:1180px}
 </style>
 </head>
 <body>
 
 <header class="bar">
   <div class="brand">
-    <b>Таблица сопоставления №2</b><i class="ver" title="Версия программы">v2.5.7</i>
+    <b>Таблица сопоставления №2</b><i class="ver" title="Версия программы">v2.6.0</i>
     <span>проверка и сбор рыночных цен ресурсов сметы</span>
   </div>
   <div class="wsbox" id="wsBox" hidden></div>
@@ -408,6 +439,7 @@ ul.files .mute{color:var(--mute)}
       <button class="tab on" data-pane="prices">Проверка цен</button>
       <button class="tab" data-pane="sheet">Сводная таблица</button>
       <button class="tab" data-pane="report">Вид отчёта</button>
+      <button class="tab" data-pane="compare" title="Что отправитель исправил после нашей таблицы">Сравнение версий</button>
       <button class="tab" data-pane="settings">Настройки документа</button>
     </nav>
 
@@ -460,6 +492,33 @@ ul.files .mute{color:var(--mute)}
       </div>
       <div class="thead" id="reportHead"></div>
       <div class="vscroll" id="reportScroll"><div class="vspace"><div class="vbody"></div></div></div>
+    </div>
+
+    <div class="pane" id="pane-compare">
+      <div class="toolbar">
+        <label class="count">Было</label>
+        <select id="cmpOld" title="Первая версия: проект с вашими рыночными ценами (то, что мы отправили) или файл"></select>
+        <input type="file" id="cmpOldFile" accept=".xlsx,.xlsm" hidden>
+        <button class="btn sm" id="cmpNewBtn" title="Смета, которую отправитель прислал после исправления">Загрузить исправленную смету</button>
+        <input type="file" id="cmpNewFile" accept=".xlsx,.xlsm" hidden>
+        <span class="count where" id="cmpNewName"></span>
+        <select id="cmpView">
+          <option value="res">По ресурсам</option>
+          <option value="rows">По строкам</option>
+        </select>
+        <select id="cmpFilter">
+          <option value="problems">Требуют внимания</option>
+          <option value="changed" selected>Все изменения</option>
+          <option value="all">Все строки</option>
+        </select>
+        <input type="search" id="cmpQ" placeholder="Поиск…" spellcheck="false">
+        <div class="grow"></div>
+        <span class="count" id="cmpCount"></span>
+        <button class="btn sm" id="cmpExport" disabled>Скачать сравнение</button>
+      </div>
+      <div id="cmpSummary"></div>
+      <div class="cmp-head" id="cmpHead"></div>
+      <div class="cmp-scroll" id="cmpBody"></div>
     </div>
 
     <div class="pane" id="pane-settings">
@@ -3433,6 +3492,313 @@ if (typeof self !== 'undefined') self.S = S;
 
 ;
 /*
+ * Version comparison: the smeta as it first came in, the smeta the sender returned after our
+ * comparison table, and what that table asked for. Which lines were fixed, which were not,
+ * and what changed that nobody asked about.
+ *
+ *   S.compare.versions(oldObjects, newObjects, requested) → result
+ *     oldObjects / newObjects   parsed sheets (S.smeta.parseWorkbook) of the two versions
+ *     requested                 resource key (S.resKey of the OLD line) → { market, note }:
+ *                               the price our table gave, or only a note (equipment)
+ *     known                     key → market price we set but the table did not carry (below its
+ *                               threshold): shown for reference, never judged as a request
+ *   S.compare.workbook(result, opts) → Uint8Array   the comparison as a styled .xlsx
+ *
+ * Lines are paired inside each sheet by name + unit, in order (longest common subsequence),
+ * so a line inserted or deleted by the sender shows as added / removed and does not shift
+ * the pairing of the lines after it. Sheets are paired by their name, else by position.
+ */
+(function (S) {
+  'use strict';
+
+  /* ------------------------------------------------------------ statuses */
+
+  // tone: good (green), bad (red), part (amber), info (grey), '' (unchanged)
+  var STATUS = {
+    fixed:    { tone: 'good', label: 'Исправлено',            rank: 3 },
+    lowered:  { tone: 'good', label: 'Снижено без замечания', rank: 2 },
+    qtydown:  { tone: 'good', label: 'Объём уменьшен',        rank: 2 },
+    partial:  { tone: 'part', label: 'Исправлено частично',   rank: 6 },
+    notfixed: { tone: 'bad',  label: 'Не исправлено',         rank: 9 },
+    worse:    { tone: 'bad',  label: 'Цена повышена вопреки замечанию', rank: 10 },
+    raised:   { tone: 'bad',  label: 'Цена повышена',         rank: 8 },
+    qtyup:    { tone: 'bad',  label: 'Объём увеличен',        rank: 7 },
+    added:    { tone: 'bad',  label: 'Новая строка',          rank: 7 },
+    removed:  { tone: 'part', label: 'Строка удалена',        rank: 5 },
+    note:     { tone: 'info', label: 'Замечание (без цены)',  rank: 4 },
+    same:     { tone: '',     label: 'Без изменений',         rank: 0 }
+  };
+
+  /** Two smeta prices are the same price when they differ by rounding only: 0.1 %, at most one sum. */
+  function samePrice(a, b) {
+    var x = a || 0, y = b || 0;
+    return Math.abs(x - y) < Math.min(1, Math.max(1e-6, Math.abs(x) * 1e-3));
+  }
+  /** The price we asked for counts as reached within 0.1 % (or one sum). */
+  function reached(p, market) { return p <= market || Math.abs(p - market) <= Math.max(1, market * 0.001); }
+  function sameQty(a, b) { var x = a || 0, y = b || 0; return Math.abs(x - y) <= Math.max(1e-9, Math.abs(x) * 1e-9); }
+
+  /**
+   * One pair of lines. `a` old, `b` new (either may be missing); `req` our request for the old line.
+   * The price status comes first; a quantity change is reported when the price says nothing.
+   */
+  function classify(a, b, req) {
+    if (a && !b) return 'removed';
+    if (!a && b) return 'added';
+    var p1 = a.price || 0, p2 = b.price || 0;
+    var qtyUp = !sameQty(a.qty, b.qty) && (b.qty || 0) > (a.qty || 0);
+    var qtyDown = !sameQty(a.qty, b.qty) && !qtyUp;
+    if (req && req.market != null && !samePrice(req.market, p1)) {
+      var m = req.market;
+      if (m < p1) {                                    // we asked for a lower price
+        if (reached(p2, m)) return qtyUp ? 'qtyup' : 'fixed';
+        if (p2 < p1 && !samePrice(p2, p1)) return 'partial';
+        if (p2 > p1 && !samePrice(p2, p1)) return 'worse';
+        return 'notfixed';
+      }
+      // we asked for a higher price (rare: the smeta was below the market)
+      if (samePrice(p2, m) || (p2 > p1 && p2 <= m)) return qtyUp ? 'qtyup' : 'fixed';
+      if (samePrice(p2, p1)) return 'notfixed';
+      return p2 < p1 ? 'lowered' : 'raised';
+    }
+    if (!samePrice(p1, p2)) return p2 < p1 ? 'lowered' : 'raised';
+    if (qtyUp) return 'qtyup';
+    if (qtyDown) return 'qtydown';
+    if (req && req.note) return 'note';
+    return 'same';
+  }
+
+  /* ------------------------------------------------------------- pairing */
+
+  function itemsOf(obj) {
+    return (obj && obj.rows || []).filter(function (r) { return r.kind === 'item'; });
+  }
+  function nuKey(r) { return S.nameUnitKey(r.nm || '', r.unit || ''); }
+
+  /** Longest common subsequence over name + unit: [[i, j]] with -1 for an unpaired side. */
+  function align(A, B) {
+    var n = A.length, m = B.length, ka = A.map(nuKey), kb = B.map(nuKey);
+    // fast path: same length and the same keys in the same places
+    if (n === m) {
+      var same = true;
+      for (var s = 0; s < n && same; s++) same = ka[s] === kb[s];
+      if (same) return ka.map(function (_, i) { return [i, i]; });
+    }
+    var W = m + 1, L = new Int32Array((n + 1) * W);
+    for (var i = n - 1; i >= 0; i--) {
+      for (var j = m - 1; j >= 0; j--) {
+        L[i * W + j] = ka[i] === kb[j] ? L[(i + 1) * W + j + 1] + 1 : Math.max(L[(i + 1) * W + j], L[i * W + j + 1]);
+      }
+    }
+    var out = [], x = 0, y = 0;
+    while (x < n && y < m) {
+      if (ka[x] === kb[y]) { out.push([x, y]); x++; y++; }
+      else if (L[(x + 1) * W + y] >= L[x * W + y + 1]) { out.push([x, -1]); x++; }
+      else { out.push([-1, y]); y++; }
+    }
+    for (; x < n; x++) out.push([x, -1]);
+    for (; y < m; y++) out.push([-1, y]);
+    return out;
+  }
+
+  function objName(o) { return S.nameKey(o.subtitle || o.name || ''); }
+
+  /** Sheets: by name when the names tell them apart, otherwise by position. */
+  function pairObjects(olds, news) {
+    var used = {}, pairs = [];
+    var byName = {};
+    news.forEach(function (o, j) { var k = objName(o); (byName[k] = byName[k] || []).push(j); });
+    olds.forEach(function (o, i) {
+      var cand = (byName[objName(o)] || []).filter(function (j) { return !used[j]; });
+      var j = cand.length ? cand[0] : (i < news.length && !used[i] ? i : -1);
+      if (j >= 0) used[j] = true;
+      pairs.push([i, j]);
+    });
+    news.forEach(function (o, j) { if (!used[j]) pairs.push([-1, j]); });
+    return pairs;
+  }
+
+  /* -------------------------------------------------------------- result */
+
+  function versions(olds, news, requested, known) {
+    requested = requested || {};
+    known = known || {};
+    var objects = [], groups = new Map();
+    var T = { oldSum: 0, newSum: 0, askedSaving: 0, gotSaving: 0, otherChange: 0, rows: 0, changedRows: 0, leftRows: 0, counts: {} };
+    Object.keys(STATUS).forEach(function (k) { T.counts[k] = 0; });
+
+    pairObjects(olds, news).forEach(function (op) {
+      var oa = op[0] >= 0 ? olds[op[0]] : null, ob = op[1] >= 0 ? news[op[1]] : null;
+      var A = itemsOf(oa), B = itemsOf(ob);
+      var o = { name: (oa || ob).subtitle || (oa || ob).name || '', oldName: oa ? oa.subtitle || oa.name : '',
+                newName: ob ? ob.subtitle || ob.name : '', rows: [], oldSum: 0, newSum: 0, bad: 0, good: 0 };
+      align(A, B).forEach(function (pr) {
+        var a = pr[0] >= 0 ? A[pr[0]] : null, b = pr[1] >= 0 ? B[pr[1]] : null;
+        var key = a ? S.resKey(a.nm || '', a.unit || '', a.price) : S.resKey(b.nm || '', b.unit || '', b.price);
+        var req = a ? requested[key] : null;
+        var st = classify(a, b, req);
+        var s1 = a ? (a.qty || 0) * (a.price || 0) : 0, s2 = b ? (b.qty || 0) * (b.price || 0) : 0;
+        var row = { st: st, key: key, nm: (a || b).nm || '', unit: (a || b).unit || '', section: (a || b).section || '',
+                    no: (b || a).noTxt || '', oldNo: a ? a.noTxt || '' : '', newNo: b ? b.noTxt || '' : '',
+                    q1: a ? a.qty || 0 : null, q2: b ? b.qty || 0 : null,
+                    p1: a ? a.price || 0 : null, p2: b ? b.price || 0 : null,
+                    market: req && req.market != null ? req.market : null, note: req && req.note || '',
+                    ours: !req && a && known[key] != null ? known[key] : null,
+                    s1: s1, s2: s2, object: o.name };
+        o.rows.push(row);
+        o.oldSum += s1; o.newSum += s2;
+        T.oldSum += s1; T.newSum += s2; T.rows++;
+        T.counts[st]++;
+        if (st !== 'same') T.changedRows++;
+        if (st === 'notfixed' || st === 'worse') T.leftRows++;
+        var tone = STATUS[st].tone;
+        if (tone === 'bad' || tone === 'part') o.bad++;
+        if (tone === 'good') o.good++;
+        if (row.market != null && a && row.market < row.p1) {
+          T.askedSaving += (a.qty || 0) * (row.p1 - row.market);
+          T.gotSaving += s1 - s2;
+        } else T.otherChange += s2 - s1;
+
+        var g = groups.get(key);
+        if (!g) {
+          g = { key: key, nm: row.nm, unit: row.unit, section: row.section, p1: row.p1, market: row.market, note: row.note, ours: row.ours,
+                p2: [], rows: 0, counts: {}, s1: 0, s2: 0, objects: [] };
+          groups.set(key, g);
+        }
+        g.rows++;
+        g.counts[st] = (g.counts[st] || 0) + 1;
+        g.s1 += s1; g.s2 += s2;
+        if (row.p2 != null && !g.p2.some(function (p) { return samePrice(p, row.p2); })) g.p2.push(row.p2);
+        if (g.objects.indexOf(o.name) < 0) g.objects.push(o.name);
+      });
+      objects.push(o);
+    });
+
+    var resources = [];
+    groups.forEach(function (g) { g.st = groupStatus(g); resources.push(g); });
+    resources.sort(function (x, y) {
+      return STATUS[y.st].rank - STATUS[x.st].rank || Math.abs(y.s1 - y.s2) - Math.abs(x.s1 - x.s2);
+    });
+    T.resCounts = {};
+    Object.keys(STATUS).forEach(function (k) { T.resCounts[k] = 0; });
+    resources.forEach(function (g) { T.resCounts[g.st]++; });
+    return { objects: objects, resources: resources, totals: T };
+  }
+
+  /**
+   * A resource on several lines: fixed everywhere is fixed; fixed on some lines and left on
+   * others is partial — the lines left are listed, which is what has to go back to the sender.
+   */
+  function groupStatus(g) {
+    var ks = Object.keys(g.counts);
+    if (ks.length === 1) return ks[0];
+    var c = g.counts;
+    if (c.worse) return 'worse';
+    if ((c.fixed || c.partial) && (c.notfixed || c.partial)) return 'partial';
+    var best = ks[0];
+    ks.forEach(function (k) { if (STATUS[k].rank > STATUS[best].rank) best = k; });
+    return best;
+  }
+
+  /* ------------------------------------------------------------- workbook */
+
+  var FILL = { good: 'FFC6EFCE', bad: 'FFFFC7CE', part: 'FFFFEB9C', info: 'FFEDEDED', head: 'FFCCFFFF' };
+  var F = { sz: 10 }, FB = { sz: 10, b: true };
+
+  function workbook(res, opts) {
+    opts = opts || {};
+    var styles = new S.Styles();
+    var sheets = [];
+
+    function st(kind, tone, fmt, h) {
+      return styles.xf({ font: kind === 'head' || kind === 'title' ? FB : F, fill: kind === 'head' ? FILL.head : FILL[tone] || null,
+        border: kind === 'title' || kind === 'plain' ? '' : 'lrtb', fmt: fmt || null, h: h || (kind === 'head' ? 'center' : null),
+        v: 'center', wrap: kind !== 'title' });
+    }
+    function sheet(name, head, widths, body, title) {
+      var rows = [], r = 1;
+      title.forEach(function (t) { rows.push({ r: r++, ht: 18, cells: [{ c: 1, s: st('title'), v: t }] }); });
+      rows.push({ r: r++, cells: [] });
+      var hr = r;
+      rows.push({ r: r++, ht: 38, cells: head.map(function (h, i) { return { c: i + 1, s: st('head'), v: h }; }) });
+      body.forEach(function (b) {
+        rows.push({ r: r++, cells: b.cells.map(function (v, i) {
+          var fmt = typeof v === 'number' ? (b.fmt && b.fmt[i]) || '#,##0' : null;
+          return { c: i + 1, s: st('cell', b.tone, fmt, typeof v === 'number' ? 'right' : null), v: v == null ? '' : v };
+        }) });
+      });
+      sheets.push({ name: name, rows: rows, cols: widths.map(function (w, i) { return { min: i + 1, max: i + 1, width: w }; }),
+        freeze: hr, autoFilter: 'A' + hr + ':' + S.col(head.length) + (r - 1),
+        pageSetup: { scale: 75, orientation: 'landscape' }, printTitles: '$' + hr + ':$' + hr });
+    }
+
+    var T = res.totals;
+    var title = [opts.title || 'Сравнение версий сметы', (opts.oldLabel ? 'Было: ' + opts.oldLabel : '') +
+      (opts.newLabel ? '   ·   Стало: ' + opts.newLabel : ''),
+      'Сумма было ' + S.money(T.oldSum) + ' · стало ' + S.money(T.newSum) + ' · разница ' + S.money(T.newSum - T.oldSum) +
+      '   ·   снижение по замечаниям: запрошено ' + S.money(T.askedSaving) + ', получено ' + S.money(T.gotSaving)];
+
+    sheet('По ресурсам',
+      ['№', 'Наименование', 'Ед. изм.', 'Цена в первой смете', 'Наша цена (замечание)', 'Цена в исправленной смете',
+        'Строк', 'Сумма было', 'Сумма стало', 'Разница', 'Статус', 'Листы'],
+      [5, 55, 8, 13, 13, 16, 7, 15, 15, 15, 26, 40],
+      res.resources.filter(function (g) { return g.st !== 'same'; }).map(function (g, i) {
+        return { tone: STATUS[g.st].tone, cells: [i + 1, g.nm, g.unit, g.p1, g.market != null ? g.market : g.note ? 'примечание' :
+          g.ours != null ? S.price(g.ours) + ' (не в таблице)' : '',
+          g.p2.length === 1 ? g.p2[0] : g.p2.map(function (p) { return S.price(p); }).join(' / '), g.rows,
+          g.s1, g.s2, g.s2 - g.s1, statusText(g), g.objects.join('; ')] };
+      }), title);
+
+    var lines = [];
+    res.objects.forEach(function (o) {
+      o.rows.forEach(function (x) {
+        if (x.st === 'same') return;
+        lines.push({ tone: STATUS[x.st].tone, fmt: { 5: '0.000', 6: '0.000' }, cells: [x.object, x.no, x.nm, x.unit,
+          x.q1, x.q2, x.p1, x.market != null ? x.market : x.ours != null ? S.price(x.ours) + ' (не в таблице)' : null,
+          x.p2, x.s1, x.s2, x.s2 - x.s1, STATUS[x.st].label] });
+      });
+    });
+    sheet('По строкам',
+      ['Лист', '№', 'Наименование', 'Ед. изм.', 'Кол-во было', 'Кол-во стало', 'Цена было', 'Наша цена', 'Цена стало',
+        'Сумма было', 'Сумма стало', 'Разница', 'Статус'],
+      [24, 6, 55, 8, 11, 11, 13, 13, 13, 15, 15, 15, 26], lines, title);
+
+    return S.writeWorkbook({ sheets: sheets, styles: styles, title: title[0] });
+  }
+
+  function statusText(g) {
+    var t = STATUS[g.st].label;
+    if (g.rows > 1 && Object.keys(g.counts).length > 1) {
+      t += ' (' + Object.keys(g.counts).map(function (k) { return STATUS[k].label.toLowerCase() + ': ' + g.counts[k]; }).join(', ') + ')';
+    }
+    return t;
+  }
+
+  /**
+   * What our comparison table asked for, read off the report the way it is exported (same mode,
+   * same threshold): a changed price, or the equipment note on an unchanged one. Lines the
+   * threshold left out of the table were never asked about.
+   */
+  function requested(model, opts) {
+    var out = {};
+    if (!model) return out;
+    var NOTE = S.report.cols.NOTE;
+    model.spans.forEach(function (span) {
+      S.report.build(model, span, opts || {}).rows.forEach(function (r) {
+        if (r.kind !== 'item' || !r.key) return;
+        if (r.market != null && !samePrice(r.market, r.price)) out[r.key] = { market: r.market };
+        else if (r.cells && r.cells[NOTE] && r.cells[NOTE].v && !out[r.key]) out[r.key] = { note: String(r.cells[NOTE].v) };
+      });
+    });
+    return out;
+  }
+
+  S.compare = { versions: versions, workbook: workbook, requested: requested, classify: classify, align: align,
+                STATUS: STATUS, statusText: statusText };
+})(S);
+
+;
+/*
  * Fixed-height row virtualiser.
  *
  * The whole reason the drafts crawled: six thousand rows were rendered as six
@@ -3818,6 +4184,286 @@ if (typeof self !== 'undefined') self.S = S;
 
 ;
 /*
+ * «Сравнение версий»: the smeta the sender returned, against the version we checked and the
+ * comparison table we sent back. The first version is a loaded project (its market prices are
+ * what we asked for) or any file; the second is a file that is read but never added to the
+ * projects.
+ */
+(function (S) {
+  'use strict';
+
+  function Compare(app) {
+    this.app = app;
+    this.oldFile = null;     // { name, objects } when «Было» is a file, not a project
+    this.newFile = null;     // { name, objects }
+    this.res = null;
+    this.bind();
+  }
+
+  function $(id) { return document.getElementById(id); }
+
+  Compare.prototype.bind = function () {
+    var self = this;
+    if (!$('cmpOld')) return;
+    $('cmpOld').addEventListener('change', function () {
+      if (this.value === 'file') { $('cmpOldFile').click(); return; }
+      self.oldFile = null;
+      self.run();
+    });
+    $('cmpOldFile').addEventListener('change', function (e) {
+      var f = e.target.files[0]; e.target.value = '';
+      if (!f) { self.fillOld(); return; }
+      self.read(f, function (objs) { self.oldFile = { name: f.name, objects: objs }; self.fillOld(); self.run(); });
+    });
+    $('cmpNewBtn').addEventListener('click', function () { $('cmpNewFile').click(); });
+    $('cmpNewFile').addEventListener('change', function (e) {
+      var f = e.target.files[0]; e.target.value = '';
+      if (!f) return;
+      self.read(f, function (objs) { self.newFile = { name: f.name, objects: objs }; self.run(); });
+    });
+    $('cmpView').addEventListener('change', function () { self.only = null; self.render(); });
+    $('cmpFilter').addEventListener('change', function () { self.only = null; self.render(); });
+    $('cmpQ').addEventListener('input', S.debounce(function () { self.render(); }, 150));
+    $('cmpExport').addEventListener('click', function () { self.exportXlsx(); });
+    // the header is a separate table: it follows the body sideways
+    $('cmpBody').addEventListener('scroll', function () { $('cmpHead').scrollLeft = this.scrollLeft; });
+    $('cmpBody').addEventListener('click', function (e) {
+      var tr = e.target.closest && e.target.closest('tr[data-k]');
+      if (!tr) return;
+      $('cmpQ').value = '';
+      $('cmpView').value = 'rows';
+      self.only = tr.dataset.k;
+      self.render();
+    });
+    document.querySelectorAll('.tab[data-pane="compare"]').forEach(function (t) {
+      // prices may have been edited since: the table we sent is read again every time
+      t.addEventListener('click', function () { self.fillOld(); self.run(); });
+    });
+  };
+
+  /** Parse a workbook off the main thread when the worker is there, the same way projects are read. */
+  Compare.prototype.read = function (file, done) {
+    var app = this.app;
+    if (!/\.xls[xm]?$/i.test(file.name)) { app.toast('Принимаются только файлы .xlsx', true); return; }
+    app.busy(true, 'Чтение файла: ' + file.name + '…');
+    var reader = new FileReader();
+    reader.onerror = function () { app.busy(false); app.toast('Не удалось прочитать файл', true); };
+    reader.onload = function () {
+      var buf = reader.result;
+      var finish = function (res) {
+        app.busy(false);
+        if (!res.ok) { app.toast(file.name + ': ' + res.error, true); return; }
+        if (!res.objects.length) { app.toast(file.name + ': листы ресурсов не найдены', true); return; }
+        done(res.objects);
+      };
+      if (app.worker) {
+        var id = ++app.seq;
+        var onMsg = function (e) {
+          if (e.data.id !== id) return;
+          app.worker.removeEventListener('message', onMsg);
+          finish(e.data);
+        };
+        app.worker.addEventListener('message', onMsg);
+        app.worker.postMessage({ cmd: 'parse', id: id, name: file.name, buffer: buf }, [buf]);
+      } else {
+        try { finish({ ok: true, objects: S.smeta.parseWorkbook(S.readXlsx(new Uint8Array(buf)), file.name) }); }
+        catch (err) { finish({ ok: false, error: String(err.message || err) }); }
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  Compare.prototype.fillOld = function () {
+    var sel = $('cmpOld');
+    if (!sel) return;
+    var cur = this.oldFile ? 'file' : sel.value;
+    var html = this.app.projects.map(function (p, i) {
+      return '<option value="p' + i + '">Проект: ' + S.esc(p.name) + '</option>';
+    }).join('');
+    html += '<option value="file">' + (this.oldFile ? 'Файл: ' + S.esc(this.oldFile.name) : 'Другой файл…') + '</option>';
+    sel.innerHTML = html;
+    if (cur && sel.querySelector('option[value="' + cur + '"]')) sel.value = cur;
+    else if (!this.app.projects.length && !this.oldFile) sel.value = 'file';
+  };
+
+  /** The first version and what we asked of it. */
+  Compare.prototype.base = function () {
+    var v = $('cmpOld').value;
+    if (v === 'file' && this.oldFile) return { label: this.oldFile.name, objects: this.oldFile.objects, requested: {}, known: {} };
+    var p = this.app.projects[+String(v).slice(1)];
+    if (!p) return null;
+    // the project on its own, every sheet in, priced as it is now — the table we sent
+    var proj = Object.assign({}, p, { enabled: true });
+    var model = S.assemble([proj], this.app.prices);
+    var requested = S.compare.requested(model, this.app.reportOpts()), known = {};
+    model.resources.forEach(function (r) {
+      if (!requested[r.key] && Math.abs((r.market || 0) - (r.price || 0)) >= 1) known[r.key] = r.market;
+    });
+    return { label: p.file || p.name, objects: p.objects, requested: requested, known: known };
+  };
+
+  Compare.prototype.run = function () {
+    this.only = null;
+    var b = this.base();
+    if (!b || !this.newFile) { this.res = null; this.render(); return; }
+    var t0 = performance.now();
+    this.res = S.compare.versions(b.objects, this.newFile.objects, b.requested, b.known);
+    this.labels = { oldLabel: b.label, newLabel: this.newFile.name, asked: Object.keys(b.requested).length };
+    this.ms = Math.round(performance.now() - t0);
+    this.render();
+  };
+
+  /* -------------------------------------------------------------- render */
+
+  var ST = function (k) { return S.compare.STATUS[k]; };
+
+  /** 1 ресурс, 2 ресурса, 5 ресурсов. */
+  function plural(n, one, few, many) {
+    var m10 = n % 10, m100 = n % 100;
+    var w = m10 === 1 && m100 !== 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many;
+    return n + ' ' + w;
+  }
+  function res(n) { return plural(n, 'ресурс', 'ресурса', 'ресурсов'); }
+  function lines(n) { return plural(n, 'строка', 'строки', 'строк'); }
+
+  function money(v) { return v == null ? '' : S.money(v); }
+  function pr(v) { return v == null ? '' : S.price(v); }
+  function delta(v) {
+    if (!v || Math.abs(v) < 0.5) return '<span class="mute">0</span>';
+    return '<span class="' + (v < 0 ? 'down' : 'up') + '">' + (v > 0 ? '+' : '−') + S.money(Math.abs(v)) + '</span>';
+  }
+
+  /** Our price: asked in the table; set but below the table's threshold (grey); or only the note. */
+  function ours(x) {
+    if (x.market != null) return pr(x.market);
+    if (x.note) return '<i>примечание</i>';
+    if (x.ours != null) return '<span class="mute" title="Цена задана, но в таблицу не попала (ниже порога)">' + pr(x.ours) + '</span>';
+    return '';
+  }
+
+  function keep(st, filter) {
+    var tone = ST(st).tone;
+    if (filter === 'problems') return tone === 'bad' || tone === 'part';
+    if (filter === 'changed') return st !== 'same';
+    return true;
+  }
+
+  Compare.prototype.render = function () {
+    var sum = $('cmpSummary'), head = $('cmpHead'), body = $('cmpBody'), cnt = $('cmpCount');
+    if (!sum) return;
+    $('cmpNewName').textContent = this.newFile ? this.newFile.name : 'не выбран';
+    $('cmpExport').disabled = !this.res;
+    if (!this.res) {
+      head.innerHTML = '';
+      body.innerHTML = '';
+      cnt.textContent = '';
+      sum.innerHTML = '<div class="cmp-empty">' +
+        (this.app.projects.length || this.oldFile ? '' : 'Сначала добавьте первую версию сметы как проект (с вашими рыночными ценами) или выберите её файлом.<br>') +
+        'Выберите исправленную смету, которую прислал отправитель: «Загрузить исправленную смету».<br>' +
+        'Строки будут сопоставлены по листам и наименованиям; цвет показывает, что сделано с каждым замечанием: ' +
+        '<span class="cmp-chip good">исправлено</span> <span class="cmp-chip part">частично</span> ' +
+        '<span class="cmp-chip bad">не исправлено / повышено</span></div>';
+      return;
+    }
+    var T = this.res.totals, L = this.labels;
+    var rc = T.resCounts;
+    var left = (rc.partial || 0) + (rc.notfixed || 0) + (rc.worse || 0);
+    var pct = T.askedSaving > 0 ? Math.round(T.gotSaving / T.askedSaving * 100) : null;
+    sum.innerHTML =
+      '<div class="cmp-cards">' +
+      card('', 'Сумма по смете', money(T.oldSum) + ' → ' + money(T.newSum), delta(T.newSum - T.oldSum)) +
+      card('good', 'Снижение по нашим замечаниям', money(T.gotSaving) + ' из ' + money(T.askedSaving),
+        pct == null ? 'замечаний с ценой нет' : pct + ' % запрошенного') +
+      card('good', 'Исправлено полностью', res(rc.fixed || 0), lines(T.counts.fixed || 0)) +
+      card(left ? 'bad' : 'good', 'Осталось исправить', res(left),
+        'частично ' + (rc.partial || 0) + ' · не исправлено ' + (rc.notfixed || 0) + ' · повышено ' + (rc.worse || 0) +
+        ' · строк со старой ценой ' + T.leftRows) +
+      card('', 'Без нашего замечания', 'снижено ' + (rc.lowered || 0) + ' · повышено ' + (rc.raised || 0),
+        'объём ↑ ' + (T.counts.qtyup || 0) + ' · новых строк ' + (T.counts.added || 0) + ' · удалено ' + (T.counts.removed || 0)) +
+      '</div>' +
+      '<div class="cmp-files">Было: <b>' + S.esc(L.oldLabel) + '</b> · Стало: <b>' + S.esc(L.newLabel) + '</b> · ' +
+      'замечаний в нашей таблице: ' + L.asked + ' · ' + lines(T.rows) + ' · ' + this.ms + ' мс</div>';
+
+    var view = $('cmpView').value, filter = $('cmpFilter').value;
+    var q = S.nameKey($('cmpQ').value || '');
+    var only = this.only;
+    var html = [], n = 0;
+    if (view === 'res' && !only) {
+      head.innerHTML = '<table class="cmp"><colgroup>' + COLS_RES + '</colgroup><tr><th>Наименование</th><th>Ед.</th>' +
+        '<th>Цена было</th><th>Наша цена</th><th>Цена стало</th><th>Строк</th><th>Сумма было</th><th>Сумма стало</th>' +
+        '<th>Разница</th><th>Статус</th></tr></table>';
+      this.res.resources.forEach(function (g) {
+        if (!keep(g.st, filter)) return;
+        if (q && S.nameKey(g.nm).indexOf(q) < 0) return;
+        n++;
+        html.push('<tr class="t-' + (ST(g.st).tone || 'none') + '" data-k="' + S.esc(g.key) + '" title="Показать строки">' +
+          '<td>' + S.esc(g.nm) + '</td><td>' + S.esc(g.unit) + '</td><td class="n">' + pr(g.p1) + '</td>' +
+          '<td class="n">' + ours(g) + '</td>' +
+          '<td class="n">' + g.p2.map(pr).join(' / ') + '</td><td class="n">' + g.rows + '</td>' +
+          '<td class="n">' + money(g.s1) + '</td><td class="n">' + money(g.s2) + '</td><td class="n">' + delta(g.s2 - g.s1) + '</td>' +
+          '<td>' + S.esc(S.compare.statusText(g)) + '</td></tr>');
+      });
+      body.innerHTML = '<table class="cmp"><colgroup>' + COLS_RES + '</colgroup>' + html.join('') + '</table>';
+      cnt.textContent = res(n);
+    } else {
+      head.innerHTML = '<table class="cmp"><colgroup>' + COLS_ROW + '</colgroup><tr><th>Лист</th><th>№</th><th>Наименование</th>' +
+        '<th>Ед.</th><th>Кол-во было → стало</th><th>Цена было</th><th>Наша цена</th><th>Цена стало</th>' +
+        '<th>Сумма было</th><th>Сумма стало</th><th>Разница</th><th>Статус</th></tr></table>';
+      this.res.objects.forEach(function (o) {
+        o.rows.forEach(function (x) {
+          if (only ? x.key !== only : !keep(x.st, filter)) return;
+          if (q && S.nameKey(x.nm).indexOf(q) < 0) return;
+          n++;
+          var qty = x.q1 == null ? S.qty(x.q2) : x.q2 == null ? S.qty(x.q1) :
+            (Math.abs(x.q1 - x.q2) > 1e-9 ? S.qty(x.q1) + ' → <b>' + S.qty(x.q2) + '</b>' : S.qty(x.q1));
+          html.push('<tr class="t-' + (ST(x.st).tone || 'none') + '"><td>' + S.esc(o.name) + '</td><td>' + S.esc(x.no) + '</td>' +
+            '<td>' + S.esc(x.nm) + '</td><td>' + S.esc(x.unit) + '</td><td class="n">' + qty + '</td>' +
+            '<td class="n">' + pr(x.p1) + '</td><td class="n">' + ours(x) + '</td>' +
+            '<td class="n">' + pr(x.p2) + '</td><td class="n">' + money(x.s1) + '</td><td class="n">' + money(x.s2) + '</td>' +
+            '<td class="n">' + delta(x.s2 - x.s1) + '</td><td>' + S.esc(ST(x.st).label) + '</td></tr>');
+        });
+      });
+      body.innerHTML = '<table class="cmp"><colgroup>' + COLS_ROW + '</colgroup>' + html.join('') + '</table>';
+      cnt.textContent = lines(n) + (only ? ' одного ресурса · выберите вид, чтобы вернуться' : '');
+    }
+    if (!n) body.innerHTML = '<div class="cmp-empty">Нет строк для этого фильтра.</div>';
+  };
+
+  var COLS_RES = '<col style="min-width:260px"><col style="width:50px"><col style="width:92px"><col style="width:92px">' +
+    '<col style="width:130px"><col style="width:48px"><col style="width:112px"><col style="width:112px"><col style="width:104px">' +
+    '<col style="width:200px">';
+  var COLS_ROW = '<col style="width:118px"><col style="width:40px"><col><col style="width:50px"><col style="width:104px">' +
+    '<col style="width:86px"><col style="width:86px"><col style="width:86px"><col style="width:104px"><col style="width:104px">' +
+    '<col style="width:96px"><col style="width:136px">';
+
+  function card(tone, title, big, small) {
+    return '<div class="cmp-card ' + tone + '"><div class="t">' + title + '</div><div class="b">' + big + '</div>' +
+      '<div class="s">' + small + '</div></div>';
+  }
+
+  Compare.prototype.exportXlsx = function () {
+    if (!this.res) return;
+    var self = this;
+    this.app.busy(true, 'Подготовка файла Excel…');
+    setTimeout(function () {
+      try {
+        var bytes = S.compare.workbook(self.res, self.labels);
+        var base = (self.newFile.name || 'smeta').replace(/\.[^.]+$/, '').replace(/[^\wЀ-ӿ\- ]+/g, '');
+        S.download(bytes, base + '_sravnenie.xlsx');
+        self.app.toast('Файл сравнения готов');
+      } catch (e) {
+        self.app.toast('Ошибка экспорта: ' + (e.message || e), true);
+      } finally {
+        self.app.busy(false);
+      }
+    }, 30);
+  };
+
+  S.Compare = Compare;
+})(S);
+
+;
+/*
  * Application wiring: files in, model in memory, workbook out.
  */
 (function (S) {
@@ -3848,6 +4494,7 @@ if (typeof self !== 'undefined') self.S = S;
     this.worker = makeWorker();
     this.bind();
     this.prices_ui = new S.Prices(this);
+    this.compare_ui = S.Compare ? new S.Compare(this) : null;
     this.sheetList = new S.VList(document.getElementById('sheetScroll'), {
       render: this.renderSheet.bind(this)
     });
@@ -4756,6 +5403,7 @@ if (typeof self !== 'undefined') self.S = S;
   if (document.readyState !== 'loading' && !window.app) window.app = new App();
 
   S.App = App;
+  S.download = download;
 })(S);
 </script>
 </body>

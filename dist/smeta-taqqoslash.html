@@ -390,13 +390,17 @@ table.cmp .up{color:var(--bad);font-weight:600}
 table.cmp .down{color:var(--good);font-weight:600}
 table.cmp .mute{color:var(--mute)}
 table.cmp{min-width:1180px}
+.cmp-card.go{cursor:pointer}
+.cmp-card.go:hover{box-shadow:0 0 0 2px var(--accent-w)}
+table.cmp tr.t-head td{background:var(--sf2);border-top:1px solid var(--rule2)}
+table.cmp s.mute{text-decoration:line-through}
 </style>
 </head>
 <body>
 
 <header class="bar">
   <div class="brand">
-    <b>Таблица сопоставления №2</b><i class="ver" title="Версия программы">v2.6.0</i>
+    <b>Таблица сопоставления №2</b><i class="ver" title="Версия программы">v2.7.0</i>
     <span>проверка и сбор рыночных цен ресурсов сметы</span>
   </div>
   <div class="wsbox" id="wsBox" hidden></div>
@@ -505,10 +509,12 @@ table.cmp{min-width:1180px}
         <select id="cmpView">
           <option value="res">По ресурсам</option>
           <option value="rows">По строкам</option>
+          <option value="sheets">Итоги листов</option>
         </select>
         <select id="cmpFilter">
           <option value="problems">Требуют внимания</option>
           <option value="changed" selected>Все изменения</option>
+          <option value="unasked">Без нашего замечания</option>
           <option value="all">Все строки</option>
         </select>
         <input type="search" id="cmpQ" placeholder="Поиск…" spellcheck="false">
@@ -3525,8 +3531,22 @@ if (typeof self !== 'undefined') self.S = S;
     qtyup:    { tone: 'bad',  label: 'Объём увеличен',        rank: 7 },
     added:    { tone: 'bad',  label: 'Новая строка',          rank: 7 },
     removed:  { tone: 'part', label: 'Строка удалена',        rank: 5 },
+    renamed:  { tone: 'part', label: 'Изменено наименование / ед. изм.', rank: 6 },
     note:     { tone: 'info', label: 'Замечание (без цены)',  rank: 4 },
     same:     { tone: '',     label: 'Без изменений',         rank: 0 }
+  };
+
+  /**
+   * Lines that are not resources but carry an amount (ИТОГО, ЗАГОТОВИТЕЛЬНО-СКЛАДСКИЕ РАСХОДЫ,
+   * ТРАНСПОРТНЫЕ УСЛУГИ=5%, ВСЕГО …): their own statuses, shown sheet by sheet.
+   */
+  var AMOUNT = {
+    label:   { tone: 'bad',  label: 'Изменён текст строки (процент?)' },
+    gap:     { tone: 'bad',  label: 'Итог не равен сумме строк' },
+    added:   { tone: 'bad',  label: 'Новая строка' },
+    removed: { tone: 'part', label: 'Строка удалена' },
+    amount:  { tone: 'info', label: 'Сумма изменилась' },
+    same:    { tone: '',     label: 'Без изменений' }
   };
 
   /** Two smeta prices are the same price when they differ by rounding only: 0.1 %, at most one sum. */
@@ -3576,8 +3596,10 @@ if (typeof self !== 'undefined') self.S = S;
   function nuKey(r) { return S.nameUnitKey(r.nm || '', r.unit || ''); }
 
   /** Longest common subsequence over name + unit: [[i, j]] with -1 for an unpaired side. */
-  function align(A, B) {
-    var n = A.length, m = B.length, ka = A.map(nuKey), kb = B.map(nuKey);
+  function align(A, B) { return alignKeys(A.map(nuKey), B.map(nuKey)); }
+
+  function alignKeys(ka, kb) {
+    var n = ka.length, m = kb.length;
     // fast path: same length and the same keys in the same places
     if (n === m) {
       var same = true;
@@ -3600,6 +3622,103 @@ if (typeof self !== 'undefined') self.S = S;
     for (; y < m; y++) out.push([-1, y]);
     return out;
   }
+
+  /**
+   * Between two paired lines, a line gone and a line come with the same unit and a close name
+   * (or the same unit, price and quantity) is one line renamed, not a deletion and an addition.
+   */
+  function pairRenames(A, B, pairs) {
+    var out = [], run = [];
+    function flush() {
+      var rem = run.filter(function (p) { return p[1] < 0; }), add = run.filter(function (p) { return p[0] < 0; });
+      var used = {}, done = {};
+      rem.forEach(function (p) {
+        var a = A[p[0]];
+        for (var k = 0; k < add.length; k++) {
+          if (used[k]) continue;
+          var b = B[add[k][1]];
+          if (S.unitKey(a.unit || '') !== S.unitKey(b.unit || '') && S.nameKey(a.nm || '') !== S.nameKey(b.nm || '')) continue;
+          var close = S.charSimilarity(a.nm || '', b.nm || '') >= 0.6 || S.nameKey(a.nm || '') === S.nameKey(b.nm || '') ||
+            (samePrice(a.price, b.price) && sameQty(a.qty, b.qty));
+          if (!close) continue;
+          used[k] = true; done[p[0]] = add[k][1];
+          break;
+        }
+      });
+      run.forEach(function (p) {
+        if (p[1] < 0 && done[p[0]] != null) out.push([p[0], done[p[0]]]);
+        else if (p[0] < 0 && add.some(function (q, k) { return used[k] && q === p; })) return;
+        else out.push(p);
+      });
+      run = [];
+    }
+    pairs.forEach(function (p) {
+      if (p[0] >= 0 && p[1] >= 0) { flush(); out.push(p); } else run.push(p);
+    });
+    flush();
+    return out;
+  }
+
+  /* ------------------------------------------------------- amount lines */
+
+  function amountLabel(r) { return String(r.nm || r.noTxt || '').replace(/\s+/g, ' ').trim(); }
+  function amountRows(obj) {
+    return (obj && obj.rows || []).filter(function (r) {
+      if (r.kind !== 'total' && r.kind !== 'extra') return false;
+      var l = amountLabel(r);
+      return l && !/^[\d\s.]+$/.test(l) && (r.sum != null || r.kind === 'total');
+    });
+  }
+  /** Paired by kind, band and words: «=5%» and «=7%» are the same line with its text changed. */
+  function amountKey(r) {
+    return r.kind + '|' + (r.section || '') + '|' + S.nameKey(amountLabel(r)).replace(/[\d.,=%]+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  /** A band total: «ИТОГО» of one band, not «ИТОГО ПРЯМЫЕ ЗАТРАТЫ» nor «ВСЕГО …». */
+  function bandTotal(r) {
+    var l = S.nameKey(amountLabel(r));
+    return r.kind === 'total' && /^ИТОГО(\s|$)/.test(l) && !/ПРЯМЫЕ|ВСЕГО|УЧЕТОМ|СМЕТ/.test(l) && !!r.section;
+  }
+  var BAND = { labor: 'трудовые ресурсы', machines: 'машины и механизмы', materials: 'материалы', equipment: 'оборудование' };
+  /** A bare «ИТОГО» says which band it closes. */
+  function bandName(r) {
+    var l = amountLabel(r);
+    return /^ИТОГО$/i.test(l) && BAND[r.section] ? l + ' (' + BAND[r.section] + ')' : l;
+  }
+  function bandSums(obj) {
+    var s = {};
+    itemsOf(obj).forEach(function (r) { s[r.section] = (s[r.section] || 0) + (r.qty || 0) * (r.price || 0); });
+    return s;
+  }
+  function sameAmount(a, b) { return Math.abs((a || 0) - (b || 0)) <= Math.max(1, Math.abs(a || 0) * 1e-6); }
+
+  /**
+   * The sheet's amount lines, before and after. A band «ИТОГО» is checked against the sum of its
+   * band's lines: a gap that is new in the returned version (a total typed over instead of summed)
+   * is flagged; a gap both versions share was already there and is left alone.
+   */
+  function compareAmounts(oa, ob) {
+    var A = amountRows(oa), B = amountRows(ob), b1 = bandSums(oa), b2 = bandSums(ob), out = [];
+    alignKeys(A.map(amountKey), B.map(amountKey)).forEach(function (p) {
+      var a = p[0] >= 0 ? A[p[0]] : null, b = p[1] >= 0 ? B[p[1]] : null;
+      var x = { kind: (a || b).kind, section: (a || b).section || '', label1: a ? bandName(a) : '', label2: b ? bandName(b) : '',
+                s1: a ? a.sum : null, s2: b ? b.sum : null, gap: null };
+      if (!a) x.st = 'added';
+      else if (!b) x.st = 'removed';
+      else if (S.nameKey(x.label1) !== S.nameKey(x.label2)) x.st = 'label';
+      else {
+        if (bandTotal(a) && a.sum != null && b.sum != null) {
+          var g1 = a.sum - (b1[a.section] || 0), g2 = b.sum - (b2[b.section] || 0);
+          if (!sameAmount(g1, g2)) { x.st = 'gap'; x.gap = g2; }
+        }
+        if (!x.st) x.st = sameAmount(x.s1, x.s2) ? 'same' : 'amount';
+      }
+      out.push(x);
+    });
+    return out;
+  }
+
+  /** A change on a line our table said nothing about. */
+  function unasked(x) { return x.market == null && !x.note && x.st !== 'same'; }
 
   function objName(o) { return S.nameKey(o.subtitle || o.name || ''); }
 
@@ -3624,19 +3743,28 @@ if (typeof self !== 'undefined') self.S = S;
     requested = requested || {};
     known = known || {};
     var objects = [], groups = new Map();
-    var T = { oldSum: 0, newSum: 0, askedSaving: 0, gotSaving: 0, otherChange: 0, rows: 0, changedRows: 0, leftRows: 0, counts: {} };
+    var T = { oldSum: 0, newSum: 0, askedSaving: 0, gotSaving: 0, otherChange: 0, rows: 0, changedRows: 0, leftRows: 0, counts: {},
+              unaskedRows: 0, unaskedUp: 0, unaskedDown: 0, amountFlags: 0, amountRows: 0 };
     Object.keys(STATUS).forEach(function (k) { T.counts[k] = 0; });
 
     pairObjects(olds, news).forEach(function (op) {
       var oa = op[0] >= 0 ? olds[op[0]] : null, ob = op[1] >= 0 ? news[op[1]] : null;
       var A = itemsOf(oa), B = itemsOf(ob);
       var o = { name: (oa || ob).subtitle || (oa || ob).name || '', oldName: oa ? oa.subtitle || oa.name : '',
-                newName: ob ? ob.subtitle || ob.name : '', rows: [], oldSum: 0, newSum: 0, bad: 0, good: 0 };
-      align(A, B).forEach(function (pr) {
+                newName: ob ? ob.subtitle || ob.name : '', rows: [], oldSum: 0, newSum: 0, bad: 0, good: 0,
+                amounts: compareAmounts(oa, ob) };
+      o.amounts.forEach(function (x) {
+        if (x.st !== 'same') T.amountRows++;
+        if (AMOUNT[x.st].tone === 'bad' || AMOUNT[x.st].tone === 'part') T.amountFlags++;
+      });
+      pairRenames(A, B, align(A, B)).forEach(function (pr) {
         var a = pr[0] >= 0 ? A[pr[0]] : null, b = pr[1] >= 0 ? B[pr[1]] : null;
         var key = a ? S.resKey(a.nm || '', a.unit || '', a.price) : S.resKey(b.nm || '', b.unit || '', b.price);
         var req = a ? requested[key] : null;
         var st = classify(a, b, req);
+        var renamed = !!(a && b && (S.nameKey(a.nm || '') !== S.nameKey(b.nm || '') || S.unitKey(a.unit || '') !== S.unitKey(b.unit || '')));
+        // a rename is never «fine» on its own: it is shown amber unless the price says worse
+        if (renamed && (STATUS[st].tone === 'good' || STATUS[st].tone === '' || st === 'note')) st = 'renamed';
         var s1 = a ? (a.qty || 0) * (a.price || 0) : 0, s2 = b ? (b.qty || 0) * (b.price || 0) : 0;
         var row = { st: st, key: key, nm: (a || b).nm || '', unit: (a || b).unit || '', section: (a || b).section || '',
                     no: (b || a).noTxt || '', oldNo: a ? a.noTxt || '' : '', newNo: b ? b.noTxt || '' : '',
@@ -3644,13 +3772,18 @@ if (typeof self !== 'undefined') self.S = S;
                     p1: a ? a.price || 0 : null, p2: b ? b.price || 0 : null,
                     market: req && req.market != null ? req.market : null, note: req && req.note || '',
                     ours: !req && a && known[key] != null ? known[key] : null,
-                    s1: s1, s2: s2, object: o.name };
+                    s1: s1, s2: s2, object: o.name,
+                    nm2: renamed ? b.nm || '' : '', unit2: renamed ? b.unit || '' : '' };
         o.rows.push(row);
         o.oldSum += s1; o.newSum += s2;
         T.oldSum += s1; T.newSum += s2; T.rows++;
         T.counts[st]++;
         if (st !== 'same') T.changedRows++;
         if (st === 'notfixed' || st === 'worse') T.leftRows++;
+        if (unasked(row)) {
+          T.unaskedRows++;
+          if (s2 > s1) T.unaskedUp += s2 - s1; else T.unaskedDown += s1 - s2;
+        }
         var tone = STATUS[st].tone;
         if (tone === 'bad' || tone === 'part') o.bad++;
         if (tone === 'good') o.good++;
@@ -3753,15 +3886,30 @@ if (typeof self !== 'undefined') self.S = S;
     res.objects.forEach(function (o) {
       o.rows.forEach(function (x) {
         if (x.st === 'same') return;
-        lines.push({ tone: STATUS[x.st].tone, fmt: { 5: '0.000', 6: '0.000' }, cells: [x.object, x.no, x.nm, x.unit,
+        lines.push({ tone: STATUS[x.st].tone, fmt: { 4: '0.000', 5: '0.000' }, cells: [x.object, x.no,
+          x.nm2 ? x.nm + '  →  ' + x.nm2 : x.nm, x.unit2 && x.unit2 !== x.unit ? x.unit + ' → ' + x.unit2 : x.unit,
           x.q1, x.q2, x.p1, x.market != null ? x.market : x.ours != null ? S.price(x.ours) + ' (не в таблице)' : null,
-          x.p2, x.s1, x.s2, x.s2 - x.s1, STATUS[x.st].label] });
+          x.p2, x.s1, x.s2, x.s2 - x.s1, STATUS[x.st].label, unasked(x) ? 'нет' : 'да'] });
       });
     });
     sheet('По строкам',
-      ['Лист', '№', 'Наименование', 'Ед. изм.', 'Кол-во было', 'Кол-во стало', 'Цена было', 'Наша цена', 'Цена стало',
-        'Сумма было', 'Сумма стало', 'Разница', 'Статус'],
-      [24, 6, 55, 8, 11, 11, 13, 13, 13, 15, 15, 15, 26], lines, title);
+      ['Лист', '№', 'Наименование (было → стало)', 'Ед. изм.', 'Кол-во было', 'Кол-во стало', 'Цена было', 'Наша цена',
+        'Цена стало', 'Сумма было', 'Сумма стало', 'Разница', 'Статус', 'По нашему замечанию'],
+      [24, 6, 55, 8, 11, 11, 13, 13, 13, 15, 15, 15, 26, 12], lines, title);
+
+    var amounts = [];
+    res.objects.forEach(function (o) {
+      amounts.push({ tone: '', cells: [o.name, 'Строки ресурсов (сумма)', '', o.oldSum, o.newSum, o.newSum - o.oldSum, ''] });
+      o.amounts.forEach(function (x) {
+        amounts.push({ tone: AMOUNT[x.st].tone, cells: [o.name, x.label1 || x.label2,
+          x.label2 && x.label2 !== x.label1 ? x.label2 : '', x.s1, x.s2,
+          x.s1 != null && x.s2 != null ? x.s2 - x.s1 : null,
+          AMOUNT[x.st].label + (x.st === 'gap' ? ': расхождение ' + S.money(x.gap) : '')] });
+      });
+    });
+    sheet('Итоги листов',
+      ['Лист', 'Строка (было)', 'Строка (стало, если текст изменён)', 'Сумма было', 'Сумма стало', 'Разница', 'Статус'],
+      [30, 48, 40, 16, 16, 16, 34], amounts, title);
 
     return S.writeWorkbook({ sheets: sheets, styles: styles, title: title[0] });
   }
@@ -3794,7 +3942,7 @@ if (typeof self !== 'undefined') self.S = S;
   }
 
   S.compare = { versions: versions, workbook: workbook, requested: requested, classify: classify, align: align,
-                STATUS: STATUS, statusText: statusText };
+                STATUS: STATUS, AMOUNT: AMOUNT, statusText: statusText, unasked: unasked };
 })(S);
 
 ;
@@ -4225,6 +4373,14 @@ if (typeof self !== 'undefined') self.S = S;
     $('cmpFilter').addEventListener('change', function () { self.only = null; self.render(); });
     $('cmpQ').addEventListener('input', S.debounce(function () { self.render(); }, 150));
     $('cmpExport').addEventListener('click', function () { self.exportXlsx(); });
+    $('cmpSummary').addEventListener('click', function (e) {
+      var c = e.target.closest && e.target.closest('[data-go]');
+      if (!c) return;
+      self.only = null;
+      if (c.dataset.go === 'unasked') { $('cmpView').value = 'rows'; $('cmpFilter').value = 'unasked'; }
+      else { $('cmpView').value = 'sheets'; $('cmpFilter').value = 'changed'; }
+      self.render();
+    });
     // the header is a separate table: it follows the body sideways
     $('cmpBody').addEventListener('scroll', function () { $('cmpHead').scrollLeft = this.scrollLeft; });
     $('cmpBody').addEventListener('click', function (e) {
@@ -4341,11 +4497,26 @@ if (typeof self !== 'undefined') self.S = S;
     return '';
   }
 
-  function keep(st, filter) {
-    var tone = ST(st).tone;
+  /** x: a line or a resource. «Без нашего замечания» — a change on what our table did not mention. */
+  function keep(x, filter) {
+    var tone = ST(x.st).tone;
     if (filter === 'problems') return tone === 'bad' || tone === 'part';
-    if (filter === 'changed') return st !== 'same';
+    if (filter === 'changed') return x.st !== 'same';
+    if (filter === 'unasked') return S.compare.unasked(x);
     return true;
+  }
+  function keepAmount(x, filter) {
+    var tone = S.compare.AMOUNT[x.st].tone;
+    if (filter === 'problems') return tone === 'bad' || tone === 'part';
+    if (filter === 'changed' || filter === 'unasked') return x.st !== 'same';
+    return true;
+  }
+  function nameCell(x) {
+    if (!x.nm2) return S.esc(x.nm);
+    return '<s class="mute">' + S.esc(x.nm) + '</s><br>' + S.esc(x.nm2);
+  }
+  function unitCell(x) {
+    return x.unit2 && x.unit2 !== x.unit ? '<s class="mute">' + S.esc(x.unit) + '</s> ' + S.esc(x.unit2) : S.esc(x.unit);
   }
 
   Compare.prototype.render = function () {
@@ -4378,8 +4549,14 @@ if (typeof self !== 'undefined') self.S = S;
       card(left ? 'bad' : 'good', 'Осталось исправить', res(left),
         'частично ' + (rc.partial || 0) + ' · не исправлено ' + (rc.notfixed || 0) + ' · повышено ' + (rc.worse || 0) +
         ' · строк со старой ценой ' + T.leftRows) +
-      card('', 'Без нашего замечания', 'снижено ' + (rc.lowered || 0) + ' · повышено ' + (rc.raised || 0),
-        'объём ↑ ' + (T.counts.qtyup || 0) + ' · новых строк ' + (T.counts.added || 0) + ' · удалено ' + (T.counts.removed || 0)) +
+      card(T.unaskedUp > 0.5 ? 'bad' : '', 'Без нашего замечания', lines(T.unaskedRows) + ' · ' + delta(T.unaskedUp - T.unaskedDown),
+        'снижено на ' + money(T.unaskedDown) + ' · повышено на ' + money(T.unaskedUp) + '<br>цена ↓ ' + (T.counts.lowered || 0) +
+        ' · ↑ ' + (T.counts.raised || 0) + ' · объём ↑ ' + (T.counts.qtyup || 0) + ' ↓ ' + (T.counts.qtydown || 0) +
+        ' · переименовано ' + (T.counts.renamed || 0) + ' · новых ' + (T.counts.added || 0) + ' · удалено ' + (T.counts.removed || 0),
+        'unasked') +
+      card(T.amountFlags ? 'bad' : 'good', 'Итоги листов (ИТОГО, ЗСР, транспорт)',
+        T.amountFlags ? lines(T.amountFlags) + ' требуют внимания' : 'расхождений нет',
+        'изменилась сумма: ' + lines(T.amountRows) + ' · текст/процент и «итог ≠ сумма строк» — красным', 'sheets') +
       '</div>' +
       '<div class="cmp-files">Было: <b>' + S.esc(L.oldLabel) + '</b> · Стало: <b>' + S.esc(L.newLabel) + '</b> · ' +
       'замечаний в нашей таблице: ' + L.asked + ' · ' + lines(T.rows) + ' · ' + this.ms + ' мс</div>';
@@ -4388,12 +4565,36 @@ if (typeof self !== 'undefined') self.S = S;
     var q = S.nameKey($('cmpQ').value || '');
     var only = this.only;
     var html = [], n = 0;
-    if (view === 'res' && !only) {
+    if (view === 'sheets' && !only) {
+      head.innerHTML = '<table class="cmp"><colgroup>' + COLS_AMT + '</colgroup><tr><th>Лист</th><th>Строка</th>' +
+        '<th>Сумма было</th><th>Сумма стало</th><th>Разница</th><th>Статус</th></tr></table>';
+      this.res.objects.forEach(function (o) {
+        var rows = o.amounts.filter(function (x) {
+          return keepAmount(x, filter) && (!q || S.nameKey(x.label1 + ' ' + x.label2).indexOf(q) >= 0);
+        });
+        if (!rows.length && filter !== 'all') return;
+        html.push('<tr class="t-head"><td>' + S.esc(o.name) + '</td><td><b>Строки ресурсов (сумма)</b></td>' +
+          '<td class="n">' + money(o.oldSum) + '</td><td class="n">' + money(o.newSum) + '</td>' +
+          '<td class="n">' + delta(o.newSum - o.oldSum) + '</td><td></td></tr>');
+        rows.forEach(function (x) {
+          n++;
+          var A = S.compare.AMOUNT[x.st];
+          var lbl = x.label2 && x.label1 && x.label2 !== x.label1 ? '<s class="mute">' + S.esc(x.label1) + '</s><br>' + S.esc(x.label2) :
+            S.esc(x.label1 || x.label2);
+          html.push('<tr class="t-' + (A.tone || 'none') + '"><td></td><td>' + lbl + '</td>' +
+            '<td class="n">' + money(x.s1) + '</td><td class="n">' + money(x.s2) + '</td>' +
+            '<td class="n">' + (x.s1 != null && x.s2 != null ? delta(x.s2 - x.s1) : '') + '</td>' +
+            '<td>' + S.esc(A.label) + (x.st === 'gap' ? ': ' + money(x.gap) : '') + '</td></tr>');
+        });
+      });
+      body.innerHTML = '<table class="cmp"><colgroup>' + COLS_AMT + '</colgroup>' + html.join('') + '</table>';
+      cnt.textContent = lines(n);
+    } else if (view === 'res' && !only) {
       head.innerHTML = '<table class="cmp"><colgroup>' + COLS_RES + '</colgroup><tr><th>Наименование</th><th>Ед.</th>' +
         '<th>Цена было</th><th>Наша цена</th><th>Цена стало</th><th>Строк</th><th>Сумма было</th><th>Сумма стало</th>' +
         '<th>Разница</th><th>Статус</th></tr></table>';
       this.res.resources.forEach(function (g) {
-        if (!keep(g.st, filter)) return;
+        if (!keep(g, filter)) return;
         if (q && S.nameKey(g.nm).indexOf(q) < 0) return;
         n++;
         html.push('<tr class="t-' + (ST(g.st).tone || 'none') + '" data-k="' + S.esc(g.key) + '" title="Показать строки">' +
@@ -4411,13 +4612,13 @@ if (typeof self !== 'undefined') self.S = S;
         '<th>Сумма было</th><th>Сумма стало</th><th>Разница</th><th>Статус</th></tr></table>';
       this.res.objects.forEach(function (o) {
         o.rows.forEach(function (x) {
-          if (only ? x.key !== only : !keep(x.st, filter)) return;
-          if (q && S.nameKey(x.nm).indexOf(q) < 0) return;
+          if (only ? x.key !== only : !keep(x, filter)) return;
+          if (q && S.nameKey(x.nm + ' ' + (x.nm2 || '')).indexOf(q) < 0) return;
           n++;
           var qty = x.q1 == null ? S.qty(x.q2) : x.q2 == null ? S.qty(x.q1) :
             (Math.abs(x.q1 - x.q2) > 1e-9 ? S.qty(x.q1) + ' → <b>' + S.qty(x.q2) + '</b>' : S.qty(x.q1));
           html.push('<tr class="t-' + (ST(x.st).tone || 'none') + '"><td>' + S.esc(o.name) + '</td><td>' + S.esc(x.no) + '</td>' +
-            '<td>' + S.esc(x.nm) + '</td><td>' + S.esc(x.unit) + '</td><td class="n">' + qty + '</td>' +
+            '<td>' + nameCell(x) + '</td><td>' + unitCell(x) + '</td><td class="n">' + qty + '</td>' +
             '<td class="n">' + pr(x.p1) + '</td><td class="n">' + ours(x) + '</td>' +
             '<td class="n">' + pr(x.p2) + '</td><td class="n">' + money(x.s1) + '</td><td class="n">' + money(x.s2) + '</td>' +
             '<td class="n">' + delta(x.s2 - x.s1) + '</td><td>' + S.esc(ST(x.st).label) + '</td></tr>');
@@ -4426,7 +4627,7 @@ if (typeof self !== 'undefined') self.S = S;
       body.innerHTML = '<table class="cmp"><colgroup>' + COLS_ROW + '</colgroup>' + html.join('') + '</table>';
       cnt.textContent = lines(n) + (only ? ' одного ресурса · выберите вид, чтобы вернуться' : '');
     }
-    if (!n) body.innerHTML = '<div class="cmp-empty">Нет строк для этого фильтра.</div>';
+    if (!n && view !== 'sheets') body.innerHTML = '<div class="cmp-empty">Нет строк для этого фильтра.</div>';
   };
 
   var COLS_RES = '<col style="min-width:260px"><col style="width:50px"><col style="width:92px"><col style="width:92px">' +
@@ -4436,9 +4637,13 @@ if (typeof self !== 'undefined') self.S = S;
     '<col style="width:86px"><col style="width:86px"><col style="width:86px"><col style="width:104px"><col style="width:104px">' +
     '<col style="width:96px"><col style="width:136px">';
 
-  function card(tone, title, big, small) {
-    return '<div class="cmp-card ' + tone + '"><div class="t">' + title + '</div><div class="b">' + big + '</div>' +
-      '<div class="s">' + small + '</div></div>';
+  var COLS_AMT = '<col style="width:220px"><col><col style="width:130px"><col style="width:130px"><col style="width:120px">' +
+    '<col style="width:260px">';
+
+  /** go: 'unasked' opens the lines nobody asked about, 'sheets' the sheet totals. */
+  function card(tone, title, big, small, go) {
+    return '<div class="cmp-card ' + tone + (go ? ' go" data-go="' + go + '" title="Показать' : '') + '"><div class="t">' + title +
+      '</div><div class="b">' + big + '</div><div class="s">' + small + '</div></div>';
   }
 
   Compare.prototype.exportXlsx = function () {

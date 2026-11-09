@@ -40,6 +40,14 @@
     $('cmpFilter').addEventListener('change', function () { self.only = null; self.render(); });
     $('cmpQ').addEventListener('input', S.debounce(function () { self.render(); }, 150));
     $('cmpExport').addEventListener('click', function () { self.exportXlsx(); });
+    $('cmpSummary').addEventListener('click', function (e) {
+      var c = e.target.closest && e.target.closest('[data-go]');
+      if (!c) return;
+      self.only = null;
+      if (c.dataset.go === 'unasked') { $('cmpView').value = 'rows'; $('cmpFilter').value = 'unasked'; }
+      else { $('cmpView').value = 'sheets'; $('cmpFilter').value = 'changed'; }
+      self.render();
+    });
     // the header is a separate table: it follows the body sideways
     $('cmpBody').addEventListener('scroll', function () { $('cmpHead').scrollLeft = this.scrollLeft; });
     $('cmpBody').addEventListener('click', function (e) {
@@ -156,11 +164,26 @@
     return '';
   }
 
-  function keep(st, filter) {
-    var tone = ST(st).tone;
+  /** x: a line or a resource. «Без нашего замечания» — a change on what our table did not mention. */
+  function keep(x, filter) {
+    var tone = ST(x.st).tone;
     if (filter === 'problems') return tone === 'bad' || tone === 'part';
-    if (filter === 'changed') return st !== 'same';
+    if (filter === 'changed') return x.st !== 'same';
+    if (filter === 'unasked') return S.compare.unasked(x);
     return true;
+  }
+  function keepAmount(x, filter) {
+    var tone = S.compare.AMOUNT[x.st].tone;
+    if (filter === 'problems') return tone === 'bad' || tone === 'part';
+    if (filter === 'changed' || filter === 'unasked') return x.st !== 'same';
+    return true;
+  }
+  function nameCell(x) {
+    if (!x.nm2) return S.esc(x.nm);
+    return '<s class="mute">' + S.esc(x.nm) + '</s><br>' + S.esc(x.nm2);
+  }
+  function unitCell(x) {
+    return x.unit2 && x.unit2 !== x.unit ? '<s class="mute">' + S.esc(x.unit) + '</s> ' + S.esc(x.unit2) : S.esc(x.unit);
   }
 
   Compare.prototype.render = function () {
@@ -193,8 +216,14 @@
       card(left ? 'bad' : 'good', 'Осталось исправить', res(left),
         'частично ' + (rc.partial || 0) + ' · не исправлено ' + (rc.notfixed || 0) + ' · повышено ' + (rc.worse || 0) +
         ' · строк со старой ценой ' + T.leftRows) +
-      card('', 'Без нашего замечания', 'снижено ' + (rc.lowered || 0) + ' · повышено ' + (rc.raised || 0),
-        'объём ↑ ' + (T.counts.qtyup || 0) + ' · новых строк ' + (T.counts.added || 0) + ' · удалено ' + (T.counts.removed || 0)) +
+      card(T.unaskedUp > 0.5 ? 'bad' : '', 'Без нашего замечания', lines(T.unaskedRows) + ' · ' + delta(T.unaskedUp - T.unaskedDown),
+        'снижено на ' + money(T.unaskedDown) + ' · повышено на ' + money(T.unaskedUp) + '<br>цена ↓ ' + (T.counts.lowered || 0) +
+        ' · ↑ ' + (T.counts.raised || 0) + ' · объём ↑ ' + (T.counts.qtyup || 0) + ' ↓ ' + (T.counts.qtydown || 0) +
+        ' · переименовано ' + (T.counts.renamed || 0) + ' · новых ' + (T.counts.added || 0) + ' · удалено ' + (T.counts.removed || 0),
+        'unasked') +
+      card(T.amountFlags ? 'bad' : 'good', 'Итоги листов (ИТОГО, ЗСР, транспорт)',
+        T.amountFlags ? lines(T.amountFlags) + ' требуют внимания' : 'расхождений нет',
+        'изменилась сумма: ' + lines(T.amountRows) + ' · текст/процент и «итог ≠ сумма строк» — красным', 'sheets') +
       '</div>' +
       '<div class="cmp-files">Было: <b>' + S.esc(L.oldLabel) + '</b> · Стало: <b>' + S.esc(L.newLabel) + '</b> · ' +
       'замечаний в нашей таблице: ' + L.asked + ' · ' + lines(T.rows) + ' · ' + this.ms + ' мс</div>';
@@ -203,12 +232,36 @@
     var q = S.nameKey($('cmpQ').value || '');
     var only = this.only;
     var html = [], n = 0;
-    if (view === 'res' && !only) {
+    if (view === 'sheets' && !only) {
+      head.innerHTML = '<table class="cmp"><colgroup>' + COLS_AMT + '</colgroup><tr><th>Лист</th><th>Строка</th>' +
+        '<th>Сумма было</th><th>Сумма стало</th><th>Разница</th><th>Статус</th></tr></table>';
+      this.res.objects.forEach(function (o) {
+        var rows = o.amounts.filter(function (x) {
+          return keepAmount(x, filter) && (!q || S.nameKey(x.label1 + ' ' + x.label2).indexOf(q) >= 0);
+        });
+        if (!rows.length && filter !== 'all') return;
+        html.push('<tr class="t-head"><td>' + S.esc(o.name) + '</td><td><b>Строки ресурсов (сумма)</b></td>' +
+          '<td class="n">' + money(o.oldSum) + '</td><td class="n">' + money(o.newSum) + '</td>' +
+          '<td class="n">' + delta(o.newSum - o.oldSum) + '</td><td></td></tr>');
+        rows.forEach(function (x) {
+          n++;
+          var A = S.compare.AMOUNT[x.st];
+          var lbl = x.label2 && x.label1 && x.label2 !== x.label1 ? '<s class="mute">' + S.esc(x.label1) + '</s><br>' + S.esc(x.label2) :
+            S.esc(x.label1 || x.label2);
+          html.push('<tr class="t-' + (A.tone || 'none') + '"><td></td><td>' + lbl + '</td>' +
+            '<td class="n">' + money(x.s1) + '</td><td class="n">' + money(x.s2) + '</td>' +
+            '<td class="n">' + (x.s1 != null && x.s2 != null ? delta(x.s2 - x.s1) : '') + '</td>' +
+            '<td>' + S.esc(A.label) + (x.st === 'gap' ? ': ' + money(x.gap) : '') + '</td></tr>');
+        });
+      });
+      body.innerHTML = '<table class="cmp"><colgroup>' + COLS_AMT + '</colgroup>' + html.join('') + '</table>';
+      cnt.textContent = lines(n);
+    } else if (view === 'res' && !only) {
       head.innerHTML = '<table class="cmp"><colgroup>' + COLS_RES + '</colgroup><tr><th>Наименование</th><th>Ед.</th>' +
         '<th>Цена было</th><th>Наша цена</th><th>Цена стало</th><th>Строк</th><th>Сумма было</th><th>Сумма стало</th>' +
         '<th>Разница</th><th>Статус</th></tr></table>';
       this.res.resources.forEach(function (g) {
-        if (!keep(g.st, filter)) return;
+        if (!keep(g, filter)) return;
         if (q && S.nameKey(g.nm).indexOf(q) < 0) return;
         n++;
         html.push('<tr class="t-' + (ST(g.st).tone || 'none') + '" data-k="' + S.esc(g.key) + '" title="Показать строки">' +
@@ -226,13 +279,13 @@
         '<th>Сумма было</th><th>Сумма стало</th><th>Разница</th><th>Статус</th></tr></table>';
       this.res.objects.forEach(function (o) {
         o.rows.forEach(function (x) {
-          if (only ? x.key !== only : !keep(x.st, filter)) return;
-          if (q && S.nameKey(x.nm).indexOf(q) < 0) return;
+          if (only ? x.key !== only : !keep(x, filter)) return;
+          if (q && S.nameKey(x.nm + ' ' + (x.nm2 || '')).indexOf(q) < 0) return;
           n++;
           var qty = x.q1 == null ? S.qty(x.q2) : x.q2 == null ? S.qty(x.q1) :
             (Math.abs(x.q1 - x.q2) > 1e-9 ? S.qty(x.q1) + ' → <b>' + S.qty(x.q2) + '</b>' : S.qty(x.q1));
           html.push('<tr class="t-' + (ST(x.st).tone || 'none') + '"><td>' + S.esc(o.name) + '</td><td>' + S.esc(x.no) + '</td>' +
-            '<td>' + S.esc(x.nm) + '</td><td>' + S.esc(x.unit) + '</td><td class="n">' + qty + '</td>' +
+            '<td>' + nameCell(x) + '</td><td>' + unitCell(x) + '</td><td class="n">' + qty + '</td>' +
             '<td class="n">' + pr(x.p1) + '</td><td class="n">' + ours(x) + '</td>' +
             '<td class="n">' + pr(x.p2) + '</td><td class="n">' + money(x.s1) + '</td><td class="n">' + money(x.s2) + '</td>' +
             '<td class="n">' + delta(x.s2 - x.s1) + '</td><td>' + S.esc(ST(x.st).label) + '</td></tr>');
@@ -241,7 +294,7 @@
       body.innerHTML = '<table class="cmp"><colgroup>' + COLS_ROW + '</colgroup>' + html.join('') + '</table>';
       cnt.textContent = lines(n) + (only ? ' одного ресурса · выберите вид, чтобы вернуться' : '');
     }
-    if (!n) body.innerHTML = '<div class="cmp-empty">Нет строк для этого фильтра.</div>';
+    if (!n && view !== 'sheets') body.innerHTML = '<div class="cmp-empty">Нет строк для этого фильтра.</div>';
   };
 
   var COLS_RES = '<col style="min-width:260px"><col style="width:50px"><col style="width:92px"><col style="width:92px">' +
@@ -251,9 +304,13 @@
     '<col style="width:86px"><col style="width:86px"><col style="width:86px"><col style="width:104px"><col style="width:104px">' +
     '<col style="width:96px"><col style="width:136px">';
 
-  function card(tone, title, big, small) {
-    return '<div class="cmp-card ' + tone + '"><div class="t">' + title + '</div><div class="b">' + big + '</div>' +
-      '<div class="s">' + small + '</div></div>';
+  var COLS_AMT = '<col style="width:220px"><col><col style="width:130px"><col style="width:130px"><col style="width:120px">' +
+    '<col style="width:260px">';
+
+  /** go: 'unasked' opens the lines nobody asked about, 'sheets' the sheet totals. */
+  function card(tone, title, big, small, go) {
+    return '<div class="cmp-card ' + tone + (go ? ' go" data-go="' + go + '" title="Показать' : '') + '"><div class="t">' + title +
+      '</div><div class="b">' + big + '</div><div class="s">' + small + '</div></div>';
   }
 
   Compare.prototype.exportXlsx = function () {

@@ -55,6 +55,32 @@ check(st('ТЕСТОВЫЙ ЦЕМЕНТ') === 'same' && st('ЗАТРАТЫ ТР�
   'the inserted and deleted lines do not shift the pairing of the lines after them');
 check(st('ТЕСТОВЫЙ ЩИТ', 1) === 'note', 'equipment with only a note, unchanged: note');
 check(rowOf('ТЕСТОВЫЙ АНКЕР М5') !== rowOf('ТЕСТОВЫЙ АНКЕР М8'), 'М5 and М8 are two lines');
+const film = res.objects[0].rows.find((r) => r.nm === 'ТЕСТОВАЯ ПЛЁНКА');
+check(film && film.st === 'renamed' && film.nm2 === 'ТЕСТОВАЯ ПЛЁНКА 0,2 ММ',
+  'a line renamed by the sender is one renamed line, not removed + added');
+check(!res.objects[0].rows.some((r) => r.st === 'added' && /ПЛЁНКА/.test(r.nm)), 'the new name is not counted as a new line');
+
+// lines that carry an amount but are not resources
+const am = res.objects[0].amounts;
+const amt = (re) => am.find((x) => re.test(x.label1 || x.label2));
+check(amt(/^ТРАНСПОРТНЫЕ/).st === 'label' && amt(/^ТРАНСПОРТНЫЕ/).label2 === 'ТРАНСПОРТНЫЕ УСЛУГИ=7%',
+  'an overhead whose percentage changed (5 % → 7 %) is paired and flagged');
+check(amt(/^ИТОГО СТРОИТЕЛЬНЫЕ/).st === 'gap' && amt(/^ИТОГО СТРОИТЕЛЬНЫЕ/).gap === 12,
+  'a band total typed over (200 while its lines sum to 188) is flagged with its gap');
+check(amt(/^ИТОГО ПРЯМЫЕ/).st === 'same', '«ИТОГО ПРЯМЫЕ ЗАТРАТЫ» is not checked against one band');
+check(res.totals.amountFlags === 2, 'two sheet total lines need attention (' + res.totals.amountFlags + ')');
+// a gap both versions share was already there: not flagged
+const v1gap = S.smeta.parseWorkbook(book(1), 'v1.xlsx'), v2same = S.smeta.parseWorkbook(book(1), 'v1.xlsx');
+v1gap[0].rows.concat(v2same[0].rows).forEach((r) => { if (/^ИТОГО СТРОИТЕЛЬНЫЕ/.test(r.nm || r.noTxt || '')) r.sum = 150; });
+check(S.compare.versions(v1gap, v2same, {}, {}).objects[0].amounts.every((x) => x.st === 'same'),
+  'a total that never matched its lines, in both versions alike, is left alone');
+
+// what our table did not mention
+const un = res.objects.flatMap((o) => o.rows).filter(S.compare.unasked).map((r) => r.nm).sort();
+check(un.join(',') === 'ТЕСТОВАЯ ДОСКА,ТЕСТОВАЯ ПЛЁНКА,ТЕСТОВЫЙ ГВОЗДЬ,ТЕСТОВЫЙ КЛЕЙ,ТЕСТОВЫЙ ШУРУП',
+  'changes nobody asked about: plank, film, nail, glue, screw (' + un.join(',') + ')');
+// plank +4, glue +9, screw +1 up; nail −1 down
+check(res.totals.unaskedUp === 14 && res.totals.unaskedDown === 1, 'their amounts: up 14, down 1 (' + res.totals.unaskedUp + ', ' + res.totals.unaskedDown + ')');
 
 const g5 = res.resources.find((g) => g.nm === 'ТЕСТОВЫЙ АНКЕР М5');
 check(g5 && g5.st === 'partial' && g5.rows === 2 && g5.counts.fixed === 1 && g5.counts.notfixed === 1,
@@ -81,7 +107,14 @@ check(JSON.stringify(S.compare.align(A, A)) === '[[0,0],[1,1],[2,2]]', 'align pa
 const bytes = S.compare.workbook(res, { oldLabel: 'v1.xlsx', newLabel: 'v2.xlsx' });
 const back = S.readXlsx(bytes);
 const names = back.sheets.map((s) => s.name);
-check(names.join('|') === 'По ресурсам|По строкам', 'the comparison workbook has its two sheets (' + names.join('|') + ')');
+check(names.join('|') === 'По ресурсам|По строкам|Итоги листов', 'the comparison workbook has its three sheets (' + names.join('|') + ')');
+const amtRows = back.sheets[2].rows.filter((r, i) => r && i > 5 && r[2] && r[2].v).map((r) => String(r[2].v) + ' | ' + String((r[7] && r[7].v) || ''));
+check(amtRows.some((s) => /ТРАНСПОРТНЫЕ УСЛУГИ=5%.*Изменён текст/.test(s)) && amtRows.some((s) => /ИТОГО СТРОИТЕЛЬНЫЕ.*расхождение 12/.test(s)),
+  'the sheet totals sheet carries the changed percentage and the typed total');
+const named = back.sheets[1].rows.filter((r, i) => r && i > 5 && r[3]).map((r) => String(r[3].v));
+check(named.includes('ТЕСТОВАЯ ПЛЁНКА  →  ТЕСТОВАЯ ПЛЁНКА 0,2 ММ'), 'a renamed line shows both names in the lines sheet');
+const asked = back.sheets[1].rows.filter((r, i) => r && i > 5 && r[3] && r[14]).map((r) => r[3].v + ':' + r[14].v);
+check(asked.includes('ТЕСТОВЫЙ БОЛТ:да') && asked.includes('ТЕСТОВЫЙ ШУРУП:нет'), 'each line says whether our table asked about it');
 const changedRes = res.resources.filter((g) => g.st !== 'same').length;
 const resRows = back.sheets[0].rows.filter((r, i) => r && i > 5 && r[2] && r[2].v).length;
 check(resRows === changedRes, 'one row per resource that changed (' + resRows + ' of ' + changedRes + ')');

@@ -64,7 +64,22 @@ try {
   await page.selectOption('#cmpView', 'rows');
   await page.selectOption('#cmpFilter', 'problems');
   const probs = await page.$$eval('#cmpBody tr', (trs) => trs.map((t) => t.cells[2].textContent));
-  check(probs.length === 7, 'lines that need attention: М5 left, М8, bolt, screw, plank, glue, dowel (' + probs.length + ')');
+  check(probs.length === 8, 'lines that need attention: М5 left, М8, bolt, screw, plank, glue, dowel, renamed film (' + probs.length + ')');
+
+  // the card of changes nobody asked about opens exactly those lines, before → after with the amount
+  await page.click('.cmp-card[data-go="unasked"]');
+  check(await page.inputValue('#cmpFilter') === 'unasked' && await page.inputValue('#cmpView') === 'rows', 'the card switches to «Без нашего замечания»');
+  const un = await page.$$eval('#cmpBody tr', (trs) => trs.map((t) => t.cells[2].innerText.replace(/\s+/g, ' ') + ' ' + t.cells[10].textContent));
+  check(un.length === 5, 'five lines changed without our remark (' + un.length + ')');
+  check(un.some((s) => /ТЕСТОВАЯ ПЛЁНКА ТЕСТОВАЯ ПЛЁНКА 0,2 ММ/.test(s)), 'the renamed line shows the old name struck and the new one');
+  check(un.some((s) => /ТЕСТОВЫЙ КЛЕЙ \+9/.test(s)), 'the new line shows its amount (+9)');
+
+  // the sheet totals: the changed percentage and the typed total are red
+  await page.click('.cmp-card[data-go="sheets"]');
+  const amt = await page.$$eval('#cmpBody tr', (trs) => trs.map((t) => t.className + ':' + t.cells[1].innerText.replace(/\s+/g, ' ')));
+  check(amt.some((s) => /^t-bad:ТРАНСПОРТНЫЕ УСЛУГИ=5% ТРАНСПОРТНЫЕ УСЛУГИ=7%/.test(s)), 'the overhead whose percentage changed is red with both texts');
+  check(amt.some((s) => /^t-bad:ИТОГО СТРОИТЕЛЬНЫЕ/.test(s)), 'the band total typed over is red');
+  check(amt.some((s) => /^t-head:Строки ресурсов/.test(s)), 'each sheet starts with the sum of its resource lines');
 
   await page.selectOption('#cmpView', 'res');
   await page.selectOption('#cmpFilter', 'changed');
@@ -90,7 +105,7 @@ try {
   await dl.saveAs(out);
   check(dl.suggestedFilename() === 'Тест_v2_sravnenie.xlsx', 'the export is named after the returned file (' + dl.suggestedFilename() + ')');
   const back = S.readXlsx(new Uint8Array(readFileSync(out)));
-  check(back.sheets.map((s) => s.name).join('|') === 'По ресурсам|По строкам', 'the export has both sheets');
+  check(back.sheets.map((s) => s.name).join('|') === 'По ресурсам|По строкам|Итоги листов', 'the export has its three sheets');
 
   check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' / ') : ''));
 } finally {

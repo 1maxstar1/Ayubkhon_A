@@ -48,7 +48,12 @@ function book(v) {
     line(5, 'ТЕСТОВЫЙ ШУРУП', 'КГ', 1, v === 1 ? 3 : 4),
     line(6, 'ТЕСТОВАЯ ДОСКА', 'М3', v === 1 ? 4 : 6, 2),
     ...(v === 1 ? [line(7, 'ТЕСТОВЫЙ ДЮБЕЛЬ', 'ШТ', 5, 1)] : []),        // deleted by the sender
-    line(8, 'ТЕСТОВЫЙ ЦЕМЕНТ', 'Т', 1, 23)
+    line(8, 'ТЕСТОВЫЙ ЦЕМЕНТ', 'Т', 1, 23),
+    line(9, v === 1 ? 'ТЕСТОВАЯ ПЛЁНКА' : 'ТЕСТОВАЯ ПЛЁНКА 0,2 ММ', 'М2', 2, 3),  // renamed by the sender
+    // the band total: summed in the first version, typed over in the returned one (its lines sum to 188)
+    [null, null, 'ИТОГО СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ', 'СУМ', null, null, v === 1 ? 189 : 200],
+    // an overhead whose percentage the sender changed
+    [null, null, v === 1 ? 'ТРАНСПОРТНЫЕ УСЛУГИ=5%' : 'ТРАНСПОРТНЫЕ УСЛУГИ=7%', 'СУМ', null, null, v === 1 ? 9 : 13]
   ]);
   const second = estimate('ТЕСТОВОЕ ОБОРУДОВАНИЕ', [
     [null, null, 'СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'],

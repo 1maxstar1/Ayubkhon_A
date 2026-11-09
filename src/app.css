@@ -384,3 +384,7 @@ table.cmp .up{color:var(--bad);font-weight:600}
 table.cmp .down{color:var(--good);font-weight:600}
 table.cmp .mute{color:var(--mute)}
 table.cmp{min-width:1180px}
+.cmp-card.go{cursor:pointer}
+.cmp-card.go:hover{box-shadow:0 0 0 2px var(--accent-w)}
+table.cmp tr.t-head td{background:var(--sf2);border-top:1px solid var(--rule2)}
+table.cmp s.mute{text-decoration:line-through}

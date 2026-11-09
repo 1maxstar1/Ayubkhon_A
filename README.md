@@ -133,8 +133,23 @@ fayllar kompyuterdan chiqmaydi.
    * Ko'rinish: «По ресурсам» (resurs ustiga bosilsa — uning barcha qatorlari)
      yoki «По строкам»; filtr «Требуют внимания» / «Все изменения» / «Все
      строки».
-   * **«Скачать сравнение»** — ikki varaqli `.xlsx` («По ресурсам», «По
-     строкам»), xuddi shu ranglar bilan.
+   * **Biz so'ramagan o'zgarishlar** (v2.7.0) — filtr «Без нашего замечания»
+     (yoki shu kartochkani bosing): jadvalimizda bo'lmagan har bir o'zgargan
+     qator — narx, miqdor, nom/birlik, yangi yoki o'chirilgan qator — oldin →
+     keyin va farqi so'mda; kartochkada jami qancha oshgan va qancha
+     kamaygani.
+   * **Nomi yoki birligi o'zgartirilgan qator** «o'chirildi + qo'shildi» emas,
+     bitta qator: «Изменено наименование / ед. изм.», eski nom chizilgan, yangisi
+     ostida (birligi bir xil va nomi yaqin, yoki narxi va miqdori bir xil bo'lsa).
+   * **«Итоги листов»** — resurs bo'lmagan, lekin summasi bor qatorlar (ИТОГО,
+     ЗАГОТОВИТЕЛЬНО-СКЛАДСКИЕ РАСХОДЫ, ТРАНСПОРТНЫЕ УСЛУГИ=5%, ВСЕГО …) har bir
+     varaq bo'yicha oldin → keyin. Qizil: matni yoki foizi o'zgargan qator
+     (5% → 7%); bo'limning «ИТОГО» si o'z qatorlari yig'indisiga teng emas,
+     va bu farq faqat qaytgan versiyada paydo bo'lgan (raqam qo'lda yozilgan).
+     Ikkala versiyada bir xil turgan eski farq belgilanmaydi.
+   * **«Скачать сравнение»** — uch varaqli `.xlsx` («По ресурсам», «По
+     строкам» — «По нашему замечанию: да/нет» ustuni bilan, «Итоги листов»),
+     xuddi shu ranglar bilan.
 
 ---
 

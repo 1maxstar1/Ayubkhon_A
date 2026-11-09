@@ -180,7 +180,8 @@ const seen = await page.evaluate(() => {
 });
 check(seen.most > 1, `the first request asks for a chunk of keys at once (${seen.most})`);
 check(seen.alone === asked, `and every key of a full page is asked for on its own (${seen.alone} of ${asked})`);
-await page.reload();
+// the page anew without the workspace in its address (a reload would reopen it by itself)
+await page.goto(page.url().replace(/#.*$/, ''));
 await page.waitForSelector('#screen-list:not([hidden])');
 await openApp(B.number);
 await page.waitForFunction(() => Object.keys(S.Hints.map).length > 0, null, { timeout: 20000 });

@@ -365,7 +365,9 @@ await ep.fill('#q', '');
 /* ------------------------------------------------------------- reload: prices stay, the pool comes from IndexedDB */
 await ep.evaluate(() => S.Sync.saveNow());
 await ep.reload();
-await openApp(rows[0].number);
+// the address keeps the workspace (v2.8.1): the reload comes straight back into it, no list in between
+await ep.waitForSelector('#wsBox:not([hidden])');
+check((await ep.textContent('#wsBox')).includes(rows[0].number), 'a reload comes back into the same workspace');
 await reopen();
 await refsReady();
 const kept = await ep.evaluate(() => {
@@ -432,7 +434,8 @@ await ep.waitForFunction(() => S.Refs.asof === '2019-01-01' && !Object.keys(S.Re
 check(await ep.evaluate(() => !document.getElementById('refAsof').hidden && !document.querySelector('#priceScroll .tagr')),
   'a date with no reference line: no tag anywhere, the date and «сбросить» still on the toolbar');
 await ep.evaluate(() => S.Sync.saveNow());
-await ep.reload();
+// the page anew without the workspace in its address: through the list, as on a first visit
+await ep.goto(ep.url().replace(/#.*$/, ''));
 // every message the page shows from here on (several follow one another when a workspace opens)
 await ep.evaluate(() => {
   const t = document.getElementById('toast');

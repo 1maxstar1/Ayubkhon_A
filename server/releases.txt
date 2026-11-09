@@ -14,3 +14,4 @@ v2.5.5 5cda32b2d00aca559a583f10a376793ab9984f01 4A smeta, jihoz izohi (>20 mln),
 v2.5.7 7ce36cf80d48653b8242de7947b280c47daae632 Avtopodbor faqat arzonroq; texnologik jihoz smetasi to'liq
 v2.6.0 eb89cfe5a9047fda36c3e1f236a68c77c853802c Sravnenie versiy: qaytgan smetani birinchisi va jadvalimiz bilan solishtirish
 v2.7.0 f103d1c8fd67c0a1b57e479677db6c63aacbd4c7 Sravnenie versiy: so'ralmagan o'zgarishlar, nomi o'zgargan qator, Itogi listov
+v2.8.0 fb467a4ff44a64bd87ed158549f0be83e218dbd5 Nash otvet (Excel): yuborilgan jadval fayldan, narxlar loyihaga

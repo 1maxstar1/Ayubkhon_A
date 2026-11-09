@@ -16,3 +16,4 @@ v2.6.0 eb89cfe5a9047fda36c3e1f236a68c77c853802c Sravnenie versiy: qaytgan smetan
 v2.7.0 f103d1c8fd67c0a1b57e479677db6c63aacbd4c7 Sravnenie versiy: so'ralmagan o'zgarishlar, nomi o'zgargan qator, Itogi listov
 v2.8.0 fb467a4ff44a64bd87ed158549f0be83e218dbd5 Nash otvet (Excel): yuborilgan jadval fayldan, narxlar loyihaga
 v2.8.1 10079e441f1d8c80b9cb53bea6af8f1917b4b3e0 qayta yuklashda ochiq zayavka va yorliq qaytadi
+v2.8.2 c01b2f02a70f0eb0f84c5bb109278eed3766e46b qayta yuklangandan keyin Bylo loyihaga qaytadi

@@ -104,6 +104,7 @@ pwsh_run  laptop-windows sh test/laptop-windows.sh
 browser_run e2e-admin    node test/e2e-admin.mjs
 browser_run e2e-refs     node test/e2e-refs.mjs
 browser_run e2e-compare  node test/e2e-compare.mjs
+browser_run e2e-compare-keep node test/e2e-compare-keep.mjs
 browser_run upload-order node test/upload-order.mjs
 both_run  e2e-workspace  node test/e2e-workspace.mjs "$S1" "$S2"
 both_run  e2e-hints      node test/e2e-hints.mjs "$S1"

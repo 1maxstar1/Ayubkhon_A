@@ -461,7 +461,9 @@ yuborila boshlaydi.
 > (`…/#ws=<id>&tab=compare`), shuning uchun Cmd+R / F5 dan keyin dastur o'sha
 > zayavkani, o'sha yorliqni o'zi qayta ochadi (narxlar serverdan). «‹ Заявки» bilan
 > ro'yxatga qaytilganda manzil tozalanadi; zayavka o'chirilgan yoki ochib bo'lmasa —
-> ro'yxat. Faqat «Сравнение версий» ga yuklangan qaytgan fayl saqlanmaydi: uni qayta tanlang.
+> ro'yxat. **v2.8.4 dan** «Сравнение версий» ga yuklangan fayllar ham (qaytgan smeta, «Наш ответ»,
+> fayldan olingan «Было») ish maydoni bilan serverda saqlanadi va qayta yuklangandan keyin o'zi
+> qaytadi — ko'rinish va filtr bilan birga; har bir zayavkaning taqqoslashi o'ziniki.
 
 Bir necha xodim bitta bazada ishlaydi: kirish — email + bir martalik kod,
 4 soat harakat bo'lmasa qulf, arizalar reyestri, ish maydonlari serverda,

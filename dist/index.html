@@ -407,7 +407,7 @@ table.cmp s.mute{text-decoration:line-through}
 
 <header class="bar">
   <div class="brand">
-    <b>Таблица сопоставления №2</b><i class="ver" title="Версия программы">v2.8.3</i>
+    <b>Таблица сопоставления №2</b><i class="ver" title="Версия программы">v2.8.4</i>
     <span>проверка и сбор рыночных цен ресурсов сметы</span>
   </div>
   <div class="wsbox" id="wsBox" hidden></div>
@@ -5022,6 +5022,10 @@ if (typeof self !== 'undefined') self.S = S;
  * comparison table we sent back. The first version is a loaded project (its market prices are
  * what we asked for) or any file; the second is a file that is read but never added to the
  * projects.
+ *
+ * In a workspace the files chosen here are kept with it (src/ui/sync.js hears `cmp:file` and
+ * `cmp:base`, and hands them back through restore()), so a reload returns to the same comparison;
+ * the view and the filter are in the address, next to the tab.
  */
 (function (S) {
   'use strict';
@@ -5030,25 +5034,38 @@ if (typeof self !== 'undefined') self.S = S;
     this.app = app;
     this.oldFile = null;     // { name, objects } when «Было» is a file, not a project
     this.newFile = null;     // { name, objects }
+    this.reply = null;       // { base, name, entries, match } — «Наш ответ» read against the «Было» it names
     this.res = null;
+    this.gen = 0;            // which workspace the files belong to; see reset()
     this.bind();
   }
 
   function $(id) { return document.getElementById(id); }
+  /** A file was chosen (or dropped: null) by the person, not brought back — whoever keeps the workspace hears it. */
+  function chose(slot, file) { document.dispatchEvent(new CustomEvent('cmp:file', { detail: { slot: slot, file: file || null } })); }
+  function option(sel, v) { return !!v && Array.prototype.some.call(sel.options, function (o) { return o.value === v; }); }
 
   Compare.prototype.bind = function () {
     var self = this;
     if (!$('cmpOld')) return;
     $('cmpOld').addEventListener('change', function () {
       if (this.value === 'file') { $('cmpOldFile').click(); return; }
+      if (self.oldFile) chose('old', null);
+      if (self.reply) chose('reply', null);
       self.oldFile = null;
       self.reply = null;
+      self.based();
       self.run();
     });
     $('cmpOldFile').addEventListener('change', function (e) {
       var f = e.target.files[0]; e.target.value = '';
       if (!f) { self.fillOld(); return; }
-      self.read(f, function (objs) { self.oldFile = { name: f.name, objects: objs }; self.reply = null; self.fillOld(); self.run(); });
+      self.read(f, function (objs) {
+        if (self.reply) chose('reply', null);
+        self.oldFile = { name: f.name, objects: objs }; self.reply = null;
+        chose('old', f);
+        self.fillOld(); self.based(); self.run();
+      }, function () { self.fillOld(); });
     });
     $('cmpNewBtn').addEventListener('click', function () { $('cmpNewFile').click(); });
     $('cmpReplyBtn').addEventListener('click', function () { $('cmpReplyFile').click(); });
@@ -5059,8 +5076,13 @@ if (typeof self !== 'undefined') self.S = S;
     $('cmpNewFile').addEventListener('change', function (e) {
       var f = e.target.files[0]; e.target.value = '';
       if (!f) return;
-      self.read(f, function (objs) { self.newFile = { name: f.name, objects: objs }; self.run(); });
+      self.read(f, function (objs) { self.newFile = { name: f.name, objects: objs }; chose('new', f); self.run(); });
     });
+    // back on the view and the filter the page was reloaded with
+    if (option($('cmpView'), S.hashGet('cv'))) $('cmpView').value = S.hashGet('cv');
+    if (option($('cmpFilter'), S.hashGet('cf'))) $('cmpFilter').value = S.hashGet('cf');
+    // another workspace, another comparison: nothing of this one is carried over
+    ['ws:open', 'ws:close'].forEach(function (ev) { document.addEventListener(ev, function () { self.reset(); }); });
     $('cmpView').addEventListener('change', function () { self.only = null; self.render(); });
     $('cmpFilter').addEventListener('change', function () { self.only = null; self.render(); });
     $('cmpQ').addEventListener('input', S.debounce(function () { self.render(); }, 150));
@@ -5118,18 +5140,19 @@ if (typeof self !== 'undefined') self.S = S;
   };
 
   /** Parse a workbook off the main thread when the worker is there, the same way projects are read. */
-  Compare.prototype.read = function (file, done) {
+  Compare.prototype.read = function (file, done, failed) {
     var app = this.app;
-    if (!/\.xls[xm]?$/i.test(file.name)) { app.toast('Принимаются только файлы .xlsx', true); return; }
+    failed = failed || function () {};
+    if (!/\.xls[xm]?$/i.test(file.name)) { app.toast('Принимаются только файлы .xlsx', true); failed(); return; }
     app.busy(true, 'Чтение файла: ' + file.name + '…');
     var reader = new FileReader();
-    reader.onerror = function () { app.busy(false); app.toast('Не удалось прочитать файл', true); };
+    reader.onerror = function () { app.busy(false); app.toast('Не удалось прочитать файл', true); failed(); };
     reader.onload = function () {
       var buf = reader.result;
       var finish = function (res) {
         app.busy(false);
-        if (!res.ok) { app.toast(file.name + ': ' + res.error, true); return; }
-        if (!res.objects.length) { app.toast(file.name + ': листы ресурсов не найдены', true); return; }
+        if (!res.ok) { app.toast(file.name + ': ' + res.error, true); failed(); return; }
+        if (!res.objects.length) { app.toast(file.name + ': листы ресурсов не найдены', true); failed(); return; }
         done(res.objects);
       };
       if (app.worker) {
@@ -5149,6 +5172,65 @@ if (typeof self !== 'undefined') self.S = S;
     reader.readAsArrayBuffer(file);
   };
 
+  /** Which first version is chosen, in words that outlive a reload: the project's file, or «a file of its own». */
+  Compare.prototype.baseName = function () {
+    var v = $('cmpOld') ? $('cmpOld').value : '';
+    if (v === 'file') return this.oldFile ? 'file' : '';
+    var p = this.app.projects[+String(v).slice(1)];
+    return p ? p.file || p.name : '';
+  };
+  Compare.prototype.based = function () {
+    document.dispatchEvent(new CustomEvent('cmp:base', { detail: { base: this.baseName() } }));
+  };
+
+  /** Empty again: a workspace was opened or left. Anything still being read is for the one before. */
+  Compare.prototype.reset = function () {
+    this.gen++;
+    this.oldFile = null; this.newFile = null; this.reply = null; this.res = null; this.only = null; this.back = null;
+    this.fillOld();
+    this.render();
+  };
+
+  /**
+   * The workspace brings back what was chosen here: files.old / files.new / files.reply (each a File,
+   * or absent) and saved.base — the project that was «Было». Read one after another, in the order
+   * they depend on each other; nothing is announced and no price is set: the prices came back with
+   * the workspace, as they were left. A file the person has chosen meanwhile is not replaced by the
+   * stored one.
+   */
+  Compare.prototype.restore = function (saved, files) {
+    var self = this, app = this.app, gen = this.gen;
+    var live = function () { return gen === self.gen; };
+    var finish = function () {
+      if (!live()) return;
+      self.fillOld();
+      self.run();
+    };
+    var reply = function () {
+      if (!live()) return;
+      self.fillOld();
+      if (!self.oldFile && saved && saved.base) {
+        for (var i = 0; i < app.projects.length; i++) {
+          if ((app.projects[i].file || app.projects[i].name) === saved.base) { $('cmpOld').value = 'p' + i; break; }
+        }
+      }
+      if (files.reply && !self.reply) self.loadReply(files.reply, finish); else finish();
+    };
+    var next = function () {
+      if (!live()) return;
+      if (!files.new || self.newFile) { reply(); return; }
+      self.read(files.new, function (objs) {
+        if (live() && !self.newFile) self.newFile = { name: files.new.name, objects: objs };
+        reply();
+      }, reply);
+    };
+    if (!files.old || this.oldFile) { next(); return; }
+    this.read(files.old, function (objs) {
+      if (live() && !self.oldFile) self.oldFile = { name: files.old.name, objects: objs };
+      next();
+    }, next);
+  };
+
   Compare.prototype.fillOld = function () {
     var sel = $('cmpOld');
     if (!sel) return;
@@ -5156,7 +5238,8 @@ if (typeof self !== 'undefined') self.S = S;
     // «Другой файл…» without a file chosen is no first version: the project, as soon as there is one
     // (after a reload the tab can open before the workspace has brought its projects back)
     if (cur === 'file' && !this.oldFile) cur = '';
-    if (!cur || !/^p\d+$/.test(cur) || +cur.slice(1) >= this.app.projects.length) cur = this.app.projects.length ? 'p0' : cur;
+    // (a file that was chosen stays chosen, whatever projects come and go)
+    if (cur !== 'file' && (!/^p\d+$/.test(cur) || +cur.slice(1) >= this.app.projects.length)) cur = this.app.projects.length ? 'p0' : cur;
     var html = this.app.projects.map(function (p, i) {
       return '<option value="p' + i + '">Проект: ' + S.esc(p.name) + '</option>';
     }).join('');
@@ -5171,25 +5254,31 @@ if (typeof self !== 'undefined') self.S = S;
    * into Excel). Its prices go onto the «Было» project — over whatever was typed or auto-applied:
    * the reply is what was actually sent — and its lines become what the comparison judges.
    */
-  Compare.prototype.loadReply = function (file) {
-    var self = this, app = this.app;
+  Compare.prototype.loadReply = function (file, back) {
+    var self = this, app = this.app, gen = this.gen;
+    back = back || null;      // brought back with the workspace: its prices are there already, as they were left
     var b = $('cmpOld').value;
     var objects = b === 'file' && this.oldFile ? this.oldFile.objects :
       (app.projects[+String(b).slice(1)] || {}).objects;
-    if (!objects) { app.toast('Сначала выберите первую версию сметы («Было»)', true); return; }
+    var end = function () { if (back) back(); };
+    if (!objects) { app.toast('Сначала выберите первую версию сметы («Было»)', true); end(); return; }
     var reader = new FileReader();
-    reader.onerror = function () { app.toast('Не удалось прочитать файл', true); };
+    reader.onerror = function () { app.toast('Не удалось прочитать файл', true); end(); };
     reader.onload = function () {
+      if (gen !== self.gen) return;
       var parsed;
       try { parsed = S.reply.parse(S.readXlsx(new Uint8Array(reader.result))); }
-      catch (e) { app.toast(file.name + ': ' + (e.message || e), true); return; }
+      catch (e) { app.toast(file.name + ': ' + (e.message || e), true); end(); return; }
       if (!parsed.entries.length) {
         app.toast(file.name + ': не найдена таблица с колонками «Наименование» и «Рыночная цена» ' +
           '(или «Bozor ma\'lumotlariga ko\'ra»)', true);
+        end();
         return;
       }
       var m = S.reply.match(parsed.entries, objects);
       self.reply = { base: b, name: file.name, entries: parsed.entries, match: m };
+      if (back) { back(); return; }
+      chose('reply', file);
       var n = Object.keys(m.prices).length;
       if (b !== 'file' && n) app.setPrices(m.prices);
       app.toast('Наш ответ: строк ' + parsed.entries.length + ', найдено в смете ' + m.found.length +
@@ -5284,6 +5373,10 @@ if (typeof self !== 'undefined') self.S = S;
   Compare.prototype.render = function () {
     var sum = $('cmpSummary'), head = $('cmpHead'), body = $('cmpBody'), cnt = $('cmpCount');
     if (!sum) return;
+    if (!this.only) {          // one resource's lines are a detour, not where the list stood
+      S.hashSet('cv', $('cmpView').value === 'res' ? '' : $('cmpView').value);
+      S.hashSet('cf', $('cmpFilter').value === 'changed' ? '' : $('cmpFilter').value);
+    }
     $('cmpNewName').textContent = this.newFile ? this.newFile.name : 'не выбран';
     $('cmpExport').disabled = !this.res;
     if (!this.res) {
@@ -7311,6 +7404,7 @@ if (typeof self !== 'undefined') self.S = S;
   var Sync = {
     ws: null, app: null, files: {}, corr: {}, q: Promise.resolve(), loading: false, dirty: false,
     pend: {}, ct: 0,        // prices typed but not yet written; see correctSoon()
+    cmp: {},                // «Сравнение версий»: the files chosen there (slot → { name, id }) and its «Было»
     seq: 0,                 // which open() is the current one; see open()
 
     init: function () {
@@ -7336,6 +7430,8 @@ if (typeof self !== 'undefined') self.S = S;
         self.saveExport(bytes, opts);
         return bytes;
       };
+      document.addEventListener('cmp:file', function (e) { self.compareFile(e.detail.slot, e.detail.file); });
+      document.addEventListener('cmp:base', function (e) { if (self.ws && !self.loading) { self.cmp.base = e.detail.base || ''; self.touch(); } });
       $('projects').addEventListener('input', function () { self.touch(); });
       $('reportMode').addEventListener('change', function () { self.touch(); });
       window.addEventListener('beforeunload', function () {
@@ -7359,6 +7455,8 @@ if (typeof self !== 'undefined') self.S = S;
       this.ws = w; this.app = a;
       S.hashSet('ws', w.id);
       this.files = (w.state && w.state.files) || {};
+      var sc = (w.state && w.state.compare) || {};
+      this.cmp = { old: sc.old || null, new: sc.new || null, reply: sc.reply || null, base: sc.base || '' };
       this.corr = {};
       this.loading = true;
       var app = A();
@@ -7514,6 +7612,61 @@ if (typeof self !== 'undefined') self.S = S;
       this.renderBox();
       if (remapped) this.touch();          // write the workspace back under the new keys
       if (app.projects.length) app.toast('Рабочая область восстановлена: файлов ' + app.projects.length);
+      this.restoreCompare();
+    },
+
+    /* ---------------------------------------------------------- compare */
+    /*
+     * The returned smeta, our reply and a first version given as a file are read on the
+     * «Сравнение версий» tab without becoming projects — so nothing above keeps them. They are
+     * stored among the workspace's files all the same, and `state.compare` says which stored file
+     * is which. The previous version of the page reads neither: it opens such a workspace as
+     * before, with the comparison empty.
+     */
+    compareFile: function (slot, file) {
+      var self = this, app = A(), ws = this.ws;
+      if (!ws || this.loading) return;
+      this.enqueue(function () {
+        if (self.ws !== ws) return;
+        var was = self.cmp[slot], had = {};
+        (ws.files || []).forEach(function (n) { had[n] = 1; });
+        var drop = was && had[was.id] ? was.id : null;
+        if (!file && !drop) { self.cmp[slot] = null; return; }
+        var fd = new FormData();
+        if (file) fd.append('files+', file);
+        if (drop) fd.append('files-', drop);
+        return S.pb.collection('workspaces').update(ws.id, fd).then(function (w) {
+          // which stored file is the new one: read inside the queue, like upload() does
+          var added = (w.files || []).filter(function (n) { return !had[n]; });
+          ws.files = w.files;
+          self.cmp[slot] = file && added[0] ? { name: file.name, id: added[0] } : null;
+        }).catch(function (e) {
+          app.toast('Файл сравнения не сохранён на сервере: ' + S.pbErr(e), true);
+        });
+      }).then(function () {
+        if (self.ws === ws) return self.saveNow();      // said at once: a reload may be a second away
+      }).catch(function () { /* saveNow has said why, and retries */ });
+    },
+
+    /** After the projects are back: fetch what the comparison had and hand it over. */
+    restoreCompare: function () {
+      var self = this, app = A(), ws = this.ws, c = this.cmp, mine = this.seq;
+      if (!ws || !app.compare_ui) return;
+      var slots = ['old', 'new', 'reply'].filter(function (k) { return c[k] && c[k].id && (ws.files || []).indexOf(c[k].id) >= 0; });
+      if (!slots.length) { if (c.base) app.compare_ui.restore({ base: c.base }, {}); return; }
+      Promise.all(slots.map(function (k) {
+        return S.fileURL(ws, c[k].id).then(function (u) { return fetch(u); }).then(function (r) {
+          if (!r.ok) throw new Error(c[k].name + ': ' + r.status);
+          return r.blob();
+        }).then(function (b) { return new File([b], c[k].name, { type: b.type }); });
+      })).then(function (got) {
+        if (self.seq !== mine) return;                  // another application was opened meanwhile
+        var files = {};
+        slots.forEach(function (k, i) { files[k] = got[i]; });
+        app.compare_ui.restore({ base: c.base }, files);
+      }).catch(function (e) {
+        if (self.seq === mine) app.toast('Файлы сравнения не получены: ' + (e.message || e), true);
+      });
     },
 
     /* ------------------------------------------------------------- save */
@@ -7540,6 +7693,7 @@ if (typeof self !== 'undefined') self.S = S;
         prices: this.downgrade(app.prices),   // readable by the previous version
         prices2: app.prices,
         looseBook: app.looseBook || null,
+        compare: { old: this.cmp.old || null, new: this.cmp.new || null, reply: this.cmp.reply || null, base: this.cmp.base || '' },
         opts: app.opts,
         mode: $('reportMode').value,
         keys: KEYS,
@@ -7834,7 +7988,7 @@ if (typeof self !== 'undefined') self.S = S;
           throw e;
         }
       }).then(function () {
-        self.ws = null; self.app = null; self.files = {}; self.corr = {}; self.marks = {};
+        self.ws = null; self.app = null; self.files = {}; self.corr = {}; self.marks = {}; self.cmp = {};
         S.hashSet('ws', '');
         self.loading = true;
         app.projects = []; app.prices = {}; app.looseBook = null; app.queue = [];

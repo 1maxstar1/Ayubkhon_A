@@ -32,6 +32,7 @@
   var Sync = {
     ws: null, app: null, files: {}, corr: {}, q: Promise.resolve(), loading: false, dirty: false,
     pend: {}, ct: 0,        // prices typed but not yet written; see correctSoon()
+    cmp: {},                // «Сравнение версий»: the files chosen there (slot → { name, id }) and its «Было»
     seq: 0,                 // which open() is the current one; see open()
 
     init: function () {
@@ -57,6 +58,8 @@
         self.saveExport(bytes, opts);
         return bytes;
       };
+      document.addEventListener('cmp:file', function (e) { self.compareFile(e.detail.slot, e.detail.file); });
+      document.addEventListener('cmp:base', function (e) { if (self.ws && !self.loading) { self.cmp.base = e.detail.base || ''; self.touch(); } });
       $('projects').addEventListener('input', function () { self.touch(); });
       $('reportMode').addEventListener('change', function () { self.touch(); });
       window.addEventListener('beforeunload', function () {
@@ -80,6 +83,8 @@
       this.ws = w; this.app = a;
       S.hashSet('ws', w.id);
       this.files = (w.state && w.state.files) || {};
+      var sc = (w.state && w.state.compare) || {};
+      this.cmp = { old: sc.old || null, new: sc.new || null, reply: sc.reply || null, base: sc.base || '' };
       this.corr = {};
       this.loading = true;
       var app = A();
@@ -235,6 +240,61 @@
       this.renderBox();
       if (remapped) this.touch();          // write the workspace back under the new keys
       if (app.projects.length) app.toast('Рабочая область восстановлена: файлов ' + app.projects.length);
+      this.restoreCompare();
+    },
+
+    /* ---------------------------------------------------------- compare */
+    /*
+     * The returned smeta, our reply and a first version given as a file are read on the
+     * «Сравнение версий» tab without becoming projects — so nothing above keeps them. They are
+     * stored among the workspace's files all the same, and `state.compare` says which stored file
+     * is which. The previous version of the page reads neither: it opens such a workspace as
+     * before, with the comparison empty.
+     */
+    compareFile: function (slot, file) {
+      var self = this, app = A(), ws = this.ws;
+      if (!ws || this.loading) return;
+      this.enqueue(function () {
+        if (self.ws !== ws) return;
+        var was = self.cmp[slot], had = {};
+        (ws.files || []).forEach(function (n) { had[n] = 1; });
+        var drop = was && had[was.id] ? was.id : null;
+        if (!file && !drop) { self.cmp[slot] = null; return; }
+        var fd = new FormData();
+        if (file) fd.append('files+', file);
+        if (drop) fd.append('files-', drop);
+        return S.pb.collection('workspaces').update(ws.id, fd).then(function (w) {
+          // which stored file is the new one: read inside the queue, like upload() does
+          var added = (w.files || []).filter(function (n) { return !had[n]; });
+          ws.files = w.files;
+          self.cmp[slot] = file && added[0] ? { name: file.name, id: added[0] } : null;
+        }).catch(function (e) {
+          app.toast('Файл сравнения не сохранён на сервере: ' + S.pbErr(e), true);
+        });
+      }).then(function () {
+        if (self.ws === ws) return self.saveNow();      // said at once: a reload may be a second away
+      }).catch(function () { /* saveNow has said why, and retries */ });
+    },
+
+    /** After the projects are back: fetch what the comparison had and hand it over. */
+    restoreCompare: function () {
+      var self = this, app = A(), ws = this.ws, c = this.cmp, mine = this.seq;
+      if (!ws || !app.compare_ui) return;
+      var slots = ['old', 'new', 'reply'].filter(function (k) { return c[k] && c[k].id && (ws.files || []).indexOf(c[k].id) >= 0; });
+      if (!slots.length) { if (c.base) app.compare_ui.restore({ base: c.base }, {}); return; }
+      Promise.all(slots.map(function (k) {
+        return S.fileURL(ws, c[k].id).then(function (u) { return fetch(u); }).then(function (r) {
+          if (!r.ok) throw new Error(c[k].name + ': ' + r.status);
+          return r.blob();
+        }).then(function (b) { return new File([b], c[k].name, { type: b.type }); });
+      })).then(function (got) {
+        if (self.seq !== mine) return;                  // another application was opened meanwhile
+        var files = {};
+        slots.forEach(function (k, i) { files[k] = got[i]; });
+        app.compare_ui.restore({ base: c.base }, files);
+      }).catch(function (e) {
+        if (self.seq === mine) app.toast('Файлы сравнения не получены: ' + (e.message || e), true);
+      });
     },
 
     /* ------------------------------------------------------------- save */
@@ -261,6 +321,7 @@
         prices: this.downgrade(app.prices),   // readable by the previous version
         prices2: app.prices,
         looseBook: app.looseBook || null,
+        compare: { old: this.cmp.old || null, new: this.cmp.new || null, reply: this.cmp.reply || null, base: this.cmp.base || '' },
         opts: app.opts,
         mode: $('reportMode').value,
         keys: KEYS,
@@ -555,7 +616,7 @@
           throw e;
         }
       }).then(function () {
-        self.ws = null; self.app = null; self.files = {}; self.corr = {}; self.marks = {};
+        self.ws = null; self.app = null; self.files = {}; self.corr = {}; self.marks = {}; self.cmp = {};
         S.hashSet('ws', '');
         self.loading = true;
         app.projects = []; app.prices = {}; app.looseBook = null; app.queue = [];

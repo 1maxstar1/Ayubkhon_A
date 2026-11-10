@@ -722,7 +722,10 @@ ruscha sahifa). Ikkalasi bir-biriga tegmaydi: UZEX o'z kolleksiyalarida turadi (
   ko'rsatiladi, «Применить» oldin so'raydi; buyum ma'lumoti kerak bo'lgan o'girish (т → м) faqat ⚠ bilan
   ko'rsatiladi, «Применить» yo'q.
 * So'mda bo'lmagan kotirovka (dollar, rubl, eksport jadvali) hech qachon so'mdagi narx sifatida taklif qilinmaydi.
-  Kotirovkalarda QQS ko'rsatilmagan — oynada shunday yozilgan.
+* **QQS (v2.9.1).** Birja narxni QQS bilan kotirovka qiladi, smeta esa QQSsiz tekshiriladi. Shuning uchun UZEX taklifi
+  QQSsiz ko'rsatiladi va qo'llanadi (÷ 1,12; 2023-yilgacha 1,15, 2019-yil oktabrgacha 1,20) — «Наш справочник» dagi birja
+  narxlari ham shunday. Bazada kotirovka sayt bosganidek (QQS bilan) saqlanadi; u narx ustidagi izohda va taklif
+  qatorida ko'rinadi.
 * «Применить» bosilgan narx katagi binafsha va «U» belgisi bilan qoladi (sahifa yangilangandan keyin ham; manba
   `uzex:<hafta>:<qator>` deb saqlanadi). Narx qo'lda yozilsa — belgi yo'qoladi. «Автоподбор» UZEX dan narx olmaydi.
 

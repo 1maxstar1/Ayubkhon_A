@@ -82,6 +82,7 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   `ref_packages` ga va `src/lib/refs` ga tegmaydi: hafta dvigatelga xotiradagi vaqtinchalik paket sifatida beriladi
   (`src/lib/uzex.js`, `src/uzex-worker.js`), IndexedDB ga yozilmaydi. Hafta to'liq yoziladi yoki umuman yozilmaydi;
   so'mda bo'lmagan kotirovka hech qachon narx sifatida taklif qilinmaydi; «Автоподбор» UZEX dan olmaydi.
+  Birja narxi QQS bilan: bazada bosilganidek saqlanadi, taklif va qo'llanadigan narx esa QQSsiz (`S.uzex.net`, ÷ 1,12).
   Testlar faqat soxta saytda (`UZEX_BASE`), test serverlari saytga o'zi chiqmaydi (`UZEX_AUTO=0`).
 * Raqamlar hech qachon yo'qolmaydi: `АНКЕР М5` ≠ `АНКЕР М8`, `4.1.1` ≠ `4.11`;
   ikki raqam orasidagi ajratgich o'chirilmaydi.

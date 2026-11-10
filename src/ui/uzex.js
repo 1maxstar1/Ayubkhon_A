@@ -12,10 +12,13 @@
  *            offered as a price in sums.
  *   tag      «UZEX 7 654 322 +2» next to «справ.» — violet, never green or red (those say how a price differs) and
  *            not the colour of our own tags. With both sources on a row carries both tags.
+ *   VAT      the exchange quotes with VAT, the smeta is checked without it: every UZEX price shown or applied here
+ *            is the quote less VAT (÷ 1,12; S.uzex.net), as the reference package's own exchange lines are. The
+ *            quote as printed, with VAT, is in the title of the price and in the line under it.
  *   popover  the lines the program's own engine finds in that week (src/uzex-worker.js), with the texts of
  *            S.refs.view; the price is violet with the «UZEX» pill; its title gives the quote as the exchange printed
- *            it — name, price, unit («т (предп.)» when the name states none), its own period, the change, forward
- *            and import marks.
+ *            it — name, price with VAT and without, unit («т (предп.)» when the name states none), its own period,
+ *            the change, forward and import marks.
  *   units    a quote in another unit of the same measure (т → кг) is offered converted, with ⚠ and the arithmetic,
  *            and asks before it is applied; one that needs the item's own data (kg per metre …) is shown with ⚠ and
  *            cannot be applied.
@@ -403,7 +406,7 @@
         if (i.left.currency) t += ' · в валюте ' + i.left.currency + ' (не предлагаются)';
         if (!i.used && src.market === 'export') t = 'экспортные котировки — в валюте, как цена в сумах не предлагаются';
       }
-      t += (t ? ' · ' : '') + 'НДС в котировках не указан';
+      t += (t ? ' · ' : '') + 'цены биржи с НДС — показаны без НДС (÷ 1,12)';
       if ($('uzInfo').textContent !== t) $('uzInfo').textContent = t;
     },
 
@@ -471,7 +474,8 @@
     /** The quote as the exchange printed it — the title of a price. */
     tip: function (qs) {
       return qs.map(function (q) {
-        var t = [q.name, 'Цена: ' + fmt(q.price) + ' сум за ' + q.unit + (q.unit_assumed ? ' (предп.)' : ''),
+        var t = [q.name, 'Цена биржи (с НДС): ' + fmt(q.price) + ' сум за ' + q.unit + (q.unit_assumed ? ' (предп.)' : ''),
+          'Без НДС: ' + fmt(S.uzex.net(q.price, q.date_to)),
           'Период котировки: ' + S.uzex.period(q.date_from, q.date_to),
           'Изменение: ' + (q.change_pct > 0 ? '+' : q.change_pct < 0 ? '−' : '') + String(Math.abs(q.change_pct)).replace('.', ',') + ' %'];
         var marks = [q.is_forward ? 'форвард' : '', q.is_import ? 'импорт' : '', q.packing || ''].filter(function (x) { return x; });
@@ -491,7 +495,7 @@
       var ctx = { sources: sources, asof: this.asofNow(), smetaPrice: rec.price, unit: rec.unit, regionLabel: S.regionLabel, queryName: rec.name };
       var html = '<div class="rp-head"><span><span class="upill">UZEX</span> биржа · неделя <b>' + S.esc(this.weekText()) + '</b> · ' +
         S.esc(MARKET[this.src.market]) + '</span><button class="link" data-x title="Закрыть">×</button></div>' +
-        '<div class="up-note">Цена биржи за единицу; НДС в котировках не указан. Если в названии нет единицы — принята тонна («предп.»).</div>';
+        '<div class="up-note">Биржа котирует цену с НДС — здесь она показана без НДС (÷ 1,12). Если в названии нет единицы — принята тонна («предп.»).</div>';
       if (!S.near(rec.market, rec.price)) html += '<div class="rp-mine">Ваша цена: <b>' + fmt(rec.market) + '</b></div>';
       var sub = false;
       lines.forEach(function (l, i) {
@@ -558,7 +562,7 @@
       if (v.evidence.length) h += '<div class="rp-ev">' + S.esc(v.evidence.join(' · ')) + '</div>';
       var meta = one ? ['котировка ' + S.uzex.period(one.date_from, one.date_to),
         'изменение ' + (one.change_pct > 0 ? '+' : one.change_pct < 0 ? '−' : '') + String(Math.abs(one.change_pct)).replace('.', ',') + ' %',
-        fmt(one.price) + ' за ' + one.unit + (one.unit_assumed ? ' (предп.)' : ''), one.packing, one.is_import ? 'импорт' : '']
+        'на бирже ' + fmt(one.price) + ' с НДС за ' + one.unit + (one.unit_assumed ? ' (предп.)' : ''), one.packing, one.is_import ? 'импорт' : '']
         : ['медиана котировок: ' + qs.length];
       h += '<div class="rp-src">' + S.esc(meta.filter(function (x) { return x; }).join(' · ')) + (v.age ? ' · ' + S.esc(v.age) : '') + '</div>';
       if (warn) h += '<div class="up-warnt">⚠ ' + S.esc(warn) + '</div>';
@@ -566,8 +570,8 @@
       if (qs.length > 1) {
         h += '<button class="link rp-fold" data-fold="' + i + '">▸ котировки (' + qs.length + ')</button>' +
           '<div class="rp-comps" data-of="' + i + '" hidden>' + qs.map(function (q) {
-            return '<div class="rp-comp"><b>' + S.esc(fmt(q.price)) + '</b><div><div class="rp-name">' + S.esc(q.name) + '</div>' +
-              '<div class="rp-src">' + S.esc('за ' + q.unit + (q.unit_assumed ? ' (предп.)' : '') + ' · котировка ' + S.uzex.period(q.date_from, q.date_to)) +
+            return '<div class="rp-comp"><b>' + S.esc(fmt(S.uzex.net(q.price, q.date_to))) + '</b><div><div class="rp-name">' + S.esc(q.name) + '</div>' +
+              '<div class="rp-src">' + S.esc('за ' + q.unit + (q.unit_assumed ? ' (предп.)' : '') + ' · на бирже ' + fmt(q.price) + ' с НДС · котировка ' + S.uzex.period(q.date_from, q.date_to)) +
               '</div></div></div>';
           }).join('') + '</div>';
       }

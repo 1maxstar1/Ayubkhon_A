@@ -6,7 +6,7 @@
  * is down leaves an error and the stored weeks, the switch reaches the server, a week can be deleted; the reference
  * packages are the same before and after.
  * Expert: out of the box only «Наш справочник» is on and the page is what it was; UZEX on — violet tags beside
- * «справ.», the popover with the quote as printed; forward, dated-earlier and dollar quotes behave as their
+ * «справ.», prices without VAT (the exchange quotes with it), the popover with the quote as printed; forward, dated-earlier and dollar quotes behave as their
  * checkboxes say; another unit of the same measure is converted with a warning and a question, one that needs the
  * item's data cannot be applied; the last source cannot be unchecked; no checkmark ever changes a price; an applied
  * price keeps its violet «U» after a reload and loses it when typed over; the week and the market can be changed.
@@ -205,23 +205,23 @@ try {
   check(await ep.isVisible(row(PIPE, 'т') + ' .tagr') && await ep.isVisible(row(PIPE, 'т') + ' .tagu'), 'with both checked a row carries both tags');
   const tag = await ep.$eval(row(PIPE, 'т') + ' .tagu', (b) => ({ text: b.textContent, color: getComputedStyle(b).color, bg: getComputedStyle(b).backgroundColor,
     border: getComputedStyle(b).borderLeftColor, weight: getComputedStyle(b).fontWeight }));
-  check(/^UZEX 7 654 322$/.test(sp(tag.text)), 'the tag reads «UZEX» and the price (' + tag.text + ')');
+  check(/^UZEX 6 834 216$/.test(sp(tag.text)), 'the tag reads «UZEX» and the price without VAT: 7 654 321,5 ÷ 1,12 (' + tag.text + ')');
   check(tag.color === 'rgb(60, 52, 137)' && tag.bg === 'rgb(238, 237, 254)' && tag.border === 'rgb(83, 74, 183)' && +tag.weight >= 600,
     `violet, semi-bold, with its left border — not green, red or our own colours (${tag.color} on ${tag.bg}, ${tag.border})`);
   check(await prices() === p0, 'checking a source sets no price');
   check(await ep.isVisible('.srcopts') && await ep.inputValue('#uzWeek') === '304' && await ep.inputValue('#uzMarket') === 'internal' &&
     /Ichki/.test(await ep.textContent('#uzMarket')) && /Eksport/.test(await ep.textContent('#uzMarket')), 'the week and the market are shown: the newest internal week');
-  check(/котировок: 4 из 6/.test(await ep.textContent('#uzInfo')) && /в валюте 1/.test(await ep.textContent('#uzInfo')) && /НДС/.test(await ep.textContent('#uzInfo')),
-    'how many quotes are in use, and that VAT is not stated (' + await ep.textContent('#uzInfo') + ')');
+  check(/котировок: 4 из 6/.test(await ep.textContent('#uzInfo')) && /в валюте 1/.test(await ep.textContent('#uzInfo')) && /цены биржи с НДС — показаны без НДС/.test(await ep.textContent('#uzInfo')),
+    'how many quotes are in use, and that the prices are shown without VAT (' + await ep.textContent('#uzInfo') + ')');
   check(/ · UZEX \d+/.test(await ep.textContent('#priceCount')), 'the status line counts the resources with a quote');
 
   const pipe = await popover(PIPE, 'т');
   const pl = pipe.lines[0];
   check(pipe.lines.length === 1 && pl.pill && pl.badge === 'Документ' && pl.apply && !pl.warn, 'the popover: one line, the «UZEX» pill, «Документ», «Применить»');
   check(pl.color === 'rgb(83, 74, 183)' && +pl.weight >= 600 && pl.border === 'rgb(83, 74, 183)', 'its price is violet and semi-bold, with the thin left border');
-  check(pl.title.includes(PIPE) && /Цена: 7 654 321,5 сум за т \(предп\.\)/.test(sp(pl.title)) && /Период котировки: 10\.03–14\.03\.2031/.test(pl.title) &&
-    /Изменение: −0,56 %/.test(pl.title), 'the title of the price gives the quote as printed: name, price, «т (предп.)», its period, the change');
-  check(/неделя 10\.03–14\.03\.2031/.test(pipe.text) && /НДС в котировках не указан/.test(pipe.text) && !/uzex-w|\|/.test(pipe.text), 'the head names the week and says VAT is not stated; no internal key is shown');
+  check(pl.title.includes(PIPE) && /Цена биржи \(с НДС\): 7 654 321,5 сум за т \(предп\.\)/.test(sp(pl.title)) && /Без НДС: 6 834 215,63/.test(sp(pl.title)) && /Период котировки: 10\.03–14\.03\.2031/.test(pl.title) &&
+    /Изменение: −0,56 %/.test(pl.title), 'the title of the price gives the quote as printed: name, price with VAT and without, «т (предп.)», its period, the change');
+  check(/неделя 10\.03–14\.03\.2031/.test(pipe.text) && /показана без НДС \(÷ 1,12\)/.test(pipe.text) && /на бирже 7 654 321,5 с НДС за т/.test(sp(pipe.text)) && !/uzex-w|\|/.test(pipe.text), 'the head names the week and says the price is without VAT; the line gives the quote with it; no internal key is shown');
   await ep.evaluate(() => S.Uzex.hide());
 
   /* ------------------------------------------------------------- what the checkboxes do */
@@ -252,18 +252,18 @@ try {
 
   /* ------------------------------------------------------------- units */
   const paint = await popover(PAINT);
-  check(paint.lines[0].warn && paint.lines[0].apply && /Единица другая, цена пересчитана: 3 141 593 за 1 т → 3 141,59 за 1 кг/.test(sp(paint.lines[0].text)) &&
+  check(paint.lines[0].warn && paint.lines[0].apply && /Единица другая, цена пересчитана: 2 804 993 за 1 т → 2 804,99 за 1 кг/.test(sp(paint.lines[0].text)) &&
     /принята тонна/.test(paint.lines[0].text), 'tonnes for a resource in kg: converted, with ⚠ and the arithmetic (' + sp(paint.lines[0].text).replace(/\s+/g, ' ').slice(120, 400) + ')');
   check(await ep.$eval(row(PAINT) + ' .tagu', (b) => b.classList.contains('near') && /≈/.test(b.textContent)), 'its tag is dashed with «≈»');
   answer = false; dialogs.length = 0;
   await ep.click('#uzexPop .up-line button[data-i]');
   await settle();
-  check(dialogs.length === 1 && /Единица другая/.test(dialogs[0]) && /Применить 3 141,59 за кг/.test(sp(dialogs[0])) && await prices() === p0,
+  check(dialogs.length === 1 && /Единица другая/.test(dialogs[0]) && /Применить 2 804,99 за кг/.test(sp(dialogs[0])) && await prices() === p0,
     'a converted price asks first, and «Отмена» applies nothing');
   answer = true; dialogs.length = 0;
   await ep.click('#uzexPop .up-line button[data-i]');
-  await ep.waitForFunction((n) => { const r = app.model.resources.find((x) => x.name === n); return r && Math.abs(r.market - 3141.59) < 0.005; }, PAINT);
-  check(dialogs.length === 1, 'confirmed, it is applied converted: 3 141,59 per kg');
+  await ep.waitForFunction((n) => { const r = app.model.resources.find((x) => x.name === n); return r && Math.abs(r.market - 2804.99) < 0.005; }, PAINT);
+  check(dialogs.length === 1, 'confirmed, it is applied converted and without VAT: 2 804,99 per kg');
 
   const metre = await popover(PIPE, 'м');
   check(metre.lines.length >= 1 && metre.lines[0].warn && !metre.lines[0].apply && /≈/.test(metre.lines[0].text) && /введите цену вручную/.test(metre.lines[0].text),
@@ -273,7 +273,7 @@ try {
   /* ------------------------------------------------------------- apply, and the mark in the cell */
   await popover(PIPE, 'т');
   await ep.click('#uzexPop .up-line button[data-i]');
-  await ep.waitForFunction((n) => { const r = app.model.resources.find((x) => x.name === n && x.unit === 'т'); return r && r.market === 7654321.5; }, PIPE);
+  await ep.waitForFunction((n) => { const r = app.model.resources.find((x) => x.name === n && x.unit === 'т'); return r && r.market === 6834215.63; }, PIPE);
   await show(PIPE);
   const cell = () => ep.$eval(row(PIPE, 'т'), (r) => {
     const pin = r.querySelector('.pin'), pill = r.querySelector('.upill.u');
@@ -341,7 +341,7 @@ try {
   await uzReady();
   await show(PIPE);
   await ep.waitForSelector(row(PIPE, 'т') + ' .tagu');
-  check(/7 711 223/.test(sp((await ep.textContent(row(PIPE, 'т') + ' .tagu')))) && /03\.03–07\.03\.2031/.test((await cards())[1]),
+  check(/6 885 021/.test(sp((await ep.textContent(row(PIPE, 'т') + ' .tagu')))) && /03\.03–07\.03\.2031/.test((await cards())[1]),
     'another week can be chosen: its quote, and the card names it');
   await ep.selectOption('#uzMarket', 'export');
   await ep.waitForFunction(() => S.Uzex.state === 'empty');

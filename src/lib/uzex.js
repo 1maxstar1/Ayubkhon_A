@@ -17,6 +17,10 @@
  *                   did not trade in it
  *       A quote that is not in sums (dollars, roubles, the unnamed currency of the export table) is never offered
  *       as a price in sums: it is left out here, whatever is asked.
+ *       The exchange quotes its prices with VAT; the smeta is checked without it. The package therefore carries
+ *       S.uzex.net(price, date) — the quote less the VAT of its date — while the stored quote stays as printed.
+ *   S.uzex.vatRate(date) → the rate of VAT in Uzbekistan on that day (0.12 since 2023)
+ *   S.uzex.net(price, date) → the price without VAT, to the tiyin
  *   S.uzex.sourceOf(importId, line) → corrections.source of a price applied from a line: «uzex:<week>:<row>», or
  *       «uzex:<week>:median:<row>,<row>…» for a line that is a median of several quotes
  *   S.uzex.parseSource(s) → { import_id, rows: [row…] } | null
@@ -31,6 +35,14 @@
 
   function srcId(imp) { return 'uzex-w' + imp.import_id; }
 
+  /* VAT in Uzbekistan: 12 % from 01.01.2023, 15 % from 01.10.2019, 20 % before. */
+  function vatRate(date) {
+    var d = String(date || '');
+    return d && d < '2019-10-01' ? 0.20 : d && d < '2023-01-01' ? 0.15 : 0.12;
+  }
+  /* half a tiyin goes up: the division leaves …62,4999999 where the arithmetic says …62,5 */
+  function net(price, date) { return Math.round(price / (1 + vatRate(date)) * 100 + 1e-6) / 100; }
+
   function packageOf(imp, quotes, o) {
     o = o || {};
     var out = { pkg: null, used: 0, left: { currency: 0, forward: 0, old: 0, empty: 0 } };
@@ -40,9 +52,10 @@
       if (q.is_forward && !o.forward) { out.left.forward++; return; }
       if (o.onlyWeek && (q.date_from !== imp.period_from || q.date_to !== imp.period_to)) { out.left.old++; return; }
       var item = q.item || q.name;
-      if (!(q.price > 0) || !item || !q.unit || !q.date_to || !(q.row_no > last)) { out.left.empty++; return; }
+      var price = q.price > 0 ? net(q.price, q.date_to) : 0;
+      if (!(price > 0) || !item || !q.unit || !q.date_to || !(q.row_no > last)) { out.left.empty++; return; }
       last = q.row_no;
-      var row = [q.row_no, item, q.name && q.name !== item ? q.name : null, q.unit, q.unit, 'materials', q.price, q.date_to,
+      var row = [q.row_no, item, q.name && q.name !== item ? q.name : null, q.unit, q.unit, 'materials', price, q.date_to,
         null, null, 'national', src, 'exchange', q.is_forward ? 'exchange-forward' : 'exchange-spot'];
       if (q.is_forward) row.push(null, null, null, ['forward']);
       rows.push(row);
@@ -57,7 +70,7 @@
       rid_min: rows[0][0], rid_max: rows[rows.length - 1][0], counts: { records: rows.length, sources: 1 },
       date_min: dmin, date_max: dmax,
       sources: [{ id: src, doc_type: 'exchange-quotes', issuer: 'UZEX', customer: null, doc_no: String(imp.import_id),
-        issue_date: imp.period_to, as_of_date: null, region: 'national', ships_nationally: true, vat_default: null, method: 'weekly-quotes' }],
+        issue_date: imp.period_to, as_of_date: null, region: 'national', ships_nationally: true, vat_default: true, method: 'weekly-quotes' }],
       fields: FIELDS, rows: rows
     };
     return out;
@@ -94,5 +107,5 @@
     return d(from, from.slice(0, 4) !== to.slice(0, 4)) + '–' + d(to, true);
   }
 
-  S.uzex = { packageOf: packageOf, rowsOf: rowsOf, sourceOf: sourceOf, parseSource: parseSource, period: period, srcId: srcId };
+  S.uzex = { vatRate: vatRate, net: net, packageOf: packageOf, rowsOf: rowsOf, sourceOf: sourceOf, parseSource: parseSource, period: period, srcId: srcId };
 })(S);

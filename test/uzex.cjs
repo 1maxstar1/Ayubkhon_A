@@ -114,9 +114,15 @@ function finish() {
   sug.init({ handle: R.open(R.derive(p.pkg, {})), sources: p.pkg.sources });
   const ask = (name, unit) => sug.suggest(R.queryOf({ name, unit, section: 'materials' }, { region: 'xorazm', asof: '2031-03-14' }));
   const pipe = ask('Труба стальная электросварная 57х3,5', 'т');
-  check(pipe.length === 1 && pipe[0].tier === 'document' && pipe[0].price === 7654321.5 && pipe[0].rid === 1, 'the engine finds the quote of the same name: «Документ», its price, its row');
+  check(S.uzex.vatRate('2031-03-14') === 0.12 && S.uzex.vatRate('2022-06-01') === 0.15 && S.uzex.vatRate('2019-09-30') === 0.20 && S.uzex.vatRate('') === 0.12,
+    'the VAT rate of the quote\'s date: 12 % since 2023, 15 % before, 20 % before October 2019');
+  check(S.uzex.net(1120, '2031-03-14') === 1000 && S.uzex.net(7654321.5, '2031-03-14') === 6834215.63 && S.uzex.net(1150, '2022-06-01') === 1000,
+    'a quote less its VAT, to the tiyin');
+  check(p.pkg.rows[0][6] === 6834215.63 && quotes[0].price === 7654321.5 && p.pkg.sources[0].vat_default === true,
+    'the package carries the price without VAT; the stored quote stays as printed');
+  check(pipe.length === 1 && pipe[0].tier === 'document' && pipe[0].price === 6834215.63 && pipe[0].rid === 1, 'the engine finds the quote of the same name: «Документ», its price without VAT, its row');
   const kg = ask('Труба стальная электросварная 57х3,5', 'кг');
-  check(kg.length === 1 && Math.abs(kg[0].price - 7654.3215) < 1e-6 && Math.abs(kg[0].raw.factor - 0.001) < 1e-12, 'a tonne price for a resource in kg is converted (÷ 1000)');
+  check(kg.length === 1 && Math.abs(kg[0].price - 6834.21563) < 1e-6 && Math.abs(kg[0].raw.factor - 0.001) < 1e-12, 'a tonne price for a resource in kg is converted (÷ 1000)');
   const m = ask('Труба стальная электросварная 57х3,5', 'м');
   check(m.length === 1 && (m[0].tier === 'estimate' || (m[0].flags || []).indexOf('derived-unit') >= 0), 'for a resource by the metre it is an estimate that needs the pipe\'s own mass');
   check(ask('Анкер М8', 'шт').length === 1 && ask('Анкер М5', 'шт').length === 0, 'М8 is found, М5 is not: numbers are never lost');

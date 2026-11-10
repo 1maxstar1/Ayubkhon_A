@@ -35,6 +35,7 @@ sh test/pb-smoke.sh; node test/e2e-workspace.mjs      # server rejimi testlari
 node test/normalize.cjs; node test/sections.cjs; node test/regions.cjs   # NLP o'lchovlari
 node test/hints.cjs a.xlsx b.xlsx                      # o'xshash resurs takliflari o'lchovi
 node test/refs.cjs                                    # справочные цены: yadro, sintetik ma'lumotda
+node test/uzex.cjs; node test/uzex-api.mjs; node test/e2e-uzex.mjs   # UZEX haftalik kotirovkalari: sahifani o'qish, sinxronlash, «Проверка цен» (soxta sayt: test/uzex-site.mjs)
 REFS_KIT=<kit> node test/refs-parity.cjs               # dastur o'lchangan natijani aynan qaytaradimi (kit — maxfiy, repoda emas)
 REFS_KIT=<kit> node test/refs-privacy.cjs              # repo va dist da haqiqiy narx/hujjat yo'qligi (commit oldidan)
 node test/fixtures.cjs --smeta a.xlsx --registry r.xls  # o'lchov ma'lumotini yangilash
@@ -76,6 +77,12 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   faqat `test/refs-parity.cjs` o'lchovi bilan o'zgaradi (`REFS_KIT` siz
   `test/all.sh` «NOT MEASURED» deydi). Taklif faqat «Применить» bosilganda
   qo'yiladi; ekspert yozgan narx doim ustun.
+* **UZEX (биржа)** (v2.9.0) — ikkinchi, **alohida** narx manbai: uzex.uz haftalik kotirovkalari (faqat ruscha
+  sahifa), o'z kolleksiyalarida (`uzex_imports`, `uzex_quotes`, `uzex_settings`; `server/pb_hooks/uzex.pb.js`).
+  `ref_packages` ga va `src/lib/refs` ga tegmaydi: hafta dvigatelga xotiradagi vaqtinchalik paket sifatida beriladi
+  (`src/lib/uzex.js`, `src/uzex-worker.js`), IndexedDB ga yozilmaydi. Hafta to'liq yoziladi yoki umuman yozilmaydi;
+  so'mda bo'lmagan kotirovka hech qachon narx sifatida taklif qilinmaydi; «Автоподбор» UZEX dan olmaydi.
+  Testlar faqat soxta saytda (`UZEX_BASE`), test serverlari saytga o'zi chiqmaydi (`UZEX_AUTO=0`).
 * Raqamlar hech qachon yo'qolmaydi: `АНКЕР М5` ≠ `АНКЕР М8`, `4.1.1` ≠ `4.11`;
   ikki raqam orasidagi ajratgich o'chirilmaydi.
 * **Xavfsizlik bo'limi hozircha o'chirilgan (egasining qarori, 2026-10-24).**

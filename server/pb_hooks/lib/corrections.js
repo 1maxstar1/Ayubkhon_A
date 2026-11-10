@@ -12,12 +12,13 @@ function money(v) {
 }
 
 // Where a price came from (corrections.source, written by the page): «typed», «hint:<correction id>»,
-// «ref:<package>:<record>» or «ref:<package>:median:<record>,<record>…». Other experts' hints label a price «из
-// справочника» by it, and these labels are meant to become learning data, so the server takes only these forms, and a
-// reference or a hint only when that package or that correction exists; anything else is stored as «typed». It stays
+// «ref:<package>:<record>» or «ref:<package>:median:<record>,<record>…», «uzex:<week>:<row>» or «uzex:<week>:median:<row>,<row>…» (an exchange quote,
+// see uzex.pb.js). Other experts' hints label a price «из справочника» by it, and these labels are meant to become
+// learning data, so the server takes only these forms, and a reference, a quote or a hint only when that package,
+// that week or that correction exists; anything else is stored as «typed». It stays
 // the page's claim about one click (the server cannot see the click), never a proof.
 const MAX_SOURCE = 200;
-const SOURCE_RE = /^(?:typed|hint:([a-z0-9]{15})|ref:([a-z0-9][a-z0-9._-]{2,63}):(?:\d{1,12}|median:\d{1,12}(?:,\d{1,12})*(?:…)?))$/;
+const SOURCE_RE = /^(?:typed|hint:([a-z0-9]{15})|ref:([a-z0-9][a-z0-9._-]{2,63}):(?:\d{1,12}|median:\d{1,12}(?:,\d{1,12})*(?:…)?)|uzex:(\d{1,9}):(?:\d{1,6}|median:\d{1,6}(?:,\d{1,6})*(?:…)?))$/;
 
 function sourceChecker(app) {
   const known = new Map();
@@ -40,6 +41,7 @@ function sourceChecker(app) {
     let ok = !!m;
     if (ok && m[1]) ok = exists("corrections", "id", m[1]);
     if (ok && m[2]) ok = exists("ref_packages", "package_id", m[2]);
+    if (ok && m[3]) ok = exists("uzex_imports", "import_id", Number(m[3]));
     if (!ok || s === "typed") return { source: "typed", price: 0 };
     return { source: s, price: money(price) };
   };

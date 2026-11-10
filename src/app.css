@@ -395,3 +395,58 @@ table.cmp s.mute{text-decoration:line-through}
 .cmp-head table.cmp th{background:var(--band)}
 .cmp-back{display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--accent-w);border-bottom:1px solid var(--rule)}
 .cmp-back b{font-weight:600}
+
+/* ------------------------------------------------------------ price sources: ours and UZEX */
+/* The exchange has a colour of its own — violet: never green or red (those say how a price differs from the smeta's)
+   and not the colours of our own tags. The dark values are for a dark page, should the program get one. */
+:root{--uzex:#534AB7;--uzex-bg:#EEEDFE;--uzex-tx:#3C3489}
+:root[data-theme="dark"]{--uzex:#AFA9EC;--uzex-bg:#3C3489;--uzex-tx:#CECBF6}
+.srcbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 10px;border-bottom:1px solid var(--rule);background:var(--sf2)}
+.srcbar[hidden]{display:none}
+.srccard{display:inline-flex;align-items:center;gap:8px;border:1.5px solid var(--rule2);background:var(--sf);border-radius:10px;
+  padding:4px 12px 4px 8px;cursor:pointer;font-family:inherit;text-align:left;color:var(--mute);min-height:38px}
+.srccard:hover{border-color:var(--mute)}
+.srccard .sc-ck{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;
+  border:1.5px solid var(--rule2);color:transparent;font-size:11px;font-weight:700;flex:none}
+.srccard .sc-tx{display:flex;flex-direction:column;line-height:1.25}
+.srccard b{font-size:12.5px;font-weight:600;color:var(--ink)}
+.srccard small{font-size:10.5px;color:var(--mute);font-variant-numeric:tabular-nums;white-space:nowrap}
+.srccard.on{border-color:#2f7d52;background:#f3faf6}
+.srccard.on .sc-ck{background:#2f7d52;border-color:#2f7d52;color:#fff}
+.srccard.uz.on{border-color:var(--uzex);background:var(--uzex-bg)}
+.srccard.uz.on .sc-ck{background:var(--uzex);border-color:var(--uzex)}
+.srccard.uz.on b{color:var(--uzex-tx)}
+.srcopts{display:flex;flex:1 0 100%;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px}
+.srcopts[hidden]{display:none}
+.srcopts select{border:1px solid var(--rule2);border-radius:6px;padding:4px 6px;background:var(--sf);font-family:inherit;font-size:12px}
+.srcopts label{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;cursor:pointer}
+.srclegend{font-size:11px;color:var(--mute);white-space:nowrap}
+.srclegend .tagr{margin-left:0;cursor:default}
+.srclegend .upill{margin-left:8px}
+.srclegend{margin-left:6px}
+.srchint{font-size:11.5px;color:var(--uzex-tx);background:var(--uzex-bg);border-radius:4px;padding:2px 8px}
+.srchint[hidden]{display:none}
+body.src-norefs #refAsof{display:none !important}
+.upill{display:inline-block;background:var(--uzex-bg);color:var(--uzex-tx);border-radius:8px;padding:0 6px;font-size:9.5px;
+  font-weight:700;letter-spacing:.03em;line-height:14px;white-space:nowrap}
+.tagu{display:inline-block;background:var(--uzex-bg);color:var(--uzex-tx);border:1px solid var(--uzex);border-left-width:3px;border-radius:3px;
+  padding:0 5px;font-size:10px;font-weight:600;margin-left:6px;cursor:pointer;font-family:inherit;font-variant-numeric:tabular-nums;
+  white-space:nowrap;line-height:14px}
+.tagu:hover{filter:brightness(.96)}
+/* another product of the exchange, or a price in another unit: dashed, to be checked */
+.tagu.near{background:var(--sf);border-style:dashed;border-left-style:solid}
+.vrow .c.uzc{gap:4px}
+.vrow .c.uzc .upill.u{flex:none;padding:0 4px}
+.pin.uz,.pin.uz.edited{color:var(--uzex);font-weight:600;background:var(--uzex-bg)}
+#uzexPop{position:fixed;z-index:76;background:var(--sf);border:1px solid var(--uzex);border-radius:8px;
+  box-shadow:0 10px 30px rgba(20,23,28,.14);width:520px;max-width:calc(100vw - 16px);max-height:70vh;overflow:auto;font-size:12px}
+#uzexPop[hidden]{display:none}
+#uzexPop .rp-head .upill{margin-right:4px}
+.up-note{padding:5px 10px;border-bottom:1px solid var(--rule);color:var(--mute);font-size:10.5px;background:var(--sf2)}
+.up-line{padding:7px 10px 7px 8px;border-bottom:1px solid #f0f2f5;border-left:3px solid var(--uzex)}
+.up-line.near{border-left-style:dashed}
+.up-price{color:var(--uzex);font-weight:600;font-variant-numeric:tabular-nums;font-size:13px;cursor:help}
+.up-warn{color:#8a5a10;cursor:help}
+.up-warnt{color:#8a5a10;font-size:11px;margin-top:2px;overflow-wrap:anywhere}
+.hp-uzex{color:var(--uzex) !important}
+.uz-auto{display:inline-flex;align-items:center;gap:5px;margin-left:10px;font-size:13px;cursor:pointer}

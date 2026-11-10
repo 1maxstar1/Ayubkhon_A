@@ -202,6 +202,7 @@
         case 'near': return !!(S.Hints && S.Hints.nearRow(r));
         case 'ref': return !!(S.Refs && S.Refs.hasRow(r));
         case 'nearref': return !!(S.Refs && S.Refs.nearRow(r));
+        case 'uzex': return !!(S.Uzex && S.Uzex.hasRow(r));
         case 'wrongsec': return !!secWarn(r);
         default: return true;
       }
@@ -231,7 +232,8 @@
       (hinted ? ' · с подсказками ' + hinted : '') +
       (near ? ' · похожих ' + near : '') +
       (mis ? ' · не тот раздел ' + mis : '') +
-      (S.Refs ? S.Refs.statusText() : '');
+      (S.Refs ? S.Refs.statusText() : '') +
+      (S.Uzex ? S.Uzex.statusText() : '');
   };
 
   Prices.prototype.renderRange = function (from, to) {
@@ -245,7 +247,9 @@
       var many = r.variants > 1;
       var multi = many ? '<button class="tagm" data-nm="' + S.esc(r.name) + '" title="' +
         S.esc(multiHint(r)) + '">' + r.variants + ' цены</button>' : '';
-      var hint = (S.Hints ? S.Hints.tag(r) : '') + (S.Refs ? S.Refs.tag(r) : '');
+      var hint = (S.Hints ? S.Hints.tag(r) : '') + (S.Refs ? S.Refs.tag(r) : '') + (S.Uzex ? S.Uzex.tag(r) : '');
+      // a price applied from an exchange quote keeps its mark in the cell until it is typed over (src/ui/uzex.js)
+      var uz = S.Uzex ? S.Uzex.cellMark(r) : '';
       var sec = secTag(r);
       out.push(
         '<div class="vrow' + (changed ? ' chg' : '') + (many ? ' many' : '') + '">' +
@@ -256,8 +260,8 @@
         cell(COLS[3], r.count) +
         cell(COLS[4], S.qty(r.qty)) +
         '<div class="c num" style="' + width(COLS[5]) + '">' + S.price(r.price) + '</div>' +
-        '<div class="c num" style="' + width(COLS[6]) + '">' +
-        '<input class="pin' + (changed ? ' edited' : '') + '" data-key="' + S.esc(r.key) + '" data-i="' + i +
+        '<div class="c num' + (uz ? ' uzc' : '') + '" style="' + width(COLS[6]) + '">' + uz +
+        '<input class="pin' + (changed ? ' edited' : '') + (uz ? ' uz' : '') + '" data-key="' + S.esc(r.key) + '" data-i="' + i +
         '" inputmode="decimal" value="' + S.price(r.market) + '"></div>' +
         '<div class="c num' + (changed ? ' diff' : '') + '" style="' + width(COLS[7]) + '">' +
         (r.smetaSum ? pct.toFixed(1) + '%' : '') + '</div>' +

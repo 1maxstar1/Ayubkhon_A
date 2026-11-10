@@ -71,6 +71,10 @@ const SERVER_SCRIPTS = [
   'src/lib/refs/view.js',
   'src/lib/refs/query.js',
   'src/ui/refs.js',
+  // UZEX weekly quotes: a second price source beside the reference package (its own collections, its own worker —
+  // src/uzex-worker.js, appended at run time to the reference worker's libraries, which carry the engine)
+  'src/lib/uzex.js',
+  'src/ui/uzex.js',
 ].filter((p) => existsSync(join(root, p)));
 
 // The reference-price worker of the server page (src/refs-worker.js): the whole-country pool, the family parsers and
@@ -119,6 +123,9 @@ function page(scripts, server) {
     // the single-file page carries no reference-price code at all, not even the empty slot
     .replace(/<script>window\.__REFS_WORKER_SRC__ = \/\*__REFS_WORKER__\*\/;<\/script>\n?/, () =>
       (refs ? '<script>window.__REFS_WORKER_SRC__ = ' + JSON.stringify(refs) + ';</script>\n' : ''))
+    .replace(/<script>window\.__UZEX_WORKER_SRC__ = \/\*__UZEX_WORKER__\*\/;<\/script>\n?/, () =>
+      (refs && existsSync(join(root, 'src/uzex-worker.js'))
+        ? '<script>window.__UZEX_WORKER_SRC__ = ' + JSON.stringify(read('src/uzex-worker.js')) + ';</script>\n' : ''))
     .replace('/*__JS__*/', () => js);
 }
 
@@ -152,7 +159,7 @@ function build() {
       .replace('/*__JS__*/', () => ['src/vendor/pocketbase.umd.js', 'src/vendor/xlsx.full.min.js', 'src/vendor/fflate.umd.js',
         'src/lib/normalize.js', 'src/lib/match.js', 'src/lib/util.js', 'src/lib/pb.js', 'src/lib/regions.js', 'src/lib/registry-parse.js',
         'src/lib/refs/package.js', 'src/lib/refs/view.js',
-        'src/ui/auth.js', 'src/ui/apps-admin.js', 'src/ui/admin.js', 'src/ui/refs-admin.js']
+        'src/ui/auth.js', 'src/ui/apps-admin.js', 'src/ui/admin.js', 'src/ui/refs-admin.js', 'src/ui/uzex-admin.js']
         .filter((p) => existsSync(join(root, p))).map(read).join('\n;\n'));
     emit('admin.html', admin);
   }

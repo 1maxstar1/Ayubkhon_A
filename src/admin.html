@@ -61,6 +61,22 @@
     <div id="refsDocs" hidden></div>
   </section>
 
+  <section class="panel" id="uzexPanel">
+    <h2>UZEX haftalik narxlar</h2>
+    <p class="lead">Manba: UzEx — Haftalik kotirovkalar (uzex.uz). Birlik nomda ko'rsatilmagan bo'lsa — 1 tonna deb olingan.
+      QQS holati ko'rsatilmagan. Bu bo'lim «Справочник цен (документы)» dan alohida: u paketlarga tegmaydi, paket yuklash
+      esa bu yerdagi haftalarga tegmaydi. Sayt faqat oxirgi 4 haftani saqlaydi — olingan har bir hafta shu bazada qoladi.</p>
+    <button class="btn primary" type="button" id="uzexSync"><span class="ic">↻</span> UZEX dan yangilash</button>
+    <button class="btn" type="button" id="uzexForce" title="Saytda ko'rinib turgan haftalarni qaytadan o'qib, saqlanganining o'rniga yozadi">Qayta o'qish</button>
+    <label class="uz-auto" title="Server ishga tushgandan yarim daqiqa keyin va har kuni soat 09:00 da (Toshkent vaqti) yangi haftalarni o'zi oladi">
+      <input type="checkbox" id="uzexAuto"> Avtomatik yangilash</label>
+    <div class="progress" id="uzexProgress" hidden><div class="bar-fill" style="width:100%"></div><span>UZEX dan o'qilmoqda…</span></div>
+    <p class="err" id="uzexErr" hidden></p>
+    <div class="stat" id="uzexStat"></div>
+    <h3>Saqlangan haftalar</h3>
+    <table class="tbl" id="uzexTable"><thead><tr><th>Hafta</th><th>Bozor</th><th>Qatorlar</th><th>Olingan</th><th></th></tr></thead><tbody></tbody></table>
+  </section>
+
   <section class="panel">
     <h2>Рабочие области</h2>
     <p class="lead">Заявки, открытые сотрудниками. <b>Очистить</b> — удаляются загруженные сметы, правки цен и экспорты,

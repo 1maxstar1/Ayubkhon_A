@@ -20,3 +20,4 @@ v2.8.2 c01b2f02a70f0eb0f84c5bb109278eed3766e46b qayta yuklangandan keyin Bylo lo
 v2.8.3 610cda8b201dfc6572a3b86568c01a82aa055aa5 Sravnenie versiy aylanadi; resurs qatorlaridan orqaga tugma
 v2.8.4 f06cb6326d6b313e88045f28fe64e8a82f01735c Sravnenie versiy: yuklangan fayllar qayta yuklashdan keyin qaytadi
 v2.9.0 fd09d6599479582a44361608f0d2f8033f30fb2e UZEX (birja) haftalik kotirovkalari - ikkinchi, alohida narx manbai
+v2.9.1 41e9e7ce278e03bc14d4c41108a117c4534eb6b1 UZEX narxlari QQSsiz korsatiladi va qollanadi (birja QQS bilan kotirovka qiladi)

@@ -338,6 +338,7 @@
       '№ ' + S.esc(h.number) + ' · ' + S.esc(h.contragent) + ' · ' + day(h.at) +
       (h.same ? ' <em>тот же контрагент</em>' : '') +
       (h.ref ? ' <em class="hp-ref" title="Эту цену эксперт применил из справочника цен, а не ввёл сам">из справочника</em>' : '') +
+      (h.uzex ? ' <em class="hp-uzex" title="Эту цену эксперт применил из котировок биржи UZEX, а не ввёл сам">с биржи UZEX</em>' : '') +
       (h.count > 1 ? ' · ×' + h.count : '') +
       (h.smeta != null && rec && !S.near(h.smeta, rec.price) ? '<small>сметная цена там: ' + S.price(h.smeta) + '</small>' : '') +
       '</span>' +
@@ -352,6 +353,7 @@
       id: c.id, price: c.market_price, smeta: c.smeta_price, note: c.note, at: c.updated, name: c.name,
       // applied from the reference package and still that price: shown as such, never as a price somebody typed
       ref: /^ref:/.test(c.source || '') && S.near(c.market_price, c.source_price),
+      uzex: /^uzex:/.test(c.source || '') && S.near(c.market_price, c.source_price),
       number: a ? a.number : '', contragent: ct ? ct.name : (a ? a.org_name : ''),
       region: c.region, by: by ? (by.name || by.email) : '',
       same: !!(mine && c.contragent === mine)

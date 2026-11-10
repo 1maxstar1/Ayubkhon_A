@@ -73,7 +73,9 @@ const FILE = {
   'refs-pool': 'src/lib/refs/pool.js',
   'refs-retrieve': 'src/lib/refs/retrieve.js',
   'refs-suggest': 'src/lib/refs/suggest.js',
-  'refs-cache': 'src/lib/refs/cache.js'
+  'refs-cache': 'src/lib/refs/cache.js',
+  // UZEX weekly quotes: matching and units (the second price source, apart from refs)
+  uzex: 'src/lib/uzex.js'
 };
 
 /**
@@ -84,7 +86,7 @@ const ORDER = ['fflate', 'xlsx', 'normalize', 'match', 'sections', 'regions', 'u
   'formula', 'xlsx-read', 'xlsx-write', 'smeta', 'assemble', 'report', 'export', 'compare', 'reply',
   'registry-parse', 'refs-package', 'refs-units', 'refs-machines', 'refs-cable', 'refs-steel',
   'refs-mineral', 'refs-electro', 'refs', 'refs-view', 'refs-query', 'refs-pool', 'refs-retrieve',
-  'refs-suggest', 'refs-cache'];
+  'refs-suggest', 'refs-cache', 'uzex'];
 
 /** Everything needed to read a workbook and build the comparison document. */
 const PIPELINE = ['fflate', 'normalize', 'match', 'sections', 'util', 'formula',

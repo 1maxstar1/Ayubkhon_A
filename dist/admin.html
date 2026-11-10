@@ -401,13 +401,68 @@ table.cmp s.mute{text-decoration:line-through}
 .cmp-head table.cmp th{background:var(--band)}
 .cmp-back{display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--accent-w);border-bottom:1px solid var(--rule)}
 .cmp-back b{font-weight:600}
+
+/* ------------------------------------------------------------ price sources: ours and UZEX */
+/* The exchange has a colour of its own — violet: never green or red (those say how a price differs from the smeta's)
+   and not the colours of our own tags. The dark values are for a dark page, should the program get one. */
+:root{--uzex:#534AB7;--uzex-bg:#EEEDFE;--uzex-tx:#3C3489}
+:root[data-theme="dark"]{--uzex:#AFA9EC;--uzex-bg:#3C3489;--uzex-tx:#CECBF6}
+.srcbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 10px;border-bottom:1px solid var(--rule);background:var(--sf2)}
+.srcbar[hidden]{display:none}
+.srccard{display:inline-flex;align-items:center;gap:8px;border:1.5px solid var(--rule2);background:var(--sf);border-radius:10px;
+  padding:4px 12px 4px 8px;cursor:pointer;font-family:inherit;text-align:left;color:var(--mute);min-height:38px}
+.srccard:hover{border-color:var(--mute)}
+.srccard .sc-ck{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;
+  border:1.5px solid var(--rule2);color:transparent;font-size:11px;font-weight:700;flex:none}
+.srccard .sc-tx{display:flex;flex-direction:column;line-height:1.25}
+.srccard b{font-size:12.5px;font-weight:600;color:var(--ink)}
+.srccard small{font-size:10.5px;color:var(--mute);font-variant-numeric:tabular-nums;white-space:nowrap}
+.srccard.on{border-color:#2f7d52;background:#f3faf6}
+.srccard.on .sc-ck{background:#2f7d52;border-color:#2f7d52;color:#fff}
+.srccard.uz.on{border-color:var(--uzex);background:var(--uzex-bg)}
+.srccard.uz.on .sc-ck{background:var(--uzex);border-color:var(--uzex)}
+.srccard.uz.on b{color:var(--uzex-tx)}
+.srcopts{display:flex;flex:1 0 100%;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px}
+.srcopts[hidden]{display:none}
+.srcopts select{border:1px solid var(--rule2);border-radius:6px;padding:4px 6px;background:var(--sf);font-family:inherit;font-size:12px}
+.srcopts label{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;cursor:pointer}
+.srclegend{font-size:11px;color:var(--mute);white-space:nowrap}
+.srclegend .tagr{margin-left:0;cursor:default}
+.srclegend .upill{margin-left:8px}
+.srclegend{margin-left:6px}
+.srchint{font-size:11.5px;color:var(--uzex-tx);background:var(--uzex-bg);border-radius:4px;padding:2px 8px}
+.srchint[hidden]{display:none}
+body.src-norefs #refAsof{display:none !important}
+.upill{display:inline-block;background:var(--uzex-bg);color:var(--uzex-tx);border-radius:8px;padding:0 6px;font-size:9.5px;
+  font-weight:700;letter-spacing:.03em;line-height:14px;white-space:nowrap}
+.tagu{display:inline-block;background:var(--uzex-bg);color:var(--uzex-tx);border:1px solid var(--uzex);border-left-width:3px;border-radius:3px;
+  padding:0 5px;font-size:10px;font-weight:600;margin-left:6px;cursor:pointer;font-family:inherit;font-variant-numeric:tabular-nums;
+  white-space:nowrap;line-height:14px}
+.tagu:hover{filter:brightness(.96)}
+/* another product of the exchange, or a price in another unit: dashed, to be checked */
+.tagu.near{background:var(--sf);border-style:dashed;border-left-style:solid}
+.vrow .c.uzc{gap:4px}
+.vrow .c.uzc .upill.u{flex:none;padding:0 4px}
+.pin.uz,.pin.uz.edited{color:var(--uzex);font-weight:600;background:var(--uzex-bg)}
+#uzexPop{position:fixed;z-index:76;background:var(--sf);border:1px solid var(--uzex);border-radius:8px;
+  box-shadow:0 10px 30px rgba(20,23,28,.14);width:520px;max-width:calc(100vw - 16px);max-height:70vh;overflow:auto;font-size:12px}
+#uzexPop[hidden]{display:none}
+#uzexPop .rp-head .upill{margin-right:4px}
+.up-note{padding:5px 10px;border-bottom:1px solid var(--rule);color:var(--mute);font-size:10.5px;background:var(--sf2)}
+.up-line{padding:7px 10px 7px 8px;border-bottom:1px solid #f0f2f5;border-left:3px solid var(--uzex)}
+.up-line.near{border-left-style:dashed}
+.up-price{color:var(--uzex);font-weight:600;font-variant-numeric:tabular-nums;font-size:13px;cursor:help}
+.up-warn{color:#8a5a10;cursor:help}
+.up-warnt{color:#8a5a10;font-size:11px;margin-top:2px;overflow-wrap:anywhere}
+.hp-uzex{color:var(--uzex) !important}
+.uz-auto{display:inline-flex;align-items:center;gap:5px;margin-left:10px;font-size:13px;cursor:pointer}
 </style>
 </head>
 <body class="admin">
 
 <header class="bar">
   <div class="brand">
-    <b>Администратор</b><i class="ver" title="Версия программы">v2.8.4</i>
+    <b>Администратор</b><i class="ver" title="Версия программы">v2.9.0</i>
     <span>реестр, рабочие области и пользователи</span>
   </div>
   <div class="grow"></div>
@@ -456,6 +511,22 @@ table.cmp s.mute{text-decoration:line-through}
     <h3>Пакеты</h3>
     <table class="tbl" id="refsTable"><thead><tr><th>Пакет</th><th>Создан</th><th>Загружен</th><th>Записей</th><th>Документов</th><th>Даты цен</th><th>Активен</th><th></th></tr></thead><tbody></tbody></table>
     <div id="refsDocs" hidden></div>
+  </section>
+
+  <section class="panel" id="uzexPanel">
+    <h2>UZEX haftalik narxlar</h2>
+    <p class="lead">Manba: UzEx — Haftalik kotirovkalar (uzex.uz). Birlik nomda ko'rsatilmagan bo'lsa — 1 tonna deb olingan.
+      QQS holati ko'rsatilmagan. Bu bo'lim «Справочник цен (документы)» dan alohida: u paketlarga tegmaydi, paket yuklash
+      esa bu yerdagi haftalarga tegmaydi. Sayt faqat oxirgi 4 haftani saqlaydi — olingan har bir hafta shu bazada qoladi.</p>
+    <button class="btn primary" type="button" id="uzexSync"><span class="ic">↻</span> UZEX dan yangilash</button>
+    <button class="btn" type="button" id="uzexForce" title="Saytda ko'rinib turgan haftalarni qaytadan o'qib, saqlanganining o'rniga yozadi">Qayta o'qish</button>
+    <label class="uz-auto" title="Server ishga tushgandan yarim daqiqa keyin va har kuni soat 09:00 da (Toshkent vaqti) yangi haftalarni o'zi oladi">
+      <input type="checkbox" id="uzexAuto"> Avtomatik yangilash</label>
+    <div class="progress" id="uzexProgress" hidden><div class="bar-fill" style="width:100%"></div><span>UZEX dan o'qilmoqda…</span></div>
+    <p class="err" id="uzexErr" hidden></p>
+    <div class="stat" id="uzexStat"></div>
+    <h3>Saqlangan haftalar</h3>
+    <table class="tbl" id="uzexTable"><thead><tr><th>Hafta</th><th>Bozor</th><th>Qatorlar</th><th>Olingan</th><th></th></tr></thead><tbody></tbody></table>
   </section>
 
   <section class="panel">
@@ -3711,6 +3782,137 @@ var S = (typeof S !== 'undefined' && S) || {};
   S.RefsAdmin = Refs;
   document.addEventListener('DOMContentLoaded', function () { Refs.init(); });
   if (document.readyState !== 'loading') Refs.init();
+})(S);
+
+;
+/*
+ * Admin page: «UZEX haftalik narxlar» — the exchange's weekly quotes, a section of its own beside «Справочник цен
+ * (документы)». Nothing here reads or writes the reference packages.
+ *
+ *   «UZEX dan yangilash»   POST /api/uzex/sync — the server fetches the weeks the site lists that are not stored yet
+ *   «Qayta o'qish»         the same with force=1 — the listed weeks are read again and rewritten
+ *   «Avtomatik yangilash»  POST /api/uzex/auto — the switch of the server's own sync (after a start, and daily)
+ *   the table              the stored weeks; an administrator may delete one (its quotes go with it; prices already
+ *                          applied from it stay)
+ * The words of this section are Uzbek, as its owner asked; the server's messages about the site are quoted as they
+ * come.
+ */
+(function (S) {
+  'use strict';
+  if (!S.pb) return;
+
+  function $(id) { return document.getElementById(id); }
+  function toast(msg, err) {
+    var t = $('toast');
+    t.textContent = msg; t.className = 'toast on' + (err ? ' err' : '');
+    clearTimeout(toast.h);
+    toast.h = setTimeout(function () { t.className = 'toast'; }, err ? 6000 : 3000);
+  }
+  function day(d) { return d && /^\d{4}-\d{2}-\d{2}/.test(d) ? d.slice(8, 10) + '.' + d.slice(5, 7) + '.' + d.slice(0, 4) : ''; }
+  function when(d) {
+    if (!d) return '';
+    var x = new Date(String(d).replace(' ', 'T'));
+    return isNaN(x) ? String(d) : x.toLocaleDateString('ru-RU') + ' ' + x.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  }
+  var MARKET = { internal: 'Ichki', 'export': 'Eksport' };
+
+  var Uz = {
+    items: [], busy: false,
+
+    init: function () {
+      var self = this;
+      if (this.inited || !$('uzexPanel')) return;
+      this.inited = true;
+      $('uzexSync').addEventListener('click', function () { self.sync(false); });
+      $('uzexForce').addEventListener('click', function () {
+        if (confirm("Saytda ko'rinib turgan haftalar qaytadan o'qiladi va saqlanganining o'rniga yoziladi. Davom etilsinmi?")) self.sync(true);
+      });
+      $('uzexAuto').addEventListener('change', function () { self.setAuto(this.checked); });
+      $('uzexTable').addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('button[data-del]');
+        if (b) self.remove(b.dataset.del);
+      });
+      document.addEventListener('auth:signedin', function () { self.load(); });
+      if (S.pb.authStore.isValid) this.load();
+    },
+
+    load: function () {
+      var self = this;
+      S.pb.send('/api/uzex/status', { method: 'GET' }).then(function (st) { self.status(st); }).catch(function () { /* an older server */ });
+      S.pb.collection('uzex_imports').getFullList({ sort: '-period_from,-import_id' }).then(function (list) {
+        self.items = list;
+        self.render();
+      }).catch(function (e) {
+        if (e && e.status === 0) return;
+        $('uzexStat').textContent = "Bu serverda UZEX bo'limi yo'q — dasturni yangilang.";
+      });
+    },
+
+    status: function (st) {
+      $('uzexAuto').checked = !!st.auto;
+      var t = st.last_sync_at ? 'Oxirgi yangilanish: ' + when(st.last_sync_at) + ', yangi haftalar: ' + (st.last_new_weeks || 0) : 'Hali yangilanmagan';
+      $('uzexStat').textContent = t;
+      var err = $('uzexErr');
+      err.hidden = st.last_sync_status !== 'error';
+      err.textContent = st.last_sync_status === 'error' ? 'Oxirgi yangilanish xato bilan tugadi: ' + (st.last_sync_message || '') +
+        ' — saqlangan haftalar joyida.' : '';
+    },
+
+    sync: function (force) {
+      var self = this;
+      if (this.busy) return;
+      this.busy = true;
+      $('uzexSync').disabled = true; $('uzexForce').disabled = true;
+      $('uzexProgress').hidden = false;
+      S.pb.send('/api/uzex/sync' + (force ? '?force=1' : ''), { method: 'POST' }).then(function (r) {
+        if (r.busy) { toast('Yangilanish allaqachon ketmoqda', true); return; }
+        var rows = (r.added || []).reduce(function (n, w) { return n + w.rows; }, 0);
+        toast(r.ok ? (r.added.length ? 'Yangi haftalar: ' + r.added.length + ' (qatorlar: ' + rows + ')' : "Yangi hafta yo'q — hammasi saqlangan")
+          : 'UZEX: ' + (r.message || 'xato'), !r.ok);
+      }).catch(function (e) {
+        toast((e && e.response && e.response.message) || S.pbErr(e), true);
+      }).then(function () {
+        self.busy = false;
+        $('uzexSync').disabled = false; $('uzexForce').disabled = false;
+        $('uzexProgress').hidden = true;
+        self.load();
+      });
+    },
+
+    setAuto: function (on) {
+      var self = this;
+      S.pb.send('/api/uzex/auto', { method: 'POST', body: { on: !!on } }).then(function (st) {
+        self.status(st);
+        toast(st.auto ? 'Avtomatik yangilash yoqildi' : "Avtomatik yangilash o'chirildi");
+      }).catch(function (e) {
+        $('uzexAuto').checked = !on;
+        toast((e && e.response && e.response.message) || S.pbErr(e), true);
+      });
+    },
+
+    render: function () {
+      var tb = $('uzexTable').querySelector('tbody');
+      if (!this.items.length) { tb.innerHTML = '<tr><td colspan="5" class="mute">Hali hech narsa olinmagan — «UZEX dan yangilash» ni bosing.</td></tr>'; return; }
+      tb.innerHTML = this.items.map(function (x) {
+        return '<tr><td title="' + S.esc(x.label || '') + '">' + S.esc(day(x.period_from) + ' – ' + day(x.period_to)) + '</td><td>' +
+          S.esc(MARKET[x.market] || x.market) + '</td><td>' + (x.row_count || 0) + '</td><td>' + S.esc(when(x.fetched_at)) + '</td>' +
+          '<td><button class="link" data-del="' + S.esc(x.id) + '">O\'chirish</button></td></tr>';
+      }).join('');
+    },
+
+    remove: function (id) {
+      var self = this;
+      var x = this.items.filter(function (i) { return i.id === id; })[0];
+      if (!x || !confirm(day(x.period_from) + ' – ' + day(x.period_to) + ' (' + (MARKET[x.market] || x.market) + ') haftasi o\'chirilsinmi?\n\n' +
+        'Undan allaqachon qo\'llangan narxlar joyida qoladi. Sayt bu haftani hali ko\'rsatayotgan bo\'lsa, keyingi yangilanishda qayta olinadi.')) return;
+      S.pb.collection('uzex_imports').delete(id).then(function () { toast("Hafta o'chirildi"); self.load(); })
+        .catch(function (e) { toast((e && e.response && e.response.message) || S.pbErr(e), true); });
+    }
+  };
+
+  S.UzexAdmin = Uz;
+  document.addEventListener('DOMContentLoaded', function () { Uz.init(); });
+  if (document.readyState !== 'loading') Uz.init();
 })(S);
 </script>
 </body>

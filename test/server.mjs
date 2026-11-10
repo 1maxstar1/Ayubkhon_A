@@ -33,6 +33,8 @@ export const DATA = join(ROOT, 'server/pb_data_test');
  * @param {string}  [opts.laptop]    PB_LAPTOP; '1' also hands the code back to this machine
  * @param {string}  [opts.autologin] PB_AUTOLOGIN; with laptop, '1' signs the page in by itself
  *                                   as PB_AUTOLOGIN_EMAIL (opts.as, the test user by default)
+ * @param {object}  [opts.env]       more environment for the server, read again at every (re)start. UZEX_AUTO is
+ *                                   '0' unless given here: a test server never calls the exchange's site by itself
  */
 export async function startServer(opts) {
   const { port, registry = false, build = false, dev = '1', laptop = '', autologin = '', as = 'test@example.com' } = opts;
@@ -47,7 +49,7 @@ export async function startServer(opts) {
   let proc = null;
   const spawnOne = () => spawn('sh', ['server/run.sh'], {
     cwd: ROOT,
-    env: { ...process.env, PB_DATA_DIR: 'pb_data_test', PB_HTTP: `127.0.0.1:${port}`, PB_DEV: dev, PB_LAPTOP: laptop, PB_AUTOLOGIN: autologin, PB_AUTOLOGIN_EMAIL: as },
+    env: { ...process.env, UZEX_AUTO: '0', PB_DATA_DIR: 'pb_data_test', PB_HTTP: `127.0.0.1:${port}`, PB_DEV: dev, PB_LAPTOP: laptop, PB_AUTOLOGIN: autologin, PB_AUTOLOGIN_EMAIL: as, ...(opts.env || {}) },
     stdio: 'ignore'
   });
   const up = async () => {

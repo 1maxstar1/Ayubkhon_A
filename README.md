@@ -682,3 +682,57 @@ REFS_KIT=<KIT> node test/refs-privacy.cjs   # haqiqiy paketga qarshi maxfiylik t
 `src/lib/refs` dagi jadvallar faqat o'lchov bilan o'zgaradi: `KIT` siz
 `test/all.sh` oxirgi o'lchov shtampini tekshiradi va o'lchanmagan o'zgarishni
 «NOT MEASURED» deb xato qiladi.
+
+## UZEX (биржа) — ikkinchi narx manbai (v2.9.0)
+
+«Наш справочник» (yuqoridagi paketlar) yonida ikkinchi, **to'liq alohida** manba: O'zbekiston respublika
+tovar-xomashyo birjasining haftalik kotirovkalari ([uzex.uz/WeeklyQuotes](https://uzex.uz/WeeklyQuotes), faqat
+ruscha sahifa). Ikkalasi bir-biriga tegmaydi: UZEX o'z kolleksiyalarida turadi (`uzex_imports`, `uzex_quotes`,
+`uzex_settings`), paket yuklash UZEX haftalariga, UZEX yangilanishi esa paketlarga hech narsa qilmaydi.
+
+### Yangilash
+
+* **O'zi** (yoqilgan holda keladi): server ishga tushgandan ~30 soniya keyin (kompyuter o'chiq turgan paytda chiqqan
+  haftalarni olib oladi) va har kuni 09:00 da (Toshkent vaqti). Faqat haftalar ro'yxatini o'qiydi va bazada yo'q
+  haftalarni oladi. Sayt oxirgi 4 haftani ko'rsatadi, shuning uchun olingan har bir hafta bazada qoladi.
+* **Qo'lda**: `admin.html` → «UZEX haftalik narxlar» → «UZEX dan yangilash». O'sha yerda: oxirgi yangilanish vaqti va
+  holati, «Avtomatik yangilash» kaliti, saqlangan haftalar jadvali (haftani o'chirish mumkin), «Qayta o'qish».
+* Hafta **to'liq yoziladi yoki umuman yozilmaydi**: sahifa ruscha bo'lmasa (7 ta ustun sarlavhasi), so'ralgan hafta
+  o'rniga boshqasi kelsa yoki bironta qator o'qilmasa — xato ko'rsatiladi, bazadagi ma'lumot joyida qoladi.
+  Sayt ishlamasa ham shunday.
+* Nom oxiridagi qavs faqat ma'lum so'z bo'lsa ajratiladi: birlik (`литр`, `декалитр`, `штука`, `метр`,
+  `погонный метр`, `кв.м`, `куб.метр`, `куб.м`, `грамм`, `кг`, `тонна`), qadoq (`в мешках`, `навал`), `Форвард` /
+  `Фьючерс`, `импорт`, valyuta (`доллар США`, `рубль`). Birlik yozilmagan bo'lsa — tonna deb olinadi va shunday
+  belgilanadi («предп.»). Boshqa qavs (masalan, po'lat markasi) — nomning bir qismi.
+
+### «Проверка цен» da
+
+* Jadval tepasida ikkita belgilanadigan kartochka: **«Наш справочник»** va **«UZEX (биржа)»** — bittasi, ikkinchisi
+  yoki ikkalasi. Kamida bittasi belgilangan turadi. Dastlab faqat «Наш справочник» — hammasi avvalgidek. Tanlov shu
+  brauzerda eslab qolinadi. Belgini qo'yish yoki olish **hech qachon narxni o'zgartirmaydi** — faqat takliflar
+  ko'rinadi yoki yashiriladi.
+* UZEX belgilansa: hafta (dastlab eng yangisi), bozor (`Ichki` / `Eksport`), «только котировки этой недели» (hafta
+  jadvalida shu haftada savdo bo'lmagan tovarlarning oldingi narxi ham turadi) va «форвард» (dastlab o'chiq).
+* UZEX taklifi **binafsha** rangda (`--uzex`), «UZEX» belgisi bilan — yashil/qizil emas (ular narx farqini
+  bildiradi) va «справ.» rangi ham emas. Ikkala manba belgilangan bo'lsa, qatorda ikkala teg turadi.
+* Mos kotirovkani dasturning o'z dvigateli topadi (`src/lib/refs` — o'zgartirilmagan): armatura diametri, quvur
+  o'lchami, birlik o'girish. Haqiqiy smetada o'lchangan: oddiy nom o'xshashligi 541 resursdan 6 tasiga, dvigatel
+  48 tasiga kotirovka topadi.
+* **Birlik boshqa bo'lsa** jim qo'llanmaydi: bir o'lchovdagi birlik (т → кг) qayta hisoblanadi, ⚠ va hisob
+  ko'rsatiladi, «Применить» oldin so'raydi; buyum ma'lumoti kerak bo'lgan o'girish (т → м) faqat ⚠ bilan
+  ko'rsatiladi, «Применить» yo'q.
+* So'mda bo'lmagan kotirovka (dollar, rubl, eksport jadvali) hech qachon so'mdagi narx sifatida taklif qilinmaydi.
+  Kotirovkalarda QQS ko'rsatilmagan — oynada shunday yozilgan.
+* «Применить» bosilgan narx katagi binafsha va «U» belgisi bilan qoladi (sahifa yangilangandan keyin ham; manba
+  `uzex:<hafta>:<qator>` deb saqlanadi). Narx qo'lda yozilsa — belgi yo'qoladi. «Автоподбор» UZEX dan narx olmaydi.
+
+### Testlar
+
+```sh
+node test/uzex.cjs             # sahifani o'qish, nomdagi qavslar, haftani dvigatelga berish
+node test/uzex-api.mjs         # server: sinxronlash, xatolar, huquqlar, avtomatik yangilash
+node test/e2e-uzex.mjs         # brauzer: admin bo'limi, kartochkalar, teglar, birlik, «U» belgisi
+```
+
+Testlar haqiqiy saytga chiqmaydi: `test/uzex-site.mjs` uning o'rnini bosadi (`UZEX_BASE`), test serverlarida
+avtomatik yangilanish o'chiq (`UZEX_AUTO=0`).

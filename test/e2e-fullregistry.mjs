@@ -19,7 +19,7 @@ const DATA = join(root, 'server/pb_data_test');
 
 execSync('sh test/pb-smoke.sh', { cwd: root, stdio: 'ignore' });
 const server = spawn('sh', ['server/run.sh'], {
-  cwd: root, env: { ...process.env, PB_DATA_DIR: 'pb_data_test', PB_HTTP: `127.0.0.1:${PORT}`, PB_DEV: '1' }, stdio: 'ignore'
+  cwd: root, env: { ...process.env, UZEX_AUTO: '0', PB_DATA_DIR: 'pb_data_test', PB_HTTP: `127.0.0.1:${PORT}`, PB_DEV: '1' }, stdio: 'ignore'
 });
 process.on('exit', () => server.kill());
 for (let i = 0; i < 20; i++) {

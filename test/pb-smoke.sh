@@ -4,7 +4,10 @@ set -e
 cd "$(dirname "$0")/../server"
 export PB_DATA_DIR=pb_data_test PB_ADMIN_EMAIL=admin@example.com PB_ADMIN_PASS=adminpass1234
 PORT=8092; BASE="http://127.0.0.1:$PORT"
-rm -rf pb_data_test
+# A server the test before has only just stopped may still be closing its database, and its last files can appear
+# while the directory is being removed: «Directory not empty», and the next test failed before it began. Removed
+# again after a moment instead.
+rm -rf pb_data_test 2>/dev/null || { sleep 1; rm -rf pb_data_test; }
 PB_SETUP_PORT=8093 ./setup.sh
 PB_DEV=1 PB_HTTP="127.0.0.1:$PORT" ./run.sh >pb_data_test/serve.log 2>&1 &
 PID=$!

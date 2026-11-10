@@ -745,6 +745,241 @@
       "createRule": "@request.auth.role = \"admin\"",
       "updateRule": "@request.auth.role = \"admin\"",
       "deleteRule": "@request.auth.role = \"admin\""
+    },
+    {
+      "id": "c_uzex_imports_",
+      "name": "uzex_imports",
+      "type": "base",
+      "fields": [
+        {
+          "name": "import_id",
+          "type": "number",
+          "required": true,
+          "onlyInt": true,
+          "min": 1
+        },
+        {
+          "type": "text",
+          "max": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "name": "period_from",
+          "required": true
+        },
+        {
+          "type": "text",
+          "max": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "name": "period_to",
+          "required": true
+        },
+        {
+          "name": "market",
+          "type": "select",
+          "required": true,
+          "maxSelect": 1,
+          "values": [
+            "internal",
+            "export"
+          ]
+        },
+        {
+          "name": "label",
+          "type": "text",
+          "max": 200
+        },
+        {
+          "name": "lang",
+          "type": "text",
+          "max": 8
+        },
+        {
+          "name": "row_count",
+          "type": "number",
+          "onlyInt": true,
+          "min": 0
+        },
+        {
+          "name": "fetched_at",
+          "type": "date"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "onCreate": true
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "onCreate": true,
+          "onUpdate": true
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_uzex_imports_id ON uzex_imports (import_id)"
+      ],
+      "listRule": "@request.auth.id != \"\"",
+      "viewRule": "@request.auth.id != \"\"",
+      "createRule": null,
+      "updateRule": null,
+      "deleteRule": "@request.auth.role = \"admin\""
+    },
+    {
+      "id": "c_uzex_quotes__",
+      "name": "uzex_quotes",
+      "type": "base",
+      "fields": [
+        {
+          "name": "import",
+          "type": "relation",
+          "collectionId": "c_uzex_imports_",
+          "maxSelect": 1,
+          "required": true,
+          "cascadeDelete": true
+        },
+        {
+          "name": "row_no",
+          "type": "number",
+          "required": true,
+          "onlyInt": true,
+          "min": 1
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "max": 500
+        },
+        {
+          "name": "item",
+          "type": "text",
+          "max": 500
+        },
+        {
+          "name": "name_norm",
+          "type": "text",
+          "max": 600
+        },
+        {
+          "name": "unit",
+          "type": "text",
+          "max": 16
+        },
+        {
+          "name": "unit_assumed",
+          "type": "bool"
+        },
+        {
+          "name": "packing",
+          "type": "text",
+          "max": 32
+        },
+        {
+          "name": "is_forward",
+          "type": "bool"
+        },
+        {
+          "name": "is_import",
+          "type": "bool"
+        },
+        {
+          "name": "currency",
+          "type": "text",
+          "max": 8
+        },
+        {
+          "name": "price",
+          "type": "number"
+        },
+        {
+          "name": "change",
+          "type": "number"
+        },
+        {
+          "name": "change_pct",
+          "type": "number"
+        },
+        {
+          "type": "text",
+          "max": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "name": "date_from"
+        },
+        {
+          "type": "text",
+          "max": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "name": "date_to"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "onCreate": true
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_uzex_quotes_row ON uzex_quotes (import, row_no)"
+      ],
+      "listRule": "@request.auth.id != \"\"",
+      "viewRule": "@request.auth.id != \"\"",
+      "createRule": null,
+      "updateRule": null,
+      "deleteRule": null
+    },
+    {
+      "id": "c_uzex_settings",
+      "name": "uzex_settings",
+      "type": "base",
+      "fields": [
+        {
+          "name": "key",
+          "type": "text",
+          "required": true,
+          "max": 16
+        },
+        {
+          "name": "auto_off",
+          "type": "bool"
+        },
+        {
+          "name": "last_sync_at",
+          "type": "date"
+        },
+        {
+          "name": "last_sync_status",
+          "type": "text",
+          "max": 16
+        },
+        {
+          "name": "last_sync_message",
+          "type": "text",
+          "max": 1000
+        },
+        {
+          "name": "last_new_weeks",
+          "type": "number",
+          "onlyInt": true,
+          "min": 0
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "onCreate": true
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "onCreate": true,
+          "onUpdate": true
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_uzex_settings_key ON uzex_settings (`key`)"
+      ],
+      "listRule": null,
+      "viewRule": null,
+      "createRule": null,
+      "updateRule": null,
+      "deleteRule": null
     }
   ],
   "deleteMissing": false

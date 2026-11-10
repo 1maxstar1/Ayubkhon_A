@@ -50,7 +50,7 @@ await new Promise((r) => sink.listen(SINK, '127.0.0.1', r));
 const server = spawn('sh', ['server/run.sh'], {
   cwd: root,
   env: {
-    ...process.env, PB_DATA_DIR: 'pb_data_test', PB_HTTP: `127.0.0.1:${PORT}`, PB_DEV: '0',
+    ...process.env, UZEX_AUTO: '0', PB_DATA_DIR: 'pb_data_test', PB_HTTP: `127.0.0.1:${PORT}`, PB_DEV: '0',
     BREVO_API_KEY: 'test-key', BREVO_API_URL: `http://127.0.0.1:${SINK}/v3/smtp/email`
   },
   stdio: 'ignore'
@@ -123,7 +123,7 @@ server.kill();
 const relayServer = spawn('sh', ['server/run.sh'], {
   cwd: root,
   env: {
-    ...process.env, PB_DATA_DIR: 'pb_data_test', PB_HTTP: `127.0.0.1:${PORT}`, PB_DEV: '0',
+    ...process.env, UZEX_AUTO: '0', PB_DATA_DIR: 'pb_data_test', PB_HTTP: `127.0.0.1:${PORT}`, PB_DEV: '0',
     BREVO_API_KEY: 'test-key', BREVO_API_URL: `http://127.0.0.1:${SINK}/v3/smtp/email`,
     GMAIL_RELAY_URL: `http://127.0.0.1:${SINK}/exec`, GMAIL_RELAY_SECRET: 'shh'
   },

@@ -6,6 +6,9 @@ cd "$(dirname "$0")/.."
 REG="$1"; S1="$2"; S2="$3"
 OUT=test/all-results.txt
 : > "$OUT"
+# No server a test starts (the laptop launchers' included) fetches the exchange's weekly quotes by itself: the
+# UZEX tests point the sync at their own stand-in site.
+UZEX_AUTO=0; export UZEX_AUTO
 
 # The usage line above names the files by what they are, not by their real
 # paths, and those names have been typed in literally — a whole run then ends
@@ -66,6 +69,7 @@ run normalize        node test/normalize.cjs
 run xlsx-guard       node test/xlsx-guard.cjs
 run smeta-form4a     node test/smeta-form4a.cjs
 run compare          node test/compare.cjs
+run uzex             node test/uzex.cjs
 run sections         node test/sections.cjs
 run regions          node test/regions.cjs
 run refs             node test/refs.cjs
@@ -95,6 +99,7 @@ run mail-otp         node test/mail-otp.mjs
 run match-keys       node test/match-keys.mjs
 run corrections-bulk node test/corrections-bulk.mjs
 run refs-api         node test/refs-api.mjs
+run uzex-api         node test/uzex-api.mjs
 run ownership        node test/ownership.mjs
 run disable-user     node test/disable-user.mjs
 both_run  browser        node test/browser.mjs "$S1" "$S2"
@@ -103,6 +108,7 @@ browser_run laptop       node test/laptop.mjs
 pwsh_run  laptop-windows sh test/laptop-windows.sh
 browser_run e2e-admin    node test/e2e-admin.mjs
 browser_run e2e-refs     node test/e2e-refs.mjs
+browser_run e2e-uzex     node test/e2e-uzex.mjs
 browser_run e2e-compare  node test/e2e-compare.mjs
 browser_run e2e-compare-keep node test/e2e-compare-keep.mjs
 browser_run upload-order node test/upload-order.mjs

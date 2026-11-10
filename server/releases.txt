@@ -19,3 +19,4 @@ v2.8.1 10079e441f1d8c80b9cb53bea6af8f1917b4b3e0 qayta yuklashda ochiq zayavka va
 v2.8.2 c01b2f02a70f0eb0f84c5bb109278eed3766e46b qayta yuklangandan keyin Bylo loyihaga qaytadi
 v2.8.3 610cda8b201dfc6572a3b86568c01a82aa055aa5 Sravnenie versiy aylanadi; resurs qatorlaridan orqaga tugma
 v2.8.4 f06cb6326d6b313e88045f28fe64e8a82f01735c Sravnenie versiy: yuklangan fayllar qayta yuklashdan keyin qaytadi
+v2.9.0 fd09d6599479582a44361608f0d2f8033f30fb2e UZEX (birja) haftalik kotirovkalari - ikkinchi, alohida narx manbai

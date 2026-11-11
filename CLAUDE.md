@@ -7,7 +7,9 @@ bosqichma-bosqich kodlash ko'rsatmasi — `docs/2-bosqich-kod-rejasi.md`.
 Versiyalar, orqaga qaytish va NLP jadvallarini o'lchov bilan o'zgartirish —
 `docs/versiyalar.md`. Uchta to'liq tekshiruv va ularning natijalari — `docs/audit-plan.md`
 (birinchi), `docs/audit-2-reja.md` (ikkinchi) va `docs/audit-3-reja.md`
-(uchinchi, o'lchov bilan: rad etilgan takliflar ham yozilgan).
+(uchinchi, o'lchov bilan: rad etilgan takliflar ham yozilgan). To'rtinchisi —
+`docs/audit-4-reja.md` — butun dastur bo'yicha **hali bajarilmagan reja**:
+topilmalar, ustuvorlik tartibi va egasi hal qiladigan savollar.
 
 ## Muloqot tili
 

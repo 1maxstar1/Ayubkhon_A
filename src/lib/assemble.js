@@ -76,7 +76,7 @@
     };
   }
 
-  function copyCells(srcCells, L, colMap, rowDelta, into) {
+  function copyCells(srcCells, L, colMap, rowDelta, into, kept) {
     for (var c = 1; c < srcCells.length; c++) {
       var cell = srcCells[c];
       if (!cell) continue;
@@ -84,7 +84,18 @@
       if (!tc) continue;
       // Formulas pointing at sheets we do not carry over (VLOOKUP into a price
       // book sheet, say) would export as #REF!, so keep their cached result.
-      if (cell.f && cell.f.indexOf('!') < 0) into[tc] = { f: S.formula.translate(cell.f, colMap, rowDelta) };
+      var alive = cell.f && cell.f.indexOf('!') < 0;
+      // … and so does a formula that calls anything but the plain functions an estimate is made of
+      // (S.formula.unsafe): it goes into the document as the number the estimate shows, and is counted.
+      if (alive) {
+        var bad = S.formula.unsafe(cell.f);
+        if (bad.length) {
+          alive = false;
+          kept.count++;
+          for (var b = 0; b < bad.length; b++) kept.names[bad[b]] = true;
+        }
+      }
+      if (alive) into[tc] = { f: S.formula.translate(cell.f, colMap, rowDelta) };
       else if (cell.v != null && cell.v !== '') into[tc] = { v: cell.v };
     }
   }
@@ -170,7 +181,7 @@
   /**
    * @param {Array} projects  [{id, name, title, objects:[parsedSheet], enabled}]
    * @param {Object} prices   resource key -> market unit price
-   * @returns {{rows:Array, nExtra:number, resources:Array, projects:Array}}
+   * @returns {{rows:Array, nExtra:number, resources:Array, spans:Array, frozen:{count:number, names:string[]}}}
    */
   function assemble(projects, prices) {
     prices = prices || {};
@@ -184,6 +195,7 @@
     });
 
     var marketMap = makeMarketMap(nExtra);
+    var kept = { count: 0, names: {} };      // formulas written as their value because of the functions they call
     var rows = [];
     var resMap = new Map();
     var out = [];
@@ -224,7 +236,7 @@
           var cells = {};
           var target = rows.length + 1;
           var delta = target - sr.r;
-          copyCells(sr.cells, L, colMap, delta, cells);
+          copyCells(sr.cells, L, colMap, delta, cells, kept);
           cells[C_IDX] = { v: target };
 
           var row = {
@@ -328,7 +340,9 @@
       g.forEach(function (r) { r.variants = g.length; r.siblings = prices; });
     });
 
-    var model = { rows: rows, nExtra: nExtra, resources: resources, spans: out, cols: {
+    var model = { rows: rows, nExtra: nExtra, resources: resources, spans: out,
+      // {count, names}: source formulas that went in as numbers (see copyCells); count 0 for an ordinary estimate
+      frozen: { count: kept.count, names: Object.keys(kept.names).sort() }, cols: {
       IDX: C_IDX, NO: C_NO, NAME: C_NAME, UNIT: C_UNIT, QTY: C_QTY,
       PRICE: C_PRICE, SUM: C_SUM, MPRICE: C_MPRICE, MSUM: C_MSUM, DIFF: C_DIFF, EXTRA: C_EXTRA
     } };

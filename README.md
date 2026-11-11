@@ -49,6 +49,13 @@ fayllar kompyuterdan chiqmaydi.
    tomoni uchun esa `F→H`, `G→I` almashtirish bilan aynan shu formulaning
    ikkinchi nusxasi yasaladi.
 
+   Smeta formulasi faqat oddiy funksiyalardan (yig'indi, yaxlitlash, shart,
+   sanash, varaq ichidagi qidiruv) iborat bo'lsa tirik ko'chadi. Smeta
+   tashqaridan keladi, hujjat esa imzolanib uzatiladi — shuning uchun tashqi
+   manzilga murojaat qiladigan (`WEBSERVICE`, `HYPERLINK` …) yoki ro'yxatda
+   yo'q funksiyali formula o'rniga smetaning o'zi ko'rsatgan qiymat yoziladi
+   va sahifa bunday formulalar nechtaligini aytadi (v2.9.4).
+
    Smetada `ИТОГО` formula emas, **yozib qo'yilgan son** bo'lsa (4А shaklining
    har bir jamisi shunday), u nimaning yig'indisi ekani topiladi — o'z
    bandining qatorlarimi yoki oldingi jamilarmi («ИТОГО ПРЯМЫЕ ЗАТРАТЫ») — va

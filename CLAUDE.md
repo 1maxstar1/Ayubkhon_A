@@ -65,7 +65,15 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   ko'rinishda** bo'lishi shart: Times New Roman 10, `CCFFFF` / `D9E2F3`
   bandlar, ingichka chegaralar, `#,##0` va `0.000` formatlari, `10 000 000`
   dan katta summalar uchun pushti shartli formatlash.
-* Formulalar tirik saqlanadi — `=E*F`, `=E*H`, `=+G-I`, `SUM(...)`.
+* Formulalar tirik saqlanadi — `=E*F`, `=E*H`, `=+G-I`, `SUM(...)`. Smetaning
+  o'z formulasi **faqat oddiy funksiyalardan** iborat bo'lsa tirik ko'chadi
+  (arifmetika, yaxlitlash, shartlar, sanash, varaq ichidagi qidiruv — ro'yxat
+  `src/lib/formula.js` da, `S.formula.unsafe`). Tashqariga murojaat qiladigan
+  (`WEBSERVICE`, `HYPERLINK` …) yoki ro'yxatda yo'q funksiyali formula o'rniga
+  smetaning o'zi ko'rsatgan **qiymat** yoziladi, va sahifa nechta ekanini
+  aytadi (v2.9.4, egasining qarori). Ro'yxat — ruxsat etilganlar ro'yxati:
+  unga funksiya qo'shish mumkin, uni «taqiqlanganlar» ro'yxatiga aylantirish
+  mumkin emas.
 * Bitta resursning bozor narxi — nomi va o'lchov birligi bo'yicha bitta qiymat;
   u loyihadagi **barcha** qatorlarga tushadi.
 * Bir resurs smetalarda bir nechta narx bilan uchrashi mumkin. Foydalanuvchi

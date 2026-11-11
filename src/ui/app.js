@@ -574,6 +574,14 @@
       document.getElementById('export').disabled = true;
     } else {
       this.model = S.assemble(this.projects, this.prices);
+      // formulas of the estimate that call something other than plain arithmetic go into the document as
+      // numbers; said once for each such set of files, not on every rebuild
+      var fz = this.model.frozen, fzKey = fz && fz.count ? fz.count + ':' + fz.names.join(',') : '';
+      if (fzKey && fzKey !== this._frozenSaid) {
+        this.toast('В смете формул с функциями, которые программа не переносит в документ: ' + fz.count + ' (' +
+          fz.names.slice(0, 6).join(', ') + '). Вместо них записаны их значения — проверьте эти строки.', true);
+      }
+      this._frozenSaid = fzKey;
       if (this.looseBook) {
         this.spreadLooseBook();
         S.applyPrices(this.model, this.prices);

@@ -7031,7 +7031,11 @@ if (typeof self !== 'undefined') self.S = S;
         });
       }
       self.setPrices(toSet);
-      self.toast('Загружено цен: ' + n);
+      // how many of them found a resource in the estimates that are loaded: a book of thirty thousand rows
+      // and an application of five hundred resources are not the same number
+      var fit = 0;
+      if (self.model) self.model.resources.forEach(function (r) { if (toSet[r.key] != null) fit++; });
+      self.toast('Загружено цен: ' + n + (self.model ? ' · подошло к ресурсам загруженных смет: ' + fit : ''));
     };
     if (isJson) reader.readAsText(file); else reader.readAsArrayBuffer(file);
   };
@@ -7965,6 +7969,11 @@ if (typeof self !== 'undefined') self.S = S;
   // said in words before the server is asked, not read out of its refusal
   var MAX_FILES = 30, MAX_MB = 60;
   var UPLOAD_RETRY_MS = 15 * 1000;
+  // how large the saved state may be (server/pb_schema.json, workspaces.state), and how many prices it keeps for
+  // resources that are in none of the loaded estimates — see slim()
+  var STATE_MAX = 5 * 1024 * 1024, SPARE = 2000;
+  var SEP = '\u241F';                   // between the parts of a resource key (src/lib/assemble.js)
+  var KEYS_OF = typeof WeakMap !== 'undefined' ? new WeakMap() : null;
   // Stamped into the saved state. 2 = resource keys built by the name key that
   // repairs half-switched keyboard layouts; anything older is lifted onto it
   // once, on the next open. Bump this whenever S.nameKey changes again.
@@ -7972,6 +7981,11 @@ if (typeof self !== 'undefined') self.S = S;
 
   function $(id) { return document.getElementById(id); }
   function A() { return window.app; }
+  /** How many bytes `v` is as the JSON the server will store. */
+  function bytesOf(v) {
+    var json = JSON.stringify(v);
+    try { return new Blob([json]).size; } catch (e) { return json.length * 2; }
+  }
   function wrap(proto, name, after) {
     var orig = proto[name];
     proto[name] = function () {
@@ -8338,8 +8352,59 @@ if (typeof self !== 'undefined') self.S = S;
       this.t = setTimeout(function () { self.saveNow(); }, SAVE_MS);
     },
 
+    /*
+     * What of the prices is worth saving.
+     *
+     * Every price that was ever touched stays in `app.prices` — one typed and then taken back, every row of a
+     * price book whether or not the application has such a resource — and all of it used to be saved, twice (the
+     * two keyings). A price book of thirty thousand rows made a state the server refuses, after which nothing of
+     * the application was saved again: the same request every fifteen seconds, for ever.
+     *
+     * A resource key ends in the estimate's own price, so the key alone says whether a price differs from it:
+     *   - a price equal to the estimate's own is what a missing key means, and is left out — unless a name-only
+     *     entry of a price book would otherwise take its place (taken back by hand, it must stay taken back);
+     *   - a price for a resource in none of the loaded estimates (a book loaded before its estimates) is kept,
+     *     up to SPARE of them — not thirty thousand;
+     *   - name-only entries of a book: the same.
+     * Estimates that are unticked still count as loaded: unticking a street does not forget its prices.
+     */
+    slim: function () {
+      var app = A(), known = {}, knownNk = {};
+      app.projects.forEach(function (p) {
+        p.objects.forEach(function (o) {
+          var keys = KEYS_OF && KEYS_OF.get(o);
+          if (!keys) {
+            keys = [];
+            o.rows.forEach(function (r) { if (r.kind === 'item') keys.push(S.resKey(r.nm, r.unit, r.price == null ? 0 : r.price)); });
+            if (KEYS_OF) KEYS_OF.set(o, keys);
+          }
+          for (var i = 0; i < keys.length; i++) { known[keys[i]] = 1; knownNk[keys[i].slice(0, keys[i].lastIndexOf(SEP))] = 1; }
+        });
+      });
+      var loose = app.looseBook || null, prices = {}, spare = 0, cut = 0;
+      Object.keys(app.prices).forEach(function (k) {
+        var v = app.prices[k];
+        if (v == null) return;
+        var i = k.lastIndexOf(SEP), own = i > 0 ? +k.slice(i + 1) : NaN;
+        var same = isFinite(own) && Math.abs(own - v) < 1e-6;
+        if (same && !(loose && loose[k.slice(0, i)] != null)) return;
+        if (!known[k]) { if (same) return; if (spare >= SPARE) { cut++; return; } spare++; }
+        prices[k] = v;
+      });
+      var book = null;
+      if (loose) {
+        spare = 0;
+        Object.keys(loose).forEach(function (nk) {
+          if (!knownNk[nk]) { if (spare >= SPARE) { cut++; return; } spare++; }
+          (book = book || {})[nk] = loose[nk];
+        });
+      }
+      return { prices: prices, looseBook: book, cut: cut };
+    },
+
     state: function () {
-      var app = A(), self = this;
+      var app = A(), self = this, kept = this.slim();
+      this.cut = kept.cut;
       return {
         projects: app.projects.map(function (p) {
           return {
@@ -8349,9 +8414,9 @@ if (typeof self !== 'undefined') self.S = S;
           };
         }),
         files: this.files,
-        prices: this.downgrade(app.prices),   // readable by the previous version
-        prices2: app.prices,
-        looseBook: app.looseBook || null,
+        prices: this.downgrade(kept.prices),  // readable by the previous version
+        prices2: kept.prices,
+        looseBook: kept.looseBook,
         compare: { old: this.cmp.old || null, new: this.cmp.new || null, reply: this.cmp.reply || null, base: this.cmp.base || '' },
         opts: app.opts,
         mode: $('reportMode').value,
@@ -8375,6 +8440,26 @@ if (typeof self !== 'undefined') self.S = S;
       var changed = app.model ? app.model.resources.filter(function (r) { return !S.near(r.price, r.market); }).length : 0;
       var body = { state: st, changed: changed, updated_by: S.me().id };
       if (stale.length) body['files-'] = stale;
+      if (this.cut && this.cutSaid !== this.ws.id) {
+        this.cutSaid = this.ws.id;
+        app.toast('В заявке сохраняются не все цены из книги цен: ' + this.cut + ' относятся к ресурсам, которых нет в ' +
+          'загруженных сметах (таких хранится не больше ' + SPARE + '). Добавьте сметы и загрузите книгу цен ещё раз.', true);
+      }
+      /* A state the server will not take is not sent, and not sent again every fifteen seconds: it would be
+         refused the same way each time. It is said once, in words, and tried again when something changes. */
+      var size = bytesOf(st);
+      if (size > STATE_MAX) {
+        var big = new Error('состояние заявки занимает ' + (size / 1048576).toFixed(1) + ' МБ, сервер принимает до ' +
+          (STATE_MAX / 1048576) + ' МБ');
+        big.refused = true;
+        this.mark('!');
+        if (this.bigSaid !== this.ws.id) {
+          this.bigSaid = this.ws.id;
+          app.toast('Не сохранено: ' + big.message + '. Уберите из заявки лишние сметы или верните часть цен к сметным.', true);
+        }
+        return Promise.reject(big);
+      }
+      this.bigSaid = null;
       this.dirty = false;
       return this.enqueue(function () {
         return S.pb.collection('workspaces').update(self.ws.id, body).then(function (w) {
@@ -8383,9 +8468,15 @@ if (typeof self !== 'undefined') self.S = S;
         }).catch(function (e) {
           self.dirty = true;
           self.mark('!');
-          app.toast('Не сохранено: ' + S.pbErr(e) + ' — повтор через 15 секунд', true);
           clearTimeout(self.t);
-          self.t = setTimeout(function () { if (self.dirty) self.saveNow(); }, 15000);
+          // 400 and 413 are the server's answer to what was sent, not to when: the same request gets the same answer
+          if (e && (e.status === 400 || e.status === 413)) {
+            e.refused = true;
+            app.toast('Не сохранено: сервер не принял состояние заявки (' + S.pbErr(e) + '). Повтор — при следующем изменении.', true);
+          } else {
+            app.toast('Не сохранено: ' + S.pbErr(e) + ' — повтор через 15 секунд', true);
+            self.t = setTimeout(function () { if (self.dirty) self.saveNow(); }, 15000);
+          }
           throw e;      // whoever is leaving the workspace needs to know it failed
         });
       });
@@ -8728,10 +8819,12 @@ if (typeof self !== 'undefined') self.S = S;
       // a tab that was superseded leaves without a word to the server: what it holds is older than what is there
       var done = this.frozen ? null : this.dirty ? this.saveNow() : this.q;
       return Promise.resolve(done).catch(function (e) {
-        if (!force) {
-          app.toast('Рабочая область не закрыта: последние изменения не сохранены (' + S.pbErr(e) + ')', true);
-          throw e;
-        }
+        if (force) return;
+        // a save the server refuses outright will be refused next time too: staying would mean staying for ever
+        if (e && e.refused && window.confirm('Последние изменения этой заявки сохранить не удаётся: ' +
+          (e.status ? S.pbErr(e) : e.message) + '.\n\nЗакрыть заявку без них?')) return;
+        app.toast('Рабочая область не закрыта: последние изменения не сохранены (' + (e && e.status == null && e.message ? e.message : S.pbErr(e)) + ')', true);
+        throw e;
       }).then(function () {
         self.ws = null; self.app = null; self.files = {}; self.corr = {}; self.marks = {}; self.cmp = {};
         self.unsaved = {}; self.read = []; clearTimeout(self.ut); self.renderUnsaved();

@@ -1165,7 +1165,11 @@
         });
       }
       self.setPrices(toSet);
-      self.toast('Загружено цен: ' + n);
+      // how many of them found a resource in the estimates that are loaded: a book of thirty thousand rows
+      // and an application of five hundred resources are not the same number
+      var fit = 0;
+      if (self.model) self.model.resources.forEach(function (r) { if (toSet[r.key] != null) fit++; });
+      self.toast('Загружено цен: ' + n + (self.model ? ' · подошло к ресурсам загруженных смет: ' + fit : ''));
     };
     if (isJson) reader.readAsText(file); else reader.readAsArrayBuffer(file);
   };

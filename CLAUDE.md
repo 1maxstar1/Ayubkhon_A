@@ -39,6 +39,7 @@ irm https://raw.githubusercontent.com/1maxstar1/Ayubkhon_A/HEAD/server/install-w
 sh test/laptop-windows.sh                             # Windows ishga tushirgichi, pwsh ostida
 sh test/laptop-backup.sh; node test/backup-prune.cjs  # Mac ishga tushirgichi: zaxira, ikkinchi joy, tiklash; qaysi nusxalar saqlanadi
 node test/upload-fail.mjs; node test/two-tabs.mjs     # serverga yuklanmagan smeta «saqlangan» emas; bitta ariza ikki vkladkada
+node test/state-size.mjs                              # holatga faqat o'zgargan narxlar yoziladi; narxlar kitobi uni to'ldirmaydi; server rad etgan holat qayta-qayta yuborilmaydi
 node test/xlsx-guard.cjs; node test/read-guard.mjs    # begona fayl: o'quvchi har qanday .xlsx da tugaydi; sahifa javob bermagan o'qishni to'xtatadi, faqat o'qilgan fayl saqlanadi
 sh test/pb-smoke.sh; node test/e2e-workspace.mjs      # server rejimi testlari
 node test/normalize.cjs; node test/sections.cjs; node test/regions.cjs   # NLP o'lchovlari

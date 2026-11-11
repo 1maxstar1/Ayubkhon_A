@@ -5988,6 +5988,7 @@ if (typeof self !== 'undefined') self.S = S;
     this.projects = [];
     this.model = null;
     this.prices = {};        // resource key -> market unit price
+    this.spareBook = null;   // price-book lines for a resource key no estimate has yet; see loadPriceBook()
     this.opts = Object.assign({}, DEFAULTS, loadOpts());
     this.seq = 0;
     this.pending = 0;
@@ -6588,7 +6589,7 @@ if (typeof self !== 'undefined') self.S = S;
           S.money(od.rows[0].calc) + '). В документе сумма считается как кол-во × цена.', true);
       }
       this._oddSaid = odKey;
-      if (this.looseBook) {
+      if (this.looseBook || this.spareBook) {
         this.spreadLooseBook();
         S.applyPrices(this.model, this.prices);
       }
@@ -6641,14 +6642,18 @@ if (typeof self !== 'undefined') self.S = S;
     });
   };
 
-  /** Resolve name-only price-book entries against the resources now loaded. */
+  /**
+   * Price-book lines that were waiting for a resource, against the resources now loaded: the lines given for one
+   * estimate price (`spareBook`, by resource key) first, then the name-only ones (`looseBook`).
+   */
   App.prototype.spreadLooseBook = function () {
-    var loose = this.looseBook;
-    if (!loose || !this.model) return;
+    var loose = this.looseBook || {}, spare = this.spareBook || {};
+    if (!this.model) return;
     var self = this;
     this.model.resources.forEach(function (r) {
-      var p = loose[r.nk];
-      if (p != null && self.prices[r.key] == null) self.prices[r.key] = p;
+      if (self.prices[r.key] != null) return;
+      var p = spare[r.key] != null ? spare[r.key] : loose[r.nk];
+      if (p != null) self.prices[r.key] = p;
     });
   };
 
@@ -7104,7 +7109,15 @@ if (typeof self !== 'undefined') self.S = S;
       // as changed: the tick stayed green over unsaved work and the whole book
       // was gone on leaving.
       self.looseBook = Object.assign(self.looseBook || {}, loose);
-      var toSet = Object.assign({}, exact);
+      // A line given for one estimate price is a price only where the estimates have that resource (or had it:
+      // a key priced before keeps being priced). The others wait apart, in `spareBook`, for an estimate added
+      // later — among the prices they made the saved state as large as the book, whatever the estimates were.
+      var toSet = {}, spare = {}, live = {};
+      if (self.model) self.model.resources.forEach(function (r) { live[r.key] = 1; });
+      Object.keys(exact).forEach(function (k) {
+        if (live[k] || self.prices[k] != null) toSet[k] = exact[k]; else spare[k] = exact[k];
+      });
+      if (Object.keys(spare).length) self.spareBook = Object.assign(self.spareBook || {}, spare);
       if (self.model) {
         self.model.resources.forEach(function (r) {          // spreadLooseBook, into the map
           var p = self.looseBook[r.nk];
@@ -8050,6 +8063,14 @@ if (typeof self !== 'undefined') self.S = S;
   // repairs half-switched keyboard layouts; anything older is lifted onto it
   // once, on the next open. Bump this whenever S.nameKey changes again.
   var KEYS = 2;
+  // A price is kept in this browser from the moment it is set until the server has it inside the saved state.
+  var WAL = 'smeta.wal.';               // + workspace id
+  var WAL_DAYS = 30;                    // what was kept for an application nobody came back to is dropped after this
+  var KEEP_MAX = 30 * 1024;             // a request that must outlive the page may be this large (the browser allows 64 KB for all of them together)
+  var SAVE_RETRY_MS = 15 * 1000;
+  // The server takes a state of 5 MB and no more (server/pb_schema.json, workspaces.state). What is saved is
+  // kept under this, with room for the request around it.
+  var STATE_MAX = 4 * 1024 * 1024;
 
   function $(id) { return document.getElementById(id); }
   function A() { return window.app; }
@@ -8070,16 +8091,26 @@ if (typeof self !== 'undefined') self.S = S;
     unsaved: {},            // file name -> { file, why, retry }: estimates on screen whose file is not on the server
     frozen: false,          // this application was opened in another tab after this one: nothing is saved from here
     read: [],               // files of the batch being read that have given a project and are to be stored
+    wal: {}, walN: 0,       // prices not yet inside a saved state: key -> { v, t, n, s }; see «kept in the browser»
+    mine: {},               // keys whose price was set in this sitting
+    busy: 0,                // requests of the queue that have not been answered
+    saveRetry: SAVE_RETRY_MS,
 
     init: function () {
       var self = this;
       var P = S.App.prototype;
       wrap(P, 'rebuild', function () { self.touch(); });
       wrap(P, 'saveOpts', function () { self.touch(); });
-      wrap(P, 'setPrice', function (key, value) { self.touch(); self.priceSet(key); self.correctSoon(key, value); });
+      wrap(P, 'setPrice', function (key, value) {
+        var one = {};
+        one[key] = value;
+        self.touch(); self.priceSet(key); self.keep(one); self.correctSoon(key, value);
+      });
       wrap(P, 'setPrices', function (map) {
         self.touch();
-        Object.keys(map).forEach(function (k) { self.priceSet(k); self.correctSoon(k, map[k]); });
+        Object.keys(map).forEach(function (k) { self.priceSet(k); });
+        self.keep(map);
+        Object.keys(map).forEach(function (k) { self.correctSoon(k, map[k]); });
       });
       // Leaving the field is the moment the number is finished being typed.
       ['priceScroll', 'sheetScroll'].forEach(function (id) {
@@ -8107,11 +8138,18 @@ if (typeof self !== 'undefined') self.S = S;
       $('projects').addEventListener('input', function () { self.touch(); });
       $('reportMode').addEventListener('change', function () { self.touch(); });
       this.listen();
+      this.walSweep();
       window.addEventListener('beforeunload', function (e) {
-        self.flush();
-        if (self.dirty) self.saveNow();
+        self.leave();
         // an estimate whose file is not on the server would not be there after the reload: the browser asks
         if (self.ws && !self.frozen && self.hasUnsaved()) { e.preventDefault(); e.returnValue = ''; }
+      });
+      window.addEventListener('pagehide', function () { self.leave(); });
+      // put out of sight — another tab, another window: saved now rather than when the timers get to it
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState !== 'hidden' || !self.ws || self.loading || self.frozen) return;
+        self.flush();
+        if (self.dirty) self.saveNow().catch(function () { /* said by saveNow, and retried */ });
       });
     },
 
@@ -8136,8 +8174,15 @@ if (typeof self !== 'undefined') self.S = S;
       this.unsaved = {};
       clearTimeout(this.ut);
       this.loading = true;
+      this.wal = this.walRead(w.id);
+      this.walN = Object.keys(this.wal).reduce(function (m, k) { return Math.max(m, +self.wal[k].n || 0); }, 0);
+      this.mine = {};
+      this.restoredOnly = false;
+      this.savedOnOpen = w.updated || '';      // the server's own clock: corrections are compared with it
+      this.corrReady = false; this.merged = false;
       var app = A();
-      app.projects = []; app.prices = {}; app.looseBook = null; app.queue = [];
+      app.projects = []; app.prices = {}; app.looseBook = null; app.spareBook = null; app.queue = [];
+      this.refused = ''; this.cutSaid = 0;
       app.rebuild(); app.renderSide();
       this.renderBox();
       this.announce(w);
@@ -8150,11 +8195,13 @@ if (typeof self !== 'undefined') self.S = S;
 
       this.corrList = [];
       this.marks = {};
-      S.pb.collection('corrections').getFullList({ filter: S.pb.filter('workspace = {:w}', { w: w.id }), fields: 'id,res_key,market_price,source' })
+      S.pb.collection('corrections').getFullList({ filter: S.pb.filter('workspace = {:w}', { w: w.id }), fields: 'id,res_key,market_price,source,updated' })
         .then(function (list) {
           if (!current()) return;
           self.corrList = list;
           self.indexCorr();
+          self.corrReady = true;
+          self.mergeCorr();
         }).catch(function (e) {
           if (current()) app.toast('Правки не загружены: ' + S.pbErr(e), true);
         });
@@ -8240,7 +8287,7 @@ if (typeof self !== 'undefined') self.S = S;
     /** Server corrections, keyed the way the live rows are keyed. */
     indexCorr: function () {
       var raw = {};
-      (this.corrList || []).forEach(function (c) { raw[c.res_key] = { id: c.id, market: c.market_price, source: c.source || '' }; });
+      (this.corrList || []).forEach(function (c) { raw[c.res_key] = { id: c.id, market: c.market_price, source: c.source || '', updated: c.updated || '' }; });
       this.corr = this.reindex(raw).map;
     },
 
@@ -8275,6 +8322,7 @@ if (typeof self !== 'undefined') self.S = S;
       app.resetOpts(st.opts);
       $('reportMode').value = st.mode || 'changed';
       app.looseBook = st.looseBook || null;
+      app.spareBook = st.book || null;
       app.rebuild(); app.renderSide();
       // `prices2` is this version's keying; `prices` is the previous one's, kept
       // so a workspace saved here can still be opened by the older page.
@@ -8291,7 +8339,141 @@ if (typeof self !== 'undefined') self.S = S;
       this.renderBox();
       if (remapped) this.touch();          // write the workspace back under the new keys
       if (app.projects.length) app.toast('Рабочая область восстановлена: файлов ' + app.projects.length);
+      this.replay();
+      this.mergeCorr();
       this.restoreCompare();
+    },
+
+    /* ----------------------------------------------- kept in the browser */
+    /*
+     * A price goes to the server twice — as a correction, and inside the saved state the table and the document
+     * are built from — and the second request used to wait for the answer to the first. A tab closed a third of
+     * a second after a price was typed, over a link slower than this machine's own, sent the correction and never
+     * the state: the price was gone from the table, and still offered to other projects as an expert's price.
+     *
+     * Three things hold it now, each enough by itself.
+     *
+     *   keep()      every price set is written to this browser's own storage at once, and let go when a saved
+     *               state that contains it has been acknowledged. Opening the application here again puts back
+     *               what is newer than the state the server holds: a closed tab, a crashed browser, the power.
+     *   leave()     on the way out both requests are made at once, beside whatever is still on its way, and
+     *               marked to outlive the page when they are small enough for the browser to allow that.
+     *   mergeCorr() a correction of this application written after its state was last saved is a price the
+     *               state has missed: it is put back, in any browser.
+     */
+    walRead: function (id) {
+      try {
+        var o = JSON.parse(localStorage.getItem(WAL + id) || '{}');
+        return o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+      } catch (e) { return {}; }
+    },
+    walWrite: function () {
+      if (!this.ws) return;
+      try {
+        if (Object.keys(this.wal).length) localStorage.setItem(WAL + this.ws.id, JSON.stringify(this.wal));
+        else localStorage.removeItem(WAL + this.ws.id);
+      } catch (e) { /* storage full or switched off: the two requests are made all the same */ }
+    },
+    /** Prices just set (`map`: key -> value), kept until a saved state carries them. */
+    keep: function (map) {
+      if (!this.ws || this.loading || this.frozen) return;
+      var self = this, now = Date.now();
+      Object.keys(map).forEach(function (k) {
+        var from = self.priceSource(k, map[k]);
+        self.wal[k] = { v: map[k], t: now, n: ++self.walN };
+        if (from) self.wal[k].s = from.source;
+        self.mine[k] = 1;
+      });
+      this.walWrite();
+    },
+    /** A state built when the counter stood at `upto` is on the server: what it carries is let go. */
+    walAck: function (id, upto) {
+      if (!this.ws || this.ws.id !== id) return;
+      var self = this, n = 0;
+      Object.keys(this.wal).forEach(function (k) { if (!(self.wal[k].n > upto)) { delete self.wal[k]; n++; } });
+      if (n) this.walWrite();
+    },
+    /** What was kept for applications nobody came back to. */
+    walSweep: function () {
+      try {
+        var old = Date.now() - WAL_DAYS * 24 * 3600 * 1000, drop = [];
+        for (var i = 0; i < localStorage.length; i++) {
+          var name = localStorage.key(i);
+          if (name.indexOf(WAL) !== 0) continue;
+          var o = this.walRead(name.slice(WAL.length));
+          var newest = Object.keys(o).reduce(function (m, k) { return Math.max(m, +o[k].t || 0); }, 0);
+          if (newest < old) drop.push(name);
+        }
+        drop.forEach(function (name) { localStorage.removeItem(name); });
+      } catch (e) { /* no storage */ }
+    },
+    /** The price a key stands at now: the one set for it, else the estimate's own. */
+    standing: function (key) {
+      var app = A(), v = app.prices[key];
+      if (v != null) return v;
+      var rs = (app.model && app.model.resources) || [];
+      for (var i = 0; i < rs.length; i++) if (rs[i].key === key) return rs[i].price;
+      return null;
+    },
+    /** Opening: what this browser kept and the server's state does not have. */
+    replay: function () {
+      var self = this, app = A(), st = (this.ws && this.ws.state) || {};
+      var at = st.savedAt ? Date.parse(st.savedAt) || 0 : 0, map = {}, n = 0, dropped = 0;
+      Object.keys(this.wal).forEach(function (k) {
+        var e = self.wal[k], cur = e && typeof e.v === 'number' && e.t > at ? self.standing(k) : null;
+        // older than the saved state (the state has it, or something newer), or the same as what is shown
+        if (!e || typeof e.v !== 'number' || !(e.t > at) || (cur != null && S.near(cur, e.v))) { delete self.wal[k]; dropped++; return; }
+        map[k] = e.v; n++;
+        if (e.s) self.markSource(k, e.v, e.s);
+      });
+      if (dropped) this.walWrite();
+      if (n) this.putBack(map, 'Восстановлены цены, которые не успели сохраниться на сервере: ' + n);
+    },
+    /**
+     * Opening: corrections of this application that are newer than its saved state. Both times are the server's.
+     * A price set in this sitting is left alone — the correction may be the one it has just replaced.
+     */
+    mergeCorr: function () {
+      if (this.merged || this.loading || !this.corrReady || !this.ws) return;
+      this.merged = true;
+      var self = this, app = A(), since = this.savedOnOpen, map = {}, n = 0;
+      if (!since || !app.model) return;
+      app.model.resources.forEach(function (r) {
+        var c = self.corr[r.key];
+        if (!c || !(c.updated > since) || self.mine[r.key] || c.market == null || S.near(r.market, c.market)) return;
+        map[r.key] = c.market; n++;
+        if (c.source && c.source !== 'typed') self.markSource(r.key, c.market, c.source);
+      });
+      if (n) this.putBack(map, 'Восстановлены цены из правок этой заявки, которых не было в сохранённом состоянии: ' + n);
+    },
+    putBack: function (map, text) {
+      var clean = !this.dirty;
+      this.restoring = true;
+      try { A().setPrices(map); } finally { this.restoring = false; }
+      // nothing here is the person's own doing: see the «released» message of another tab
+      if (clean) this.restoredOnly = true;
+      A().toast(text);
+    },
+    /**
+     * The page is going. Everything waiting is sent at once — not behind the request in front of it, whose answer
+     * the page will not live to see.
+     */
+    leave: function () {
+      var self = this, ws = this.ws;
+      if (!ws || this.loading || this.frozen) return;
+      if (!this.dirty && !Object.keys(this.pend).length) return;
+      var behind = this.busy > 0;
+      this.leaving = true;
+      try {
+        this.flush();
+        if (this.dirty) this.saveNow().catch(function () { /* said by saveNow, and retried if the page stays */ });
+      } finally { this.leaving = false; }
+      // the page stayed after all, and a state sent before this one was still on its way: whichever arrived last
+      // is the one kept, so the state is sent once more in its turn
+      if (behind) this.q.then(function () { if (self.ws === ws && !self.frozen) self.touch(); });
+    },
+    small: function (body) {
+      try { return new Blob([JSON.stringify(body)]).size <= KEEP_MAX; } catch (e) { return false; }
     },
 
     /* ---------------------------------------------------------- compare */
@@ -8382,7 +8564,7 @@ if (typeof self !== 'undefined') self.S = S;
           });
         } else if (m.type === 'released' && m.changed) {
           // the older tab has just written something this tab opened without
-          if (self.dirty || self.hasUnsaved()) {
+          if ((self.dirty && !self.restoredOnly) || self.hasUnsaved()) {
             A().toast('В другой вкладке были несохранённые правки этой заявки. Обновите страницу, чтобы увидеть их.', true);
           } else location.reload();
         }
@@ -8411,6 +8593,7 @@ if (typeof self !== 'undefined') self.S = S;
     /* ------------------------------------------------------------- save */
     touch: function () {
       if (!this.ws || this.loading || this.frozen) return;
+      if (!this.restoring) this.restoredOnly = false;
       this.dirty = true;
       this.mark('●');
       clearTimeout(this.t);
@@ -8418,8 +8601,61 @@ if (typeof self !== 'undefined') self.S = S;
       this.t = setTimeout(function () { self.saveNow(); }, SAVE_MS);
     },
 
+    /**
+     * The prices that go into the saved state.
+     *
+     * Every key ever touched used to be saved, twice (see downgrade()): a price put back to the estimate's own
+     * stayed, «Сбросить» made nothing smaller, and a price book left every one of its lines there whether or not
+     * the estimates had such a resource. Past 5 MB the server refuses the state, and it was the same request
+     * again every fifteen seconds from then on, with nothing typed afterwards saved.
+     *
+     * Saved now: a price that differs from the estimate's own, and the price of a resource that is not on
+     * screen at the moment (a sheet unticked for a while keeps its prices). A price equal to the estimate's
+     * own says nothing the estimate does not — except where a price book has a line for that resource: there
+     * it is the expert's «no, the estimate's price», and it is kept so that the book does not come back over it.
+     */
+    savedPrices: function () {
+      var app = A(), out = {}, live = {}, loose = app.looseBook, spare = app.spareBook;
+      if (!app.model) return app.prices;
+      app.model.resources.forEach(function (r) { live[r.key] = r; });
+      Object.keys(app.prices).forEach(function (k) {
+        var v = app.prices[k], r = live[k];
+        if (v == null) return;
+        if (r && S.near(r.price, v) && !((loose && loose[r.nk] != null) || (spare && spare[k] != null))) return;
+        out[k] = v;
+      });
+      return out;
+    },
+
+    /**
+     * A state the server will take. The one part that can outgrow it is a price book's lines that answer to no
+     * resource of the estimates loaded — kept so that an estimate added later is priced from the book. When they
+     * do not fit, the first of them are saved and it is said once; in this sitting the whole book goes on working.
+     */
+    fit: function (st) {
+      var size = function (o) { return new Blob([JSON.stringify(o)]).size; };
+      var over = size(st) - STATE_MAX, cut = 0;
+      ['book', 'looseBook'].forEach(function (name) {
+        var b = st[name];
+        if (over <= 0 || !b) return;
+        var keys = Object.keys(b), had = size(b);
+        var keepN = had - over < 64 ? 0 : Math.floor(keys.length * (had - over) / had * 0.97);
+        var kept = {};
+        keys.slice(0, keepN).forEach(function (k) { kept[k] = b[k]; });
+        st[name] = keepN ? kept : null;
+        cut += keys.length - keepN;
+        over -= had - (keepN ? size(kept) : 4);
+      });
+      if (cut && cut !== this.cutSaid) {
+        A().toast('Книга цен велика для заявки: ' + cut + ' её строк, которым нет соответствия в загруженных сметах, ' +
+          'не сохранены на сервере. Цены, поставленные в сметы, сохранены. Добавив новые сметы, загрузите книгу ещё раз.', true);
+      }
+      this.cutSaid = cut;
+      return st;
+    },
+
     state: function () {
-      var app = A(), self = this;
+      var app = A(), self = this, prices = this.savedPrices();
       return {
         projects: app.projects.map(function (p) {
           return {
@@ -8429,9 +8665,10 @@ if (typeof self !== 'undefined') self.S = S;
           };
         }),
         files: this.files,
-        prices: this.downgrade(app.prices),   // readable by the previous version
-        prices2: app.prices,
+        prices: this.downgrade(prices),       // readable by the previous version
+        prices2: prices,
         looseBook: app.looseBook || null,
+        book: app.spareBook || null,
         compare: { old: this.cmp.old || null, new: this.cmp.new || null, reply: this.cmp.reply || null, base: this.cmp.base || '' },
         opts: app.opts,
         mode: $('reportMode').value,
@@ -8445,7 +8682,8 @@ if (typeof self !== 'undefined') self.S = S;
       if (!this.ws || this.loading || this.frozen) return Promise.resolve();
       this.flush();
       clearTimeout(this.t);
-      var st = this.state();
+      var upto = this.walN, id = this.ws.id;
+      var st = this.fit(this.state());
       var live = {};
       app.projects.forEach(function (p) { live[p.file] = 1; });
       this.renderUnsaved();     // a held file whose project was taken off the list is no longer waited for
@@ -8457,15 +8695,33 @@ if (typeof self !== 'undefined') self.S = S;
       if (stale.length) body['files-'] = stale;
       this.dirty = false;
       return this.enqueue(function () {
-        return S.pb.collection('workspaces').update(self.ws.id, body).then(function (w) {
-          self.ws.updated = w.updated; self.ws.files = w.files; self.ws.changed = w.changed;
+        var ws = self.ws;
+        if (!ws || ws.id !== id) return;            // closed while this waited its turn
+        var how = self.leaving && self.small(body) ? { keepalive: true } : undefined;
+        return S.pb.collection('workspaces').update(id, body, how).then(function (w) {
+          if (self.ws !== ws) return;
+          ws.updated = w.updated; ws.files = w.files; ws.changed = w.changed;
+          self.refused = '';
+          self.walAck(id, upto);
           self.mark('✓');
         }).catch(function (e) {
+          if (self.ws !== ws) throw e;
           self.dirty = true;
           self.mark('!');
-          app.toast('Не сохранено: ' + S.pbErr(e) + ' — повтор через 15 секунд', true);
           clearTimeout(self.t);
-          self.t = setTimeout(function () { if (self.dirty) self.saveNow(); }, 15000);
+          if (e && (e.status === 400 || e.status === 413)) {
+            // The server has read the state and will not take it; the same state would be refused the same way.
+            // It used to be sent again every fifteen seconds for as long as the page stayed open. Nothing is
+            // repeated now: the next change is the next attempt.
+            var why = e.response && e.response.data && e.response.data.state ? 'объём данных заявки больше допустимого'
+              : S.pbErr(e);
+            self.refused = why;
+            app.toast('Заявка не сохранена: сервер не принимает её данные (' + why + '). Повторять нет смысла — ' +
+              'следующая попытка будет после следующего изменения. Цены при этом записаны как правки и хранятся в этом браузере.', true);
+          } else {
+            app.toast('Не сохранено: ' + S.pbErr(e) + ' — повтор через ' + Math.round(self.saveRetry / 1000) + ' секунд', true);
+            self.t = setTimeout(function () { if (self.dirty) self.saveNow().catch(function () { /* said above */ }); }, self.saveRetry);
+          }
           throw e;      // whoever is leaving the workspace needs to know it failed
         });
       });
@@ -8478,8 +8734,18 @@ if (typeof self !== 'undefined') self.S = S;
      * promise, which does not.
      */
     enqueue: function (fn) {
-      var attempt = this.q.then(fn, fn);
-      this.q = attempt.catch(function () { /* the retry timer owns this */ });
+      var self = this, attempt, before = this.q;
+      var done = function () { self.busy--; };
+      this.busy++;
+      if (this.leaving) {
+        // see leave(): made now, beside what is on its way
+        try { attempt = Promise.resolve(fn()); } catch (e) { attempt = Promise.reject(e); }
+        this.q = Promise.all([before, attempt.catch(function () { /* the retry timer owns this */ })]);
+      } else {
+        attempt = before.then(fn, fn);
+        this.q = attempt.catch(function () { /* the retry timer owns this */ });
+      }
+      attempt.then(done, done);
       return attempt;
     },
 
@@ -8682,8 +8948,9 @@ if (typeof self !== 'undefined') self.S = S;
     sendBulk: function (ws, part, marks, waiting) {
       var self = this, app = A();
       this.enqueue(function () {
+        var body = { workspace: ws.id, set: part.set, del: part.del };
         return S.pb.send('/api/corrections/bulk', {
-          method: 'POST', body: { workspace: ws.id, set: part.set, del: part.del }
+          method: 'POST', body: body, keepalive: !!self.leaving && self.small(body)
         }).then(function (r) {
           part.set.forEach(function (row) {
             var k = row.res_key;
@@ -8808,17 +9075,20 @@ if (typeof self !== 'undefined') self.S = S;
       // a tab that was superseded leaves without a word to the server: what it holds is older than what is there
       var done = this.frozen ? null : this.dirty ? this.saveNow() : this.q;
       return Promise.resolve(done).catch(function (e) {
-        if (!force) {
-          app.toast('Рабочая область не закрыта: последние изменения не сохранены (' + S.pbErr(e) + ')', true);
-          throw e;
-        }
+        if (force) return;
+        // a state the server will not take would keep the person in this application for good
+        if (self.refused && window.confirm('Заявка не сохраняется: сервер не принимает её данные (' + self.refused +
+          ').\n\nЦены записаны как правки и хранятся в этом браузере. Закрыть заявку?')) return;
+        app.toast('Рабочая область не закрыта: последние изменения не сохранены (' + S.pbErr(e) + ')', true);
+        throw e;
       }).then(function () {
+        self.wal = {}; self.walN = 0; self.mine = {}; self.refused = ''; self.cutSaid = 0;
         self.ws = null; self.app = null; self.files = {}; self.corr = {}; self.marks = {}; self.cmp = {};
         self.unsaved = {}; clearTimeout(self.ut); self.renderUnsaved();
         self.thaw();
         S.hashSet('ws', '');
         self.loading = true;
-        app.projects = []; app.prices = {}; app.looseBook = null; app.queue = [];
+        app.projects = []; app.prices = {}; app.looseBook = null; app.spareBook = null; app.queue = [];
         app.resetOpts();
         $('reportMode').value = 'changed';
         app.rebuild(); app.renderSide();

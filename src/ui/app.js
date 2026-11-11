@@ -23,6 +23,7 @@
     this.projects = [];
     this.model = null;
     this.prices = {};        // resource key -> market unit price
+    this.spareBook = null;   // price-book lines for a resource key no estimate has yet; see loadPriceBook()
     this.opts = Object.assign({}, DEFAULTS, loadOpts());
     this.seq = 0;
     this.pending = 0;
@@ -623,7 +624,7 @@
           S.money(od.rows[0].calc) + '). В документе сумма считается как кол-во × цена.', true);
       }
       this._oddSaid = odKey;
-      if (this.looseBook) {
+      if (this.looseBook || this.spareBook) {
         this.spreadLooseBook();
         S.applyPrices(this.model, this.prices);
       }
@@ -676,14 +677,18 @@
     });
   };
 
-  /** Resolve name-only price-book entries against the resources now loaded. */
+  /**
+   * Price-book lines that were waiting for a resource, against the resources now loaded: the lines given for one
+   * estimate price (`spareBook`, by resource key) first, then the name-only ones (`looseBook`).
+   */
   App.prototype.spreadLooseBook = function () {
-    var loose = this.looseBook;
-    if (!loose || !this.model) return;
+    var loose = this.looseBook || {}, spare = this.spareBook || {};
+    if (!this.model) return;
     var self = this;
     this.model.resources.forEach(function (r) {
-      var p = loose[r.nk];
-      if (p != null && self.prices[r.key] == null) self.prices[r.key] = p;
+      if (self.prices[r.key] != null) return;
+      var p = spare[r.key] != null ? spare[r.key] : loose[r.nk];
+      if (p != null) self.prices[r.key] = p;
     });
   };
 
@@ -1139,7 +1144,15 @@
       // as changed: the tick stayed green over unsaved work and the whole book
       // was gone on leaving.
       self.looseBook = Object.assign(self.looseBook || {}, loose);
-      var toSet = Object.assign({}, exact);
+      // A line given for one estimate price is a price only where the estimates have that resource (or had it:
+      // a key priced before keeps being priced). The others wait apart, in `spareBook`, for an estimate added
+      // later — among the prices they made the saved state as large as the book, whatever the estimates were.
+      var toSet = {}, spare = {}, live = {};
+      if (self.model) self.model.resources.forEach(function (r) { live[r.key] = 1; });
+      Object.keys(exact).forEach(function (k) {
+        if (live[k] || self.prices[k] != null) toSet[k] = exact[k]; else spare[k] = exact[k];
+      });
+      if (Object.keys(spare).length) self.spareBook = Object.assign(self.spareBook || {}, spare);
       if (self.model) {
         self.model.resources.forEach(function (r) {          // spreadLooseBook, into the map
           var p = self.looseBook[r.nk];

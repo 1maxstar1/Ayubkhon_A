@@ -38,7 +38,9 @@ irm https://raw.githubusercontent.com/1maxstar1/Ayubkhon_A/HEAD/server/install-w
 sh test/laptop-windows.sh                             # Windows ishga tushirgichi, pwsh ostida
 sh test/laptop-backup.sh; node test/backup-prune.cjs  # Mac ishga tushirgichi: zaxira, ikkinchi joy, tiklash; qaysi nusxalar saqlanadi
 node test/upload-fail.mjs; node test/two-tabs.mjs     # serverga yuklanmagan smeta «saqlangan» emas; bitta ariza ikki vkladkada
+node test/close-tab.mjs; node test/state-size.mjs    # yopilgan vkladkada oxirgi narx yo'qolmaydi; holat server cheklovidan oshmaydi
 sh test/pb-smoke.sh; node test/e2e-workspace.mjs      # server rejimi testlari
+node test/num.cjs; node test/xlsx-guard.cjs           # son qat'iy o'qiladi («1,234.50» — ha, yonida so'z bo'lsa — yo'q); begona .xlsx o'quvchini osib qo'ymaydi
 node test/normalize.cjs; node test/sections.cjs; node test/regions.cjs   # NLP o'lchovlari
 node test/hints.cjs a.xlsx b.xlsx                      # o'xshash resurs takliflari o'lchovi
 node test/refs.cjs                                    # справочные цены: yadro, sintetik ma'lumotda

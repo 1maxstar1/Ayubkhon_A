@@ -63,7 +63,7 @@ xatoni ham ko'rsatmaydi, shuning uchun ularni tuzatish kerak.
 
 ## A. Hujjatdagi raqamlar
 
-### [ ] A1 «Полная копия»: saralashdan keyin ИТОГО formulalari buziladi
+### [x] A1 «Полная копия»: saralashdan keyin ИТОГО formulalari buziladi
 
 `src/lib/report.js:137-181` (`rowOf`, `mapRow`, `translateMap`),
 `src/lib/formula.js:60-79` — **yuqori** · M
@@ -85,7 +85,15 @@ qoladi. Yangi test: eksportni qayta o'qib, har bir formulani hisoblaydi va
 ИТОГО = qatorlar yig'indisi ekanini uch turda ham tekshiradi (hozir bunday
 test yo'q — shuning uchun xato ko'rinmagan). Eksport ko'rinishi o'zgarmaydi.
 
-### [ ] A2 4А shakli: ИТОГО ning bozor tomoni smeta summasida qoladi
+**Bajarildi — v2.9.2, commit `591457f`.** Havola endi qatorga emas, **o'ringa**
+ergashadi (faqat qatorning o'ziga havolasi qator bilan ko'chadi) — Excelda
+saralashdan keyin bo'lgani kabi. Yangi test `test/export-formulas.cjs`
+(+ `test/calc.cjs` — kichik hisoblagich). Haqiqiy smetada: 6 784 formula,
+xato 0, teskari diapazon 0, 36 ta band jamisidan 36 tasi o'z qatorlariga teng.
+Eslatma: saralash qatorni boshqa band o'rniga olib o'tsa, o'sha band jamisi
+smetadagidan farq qiladi — umumiy summa o'zgarmaydi.
+
+### [x] A2 4А shakli: ИТОГО ning bozor tomoni smeta summasida qoladi
 
 `src/lib/assemble.js:207` (`cells[C_MSUM] = { v: g.v }`) — **yuqori** · S–M
 
@@ -102,7 +110,17 @@ Reja: yozilgan jami o'rniga shu band qatorlari bo'yicha `SUM(...)` yozish
 (smeta tomonida ham, bozor tomonida ham — «formulalar tirik» qoidasiga mos).
 Muqobil: bozor tomonini bo'sh qoldirish. → egasining qarori 8.
 
-### [ ] A3 «Uskunalar» qoidasi sahifada ishlamaydi
+**Bajarildi — v2.9.2, commit `bc2875c`; egasi `SUM` ni tanladi.** Yozilgan
+jami nimaning yig'indisi ekani topiladi (o'z bandining qatorlari yoki oldingi
+jamilar — «ИТОГО ПРЯМЫЕ ЗАТРАТЫ») va **son tekshirilgandan keyingina** ikkala
+tomonga formula yoziladi. Haqiqiy faylda 89 ta jami formulaga aylandi: narx
+o'zgarmaganda 86 tasi bosilgan songa ±0,5 so'm aniqlikda teng (smeta jamini
+butun so'mga yaxlitlaydi), 3 tasi (yaxlitlangan jamilar yig'indisi) ±2 so'm.
+Qatorlari tushuntirmaydigan jami «yig'indi + qoldiq» bo'lib yoziladi
+(`=SUM(G30:G31)+7`). Matn bo'lgan jami («-») va formula bo'lgan jami avvalgidek.
+Oddiy smetalar eksporti baytma-bayt o'zgarmadi.
+
+### [x] A3 «Uskunalar» qoidasi sahifada ishlamaydi
 
 `src/worker.js:16-20`, `src/lib/smeta.js:334`, `src/lib/assemble.js:177` — **o'rta** · S
 
@@ -115,7 +133,12 @@ Reja: maydonni yuborish (bir qator) va yangi test: worker qaytargan natija
 `parseWorkbook` natijasi bilan maydonma-maydon bir xil. Bu test kelajakda
 shunga o'xshash har qanday «unutilgan maydon»ni ushlaydi.
 
-### [ ] A4 Standart sarlavha qatori hech qachon tanilmaydi
+**Bajarildi — v2.9.2, commit `2cb546c`.** Worker endi o'quvchi qaytargan
+obyektlarni o'zgarishsiz yuboradi (maydonlarni qo'lda tanlamaydi). Test
+`test/worker-parity.cjs` worker'ni ikkala sahifaga qurilgan holida ishga
+tushiradi.
+
+### [x] A4 Standart sarlavha qatori hech qachon tanilmaydi
 
 `src/lib/smeta.js:38,95,109,298` — **o'rta** · S
 
@@ -135,6 +158,20 @@ Reja: sarlavhani tozalangan matn bilan solishtirish. **Ehtiyot:** bu o'qish
 yo'lini o'zgartiradi — tuzatishdan oldin va keyin ikkala haqiqiy smeta
 eksporti baytma-bayt solishtiriladi; (b) bo'yicha ko'rinish `321.xlsx` bilan
 taqqoslanadi.
+
+**Bajarildi — v2.9.2, commit `2baf49e` — (a) qismi; (b) ataylab qilinmadi.**
+Tarix ko'rsatdiki, sarlavha repo boshidan beri hech qachon tanilmagan: hozirgacha
+chiqqan **har bir** hujjat «shakl bo'yicha» o'qishdan qurilgan va egasi ularni
+namuna bilan solishtirib qabul qilgan. Shuning uchun shakl bo'yicha o'qish
+birinchi va tegilmagan holda qoldi; sarlavha faqat u **o'qiy olmagan** varaqda
+so'raladi (bandlari nom ustunida, bandsiz, ortiqcha ustunli) va varaq boshqa
+oddiy varaqlar bilan bir xil ko'rinishda joylashadi. Qo'ldagi 51 ta kitob
+(haqiqiy smetalar va dasturning o'z eksportlari) oldin va keyin bir xil
+o'qiladi. Faqat smetaning o'z sarlavhasi qabul qilinadi (bitta miqdor, bitta
+narx, bitta summa) — dasturning solishtirish jadvali va o'z hujjati smeta deb
+olinmaydi. `[~]` (b) «sarlavha qatorini Лист1 ga qo'shish» rad etildi: u
+qabul qilingan hujjat ko'rinishini va A ustunidagi raqamlashni o'zgartirardi.
+Test: `test/smeta-header.cjs`.
 
 ### [ ] A5 Sonlarni o'qish: vergul va nuqta
 
@@ -175,7 +212,7 @@ Reja: (1) ikki xonagacha yaxlitlash, natija 0 bo'lsa tegmaslik; (2) → egasinin
 qarori 2: qo'lda yozilganlarni o'tkazib yuborish va nechta o'tkazilganini
 aytish.
 
-### [ ] A8 Hamma o'zgarish chegaradan past bo'lsa, hisobot varag'i jimgina bo'sh
+### [x] A8 Hamma o'zgarish chegaradan past bo'lsa, hisobot varag'i jimgina bo'sh
 
 `src/lib/report.js:225-228`, `src/ui/app.js:17` — **o'rta** · S
 
@@ -185,6 +222,12 @@ hech qanday izoh yo'q; ekspert «narxlarim saqlanmadi» deb o'ylaydi.
 
 Reja: «изменено N, из них в отчёт попало 0 — все ниже порога X» qatori va
 chegarani shu yerning o'zida o'zgartirish havolasi.
+
+**Bajarildi — v2.9.2, commit `0207213`.** «Вид отчёта» ustida izoh: nechta
+o'zgargan narx chegaradan past qolgani va chegara qiymati; varaq bo'sh bo'lsa —
+pushti rangda, «Цены сохранены и стоят в „Сводной таблице“» degan so'z va
+«Изменить порог» tugmasi bilan. «Скачать Excel» dan keyingi xabarda ham.
+Hujjatga nima tushishi o'zgarmadi.
 
 ### [ ] A9 Mayda aniqlik kamchiliklari (past)
 

@@ -49,6 +49,16 @@ fayllar kompyuterdan chiqmaydi.
    tomoni uchun esa `F→H`, `G→I` almashtirish bilan aynan shu formulaning
    ikkinchi nusxasi yasaladi.
 
+   Smetada `ИТОГО` formula emas, **yozib qo'yilgan son** bo'lsa (4А shaklining
+   har bir jamisi shunday), u nimaning yig'indisi ekani topiladi — o'z
+   bandining qatorlarimi yoki oldingi jamilarmi («ИТОГО ПРЯМЫЕ ЗАТРАТЫ») — va
+   ikkala tomonga ham shu yig'indi formula bo'lib yoziladi (v2.9.2): narx
+   o'zgarsa, bozor jamisi ham o'zgaradi. Smeta jamini butun so'mga yaxlitlab
+   bosadi, shuning uchun formula natijasi bosilgan sondan yarim so'mgacha farq
+   qilishi mumkin. Qatorlari tushuntirmaydigan jami «qatorlar yig'indisi +
+   qoldiq» ko'rinishida yoziladi (`=SUM(G30:G31)+7`): smeta tomoni o'sha sonni
+   ko'rsatadi, bozor tomoni qatorlar qancha o'zgargan bo'lsa shuncha o'zgaradi.
+
 3. **Qator raqamlari (A ustuni).** `Лист1` ning `A` ustuni butun varaq bo'ylab
    `1 … N` bo'lib boradi, va dastur qaysi raqamlar qaysi loyihaga tegishli
    ekanini o'zi ko'rsatadi — daftarga yozib qo'yish shart emas:
@@ -174,7 +184,7 @@ bir xilda tegishli.
 |---|---|
 | **Faqat o'zgargan narxlar (tozalangan)** | Faqat narxi tuzatilgan resurslar. Birlashtirish qoidasi narxlar varag'idagi bilan bir xil: nom + narx bir xil bo'lsa bitta qator (`КОЛ-ВО` barcha ko'chalar bo'yicha qo'shiladi), nomi bir xil narxi har xil bo'lsa — alohida qatorlar, nomi har xil narxi bir xil bo'lsa — ham alohida. Bo'limlar (`ЗАТРАТЫ ТРУДА`, `МАШИНЫ`, `МАТЕРИАЛЫ`, `ОБОРУДОВАНИЕ`), har biriga `ИТОГО` va oxirida `ЖАМИ / ВСЕГО`. |
 | **Barcha resurslar (tozalangan)** | Yuqoridagi bilan bir xil, lekin narxi o'zgarmaganlar ham qoladi. |
-| **To'liq nusxa** | Loyihaning har bir qatori, hech narsa tashlanmaydi. Narxi o'zgargan qatorlar o'z o'rnida alifbo tartibida saralanadi — ya'ni Excelda `фарқ ≠ 0` bo'yicha filtr qo'yib, nom bo'yicha saralaganda chiqadigan natijaning aynan o'zi. |
+| **To'liq nusxa** | Loyihaning har bir qatori, hech narsa tashlanmaydi. Narxi o'zgargan qatorlar o'z o'rnida alifbo tartibida saralanadi — ya'ni Excelda `фарқ ≠ 0` bo'yicha filtr qo'yib, nom bo'yicha saralaganda chiqadigan natijaning aynan o'zi. Har bir `ИТОГО` o'z o'rnidagi qatorlarni yig'adi (Excelda saralashdan keyin bo'lgani kabi): saralash qatorni boshqa bo'lim o'rniga olib o'tsa, o'sha ikki bo'lim jamisi smetadagidan farq qiladi, umumiy summa esa o'zgarmaydi (v2.9.2 gacha bunday jamilar noto'g'ri yoki aylanma havola bo'lib chiqardi). |
 
 **Smeta tuzuvchiga yuboriladigan varaq (v2.5.5).** «Faqat o'zgargan narxlar»
 rejimida resurs hisobotga faqat uning farqi (loyiha bo'yicha miqdor × (smeta

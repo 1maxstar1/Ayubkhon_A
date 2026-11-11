@@ -101,6 +101,12 @@ main.narrow .side-head > span{display:none}
 aside{background:var(--sf);border-right:1px solid var(--rule);overflow:auto;display:flex;flex-direction:column}
 .side-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;font-size:11px;
   text-transform:uppercase;letter-spacing:.07em;color:var(--mute);border-bottom:1px solid var(--rule);position:sticky;top:0;background:var(--sf);z-index:2}
+/* estimates on screen whose file is not on the server (Sync.unsaved) */
+.unsaved{margin:6px 6px 0;padding:8px;border:1px solid var(--pink2);border-radius:8px;background:var(--pink);color:var(--pinktx);font-size:12px;display:flex;flex-direction:column;gap:6px}
+.unsaved .row{display:flex;gap:8px;align-items:flex-start;justify-content:space-between}
+.unsaved .row span{min-width:0;overflow-wrap:anywhere}
+.unsaved .btn{flex:0 0 auto;height:24px;padding:0 8px}
+.unsaved .hint{opacity:.85}
 .projects{padding:6px}
 .proj{border:1px solid var(--rule);border-radius:8px;margin-bottom:8px;overflow:hidden}
 .proj > header{display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--sf2);border-bottom:1px solid var(--rule)}
@@ -514,6 +520,7 @@ body.src-norefs #refAsof{display:none !important}
       <span>Проекты</span>
       <button class="link" id="collapseAll" title="Свернуть список проектов">–</button>
     </div>
+    <div class="unsaved" id="wsUnsaved" hidden></div>
     <div id="projects" class="projects"></div>
     <div class="drop-hint" id="dropHint">
       <b>Перетащите файлы сюда</b>

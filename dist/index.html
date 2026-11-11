@@ -101,6 +101,12 @@ main.narrow .side-head > span{display:none}
 aside{background:var(--sf);border-right:1px solid var(--rule);overflow:auto;display:flex;flex-direction:column}
 .side-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;font-size:11px;
   text-transform:uppercase;letter-spacing:.07em;color:var(--mute);border-bottom:1px solid var(--rule);position:sticky;top:0;background:var(--sf);z-index:2}
+/* estimates on screen whose file is not on the server (Sync.unsaved) */
+.unsaved{margin:6px 6px 0;padding:8px;border:1px solid var(--pink2);border-radius:8px;background:var(--pink);color:var(--pinktx);font-size:12px;display:flex;flex-direction:column;gap:6px}
+.unsaved .row{display:flex;gap:8px;align-items:flex-start;justify-content:space-between}
+.unsaved .row span{min-width:0;overflow-wrap:anywhere}
+.unsaved .btn{flex:0 0 auto;height:24px;padding:0 8px}
+.unsaved .hint{opacity:.85}
 .projects{padding:6px}
 .proj{border:1px solid var(--rule);border-radius:8px;margin-bottom:8px;overflow:hidden}
 .proj > header{display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--sf2);border-bottom:1px solid var(--rule)}
@@ -514,6 +520,7 @@ body.src-norefs #refAsof{display:none !important}
       <span>Проекты</span>
       <button class="link" id="collapseAll" title="Свернуть список проектов">–</button>
     </div>
+    <div class="unsaved" id="wsUnsaved" hidden></div>
     <div id="projects" class="projects"></div>
     <div class="drop-hint" id="dropHint">
       <b>Перетащите файлы сюда</b>
@@ -7764,6 +7771,10 @@ if (typeof self !== 'undefined') self.S = S;
   var BULK = 1000;                      // corrections per request; the server caps it at 3000
   var RETRY_MS = 10000;                 // before trying a refused batch again
   var XLSX_RE = /\.xlsx?$|\.xlsm$/i;
+  // what the server allows a workspace to hold (server/pb_schema.json, workspaces.files): known here so that it is
+  // said in words before the server is asked, not read out of its refusal
+  var MAX_FILES = 30, MAX_MB = 60;
+  var UPLOAD_RETRY_MS = 15 * 1000;
   // Stamped into the saved state. 2 = resource keys built by the name key that
   // repairs half-switched keyboard layouts; anything older is lifted onto it
   // once, on the next open. Bump this whenever S.nameKey changes again.
@@ -7785,6 +7796,7 @@ if (typeof self !== 'undefined') self.S = S;
     pend: {}, ct: 0,        // prices typed but not yet written; see correctSoon()
     cmp: {},                // «Сравнение версий»: the files chosen there (slot → { name, id }) and its «Было»
     seq: 0,                 // which open() is the current one; see open()
+    unsaved: {},            // file name -> { file, why, retry }: estimates on screen whose file is not on the server
 
     init: function () {
       var self = this;
@@ -7813,9 +7825,11 @@ if (typeof self !== 'undefined') self.S = S;
       document.addEventListener('cmp:base', function (e) { if (self.ws && !self.loading) { self.cmp.base = e.detail.base || ''; self.touch(); } });
       $('projects').addEventListener('input', function () { self.touch(); });
       $('reportMode').addEventListener('change', function () { self.touch(); });
-      window.addEventListener('beforeunload', function () {
+      window.addEventListener('beforeunload', function (e) {
         self.flush();
         if (self.dirty) self.saveNow();
+        // an estimate whose file is not on the server would not be there after the reload: the browser asks
+        if (self.ws && self.hasUnsaved()) { e.preventDefault(); e.returnValue = ''; }
       });
     },
 
@@ -7837,6 +7851,8 @@ if (typeof self !== 'undefined') self.S = S;
       var sc = (w.state && w.state.compare) || {};
       this.cmp = { old: sc.old || null, new: sc.new || null, reply: sc.reply || null, base: sc.base || '' };
       this.corr = {};
+      this.unsaved = {};
+      clearTimeout(this.ut);
       this.loading = true;
       var app = A();
       app.projects = []; app.prices = {}; app.looseBook = null; app.queue = [];
@@ -8089,6 +8105,7 @@ if (typeof self !== 'undefined') self.S = S;
       var st = this.state();
       var live = {};
       app.projects.forEach(function (p) { live[p.file] = 1; });
+      this.renderUnsaved();     // a held file whose project was taken off the list is no longer waited for
       var stale = Object.keys(this.files).filter(function (n) { return !live[n]; }).map(function (n) { return self.files[n]; });
       Object.keys(this.files).forEach(function (n) { if (!live[n]) delete self.files[n]; });
       st.files = this.files;
@@ -8124,13 +8141,22 @@ if (typeof self !== 'undefined') self.S = S;
     },
 
     /* ----------------------------------------------------------- files */
+    /*
+     * An estimate is on screen the moment it is read; it is in the workspace only when its file is on the server.
+     * Between the two the upload can fail — the thirty-first file, a file too large, the link dropping for a
+     * second — and that used to be one message, gone under the next one, after which the estimate sat in the list
+     * under a green «✓», took prices, and was not there after a reload.
+     *
+     * A file that has not been stored is now kept in `unsaved` with the reason: the mark stays «!», a line over
+     * the list of projects names the file and offers to try again, a failure of the link is retried by itself,
+     * and leaving the application asks first.
+     */
     upload: function (files) {
       var self = this, app = A();
       if (!this.ws || this.loading) return;
       files = files.filter(function (f) { return XLSX_RE.test(f.name); });
       if (!files.length) return;
-      var fd = new FormData();
-      files.forEach(function (f) { fd.append('files+', f); });
+      var ws = this.ws;
       /*
        * Which stored file belongs to which estimate is worked out by comparing
        * the workspace's file list before and after — and «before» has to be
@@ -8141,16 +8167,81 @@ if (typeof self !== 'undefined') self.S = S;
        * one estimate twice and the other one's content gone.
        */
       this.enqueue(function () {
-        var had = {};
-        (self.ws.files || []).forEach(function (n) { had[n] = 1; });
-        return S.pb.collection('workspaces').update(self.ws.id, fd).then(function (w) {
+        if (self.ws !== ws) return;
+        var had = {}, room = MAX_FILES - (ws.files || []).length, send = [];
+        (ws.files || []).forEach(function (n) { had[n] = 1; });
+        files.forEach(function (f) {
+          if (f.size > MAX_MB * 1024 * 1024) self.hold(f, 'файл больше ' + MAX_MB + ' МБ — столько заявка не хранит', false);
+          else if (send.length >= room) self.hold(f, 'в заявке уже ' + MAX_FILES + ' файлов — это предел; уберите ненужный и повторите', true);
+          else send.push(f);
+        });
+        if (!send.length) { self.unsavedChanged(true); return; }
+        var fd = new FormData();
+        send.forEach(function (f) { fd.append('files+', f); });
+        return S.pb.collection('workspaces').update(ws.id, fd).then(function (w) {
           var added = (w.files || []).filter(function (n) { return !had[n]; });
-          files.forEach(function (f, i) { if (added[i]) self.files[f.name] = added[i]; });
-          self.ws.files = w.files;
+          send.forEach(function (f, i) { if (added[i]) { self.files[f.name] = added[i]; delete self.unsaved[f.name]; } });
+          ws.files = w.files;
+          self.unsavedChanged(false);
           self.touch();
         }).catch(function (e) {
-          app.toast('Файл не загружен на сервер: ' + S.pbErr(e), true);
+          // the link, or the server itself: worth trying again without being asked
+          var again = !e || !e.status || e.status >= 500;
+          send.forEach(function (f) { self.hold(f, S.pbErr(e), true); });
+          self.unsavedChanged(true);
+          if (again) {
+            clearTimeout(self.ut);
+            self.ut = setTimeout(function () { self.retryUploads(); }, UPLOAD_RETRY_MS);
+          }
         });
+      });
+    },
+
+    /** Keep a file that is not on the server, with why. `retry`: trying again can help. */
+    hold: function (file, why, retry) {
+      this.unsaved[file.name] = { file: file, why: why, retry: retry };
+    },
+    hasUnsaved: function () { return Object.keys(this.unsaved || {}).length > 0; },
+
+    /** Send again what is being held (one file by name, or all that can be retried). */
+    retryUploads: function (name) {
+      var self = this;
+      this.renderUnsaved();                                           // drops what is no longer on the list
+      var files = Object.keys(this.unsaved).filter(function (n) {
+        return (name ? n === name : true) && self.unsaved[n].retry;
+      }).map(function (n) { return self.unsaved[n].file; });
+      if (files.length) this.upload(files);
+    },
+
+    /** The list of held files changed: the line, the mark, and — when something was just refused — the message. */
+    unsavedChanged: function (say) {
+      var names = Object.keys(this.unsaved);
+      this.renderUnsaved();
+      this.mark(this.dirty ? '●' : '✓');
+      if (say && names.length) {
+        A().toast('Не сохранено на сервере: ' + names.map(function (n) { return n + ' — ' + this.unsaved[n].why; }, this).join('; '), true);
+      }
+    },
+
+    renderUnsaved: function () {
+      var self = this, box = $('wsUnsaved');
+      if (!box) return;
+      // A held file whose project was taken off the list is no longer waited for. Not while files are still
+      // being read, though: the upload starts with the reading, and can fail before its project is on the list.
+      if (!(A().pending > 0)) {
+        var live = {};
+        A().projects.forEach(function (p) { live[p.file] = 1; });
+        Object.keys(this.unsaved).forEach(function (n) { if (!live[n]) delete self.unsaved[n]; });
+      }
+      var names = Object.keys(this.unsaved);
+      box.hidden = !names.length;
+      box.innerHTML = names.map(function (n, i) {
+        var u = self.unsaved[n];
+        return '<div class="row"><span><b>' + S.esc(n) + '</b> — не сохранён на сервере: ' + S.esc(u.why) + '</span>' +
+          (u.retry ? '<button type="button" class="btn sm" data-i="' + i + '">Повторить</button>' : '') + '</div>';
+      }).join('') + (names.length ? '<div class="hint">Пока файл не сохранён, после перезагрузки страницы этой сметы в заявке не будет.</div>' : '');
+      box.querySelectorAll('button[data-i]').forEach(function (b) {
+        b.addEventListener('click', function () { self.retryUploads(names[+b.dataset.i]); });
       });
     },
 
@@ -8313,7 +8404,13 @@ if (typeof self !== 'undefined') self.S = S;
     /* ----------------------------------------------------------- header */
     mark: function (s) {
       var el = $('wsSave');
-      if (el) { el.textContent = s; el.title = s === '●' ? 'Сохранение…' : s === '✓' ? 'Сохранено' : 'Ошибка сохранения'; }
+      // «saved» is not said while an estimate on screen has no file on the server
+      var held = s === '✓' && this.hasUnsaved();
+      if (held) s = '!';
+      if (el) {
+        el.textContent = s;
+        el.title = held ? 'Есть сметы, не сохранённые на сервере' : s === '●' ? 'Сохранение…' : s === '✓' ? 'Сохранено' : 'Ошибка сохранения';
+      }
     },
     renderBox: function () {
       var box = $('wsBox'), self = this;
@@ -8359,6 +8456,10 @@ if (typeof self !== 'undefined') self.S = S;
      */
     close: function (force) {
       var self = this, app = A();
+      this.renderUnsaved();
+      var held = Object.keys(this.unsaved);
+      if (!force && held.length && !window.confirm('Не сохранены на сервере: ' + held.join(', ') +
+        '.\n\nЕсли закрыть заявку сейчас, этих смет в ней не будет. Закрыть?')) return Promise.reject(new Error('unsaved'));
       this.seq++;                             // anything still arriving is for a workspace nobody is in
       this.flush();
       var done = this.dirty ? this.saveNow() : this.q;
@@ -8369,6 +8470,7 @@ if (typeof self !== 'undefined') self.S = S;
         }
       }).then(function () {
         self.ws = null; self.app = null; self.files = {}; self.corr = {}; self.marks = {}; self.cmp = {};
+        self.unsaved = {}; clearTimeout(self.ut); self.renderUnsaved();
         S.hashSet('ws', '');
         self.loading = true;
         app.projects = []; app.prices = {}; app.looseBook = null; app.queue = [];

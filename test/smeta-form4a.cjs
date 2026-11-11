@@ -186,6 +186,13 @@ check(movedUnder.length === 1 && movedUnder[0].cells[C.NOTE].v === 'X', 're-pric
   check(names({ minDiff: 40 }) === '', 'equal to the threshold is not above it');
   check(names({ minDiff: 1000, equipNote: NOTE, equipLimit: 20 }) === 'ТЕСТОВЫЙ ЩИТ', 'equipment above its own price threshold stays regardless');
   check(repItems(S.report.build(asm4, asm4.spans[0], { mode: 'dedup', minDiff: 1000 })).length === 7, '«all resources» mode keeps every line');
+  // … and the sheet says how many re-priced lines the threshold kept off it
+  const under = (o) => S.report.build(asm4, asm4.spans[0], Object.assign({ mode: 'changed' }, o)).under;
+  check(under({}) === 0 && under({ minDiff: 20 }) === 1 && under({ minDiff: 40 }) === 2,
+    'the sheet counts the re-priced lines under the threshold: 0 without one, 1 at 20, both at 40');
+  check(under({ minDiff: 1000, equipNote: NOTE, equipLimit: 20 }) === 2, 'equipment kept for its note is not counted as left out');
+  check(under({ mode: 'dedup', minDiff: 1000 }) === 0 && !S.report.build(asm4, asm4.spans[0], { mode: 'full', minDiff: 1000 }).under,
+    'the other two kinds of sheet leave nothing out');
   void kEq;
 }
 

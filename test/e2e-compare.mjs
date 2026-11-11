@@ -43,6 +43,21 @@ try {
   // our table: the prices, and a threshold that fits invented prices of a few sum
   await page.evaluate((p) => { app.opts.minDiff = 1; app.opts.equipLimit = 20; app.setPrices(p); }, prices(S));
 
+  // «Вид отчёта» says what the difference threshold kept off the sheet: one re-priced resource here (1 × 0.5),
+  // and everything once the threshold is above every difference — an empty sheet is never left unexplained
+  await page.click('.tab[data-pane="report"]');
+  const note = () => page.evaluate(() => { const n = document.getElementById('reportNote'); return { shown: !n.hidden, all: n.classList.contains('all'), text: n.textContent.replace(/\s+/g, ' ').trim() }; });
+  let n = await note();
+  check(n.shown && !n.all && /Изменённых цен вне отчёта: 1 /.test(n.text), 'the report says one re-priced resource is under the threshold (' + n.text.slice(0, 60) + ')');
+  await page.evaluate(() => { app.opts.minDiff = 1000; app.opts.equipLimit = 1e9; app.buildReportPreview(); });
+  n = await note();
+  check(n.shown && n.all && /В отчёте пусто: все изменённые цены \(6\)/.test(n.text) && /1 000 сум/.test(n.text), 'an emptied report says why, with the count and the threshold (' + n.text.slice(0, 70) + ')');
+  await page.click('#reportNoteBtn');
+  check(await page.isVisible('#pane-settings') && await page.evaluate(() => document.activeElement.id) === 'optMinDiff', 'its button leads to the threshold in the settings');
+  await page.evaluate(() => { app.opts.minDiff = 0; app.opts.equipLimit = 20; app.buildReportPreview(); });
+  check(!(await note()).shown, 'without a threshold there is nothing to say');
+  await page.evaluate(() => { app.opts.minDiff = 1; app.buildReportPreview(); });
+
   await page.click('.tab[data-pane="compare"]');
   check(await page.isVisible('#pane-compare'), 'the compare tab opens');
   check(/исправленную смету/.test(await page.textContent('#cmpSummary')), 'before a file is chosen, the pane says what to do');

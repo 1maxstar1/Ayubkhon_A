@@ -18,6 +18,9 @@
  *   changed — only re-priced resources, one line per distinct name+price pair,
  *             quantities summed across every street. This is the "clean" list.
  *   dedup   — like `changed`, but unchanged resources are kept too.
+ *
+ * S.report.build(model, span, opts) → { rows, …, under, minDiff }: `under` is how many re-priced lines the
+ * «changed» sheet left out because their difference is not above `minDiff` (0 in the other modes).
  */
 (function (S) {
   'use strict';
@@ -235,10 +238,13 @@
 
     // «changed» mode is the sheet for the smeta's author: a re-priced resource goes on it only when its
     // difference over the project (quantity × (smeta − market)) is larger than the threshold either way.
+    // How many re-priced lines it kept off the sheet is handed back with the sheet: left unsaid, an expert whose
+    // every change was a small one found the sheet empty and took the prices for lost.
     var minDiff = onlyChanged && typeof opts.minDiff === 'number' && opts.minDiff > 0 ? opts.minDiff : 0;
+    var under = 0;
     if (minDiff) SECTION_ORDER.forEach(function (s) {
       groups[s].forEach(function (rec, k) {
-        if (!rec.big && Math.abs(rec.qty * (rec.price - rec.market)) <= minDiff) groups[s].delete(k);
+        if (!rec.big && Math.abs(rec.qty * (rec.price - rec.market)) <= minDiff) { groups[s].delete(k); under++; }
       });
     });
 
@@ -295,7 +301,10 @@
       rows.push({ kind: 'grandtotal', ht: 24.75, cells: gc });
     }
 
-    return finish(rows, firstBody, model, opts, span);
+    var rep = finish(rows, firstBody, model, opts, span);
+    rep.under = under;
+    rep.minDiff = minDiff;
+    return rep;
   }
 
   function finish(rows, firstBody, model, opts, span) {

@@ -138,6 +138,13 @@
     bindChk(this, 'optEquipOn', 'equipOn');
     bindOpt(this, 'optEquipLimit', 'equipLimit', true);
     bindOpt(this, 'optMinDiff', 'minDiff', true);
+    // the note over an emptied report leads to the number that emptied it
+    document.getElementById('reportNoteBtn').addEventListener('click', function () {
+      var tab = document.querySelector('.tab[data-pane="settings"]');
+      if (tab) tab.click();
+      var field = document.getElementById('optMinDiff');
+      field.focus(); field.select();
+    });
     bindChk(this, 'optHideSums', 'hideSums');
     bindChk(this, 'optHideQty', 'hideQty');
     bindChk(this, 'optContents', 'contents');
@@ -785,7 +792,23 @@
     var items = rep.rows.filter(function (r) { return r.kind === 'item'; }).length;
     document.getElementById('reportCount').textContent =
       rep.rows.length + ' строк · ' + items + ' ресурсов · ' + Math.round(performance.now() - t0) + ' мс';
+    // «Только изменённые» leaves out a re-priced resource whose difference is not above the threshold. Said
+    // here, because an empty sheet with nothing said reads as «my prices were not saved».
+    var note = underText(rep.under, rep.minDiff, items);
+    document.getElementById('reportNote').hidden = !note;
+    document.getElementById('reportNote').classList.toggle('all', !!note && !items);
+    document.getElementById('reportNoteText').textContent = note;
   };
+
+  /** What the threshold kept off the «changed» sheet, in words; '' when it kept nothing off. */
+  function underText(under, minDiff, items) {
+    if (!under) return '';
+    var limit = S.money(minDiff) + ' сум';
+    return items
+      ? 'Изменённых цен вне отчёта: ' + under + ' — разница по каждой не больше порога ' + limit + '.'
+      : 'В отчёте пусто: все изменённые цены (' + under + ') дают разницу не больше порога ' + limit +
+        '. Цены сохранены и стоят в «Сводной таблице».';
+  }
 
   App.prototype.renderReport = function (from, to) {
     if (!this._repHead) {
@@ -812,10 +835,20 @@
     setTimeout(function () {
       try {
         var t0 = performance.now();
-        var bytes = S.buildWorkbook(self.model, self.reportOpts());
+        var opts = self.reportOpts();
+        var bytes = S.buildWorkbook(self.model, opts);
         download(bytes, fileName(self));
+        // the same count the preview shows, over every project of the file
+        var under = 0, items = 0;
+        self.model.spans.forEach(function (span) {
+          var rep = S.report.build(self.model, span, opts);
+          under += rep.under || 0;
+          rep.rows.forEach(function (r) { if (r.kind === 'item') items++; });
+        });
+        var left = underText(under, opts.minDiff, items);
         self.toast('Файл готов · ' + modeLabel() + ' · ' +
-          (bytes.length / 1024 / 1024).toFixed(1) + ' MB · ' + Math.round(performance.now() - t0) + ' ms');
+          (bytes.length / 1024 / 1024).toFixed(1) + ' MB · ' + Math.round(performance.now() - t0) + ' ms' +
+          (left ? ' · ' + left : ''), !!left && !items);
       } catch (e) {
         self.toast('Ошибка экспорта: ' + (e.message || e), true);
       } finally {

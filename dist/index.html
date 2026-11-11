@@ -143,6 +143,10 @@ body.drag::after{content:"";position:fixed;inset:8px;border:2px dashed var(--acc
 
 /* ------------------------------------------------------------ data tables */
 .thead,.vrow{display:flex;align-items:stretch}
+/* what the difference threshold kept off the «changed» report; pink when it kept everything off */
+.repnote{display:flex;gap:10px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--rule);background:var(--sf2);font-size:12.5px}
+.repnote.all{background:var(--pink);color:var(--pinktx)}
+.repnote .btn{height:26px;padding:0 10px;flex:0 0 auto}
 .thead{border-bottom:1px solid var(--rule2);background:var(--cyan);font-weight:600;font-size:11px;
   text-transform:uppercase;letter-spacing:.03em;position:sticky;top:0;z-index:3}
 .thead .c{padding:6px 7px;border-right:1px solid #b9dede;display:flex;align-items:center}
@@ -556,6 +560,8 @@ body.src-norefs #refAsof{display:none !important}
         <div class="grow"></div>
         <span class="count" id="reportCount"></span>
       </div>
+      <div class="repnote" id="reportNote" hidden><span id="reportNoteText"></span>
+        <button type="button" class="btn" id="reportNoteBtn">Изменить порог</button></div>
       <div class="thead" id="reportHead"></div>
       <div class="vscroll" id="reportScroll"><div class="vspace"><div class="vbody"></div></div></div>
     </div>
@@ -3601,6 +3607,9 @@ if (typeof self !== 'undefined') self.S = S;
  *   changed — only re-priced resources, one line per distinct name+price pair,
  *             quantities summed across every street. This is the "clean" list.
  *   dedup   — like `changed`, but unchanged resources are kept too.
+ *
+ * S.report.build(model, span, opts) → { rows, …, under, minDiff }: `under` is how many re-priced lines the
+ * «changed» sheet left out because their difference is not above `minDiff` (0 in the other modes).
  */
 (function (S) {
   'use strict';
@@ -3818,10 +3827,13 @@ if (typeof self !== 'undefined') self.S = S;
 
     // «changed» mode is the sheet for the smeta's author: a re-priced resource goes on it only when its
     // difference over the project (quantity × (smeta − market)) is larger than the threshold either way.
+    // How many re-priced lines it kept off the sheet is handed back with the sheet: left unsaid, an expert whose
+    // every change was a small one found the sheet empty and took the prices for lost.
     var minDiff = onlyChanged && typeof opts.minDiff === 'number' && opts.minDiff > 0 ? opts.minDiff : 0;
+    var under = 0;
     if (minDiff) SECTION_ORDER.forEach(function (s) {
       groups[s].forEach(function (rec, k) {
-        if (!rec.big && Math.abs(rec.qty * (rec.price - rec.market)) <= minDiff) groups[s].delete(k);
+        if (!rec.big && Math.abs(rec.qty * (rec.price - rec.market)) <= minDiff) { groups[s].delete(k); under++; }
       });
     });
 
@@ -3878,7 +3890,10 @@ if (typeof self !== 'undefined') self.S = S;
       rows.push({ kind: 'grandtotal', ht: 24.75, cells: gc });
     }
 
-    return finish(rows, firstBody, model, opts, span);
+    var rep = finish(rows, firstBody, model, opts, span);
+    rep.under = under;
+    rep.minDiff = minDiff;
+    return rep;
   }
 
   function finish(rows, firstBody, model, opts, span) {
@@ -5880,6 +5895,13 @@ if (typeof self !== 'undefined') self.S = S;
     bindChk(this, 'optEquipOn', 'equipOn');
     bindOpt(this, 'optEquipLimit', 'equipLimit', true);
     bindOpt(this, 'optMinDiff', 'minDiff', true);
+    // the note over an emptied report leads to the number that emptied it
+    document.getElementById('reportNoteBtn').addEventListener('click', function () {
+      var tab = document.querySelector('.tab[data-pane="settings"]');
+      if (tab) tab.click();
+      var field = document.getElementById('optMinDiff');
+      field.focus(); field.select();
+    });
     bindChk(this, 'optHideSums', 'hideSums');
     bindChk(this, 'optHideQty', 'hideQty');
     bindChk(this, 'optContents', 'contents');
@@ -6527,7 +6549,23 @@ if (typeof self !== 'undefined') self.S = S;
     var items = rep.rows.filter(function (r) { return r.kind === 'item'; }).length;
     document.getElementById('reportCount').textContent =
       rep.rows.length + ' строк · ' + items + ' ресурсов · ' + Math.round(performance.now() - t0) + ' мс';
+    // «Только изменённые» leaves out a re-priced resource whose difference is not above the threshold. Said
+    // here, because an empty sheet with nothing said reads as «my prices were not saved».
+    var note = underText(rep.under, rep.minDiff, items);
+    document.getElementById('reportNote').hidden = !note;
+    document.getElementById('reportNote').classList.toggle('all', !!note && !items);
+    document.getElementById('reportNoteText').textContent = note;
   };
+
+  /** What the threshold kept off the «changed» sheet, in words; '' when it kept nothing off. */
+  function underText(under, minDiff, items) {
+    if (!under) return '';
+    var limit = S.money(minDiff) + ' сум';
+    return items
+      ? 'Изменённых цен вне отчёта: ' + under + ' — разница по каждой не больше порога ' + limit + '.'
+      : 'В отчёте пусто: все изменённые цены (' + under + ') дают разницу не больше порога ' + limit +
+        '. Цены сохранены и стоят в «Сводной таблице».';
+  }
 
   App.prototype.renderReport = function (from, to) {
     if (!this._repHead) {
@@ -6554,10 +6592,20 @@ if (typeof self !== 'undefined') self.S = S;
     setTimeout(function () {
       try {
         var t0 = performance.now();
-        var bytes = S.buildWorkbook(self.model, self.reportOpts());
+        var opts = self.reportOpts();
+        var bytes = S.buildWorkbook(self.model, opts);
         download(bytes, fileName(self));
+        // the same count the preview shows, over every project of the file
+        var under = 0, items = 0;
+        self.model.spans.forEach(function (span) {
+          var rep = S.report.build(self.model, span, opts);
+          under += rep.under || 0;
+          rep.rows.forEach(function (r) { if (r.kind === 'item') items++; });
+        });
+        var left = underText(under, opts.minDiff, items);
         self.toast('Файл готов · ' + modeLabel() + ' · ' +
-          (bytes.length / 1024 / 1024).toFixed(1) + ' MB · ' + Math.round(performance.now() - t0) + ' ms');
+          (bytes.length / 1024 / 1024).toFixed(1) + ' MB · ' + Math.round(performance.now() - t0) + ' ms' +
+          (left ? ' · ' + left : ''), !!left && !items);
       } catch (e) {
         self.toast('Ошибка экспорта: ' + (e.message || e), true);
       } finally {

@@ -58,8 +58,13 @@ check(m.sumOff.rows.join() === marked.map((r) => r.r).join(), 'and listed by the
 check(!m.rows.some((r) => r.nm === 'ТЕСТОВЫЙ ГВОЗДЬ' && r.printed != null), 'a sum that is off by less than one sum — rounding — is not counted');
 const strip = (mm) => JSON.stringify(mm.rows.map((r) => r.cells));
 check(strip(m) === strip(model(estimate({}))), 'no cell of the document differs from the one built from the estimate that adds up');
-const bytes = (mm) => Buffer.from(S.buildWorkbook(mm, { mode: 'full' })).toString('base64');
-check(bytes(m) === bytes(model(book(1))), 'and the exported workbook is the same, byte for byte');
+// every part of the workbook but the one that carries the time it was written
+const parts = (mm) => {
+  const z = S.__fflate.unzipSync(S.buildWorkbook(mm, { mode: 'full' }));
+  return Object.keys(z).filter((n) => !/^docProps\//.test(n)).sort().map((n) => n + ':' + Buffer.from(z[n]).toString('base64')).join('\n');
+};
+const pa = parts(m), pb0 = parts(model(book(1)));
+check(pa === pb0 && /xl\/worksheets\/sheet1\.xml/.test(pa), 'and the exported workbook is the same, sheet for sheet and byte for byte');
 const priced = model(wb, { [S.resKey('ТЕСТОВЫЙ БОЛТ', 'ШТ', 7)]: 6 });
 check(priced.sumOff.rows.length === 2 && priced.sumOff.diff === 1, 'a market price does not change the count: it is about the estimate');
 

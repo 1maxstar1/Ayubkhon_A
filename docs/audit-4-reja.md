@@ -17,8 +17,10 @@ marta ishga tushirib ko'rilgan yoki «faqat o'qildi» deb belgilangan; eng
 jiddiylari ikkinchi marta, mustaqil qayta tekshirildi. Haqiqiy narxlar va
 hujjat nomlari bu faylda yo'q.
 
-Holat belgilari: `[ ]` ochiq · `[?]` egasining qarori kerak · `[x]` bajarilgan
-(hozircha hech biri) · `[~]` tekshirildi va rad etildi.
+Holat belgilari: `[ ]` ochiq · `[?]` egasining qarori kerak · `[x]` bajarilgan ·
+`[~]` tekshirildi va rad etildi. 1- va 2-bosqich relizga chiqqan (v2.9.2, v2.9.3);
+3-bosqich kodi yozilgan va sinovdan o'tgan, lekin **hali reliz qilinmagan**
+(pull request #2) — unda «v2.9.4 uchun» deb belgilangan.
 
 Jiddiylik: **yuqori** — noto'g'ri hujjat yoki ma'lumot yo'qolishi ·
 **o'rta** — ish to'xtaydi yoki xato ehtimoli · **past** — noqulaylik.
@@ -173,7 +175,7 @@ olinmaydi. `[~]` (b) «sarlavha qatorini Лист1 ga qo'shish» rad etildi: u
 qabul qilingan hujjat ko'rinishini va A ustunidagi raqamlashni o'zgartirardi.
 Test: `test/smeta-header.cjs`.
 
-### [ ] A5 Sonlarni o'qish: vergul va nuqta
+### [x] A5 Sonlarni o'qish: vergul va nuqta
 
 `src/lib/util.js:43-52` (`S.num`) — **o'rta** · S
 
@@ -188,7 +190,20 @@ undan keyin roppa-rosa uchta raqam bo'lsa — noaniq: narx katagida so'rash
 («minglikmi yoki kasrmi?»); o'qilmagan qiymatda katak qizil ramka va
 «не число» xabari, eski narx jimgina qaytmaydi. `test/num.cjs` — yangi.
 
-### [ ] A6 Summasi «miqdor × narx» ga teng bo'lmagan qator jimgina qayta hisoblanadi
+**Bajarildi — v2.9.4 uchun, commit `2e5bbc5`.** `S.num` ga **tegilmadi** — smetalar
+u orqali o'qiladi, va bu yerda haqiqiy smetalar yo'q edi (eksportni baytma-bayt
+solishtirib bo'lmasdi). Qo'lda yozish uchun alohida `S.typed`: bo'shliq va
+apostrof — guruhlash; ikkala belgi bo'lsa oxirgisi kasr; bitta belgi takrorlansa
+(«1.234.567») — mingliklar; «−», «–» — minus. Son bo'lmagan matn narxni
+**o'zgartirmaydi**: maydon qizil ramkada, undan chiqilganda «не число: цена не
+изменена» deyiladi. Bo'shatilgan maydon avvalgidek smeta narxini bildiradi.
+«12,500» avvalgidek 12,5 deb olinadi, maydondan chiqilganda «Если это 12 500 —
+нажмите» tugmasi bilan (so'rov oynasi emas — yozishni to'xtatmaydi).
+«Сводная таблица», «Применить %» va hujjat sozlamalari ham shu orqali.
+Test: `test/typed-price.mjs` (50 xil yozuv + brauzer). **Qolgani:** «Книга цен»
+va «Наш ответ» fayllaridagi sonlar hali `S.num` bilan o'qiladi (D2).
+
+### [x] A6 Summasi «miqdor × narx» ga teng bo'lmagan qator jimgina qayta hisoblanadi
 
 `src/lib/assemble.js:180` — **o'rta** · S
 
@@ -198,6 +213,13 @@ kam (ikki mingdan bittasi), lekin o'sha bandning jamisi 0,42 % ga farq qildi.
 
 Reja: bunday qatorlarni yuklashda sanash va «Проверка» ro'yxatida ko'rsatish
 («в N строках сумма сметы ≠ кол-во × цена»); hisoblash qoidasi o'zgarmaydi.
+
+**Bajarildi — v2.9.4 uchun, commit `34d456a`.** Bunday qatorlar yig'ishda
+sanaladi (farq 1 so'mdan katta bo'lsa — smeta butun so'mga yaxlitlaydi) va
+jamilar yonida ko'rsatiladi: «Сумма ≠ кол-во × цена · N строк · X сум». Bosilsa
+«Сводная таблица» da navbatdagi shunday qatorga o'tadi; u yerda summa katagi
+tagiga chizilgan va smetada nima bosilganini aytadi. Hujjat kataklari va
+eksport baytma-bayt o'zgarmagan (`test/sum-off.mjs`).
 
 ### [?] A7 «Применить %»: yaxlitlash va yozilgan narxlar
 
@@ -296,7 +318,7 @@ haqiqiy Mac'da sinalmagan narsa — macOS login paytida ishga tushgan dasturga
 bulut papkasiga yozishga so'rovsiz ruxsat beradimi (`status` ikkinchi nusxalar
 sonini ko'rsatadi — bir kundan keyin qarab qo'yish kerak).
 
-### [ ] B2 Oxirgi narx vkladka yopilganda yo'qolishi mumkin
+### [x] B2 Oxirgi narx vkladka yopilganda yo'qolishi mumkin
 
 `src/ui/sync.js:65-68,368-372` — **yuqori** (LAN/VPS da), **o'rta** (noutbukda) · M
 
@@ -315,6 +337,19 @@ yopilishi, brauzer qulashi, tok o'chishidan himoya; (2) sahifa yashirilganda
 ikkala so'rovni **parallel** va `keepalive` bilan jo'natish; (3) tiklashda
 holatdagi narxlarni shu ish maydonining o'z tuzatishlari bilan birlashtirish
 (ular baribir yuklanadi) — serverga yetgan narx jadvaldan tushib qolmaydi.
+
+**Bajarildi — v2.9.4 uchun, commit `35df51c` — uchalasi.** (1) Har bir narx
+darhol brauzerga yoziladi (`localStorage`, ariza bo'yicha) va uni olib yurgan
+holat tasdiqlangach o'chiriladi; keyingi ochishda saqlangan holatdan yangirog'i
+qaytariladi va bu aytiladi. (2) Sahifa ketayotganda tuzatishlar va holat
+navbatsiz, yonma-yon va `keepalive` bilan yuboriladi (brauzer ruxsat bergan
+hajmda). (3) Arizaning saqlangan holatidan **yangiroq** tuzatishi — serverga
+yetib, holatga tushmay qolgan narx: u istalgan kompyuterda jadvalga manbasi
+bilan qaytadi; eskirog'i esa ataylab smeta narxiga qaytarilgan narxni
+tiriltirmaydi. O'lchov (`test/close-tab.mjs`, sahifa bilan server orasida 600 ms
+li **haqiqiy proksi**): yopilgan vkladkadan keyin narx oldin 4 tadan 0 marta,
+endi 4 tadan 4 marta joyida. Eslatma: Playwright'ning so'rov ushlagichi sahifa
+yopilayotgandagi so'rovlarni ko'rmaydi — shuning uchun proksi.
 
 ### [x] B3 Ikki vkladka bir-birining narxlarini jimgina o'chiradi
 
@@ -403,7 +438,7 @@ bilan ochiladi (yo'q bo'lsa — standart), yopilganda standart qaytadi; hisobot
 turi ham. Eslatma: oldin bir arizada o'zgartirilgan shtamp yoki eslatma matni
 keyingisiga «o'tib» qolardi — endi har arizada alohida yoziladi.
 
-### [ ] B7 Holat 5 MB dan oshsa, ish maydoni boshqa saqlanmaydi
+### [x] B7 Holat 5 MB dan oshsa, ish maydoni boshqa saqlanmaydi
 
 `src/ui/sync.js:321-322,351-357`, `src/ui/app.js:898-922`,
 `src/ui/prices.js:144-148` — **o'rta** (kam uchraydi, lekin chiqish yo'q) · S–M
@@ -422,6 +457,18 @@ kalitni o'chirish; kitobning loyihaga to'g'ri kelmagan qatorlarini alohida,
 soni cheklangan joyda tutish; eski kalit nusxasida faqat yangi kalitdan
 **farq qiladigan** yozuvlarni qoldirish (qaytish qoidasi saqlanadi); 400/413
 ni takrorlamaslik va ruscha tushuntirish.
+
+**Bajarildi — v2.9.4 uchun, commit `6fdb787`.** Holatga faqat smeta narxidan
+farq qiladigan narxlar yoziladi (kalit smeta narxi bilan tugaydi — farq kalitning
+o'zidan ko'rinadi). Qo'lda smeta narxiga qaytarilgan narx, agar kitobning
+nomli yozuvi uning o'rnini egallashi mumkin bo'lsa, saqlanib qoladi. Belgisi
+olingan varaqlar narxi saqlanadi. Yuklangan smetalarda yo'q resurslar uchun
+kitob qatorlaridan 2000 tagacha saqlanadi va nechta saqlanmagani aytiladi.
+5 MB dan katta holat yuborilmaydi (hajmi aytiladi); 400/413 qayta-qayta
+yuborilmaydi, ruscha tushuntiriladi; bunday arizadan chiqish so'rab, ruxsat
+beradi. 35 ming qatorli kitob bilan holat 358 KB (`test/state-size.mjs`).
+`[~]` «eski kalit nusxasini siyraklashtirish» rad etildi: eski sahifa faqat
+o'sha nusxani o'qiydi — siyraklashtirilsa, orqaga qaytishda narxlar yo'qolardi.
 
 ### [x] B8 Qaytarib bo'lmaydigan amallar so'rovsiz
 
@@ -505,7 +552,7 @@ request va status-check talabi ataylab yoqilmagan: relizlar shu shoxga
 to'g'ridan-to'g'ri yoziladi. Qolgani (40 belgili xesh, PocketBase sha256,
 zaxira manzil) — kod, 6-bosqich bilan.
 
-### [ ] C2–C4 Begona fayl va begona sahifa — [bugun]
+### [x] C2, C4, C5 · [?] C3 — Begona fayl va begona sahifa — [bugun]
 
 | № | Nima | Jiddiylik | Tuzatish | Hajm |
 |---|---|---|---|---|
@@ -516,6 +563,29 @@ zaxira manzil) — kod, 6-bosqich bilan.
 
 Yaxshi xabar (C4 sinovida tasdiqlandi): hafta to'liq yoziladi yoki umuman
 yozilmaydi; begona matn sahifalarda xavfsiz ko'rsatiladi.
+
+**C2, C5 bajarildi — v2.9.4 uchun, commit `128768e`.** O'quvchining barcha
+qidiruvlari bir o'tishli: 16 xil shakl, har birida 200 000 yopilmagan teg —
+millisekundlar (oldin 30 000 tasi 1–9 soniya, megabayti — soatlar). Ochilgan
+hajm ochishdan **oldin** so'raladi (256 MB), kitobda 5 mln katak va shuncha
+umumiy satr; bitta qism ko'p marta sanalsa ham bir marta o'qiladi; chegaradan
+tashqari belgi havolasi kitobni buzmaydi. 20 ta halol kitob (SheetJS,
+dasturning o'z hujjatlari, qo'lda yozilgan chekka holatlar) eski va yangi
+o'quvchida **aynan bir xil** o'qiladi, tezlik o'zgarmagan. Sahifada: worker'ga
+har faylga bir daqiqa, javob bermasa to'xtatiladi va almashtiriladi, navbatdagi
+fayllar yangisida o'qiladi («Сравнение версий» ham shu yo'ldan); arizada fayl
+serverga **o'qilgandan keyin** yuklanadi. Testlar: `test/xlsx-guard.cjs`,
+`test/read-guard.mjs`.
+
+**C4 bajarildi — v2.9.4 uchun, commit `d1ba5c1`.** UZEX sahifasi bir o'tishda
+o'qiladi; sahifa 8 MB, katak 4000 belgi, hafta 5000 qator (so'ralganicha),
+ro'yxat 100 hafta bilan cheklangan — oshsa hafta yozilmaydi, saqlangani joyida
+qoladi. Bitta sinxronlash 10 daqiqa; ulgurmagan haftalar keyingisida olinadi.
+Soxta saytning barcha sahifalarida eski va yangi o'quvchi 261 o'qishda bir xil
+natija beradi. **Qilinmadi:** yo'naltirishlarga ergashmaslik — PocketBase'ning
+`$http.send` ida buning kaliti yo'q.
+
+**C3 ochiq** — egasining 4-qarori kutilmoqda.
 
 ### [ ] C6–C9 Ikkinchi odam paydo bo'lganda — [ko'pchilik]
 
@@ -929,7 +999,7 @@ tuzatiladi (2-tekshiruvdagi tartib).
 |---|---|---|---|
 | 1 · v2.9.2 | Hujjat to'g'ri chiqsin | A1, A2, A3, A4, A8 + hisoblaydigan eksport testi | 3 kun |
 | 2 · v2.9.3 | Hech narsa yo'qolmasin | B1, B5 (+«Отменить»), B3 (vkladkalar), B4, B6, B8, E1, E2 | 4 kun |
-| 3 · v2.9.4 | Begona fayl va chetdagi holatlar | C2, C3, C4, C5, A5, A6, B2, B7 | 3–4 kun |
+| 3 · v2.9.4 | Begona fayl va chetdagi holatlar | C2, C3, C4, C5, A5, A6, B2, B7 — C3 dan boshqasi yozilgan (PR #2), **reliz qilinmagan** | 3–4 kun |
 | 4 | Testlar yashil va avtomatik | H1, H2, H3, H4 (qolganlari), F7 | 3 kun |
 | 5 · v2.10.0 | Qulaylik va QQS | E10–E12, E3–E9, E14–E20, F1–F6, A7, D1–D3 | 5–6 kun, bo'lib-bo'lib |
 | 6 · v2.11.0 | Xavfsiz yangilanish, Mac o'zi yangilanadi | C1, G1, G2, G3 — shundan keyin repo yopiq bo'lishi mumkin | 5 kun |

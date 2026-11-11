@@ -80,8 +80,7 @@
       if (!inp.classList || !inp.classList.contains('pin')) return;
       var rec = self.byKey(inp.dataset.key);
       if (!rec) return;
-      var v = S.num(inp.value);
-      self.app.setPrice(rec.key, v == null ? rec.price : v);
+      if (!self.app.typePrice(inp, rec.key, rec.price)) return;      // not a number: nothing changes
       inp.classList.toggle('edited', !S.near(rec.price, rec.market));
       self.updateRowEcho(inp, rec);
     });
@@ -91,13 +90,14 @@
       if (!inp.classList || !inp.classList.contains('pin')) return;
       var rec = self.byKey(inp.dataset.key);
       if (rec) inp.value = fmtIn(rec.market);
+      delete inp.dataset.typed;
       inp.select();
     });
     scroll.addEventListener('focusout', function (e) {
       var inp = e.target;
       if (!inp.classList || !inp.classList.contains('pin')) return;
       var rec = self.byKey(inp.dataset.key);
-      if (rec) inp.value = S.price(rec.market);
+      if (rec) { self.app.leftPrice(inp, rec.key, rec.market); inp.value = S.price(rec.market); }
     });
 
     scroll.addEventListener('keydown', function (e) {
@@ -113,6 +113,7 @@
       else if (e.key === 'ArrowUp') { e.preventDefault(); self.focusRow(+inp.dataset.i - 1); }
       else if (e.key === 'Escape') {
         var rec = self.byKey(inp.dataset.key);
+        delete inp.dataset.typed;
         if (rec) { self.app.setPrice(rec.key, rec.price); self.list.refresh(); }
       }
     });
@@ -133,7 +134,7 @@
       var raw = prompt('Применить процент к ' + self.view.length +
         ' видимым ресурсам?\nНапример: -10  (на 10% ниже сметной цены)', '-10');
       if (raw == null) return;
-      var pct = S.num(raw);
+      var pct = S.typed(raw).v;
       if (pct == null) { self.app.toast('Процент введён неверно', true); return; }
       var map = {};
       self.view.forEach(function (r) { map[r.key] = Math.round(r.price * (1 + pct / 100)); });

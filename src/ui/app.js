@@ -170,9 +170,7 @@
       var key = inp.dataset.key;
       var row = self.rowByKeyFirst(key);
       if (!row) return;
-      var v = S.num(inp.value);
-      self.setPrice(key, v == null ? row.price : v);
-      self.echoSheetRows(key);
+      if (self.typePrice(inp, key, row.price)) self.echoSheetRows(key);
     });
 
     // Grouped digits while reading, plain digits while typing.
@@ -181,13 +179,14 @@
       if (!inp.classList || !inp.classList.contains('pin')) return;
       var row = self.rowByKeyFirst(inp.dataset.key);
       if (row) inp.value = inVal(row.market);
+      delete inp.dataset.typed;
       inp.select();
     });
     scroll.addEventListener('focusout', function (e) {
       var inp = e.target;
       if (!inp.classList || !inp.classList.contains('pin')) return;
       var row = self.rowByKeyFirst(inp.dataset.key);
-      if (row) inp.value = S.price(row.market);
+      if (row) { self.leftPrice(inp, inp.dataset.key, row.market); inp.value = S.price(row.market); }
     });
 
     scroll.addEventListener('keydown', function (e) {
@@ -197,9 +196,44 @@
       else if (e.key === 'ArrowUp') { e.preventDefault(); self.stepSheet(+inp.dataset.i, -1); }
       else if (e.key === 'Escape') {
         var row = self.rowByKeyFirst(inp.dataset.key);
+        delete inp.dataset.typed;
         if (row) { self.setPrice(inp.dataset.key, row.price); self.sheetList.refresh(); }
       }
     });
+  };
+
+  /*
+   * A price field, as it is typed in and as it is left — the same on «Проверка цен» and «Сводная таблица».
+   *
+   * Text that is not a number used to put the estimate's price back without a word: the expert typed, the field
+   * showed the old price, nothing said why. Now it changes nothing: the field is framed in red while the text
+   * stands, and leaving it says that the price stayed as it was. An emptied field still means «the estimate's
+   * price». And a number that reads two ways («12,500») is taken as before — 12,5 — with the other reading one
+   * press away.
+   */
+  App.prototype.typePrice = function (inp, key, smeta) {
+    var r = S.typed(inp.value);
+    var bad = !r.empty && r.v == null;
+    inp.dataset.typed = '1';
+    inp.classList.toggle('bad', bad);
+    if (bad) return false;
+    this.setPrice(key, r.empty ? smeta : r.v);
+    return true;
+  };
+
+  App.prototype.leftPrice = function (inp, key, market) {
+    if (inp.dataset.typed !== '1') return;
+    delete inp.dataset.typed;
+    inp.classList.remove('bad');
+    var self = this, text = String(inp.value).trim(), r = S.typed(text);
+    if (r.empty) return;
+    if (r.v == null) {
+      this.toast('«' + text.slice(0, 30) + '» — не число: цена не изменена, осталась ' + S.price(market), true);
+    } else if (r.alt != null) {
+      this.toast('«' + text + '» прочитано как ' + S.price(r.v) + '. Если это ' + S.price(r.alt) + ' — нажмите:', false, {
+        action: { label: S.price(r.alt), fn: function () { self.setPrice(key, r.alt); self.prices_ui.list.refresh(); self.sheetList.refresh(); } }
+      });
+    }
   };
 
   /** Move the caret to the next/previous priced row, skipping the banners. */
@@ -249,7 +283,7 @@
   function bindOpt(app, id, key, numeric) {
     var el = document.getElementById(id);
     el.addEventListener('input', S.debounce(function () {
-      app.opts[key] = numeric ? (S.num(el.value) || 0) : el.value;
+      app.opts[key] = numeric ? (S.typed(el.value).v || 0) : el.value;
       app.saveOpts();
     }, 250));
   }

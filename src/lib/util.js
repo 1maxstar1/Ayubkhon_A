@@ -51,6 +51,56 @@ var S = (typeof S !== 'undefined' && S) || {};
     return null;
   }
 
+  /**
+   * A number the way a person types it into a price field.
+   *
+   * num() above reads what a file holds and is left exactly as it is — the estimates are read through it. A
+   * person types «1 234,56», pastes «1,234.56» or «1.234,56» from another table, or a minus that is not the
+   * keyboard's; num() answers null to those, and the field then quietly put the estimate's price back.
+   *
+   *   - spaces of any kind and apostrophes between digits are grouping; «−» and «–» are a minus; «+» is allowed;
+   *   - with both «,» and «.» the last one is the decimal mark and the other one groups thousands;
+   *   - one mark repeated («1.234.567») groups thousands;
+   *   - a single mark is the decimal mark, as before — but «12,500» can also be twelve thousand five hundred,
+   *     so that reading is handed back too (`alt`) for the field to offer.
+   *
+   * @returns {{v: ?number, empty: boolean, alt: (number|undefined)}}  v is null when the text is not a number
+   */
+  function typed(text) {
+    var t = String(text == null ? '' : text).replace(NBSP, '').replace(/[\s'’`]/g, '').replace(/[\u2212\u2013\u2014]/g, '-');
+    if (t === '') return { v: null, empty: true };
+    var no = { v: null, empty: false };
+    if (/e/i.test(t)) { var e = num(t); return e == null ? no : { v: e, empty: false }; }
+    var m = /^([-+]?)([\d.,]+)$/.exec(t);
+    if (!m || !/\d/.test(m[2])) return no;
+    var sign = m[1] === '-' ? -1 : 1;
+    var body = m[2].replace(/[.,]$/, '');                 // «12,» on the way to «12,5» is twelve
+    var commas = body.split(',').length - 1, dots = body.split('.').length - 1;
+    var GROUPS = /^\d{1,3}(?:[.,]\d{3})+$/;
+    var out, alt;
+    if (!commas && !dots) out = +body;
+    else if (commas && dots) {
+      var dec = body.lastIndexOf(',') > body.lastIndexOf('.') ? ',' : '.';
+      var cut = body.lastIndexOf(dec);
+      var whole = body.slice(0, cut), frac = body.slice(cut + 1);
+      // the decimal mark once; the other one only before it, and in threes
+      if ((dec === ',' ? commas : dots) !== 1 || !/^\d+$/.test(frac) || !GROUPS.test(whole)) return no;
+      out = +(whole.replace(/[.,]/g, '') + '.' + frac);
+    } else if (commas + dots > 1) {
+      if (!GROUPS.test(body)) return no;
+      out = +body.replace(/[.,]/g, '');
+    } else {
+      var p = body.split(/[.,]/);
+      if (!/^\d*$/.test(p[0]) || !/^\d+$/.test(p[1])) return no;
+      out = +((p[0] || '0') + '.' + p[1]);
+      if (p[1].length === 3 && /^[1-9]\d{0,2}$/.test(p[0])) alt = +(p[0] + p[1]);
+    }
+    if (!isFinite(out)) return no;
+    var res = { v: sign * out, empty: false };
+    if (alt != null) res.alt = sign * alt;
+    return res;
+  }
+
   var NF = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
   var NF3 = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 3 });
   function money(v) {
@@ -91,7 +141,7 @@ var S = (typeof S !== 'undefined' && S) || {};
   S.hashGet = hashGet; S.hashSet = hashSet;
 
   S.col = col; S.colIndex = colIndex; S.esc = esc;
-  S.near = near; S.num = num;
+  S.near = near; S.num = num; S.typed = typed;
   S.money = money; S.price = price; S.qty = qty; S.debounce = debounce;
 })(S);
 if (typeof self !== 'undefined') self.S = S;

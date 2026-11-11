@@ -120,6 +120,7 @@ browser_run upload-order node test/upload-order.mjs
 browser_run upload-fail  node test/upload-fail.mjs
 browser_run read-guard   node test/read-guard.mjs
 browser_run sum-off      node test/sum-off.mjs
+browser_run typed-price  node test/typed-price.mjs
 browser_run two-tabs     node test/two-tabs.mjs
 browser_run state-size   node test/state-size.mjs
 browser_run close-tab    node test/close-tab.mjs

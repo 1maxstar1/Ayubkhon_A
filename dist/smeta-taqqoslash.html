@@ -3059,6 +3059,9 @@ if (typeof self !== 'undefined') self.S = S;
       if (src[i].kind === 'section') { start = i; break; }
     }
     var body = src.slice(start);
+    // Where each line of the estimate stands before the sort, by its Лист1 row number.
+    var placeOf = new Map();
+    body.forEach(function (r, idx) { placeOf.set(r.r, idx); });
 
     if (opts.sortChanged !== false) {
       var slots = [], moving = [];
@@ -3072,14 +3075,24 @@ if (typeof self !== 'undefined') self.S = S;
 
     var rows = head(opts, span.project).concat(headerRows());
     var firstBody = rows.length + 1;
-    var rowOf = new Map();
-    body.forEach(function (r, idx) { rowOf.set(r.r, firstBody + idx); });
 
     var map = colMap(model.nExtra);
-    var mapRow = function (n) { return rowOf.get(n) || null; };
     var big = bigEquipment(model, span, opts);
 
-    body.forEach(function (r) {
+    body.forEach(function (r, idx) {
+      /*
+       * A reference follows the place, not the line that stood there. The sort puts the re-priced lines in
+       * one another's places, and a total's SUM(a:b) must go on covering the places from a to b — as it does
+       * in Excel, where sorting moves the lines and leaves the formulas of the rows that stay alone. Mapped
+       * by line instead, the two ends of the range went wherever those two lines went: the range shrank, ran
+       * backwards, or took in its own total. Only a line's reference to itself (=F*G of its own row) moves
+       * with the line.
+       */
+      var mapRow = function (n) {
+        if (n === r.r) return firstBody + idx;
+        var at = placeOf.get(n);
+        return at == null ? null : firstBody + at;
+      };
       var cells = {};
       for (var c in r.cells) {
         var v = r.cells[c];

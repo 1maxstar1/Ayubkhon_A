@@ -189,6 +189,19 @@ body.drag::after{content:"";position:fixed;inset:8px;border:2px dashed var(--acc
   padding:9px 16px;border-radius:7px;opacity:0;pointer-events:none;transition:.18s;z-index:80;max-width:70vw}
 .toast.on{opacity:1;transform:translate(-50%,0)}
 .toast.err{background:#7d1b16}
+/* the program page: messages stand one above another (App.toast) — a notice never replaces an error */
+.toasts{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:80;max-width:min(760px,86vw);
+  display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
+.toast-item{background:#14171c;color:#fff;padding:9px 14px;border-radius:7px;display:flex;gap:12px;align-items:center;
+  pointer-events:auto;box-shadow:0 2px 10px rgba(0,0,0,.25);animation:toast-in .18s ease-out}
+.toast-item.err{background:#7d1b16}
+.toast-item span{min-width:0;overflow-wrap:anywhere}
+.toast-act{flex:0 0 auto;background:#fff;color:#14171c;border:0;border-radius:5px;padding:4px 11px;font-weight:600;cursor:pointer}
+.toast-x{flex:0 0 auto;background:none;border:0;color:#fff;opacity:.75;font-size:17px;line-height:1;cursor:pointer;padding:0 2px}
+.toast-x:hover{opacity:1}
+.toast-act:focus-visible,.toast-x:focus-visible{outline:2px solid #fff;outline-offset:2px}
+@keyframes toast-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.toast-item{animation:none}}
 .busy{position:fixed;inset:0;background:rgba(238,240,244,.72);display:none;align-items:center;justify-content:center;
   gap:12px;z-index:90;backdrop-filter:blur(1px)}
 .busy.on{display:flex}

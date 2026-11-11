@@ -78,7 +78,7 @@
         </select>
         <div class="grow"></div>
         <button class="btn sm" id="pctBtn">Применить %</button>
-        <button class="btn sm" id="resetBtn">Сбросить выбранные</button>
+        <button class="btn sm" id="resetBtn" title="Вернуть сметную цену всем показанным ресурсам, у которых она изменена">Сбросить показанные</button>
         <span class="count" id="priceCount"></span>
       </div>
       <div class="thead" id="priceHead"></div>
@@ -181,7 +181,7 @@
 </main>
 
 <!--__SCREENS__-->
-<div id="toast" class="toast"></div>
+<div id="toast" class="toasts"></div>
 <div id="busy" class="busy"><div class="spin"></div><span id="busyText">Обработка…</span></div>
 
 <input type="file" id="bookInput" accept=".json,.xlsx" hidden>

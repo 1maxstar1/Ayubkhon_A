@@ -631,6 +631,18 @@
 
   S.Sync = Sync;
   S.markSource = function (key, price, source) { Sync.markSource(key, price, source); };
+  /**
+   * Where the price a resource has now was applied from — `ref:…`, `hint:…`, `uzex:…` — or '' when it was typed
+   * or nothing is known: the mark of this session first, then what the server holds for that very price. Asked
+   * before a bulk change replaces the price, so that «Отменить» can put the source back with it.
+   */
+  S.sourceOfPrice = function (key, value) {
+    if (!Sync.ws) return '';
+    var m = Sync.priceSource(key, value);
+    if (m) return m.source === 'typed' ? '' : (m.source || '');
+    var c = Sync.corr && Sync.corr[key];
+    return c && c.source && c.source !== 'typed' && S.near(c.market, value) ? c.source : '';
+  };
   S.priceSource = function (key, value) { return Sync.priceSource(key, value); };
   document.addEventListener('DOMContentLoaded', function () { Sync.init(); });
   if (document.readyState !== 'loading') Sync.init();

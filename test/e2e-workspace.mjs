@@ -283,12 +283,34 @@ check(pct && Math.abs(pct.market_price - Math.round(first.price * 0.9)) <= 1, 'a
 // «Сбросить» puts every resource back on its own estimate price, which means
 // removing every correction — in as few requests as the writes took, and cut
 // the same way, because the server counts deletions among the rows it caps.
+// It asks first — one press used to take a whole estimate's prices away — and «нет» leaves everything alone.
+let resetAsked = '';
+page.once('dialog', (d) => { resetAsked = d.message(); d.dismiss(); });
+await page.click('#resetBtn');
+await page.evaluate(() => S.Sync.flush());
+await page.evaluate(() => S.Sync.q);
+check(new RegExp('Вернуть к сметной цене ' + all + ' изменённых цен').test(resetAsked), `«Сбросить показанные» says how many prices it is about to undo and asks (${resetAsked.slice(0, 50)}…)`);
+check((await count('corrections')) === all, 'answering «нет» leaves every price and every correction');
 corrWrites = 0;
+page.once('dialog', (d) => d.accept());
 await page.click('#resetBtn');
 await page.evaluate(() => S.Sync.flush());
 await page.evaluate(() => S.Sync.q);
 check((await count('corrections')) === 0, 'resetting them all removes every correction');
 check(corrWrites === Math.ceil(all / 1000), `in ${corrWrites} request(s) of at most a thousand, not ${all}`);
+// … and the press can be taken back: «Отменить» in the message puts every price and its correction back
+check(/Возвращено к сметной цене/.test(await page.textContent('#toast')) && await page.isVisible('.toast-act'), 'the message after it carries «Отменить»');
+await page.click('.toast-act');
+await page.evaluate(() => S.Sync.flush());
+await page.evaluate(() => S.Sync.q);
+check((await count('corrections')) === all, `«Отменить» brings every price back, corrections with them (${await count('corrections')} of ${all})`);
+check(await page.evaluate((k) => { const r = app.model.resources.find((x) => x.key === k); return Math.abs(r.market - Math.round(r.price * 0.9)) <= 1; }, first.key),
+  'at the prices they had');
+page.once('dialog', (d) => d.accept());
+await page.click('#resetBtn');
+await page.evaluate(() => S.Sync.flush());
+await page.evaluate(() => S.Sync.q);
+check((await count('corrections')) === 0, 'and resetting again clears them again');
 
 // A price book is how prices are carried from one project to the next. It used
 // to be written straight into the model, around the one method the server
@@ -316,6 +338,7 @@ check(Object.keys(wBook.state.prices2 || {}).length >= bookRows.length,
   'the saved state carries the loaded prices');
 // Put the project back the way the later checks expect it.
 corrWrites = 0;
+page.once('dialog', (d) => d.accept());
 await page.click('#resetBtn');
 await page.evaluate(() => S.Sync.flush());
 await page.evaluate(() => S.Sync.q);

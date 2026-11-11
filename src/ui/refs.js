@@ -622,12 +622,10 @@
     if (!window.confirm('Автоподбор: ' + pick.length + ' ресурс(ов) с зелёной справочной ценой (уровень «Документ» / ' +
       '«Ставка по таблице»), где цена по смете выше справочной. Разница по смете: ' + S.money(total) + ' сум.\n\nПрименить справочные цены?')) return;
     var map = {};
-    pick.forEach(function (p) {
-      if (S.markSource) S.markSource(p.rec.key, p.price, self.sourceOf(p.line));
-      map[p.rec.key] = p.price;
+    pick.forEach(function (p) { map[p.rec.key] = p.price; });
+    app.bulkPrices(map, 'Автоподбор: применено ' + pick.length + ' · разница ' + S.money(total) + ' сум', function () {
+      pick.forEach(function (p) { if (S.markSource) S.markSource(p.rec.key, p.price, self.sourceOf(p.line)); });
     });
-    app.setPrices(map);
-    app.toast('Автоподбор: применено ' + pick.length + ' · разница ' + S.money(total) + ' сум');
   };
 
   Refs.closeDate = function () {

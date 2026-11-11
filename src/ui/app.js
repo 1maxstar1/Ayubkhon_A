@@ -276,13 +276,53 @@
     if (text) document.getElementById('busyText').textContent = text;
   };
 
-  App.prototype.toast = function (msg, err) {
-    var t = document.getElementById('toast');
-    t.textContent = msg;
-    t.classList.toggle('err', !!err);
-    t.classList.add('on');
-    clearTimeout(this._tt);
-    this._tt = setTimeout(function () { t.classList.remove('on'); }, err ? 5000 : 2600);
+  /**
+   * A message at the bottom of the window.
+   *
+   * There used to be one line for all of them, and whichever came last was the one on screen: «Файл не загружен
+   * на сервер» was replaced within the same second by «найдено листов объектов: 1», and the estimate that had
+   * not been stored looked stored. Messages now stand one above another, each for its own time. A notice
+   * never pushes an error out; an error stays long enough to be read and can be closed by hand.
+   *
+   *   toast(text)                       a notice, a few seconds
+   *   toast(text, true)                 an error
+   *   toast(text, err, { ms, action: { label, fn } })   with a button — «Отменить» after a bulk change
+   * Returns a function that takes the message away.
+   */
+  var NOTICES = 3, ERRORS = 4, SEC = 1000;
+  App.prototype.toast = function (msg, err, opts) {
+    opts = opts || {};
+    var box = document.getElementById('toast');
+    var el = document.createElement('div');
+    el.className = 'toast-item' + (err ? ' err' : '');
+    el.setAttribute('role', err ? 'alert' : 'status');
+    var text = document.createElement('span');
+    text.textContent = msg;
+    el.appendChild(text);
+    var timer = 0;
+    var close = function () { clearTimeout(timer); if (el.parentNode) el.parentNode.removeChild(el); };
+    if (opts.action) {
+      var act = document.createElement('button');
+      act.type = 'button'; act.className = 'toast-act'; act.textContent = opts.action.label;
+      act.addEventListener('click', function () { close(); opts.action.fn(); });
+      el.appendChild(act);
+    }
+    if (err || opts.action) {
+      var x = document.createElement('button');
+      x.type = 'button'; x.className = 'toast-x'; x.textContent = '×'; x.title = 'Закрыть';
+      x.addEventListener('click', close);
+      el.appendChild(x);
+    }
+    // the same thing said again takes the place of the first saying, it does not pile up under it
+    var same = box.children, i;
+    for (i = same.length - 1; i >= 0; i--) {
+      if (same[i].firstChild.textContent === msg && same[i].classList.contains('err') === !!err) box.removeChild(same[i]);
+    }
+    box.appendChild(el);
+    var mine = box.querySelectorAll(err ? '.toast-item.err' : '.toast-item:not(.err)');
+    for (i = 0; i < mine.length - (err ? ERRORS : NOTICES); i++) box.removeChild(mine[i]);
+    timer = setTimeout(close, opts.ms || (err ? 12 * SEC : opts.action ? 10 * SEC : 2.6 * SEC));
+    return close;
   };
 
   /* ---------------------------------------------------------------- files */
@@ -545,6 +585,46 @@
     this.prices_ui.apply();
     this.ledger();
     this.sheetList.refresh();
+  };
+
+  /**
+   * Many prices at once, with a way back.
+   *
+   * «Сбросить», «Применить %» and «Автоподбор» each change hundreds of prices with one press, and nothing in
+   * the program could take a press back: one slip on «Сбросить» with the filter at «Все» cost a whole
+   * estimate's work, and its corrections on the server with it. So the prices the press is about to replace
+   * are kept — with where each came from — and the message that follows carries «Отменить» for ten seconds.
+   * One step back, for the last bulk change only: it is a guard against a slip, not a history.
+   *
+   * `prepare`, when given, runs just before the prices are set — for the marks of where they come from.
+   */
+  App.prototype.bulkPrices = function (map, text, prepare) {
+    var self = this, keys = Object.keys(map), before = {};
+    keys.forEach(function (k) {
+      var had = self.prices[k] != null;
+      before[k] = { had: had, v: self.prices[k], src: had && S.sourceOfPrice ? S.sourceOfPrice(k, self.prices[k]) : '' };
+    });
+    if (prepare) prepare();
+    this.setPrices(map);
+    // only the last press can be taken back: the offer to undo an earlier one goes when a new one is made
+    if (this._undoOffer) this._undoOffer();
+    this._undoOffer = this.toast(text, false, { action: { label: 'Отменить', fn: function () { self.undoPrices(before); } } });
+  };
+
+  /** Put back what bulkPrices() replaced: the prices, and for an applied price the source it was applied from. */
+  App.prototype.undoPrices = function (before) {
+    var self = this, back = {}, smeta = {};
+    ((this.model && this.model.resources) || []).forEach(function (r) { smeta[r.key] = r.price; });
+    var keys = Object.keys(before).filter(function (k) { return before[k].had || smeta[k] != null; });
+    keys.forEach(function (k) {
+      var b = before[k];
+      back[k] = b.had ? b.v : smeta[k];
+      if (b.had && b.src && S.markSource) S.markSource(k, b.v, b.src);
+    });
+    this.setPrices(back);
+    // a resource that had no price of its own has none again, not its smeta price written out
+    keys.forEach(function (k) { if (!before[k].had) delete self.prices[k]; });
+    this.toast('Возвращено как было: ' + keys.length + ' цен');
   };
 
   /** One key changed: touch only the rows that use it. */

@@ -137,15 +137,20 @@
       if (pct == null) { self.app.toast('Процент введён неверно', true); return; }
       var map = {};
       self.view.forEach(function (r) { map[r.key] = Math.round(r.price * (1 + pct / 100)); });
-      self.app.setPrices(map);
-      self.app.toast('Цены ' + self.view.length + ' ресурсов изменены на ' + pct + '%');
+      self.app.bulkPrices(map, 'Цены ' + self.view.length + ' ресурсов изменены на ' + pct + '%');
     });
 
+    // The button says «показанные» and means it: every resource on the list as it is filtered now. With the
+    // filter at «Все» that is the whole application, so it counts what it is about to undo and asks first;
+    // only the prices that differ from the estimate's are touched, and the press can be taken back.
     document.getElementById('resetBtn').addEventListener('click', function () {
-      var map = {};
-      self.view.forEach(function (r) { map[r.key] = r.price; });
-      self.app.setPrices(map);
-      self.app.toast(self.view.length + ' ресурсов возвращены к сметной цене');
+      var map = {}, n = 0;
+      self.view.forEach(function (r) { if (!S.near(r.market, r.price)) { map[r.key] = r.price; n++; } });
+      if (!n) { self.app.toast('Среди показанных нет изменённых цен'); return; }
+      if (n > 1 && !window.confirm('Вернуть к сметной цене ' + n + ' изменённых цен' +
+        (self.view.length === self.app.model.resources.length ? ' — это все изменённые цены заявки' : ' (показано ресурсов: ' + self.view.length + ')') +
+        '?\n\nСразу после этого действие можно отменить кнопкой «Отменить».')) return;
+      self.app.bulkPrices(map, 'Возвращено к сметной цене: ' + n);
     });
   };
 

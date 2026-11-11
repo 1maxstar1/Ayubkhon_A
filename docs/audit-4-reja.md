@@ -408,6 +408,13 @@ taqiqi), hisobda ikki bosqichli kirish; ro'yxatda faqat to'liq 40 belgili
 xesh qabul qilish; PocketBase ZIP ining sha256 ini qotirish; ro'yxat manzili
 uchun zaxira yo'l (shox nomi → `HEAD`).
 
+Bajarildi (2026-11-11, egasi, kodsiz): hisobda ikki bosqichli kirish; asosiy
+shox `claude/excel-price-validation-5ehbvb` ga ruleset — o'chirish va
+force-push taqiqlangan (GitHub API: `deletion`, `non_fast_forward`). Pull
+request va status-check talabi ataylab yoqilmagan: relizlar shu shoxga
+to'g'ridan-to'g'ri yoziladi. Qolgani (40 belgili xesh, PocketBase sha256,
+zaxira manzil) — kod, 6-bosqich bilan.
+
 ### [ ] C2–C4 Begona fayl va begona sahifa — [bugun]
 
 | № | Nima | Jiddiylik | Tuzatish | Hajm |

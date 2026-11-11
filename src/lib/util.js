@@ -40,10 +40,41 @@ var S = (typeof S !== 'undefined' && S) || {};
     return d < 1e-6 || d < Math.abs(a) * 1e-9;
   }
 
+  /**
+   * A number as it is written in an estimate or typed into a price box; null when the text is not one.
+   *
+   * One comma or one point is the decimal mark, as it always was: «12,5» and «12.5», and «12,500» is twelve and
+   * a half — a comma is the decimal mark in Russian, and quantities are written to three places.
+   *
+   * What used to be refused, and is read now, is a number written with its thousands grouped: «1 234 567,89»
+   * was always read (spaces go), but «1,234,567.89», «1.234.567,89» and «1,234,567» were not a number at all —
+   * and a price box given one quietly put the estimate's price back. With both marks present the one written
+   * last is the decimal mark and the other groups thousands; a mark written more than once groups thousands.
+   * Groups must be of three digits, so «4.1.1» and «12.11.2026» stay what they are: not numbers. A leading «+»
+   * and the typographic minus are read too.
+   */
+  function grouped(head, mark) {
+    var parts = head.replace(/^-/, '').split(mark);
+    if (!/^\d{1,3}$/.test(parts[0])) return false;
+    for (var i = 1; i < parts.length; i++) if (!/^\d{3}$/.test(parts[i])) return false;
+    return true;
+  }
   function num(v) {
     if (typeof v === 'number') return isFinite(v) ? v : null;
     if (typeof v === 'string') {
-      var t = v.replace(NBSP, '').replace(/\s/g, '').replace(',', '.');
+      var t = v.replace(NBSP, '').replace(/\s/g, '').replace(/\u2212/g, '-');
+      if (t.charAt(0) === '+') t = t.slice(1);
+      var commas = t.split(',').length - 1, points = t.split('.').length - 1;
+      if (commas && points) {
+        var dec = t.lastIndexOf(',') > t.lastIndexOf('.') ? ',' : '.', grp = dec === ',' ? '.' : ',';
+        var cut = t.split(dec);
+        if (cut.length !== 2 || !grouped(cut[0], grp)) return null;
+        t = cut[0].split(grp).join('') + '.' + cut[1];
+      } else if (commas > 1 || points > 1) {
+        var mark = commas > 1 ? ',' : '.';
+        if (!grouped(t, mark)) return null;
+        t = t.split(mark).join('');
+      } else t = t.replace(',', '.');
       if (t === '' || !/^-?\d*\.?\d+(e[-+]?\d+)?$/i.test(t)) return null;
       var n = parseFloat(t);
       return isFinite(n) ? n : null;

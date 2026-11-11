@@ -58,6 +58,28 @@ try {
   check(!(await note()).shown, 'without a threshold there is nothing to say');
   await page.evaluate(() => { app.opts.minDiff = 1; app.buildReportPreview(); });
 
+  // A price box given something that is not a number. It used to put the estimate's price back without a word.
+  await page.click('.tab[data-pane="prices"]');
+  const pbox = page.locator('#priceScroll .pin').first();
+  const boxState = () => page.evaluate(() => { const i = document.querySelector('#priceScroll .pin'); const r = app.model.resources.find((x) => x.key === i.dataset.key);
+    return { market: r.market, price: r.price, bad: i.classList.contains('bad') }; });
+  const boxStart = await boxState();
+  await pbox.click();
+  await pbox.fill('98 765 сум');
+  let boxNow = await boxState();
+  check(boxNow.market === boxStart.market && boxNow.bad, 'text that is not a number changes nothing, and the box is marked (' + boxNow.market + ')');
+  await page.keyboard.press('Tab');
+  check(/Цена не изменена: «98 765 сум» не читается как число/.test(await page.textContent('#toast')) && (await boxState()).market === boxStart.market && !(await boxState()).bad,
+    'leaving the box says so; the price is what it was');
+  await pbox.click();
+  await pbox.fill('1,234.5');
+  boxNow = await boxState();
+  check(boxNow.market === 1234.5 && !boxNow.bad, 'a number with its thousands grouped is read (1,234.5 → ' + boxNow.market + ')');
+  await pbox.fill('');
+  check((await boxState()).market === boxStart.price, 'an emptied box is the estimate\'s price again');
+  await page.evaluate((m) => { const i = document.querySelector('#priceScroll .pin'); app.setPrice(i.dataset.key, m); app.prices_ui.apply(); }, boxStart.market);
+  await page.click('.tab[data-pane="report"]');
+
   // the list of projects folds to a strip that keeps its button, and comes back (folded to nothing, the whole
   // page went blank and only a reload brought it back)
   const widths = () => page.evaluate(() => ({ side: Math.round(document.getElementById('side').getBoundingClientRect().width),
@@ -222,9 +244,12 @@ try {
   });
   await page.setInputFiles('#pick', [fStuck, fNext]);
   await page.waitForFunction((n) => app.projects.length === n + 1 && app.pending === 0, had, { timeout: 30 * 1000 });
-  check(/Зависший\.xlsx: не прочитан за 1 секунд/.test(await page.textContent('#toast')), 'a file the worker never answers for is reported as unreadable');
-  check(await page.evaluate(() => app.projects[app.projects.length - 1].file === 'Следующий.xlsx' && app.worker !== window.__oldWorker && !document.getElementById('busy').classList.contains('on')),
-    'the worker is replaced, the file behind it is read, and the page is not left «reading»');
+  // which of the two reaches the worker first is the browser's business: one is never answered, the other is read
+  const gaveUp = /(Зависший|Следующий)\.xlsx: не прочитан за 1 секунд/.exec(await page.textContent('#toast'));
+  check(!!gaveUp, 'a file the worker never answers for is reported as unreadable');
+  const other = gaveUp && gaveUp[1] === 'Зависший' ? 'Следующий.xlsx' : 'Зависший.xlsx';
+  check(await page.evaluate((f) => app.projects[app.projects.length - 1].file === f && app.worker !== window.__oldWorker && !document.getElementById('busy').classList.contains('on'), other),
+    'the worker is replaced, the other file is read, and the page is not left «reading»');
 
   check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' / ') : ''));
 } finally {

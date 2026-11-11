@@ -180,6 +180,7 @@ body.drag::after{content:"";position:fixed;inset:8px;border:2px dashed var(--acc
 .pin:hover{border-color:var(--rule2);background:#fff}
 .pin:focus{border-color:var(--accent);background:#fff;outline:none}
 .pin.edited{background:#fff7e6;font-weight:600}
+.pin.bad,.pin.bad:focus{border-color:var(--bad);background:var(--pink);color:var(--pinktx)}   /* what is in the box is not a number: the price is unchanged */
 .tagm{display:inline-block;background:#fde7c7;color:#8a5300;border:0;border-radius:3px;padding:1px 5px;
   font-size:10px;margin-left:6px;cursor:pointer;font-family:inherit}
 .tagm:hover{background:#f8d49b}

@@ -196,6 +196,7 @@
 
     var marketMap = makeMarketMap(nExtra);
     var kept = { count: 0, names: {} };      // formulas written as their value because of the functions they call
+    var odd = { count: 0, rows: [] };        // lines whose printed sum is not their quantity × price
     var rows = [];
     var resMap = new Map();
     var out = [];
@@ -273,6 +274,13 @@
             cells[C_MSUM] = { f: '=E' + target + '*H' + target };
             cells[C_DIFF] = { f: '=+G' + target + '-I' + target };
             tally.item(target, (sr.qty || 0) * sp);
+            // The document always computes a line's sum (=E*F). When the estimate printed another number for
+            // it, the document quietly disagreed with the estimate; now the line is counted and named. Half a
+            // sum is the estimate's own rounding, not a disagreement.
+            if (sr.sum != null && Math.abs(sr.sum - (sr.qty || 0) * sp) > 0.51) {
+              odd.count++;
+              if (odd.rows.length < 20) odd.rows.push({ r: target, nm: sr.nm, sum: sr.sum, calc: (sr.qty || 0) * sp });
+            }
 
             var rec = resMap.get(key);
             if (!rec) {
@@ -342,7 +350,9 @@
 
     var model = { rows: rows, nExtra: nExtra, resources: resources, spans: out,
       // {count, names}: source formulas that went in as numbers (see copyCells); count 0 for an ordinary estimate
-      frozen: { count: kept.count, names: Object.keys(kept.names).sort() }, cols: {
+      frozen: { count: kept.count, names: Object.keys(kept.names).sort() },
+      // {count, rows:[{r, nm, sum, calc}]}: lines whose sum in the estimate is not quantity × price (the first twenty)
+      oddSums: odd, cols: {
       IDX: C_IDX, NO: C_NO, NAME: C_NAME, UNIT: C_UNIT, QTY: C_QTY,
       PRICE: C_PRICE, SUM: C_SUM, MPRICE: C_MPRICE, MSUM: C_MSUM, DIFF: C_DIFF, EXTRA: C_EXTRA
     } };

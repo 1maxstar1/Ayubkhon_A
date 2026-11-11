@@ -80,8 +80,9 @@
       if (!inp.classList || !inp.classList.contains('pin')) return;
       var rec = self.byKey(inp.dataset.key);
       if (!rec) return;
-      var v = S.num(inp.value);
-      self.app.setPrice(rec.key, v == null ? rec.price : v);
+      var t = self.app.typedPrice(inp);
+      if (t.kind === 'bad') return;                 // not a number: nothing changes, the box says so (App.typedPrice)
+      self.app.setPrice(rec.key, t.kind === 'empty' ? rec.price : t.v);
       inp.classList.toggle('edited', !S.near(rec.price, rec.market));
       self.updateRowEcho(inp, rec);
     });
@@ -97,7 +98,7 @@
       var inp = e.target;
       if (!inp.classList || !inp.classList.contains('pin')) return;
       var rec = self.byKey(inp.dataset.key);
-      if (rec) inp.value = S.price(rec.market);
+      if (rec) { self.app.leftPrice(inp, rec.price); inp.value = S.price(rec.market); }
     });
 
     scroll.addEventListener('keydown', function (e) {

@@ -66,6 +66,7 @@ echo "test                   sonuc  vaqt"
 echo "-----------------------------------"
 run build            node build.mjs
 run normalize        node test/normalize.cjs
+run num              node test/num.cjs
 run xlsx-guard       node test/xlsx-guard.cjs
 run smeta-form4a     node test/smeta-form4a.cjs
 run smeta-header     node test/smeta-header.cjs

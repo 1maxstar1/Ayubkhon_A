@@ -158,6 +158,39 @@
   };
 
   /**
+   * What was typed into a price box, for both tables that have one.
+   *
+   *   { kind: 'empty' }            nothing: the resource goes back to the estimate's price
+   *   { kind: 'ok', v }            a number
+   *   { kind: 'bad' }              not a number: the price is left as it is
+   *
+   * It used to be one line — «not a number? then the estimate's price» — so a price pasted as «98 765 сум» or
+   * mistyped put the estimate's price back without a word, and the box showed it as if that had been typed.
+   * Now what cannot be read changes nothing: the box is marked while it holds it, and leaving the box says so.
+   */
+  App.prototype.typedPrice = function (inp) {
+    var text = String(inp.value || '').replace(/[\s\u00A0\u2007\u202F]/g, '');
+    var v = S.num(inp.value);
+    var kind = text === '' ? 'empty' : v == null || v < 0 ? 'bad' : 'ok';
+    inp.classList.toggle('bad', kind === 'bad');
+    inp.title = kind === 'bad' ? 'Не число — цена не изменена' : '';
+    return { kind: kind, v: v };
+  };
+  /** Leaving a price box: say what was not read, and what a lone comma was taken for. `smeta` is the estimate's price. */
+  App.prototype.leftPrice = function (inp, smeta) {
+    var raw = String(inp.value || '').trim();
+    var t = this.typedPrice(inp);
+    inp.classList.remove('bad'); inp.title = '';
+    if (t.kind === 'bad') {
+      this.toast('Цена не изменена: «' + raw.slice(0, 30) + '» не читается как число', true);
+    } else if (t.kind === 'ok' && /^\d{1,3},\d{3}$/.test(raw.replace(/\s/g, '')) && smeta >= t.v * 100) {
+      // a lone comma before three digits is a decimal mark; next to an estimate price a hundred times larger, thousands were probably meant
+      this.toast('«' + raw + '» прочитано как ' + S.price(t.v) + ' (запятая — десятичный знак). Если это ' +
+        raw.replace(',', ' ') + ', введите без запятой.', true);
+    }
+  };
+
+  /**
    * The market price is editable straight from the assembled sheet, not only on
    * the prices tab. One edit still means one resource: it lands on every row
    * with the same name and unit, which is what "review the price across the
@@ -173,8 +206,9 @@
       var key = inp.dataset.key;
       var row = self.rowByKeyFirst(key);
       if (!row) return;
-      var v = S.num(inp.value);
-      self.setPrice(key, v == null ? row.price : v);
+      var t = self.typedPrice(inp);
+      if (t.kind === 'bad') return;
+      self.setPrice(key, t.kind === 'empty' ? row.price : t.v);
       self.echoSheetRows(key);
     });
 
@@ -190,7 +224,7 @@
       var inp = e.target;
       if (!inp.classList || !inp.classList.contains('pin')) return;
       var row = self.rowByKeyFirst(inp.dataset.key);
-      if (row) inp.value = S.price(row.market);
+      if (row) { self.leftPrice(inp, row.price); inp.value = S.price(row.market); }
     });
 
     scroll.addEventListener('keydown', function (e) {
@@ -582,6 +616,13 @@
           fz.names.slice(0, 6).join(', ') + '). Вместо них записаны их значения — проверьте эти строки.', true);
       }
       this._frozenSaid = fzKey;
+      var od = this.model.oddSums, odKey = od && od.count ? od.count + ':' + od.rows[0].r : '';
+      if (odKey && odKey !== this._oddSaid) {
+        this.toast('В смете строк, где сумма не равна кол-во × цена: ' + od.count + ' (например, строка ' + od.rows[0].r +
+          ' «' + String(od.rows[0].nm).slice(0, 40) + '»: в смете ' + S.money(od.rows[0].sum) + ', кол-во × цена = ' +
+          S.money(od.rows[0].calc) + '). В документе сумма считается как кол-во × цена.', true);
+      }
+      this._oddSaid = odKey;
       if (this.looseBook) {
         this.spreadLooseBook();
         S.applyPrices(this.model, this.prices);

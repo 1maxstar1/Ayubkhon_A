@@ -770,7 +770,51 @@
       block('Ресурсов', S.money(m.resources.length) + ' · изменено ' + changed) +
       block('По смете', S.money(smeta) + ' сум') +
       block('По рынку', S.money(market) + ' сум') +
-      block('Разница', S.money(diff) + ' сум  (' + pct.toFixed(2) + '%)', diff > 0 ? 'good' : diff < 0 ? 'bad' : '');
+      block('Разница', S.money(diff) + ' сум  (' + pct.toFixed(2) + '%)', diff > 0 ? 'good' : diff < 0 ? 'bad' : '') +
+      this.sumOffBlock();
+    var off = document.getElementById('sumOff');
+    if (off) off.addEventListener('click', this.nextSumOff.bind(this));
+  };
+
+  /*
+   * Rows of the estimate whose printed sum is not quantity × price. The document always computes the sum, so on
+   * these rows it differs from the paper — by the estimate's own mistake, but silently. They are counted where the
+   * totals are, and a click walks through them in «Сводная таблица».
+   */
+  App.prototype.sumOffBlock = function () {
+    var o = this.model && this.model.sumOff;
+    if (!o || !o.rows.length) return '';
+    var n = o.rows.length;
+    var title = 'В смете напечатанная сумма не равна «кол-во × цена»: строк ' + n + ', всего на ' + S.money(o.diff) +
+      ' сум (напечатано минус посчитано). В документе сумма считается формулой, поэтому в этих строках она отличается ' +
+      'от напечатанной. Нажмите, чтобы перейти к строке.';
+    return '<div><span class="k">Сумма ≠ кол-во × цена</span>' +
+      '<button type="button" class="v bad lnk" id="sumOff" title="' + S.esc(title) + '">' + S.money(n) + ' ' + plural(n, 'строка', 'строки', 'строк') +
+      ' · ' + S.money(o.diff) + ' сум</button></div>';
+  };
+
+  function plural(n, one, few, many) {
+    var d = n % 10, h = n % 100;
+    return d === 1 && h !== 11 ? one : d >= 2 && d <= 4 && (h < 12 || h > 14) ? few : many;
+  }
+
+  App.prototype.nextSumOff = function () {
+    var o = this.model && this.model.sumOff;
+    if (!o || !o.rows.length) return;
+    this._sumOffAt = ((this._sumOffAt == null ? -1 : this._sumOffAt) + 1) % o.rows.length;
+    var r = o.rows[this._sumOffAt];
+    var tab = document.querySelector('.tab[data-pane="sheet"]');
+    if (tab && !tab.classList.contains('on')) tab.click();
+    var q = document.getElementById('q2');
+    if (q.value) { q.value = ''; this.applySheetFilter(); }
+    var view = this.sheetView || [];
+    for (var i = 0; i < view.length; i++) {
+      if (view[i].r !== r) continue;
+      this.sheetList.scrollToRow(i);
+      this.toast('Строка A' + r + ' (' + (this._sumOffAt + 1) + ' из ' + o.rows.length + '): в смете напечатано ' +
+        S.money(view[i].printed) + ', кол-во × цена = ' + S.money((view[i].qty || 0) * view[i].price));
+      return;
+    }
   };
 
   function block(k, v, cls) {
@@ -887,7 +931,8 @@
       '<div class="c mid" style="' + w(SHEET_COLS[2]) + '">' + S.esc(r.unit) + '</div>' +
       '<div class="c num" style="' + w(SHEET_COLS[3]) + '">' + S.qty(qty) + '</div>' +
       '<div class="c num" style="' + w(SHEET_COLS[4]) + '">' + S.price(r.price) + '</div>' +
-      '<div class="c num" style="' + w(SHEET_COLS[5]) + '">' + S.money(sm) + '</div>' +
+      '<div class="c num' + (r.printed != null ? ' off' : '') + '" style="' + w(SHEET_COLS[5]) + '"' +
+      (r.printed != null ? ' title="В смете напечатано ' + S.money(r.printed) + ' — это не кол-во × цена"' : '') + '>' + S.money(sm) + '</div>' +
       market +
       '<div class="c num" style="' + w(SHEET_COLS[7]) + '">' + S.money(mk) + '</div>' +
       '<div class="c num' + (chg ? ' diff' : '') + '" style="' + w(SHEET_COLS[8]) + '">' + S.money(d) + '</div>' +

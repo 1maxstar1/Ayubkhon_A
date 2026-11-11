@@ -187,6 +187,7 @@
     var rows = [];
     var resMap = new Map();
     var out = [];
+    var sumOff = { rows: [], diff: 0 };   // item rows whose printed sum is not quantity × price
 
     function push(row) {
       row.r = rows.length + 1;
@@ -261,6 +262,15 @@
             cells[C_MSUM] = { f: '=E' + target + '*H' + target };
             cells[C_DIFF] = { f: '=+G' + target + '-I' + target };
             tally.item(target, (sr.qty || 0) * sp);
+            /* The document computes the sum (quantity × price) and does not copy the one printed in the estimate.
+               Where the two disagree the estimate itself does not add up, and the expert should hear of it rather
+               than find a total that differs from the paper: such rows are counted and marked, nothing else about
+               them changes. More than a sum apart — estimates round to whole sums. */
+            if (sr.sum != null && Math.abs(sr.sum - (sr.qty || 0) * sp) > 1) {
+              row.printed = sr.sum;
+              sumOff.rows.push(target);
+              sumOff.diff += sr.sum - (sr.qty || 0) * sp;
+            }
 
             var rec = resMap.get(key);
             if (!rec) {
@@ -328,7 +338,7 @@
       g.forEach(function (r) { r.variants = g.length; r.siblings = prices; });
     });
 
-    var model = { rows: rows, nExtra: nExtra, resources: resources, spans: out, cols: {
+    var model = { rows: rows, nExtra: nExtra, resources: resources, spans: out, sumOff: sumOff, cols: {
       IDX: C_IDX, NO: C_NO, NAME: C_NAME, UNIT: C_UNIT, QTY: C_QTY,
       PRICE: C_PRICE, SUM: C_SUM, MPRICE: C_MPRICE, MSUM: C_MSUM, DIFF: C_DIFF, EXTRA: C_EXTRA
     } };

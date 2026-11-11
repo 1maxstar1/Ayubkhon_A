@@ -28,6 +28,7 @@ node test/smeta-form4a.cjs                            # 4А shakli (АВС-4): b
 node test/smeta-header.cjs                            # oddiy varaq: shakli bo'yicha o'qilmasa — sarlavhasi bo'yicha
 node test/export-formulas.cjs                         # eksport qayta o'qiladi, formulalari hisoblanadi: ИТОГО = qatorlar yig'indisi (uch turda)
 node test/worker-parity.cjs                           # sahifadagi worker o'quvchi qaytargan narsani aynan qaytaradi
+node test/sum-off.mjs                                 # smetada bosilgan summa ≠ miqdor × narx bo'lgan qatorlar sanaladi va ko'rsatiladi (hisob o'zgarmaydi)
 node test/compare.cjs; node test/e2e-compare.mjs      # «Сравнение версий» va «Наш ответ (Excel)»: qaytgan smetani birinchisi va jadvalimiz bilan solishtirish
 node test/e2e-compare-keep.mjs                        # ... va ish maydonida: yuklangan fayllar qayta yuklashdan keyin qaytadi
 node test/browser.mjs a.xlsx b.xlsx                   # haqiqiy brauzerda (bitta-fayl rejim)

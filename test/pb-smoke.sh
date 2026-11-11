@@ -4,6 +4,15 @@ set -e
 cd "$(dirname "$0")/../server"
 export PB_DATA_DIR=pb_data_test PB_ADMIN_EMAIL=admin@example.com PB_ADMIN_PASS=adminpass1234
 PORT=8092; BASE="http://127.0.0.1:$PORT"
+# No server of an earlier test may still be serving the directory that is about to be removed. A test that was
+# killed, or one that left without waiting for its server, leaves one behind; it went on writing while the next
+# test started — and that one failed for no reason of its own. Ended here, and waited for: asked first, then made to.
+LEFT='serve .*--dir pb_data_test'
+if command -v pkill >/dev/null 2>&1 && pgrep -f -- "$LEFT" >/dev/null 2>&1; then
+  pkill -f -- "$LEFT" 2>/dev/null || true
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do pgrep -f -- "$LEFT" >/dev/null 2>&1 || break; sleep 0.2; done
+  if pgrep -f -- "$LEFT" >/dev/null 2>&1; then pkill -9 -f -- "$LEFT" 2>/dev/null || true; sleep 0.5; fi
+fi
 # A server the test before has only just stopped may still be closing its database, and its last files can appear
 # while the directory is being removed: «Directory not empty», and the next test failed before it began. Removed
 # again after a moment instead.

@@ -15,6 +15,14 @@
  *
  * Every test gets its own port; they share server/pb_data_test, so they must
  * not run at the same time — test/all.sh runs them one after another.
+ *
+ * A server does not outlive its test, and a test does not start on top of another's server:
+ *   - test/pb-smoke.sh, which every start goes through, first ends any server still serving pb_data_test and
+ *     waits for it to be gone — a test that was killed leaves one behind, and it used to go on writing into
+ *     the directory the next test was removing («Directory not empty», a test failing for no reason of its own);
+ *   - a port that still answers after that belongs to something else, and is refused in words;
+ *   - a server that exits while it is being waited for is reported at once, with its exit code;
+ *   - stop() ends the server and resolves when it is gone; Ctrl-C and a plain kill of the test end it too.
  */
 import { spawn, execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -39,9 +47,12 @@ export const DATA = join(ROOT, 'server/pb_data_test');
 export async function startServer(opts) {
   const { port, registry = false, build = false, dev = '1', laptop = '', autologin = '', as = 'test@example.com' } = opts;
   const base = `http://127.0.0.1:${port}`;
+  const answers = async () => { try { await fetch(base + '/api/health', { signal: AbortSignal.timeout(1500) }); return true; } catch (e) { return false; } };
 
   if (build) execSync('node build.mjs --serve', { cwd: ROOT, stdio: 'ignore' });
   execSync('sh test/pb-smoke.sh', { cwd: ROOT, stdio: 'ignore' });
+  // pb-smoke.sh has ended every test server there was: whatever answers on the port now is not one of ours
+  if (await answers()) throw new Error(`port ${port} is taken by something that is not a test server — the test cannot start on ${base}`);
   if (registry) {
     execSync('node test/registry.cjs --json server/pb_data_test/rows.json', { cwd: ROOT, stdio: 'ignore' });
   }
@@ -53,15 +64,28 @@ export async function startServer(opts) {
     stdio: 'ignore'
   });
   const up = async () => {
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 40; i++) {
+      // gone already: there is nothing to wait for, and the reason is its exit code
+      if (proc.exitCode != null || proc.signalCode != null) {
+        throw new Error(`the server on ${base} exited while starting (code ${proc.exitCode}, signal ${proc.signalCode})`);
+      }
       try { if ((await fetch(base + '/api/health')).ok) return true; } catch (e) { /* not up yet */ }
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 250));
     }
     return false;
   };
+  /** End the server and wait until it is gone: asked first, then made to. */
+  const end = (p) => new Promise((resolve) => {
+    if (!p || p.exitCode != null || p.signalCode != null) return resolve();
+    const hard = setTimeout(() => { try { p.kill('SIGKILL'); } catch (e) { /* gone */ } }, 4000);
+    p.once('exit', () => { clearTimeout(hard); resolve(); });
+    try { p.kill(); } catch (e) { clearTimeout(hard); resolve(); }
+  });
 
   proc = spawnOne();
   process.on('exit', () => { try { proc.kill(); } catch (e) { /* already gone */ } });
+  // Ctrl-C, or the suite's own timeout: without these the test went and its server stayed
+  ['SIGINT', 'SIGTERM', 'SIGHUP'].forEach((sig) => process.once(sig, () => { try { proc.kill(); } catch (e) { /* gone */ } process.exit(130); }));
   if (!await up()) throw new Error(`server did not start on ${base}`);
 
   /** A request. Returns {} for the 204 a DELETE answers with. */
@@ -109,13 +133,15 @@ export async function startServer(opts) {
     },
     /** Stop and start again, keeping the data — for testing what happens at boot. */
     restart: async () => {
-      proc.kill();
-      await new Promise((r) => setTimeout(r, 700));
+      await end(proc);
       proc = spawnOne();
       if (!await up()) throw new Error('server did not come back');
       pb.su = await auth();
     },
-    stop: () => { try { proc.kill(); } catch (e) { /* already gone */ } }
+    /** Ends the server; the promise resolves when it is gone (awaiting it is optional: the next start waits too). */
+    stop: () => end(proc),
+    /** The server's process id — for tests of this helper. */
+    pid: () => proc.pid
   };
   return pb;
 }

@@ -14,7 +14,8 @@ import { startServer } from './server.mjs';
 import { startSite, week, sampleRows } from './uzex-site.mjs';
 
 const site = await startSite(8145);
-const env = { UZEX_BASE: site.base, UZEX_AUTO: '0' };
+// UZEX_SYNC_MS: one sync may take three seconds here (ten minutes otherwise); the stand-in answers at once unless told to wait
+const env = { UZEX_BASE: site.base, UZEX_AUTO: '0', UZEX_SYNC_MS: '3000' };
 const pb = await startServer({ port: 8143, registry: true, env });
 const { api } = pb;
 let fail = 0;
@@ -99,7 +100,35 @@ try {
   const g = (await call('POST', '/api/uzex/sync?force=1', boss)).body;
   check(g.ok === false && g.errors.some((x) => x.import_id === 204 && /ячеек/.test(x.message)) && (await quotes(204)).rows.length === 10,
     'a week with a broken row is not written at all; what was stored for it stays');
+  /* a page that is not a page: the server reads it once, quickly, and keeps what it had */
+  site.mode = 'unclosed';
+  let t0 = Date.now();
+  const un = (await call('POST', '/api/uzex/sync?force=1', boss)).body;
+  let took = Date.now() - t0;
+  check(un.ok === false && un.errors.length === 4 && await pb.count('uzex_quotes') === 23,
+    `week pages of 300 000 unclosed cells are refused and the data stays (${String(un.message).slice(0, 60)})`);
+  check(took < 20 * 1000, `and the server is not held by them: four such pages in ${(took / 1000).toFixed(1)} s`);
+  site.mode = 'huge';
+  t0 = Date.now();
+  const hg = (await call('POST', '/api/uzex/sync?force=1', boss)).body;
+  took = Date.now() - t0;
+  check(hg.ok === false && hg.errors.length === 4 && /слишком большая/.test(hg.message) && await pb.count('uzex_quotes') === 23,
+    `a page of nine megabytes is not read at all (${(took / 1000).toFixed(1)} s)`);
+  check((await call('GET', '/api/health')).status === 200, 'the server answers afterwards');
   site.mode = 'ok';
+
+  /* a site that answers slowly does not hold the sync for as long as it likes */
+  site.delay = 1300;
+  t0 = Date.now();
+  const sl = (await call('POST', '/api/uzex/sync?force=1', boss)).body;
+  took = Date.now() - t0;
+  site.delay = 0;
+  check(sl.ok === false && sl.added.length >= 1 && sl.added.length < 4 && sl.errors.length === 4 - sl.added.length &&
+    sl.errors.every((x) => /при следующем/.test(x.message)),
+    `a sync that runs out of its time stops asking: ${sl.added.length} weeks taken, ${sl.errors.length} left for the next one (${(took / 1000).toFixed(1)} s)`);
+  check(await pb.count('uzex_imports') === 4 && await pb.count('uzex_quotes') === 23, 'what was stored stays whole');
+  const again = (await call('POST', '/api/uzex/sync?force=1', boss)).body;
+  check(again.ok && again.added.length === 4, 'and the next sync takes them all');
 
   /* ------------------------------------------------------------- a new week */
   site.weeks.unshift(week(208, '2031-03-17', '2031-03-21', 'internal', sampleRows().slice(0, 4)));

@@ -58,6 +58,46 @@ check(n('Тестовый кокс', 'export').currency === 'VAL' && n('X (до�
     check(rows.length === 10 && rows[0].row_no === 1 && rows[0].price === 1234.5 && rows[0].change === -65.5 && rows[0].change_pct < 0 &&
       rows[2].date_from === '2031-03-03' && rows[3].change_pct > 0, 'a week: every row, its numbers, its own dates, the sign of the change on the percent');
     check(throws(() => U.parseWeek('<html></html>', 204, 'internal'), /списка недель/), 'a page without the week list is refused');
+
+    /*
+     * A page that is not what it should be. The reader used to find its cells with expressions like «<td …>…</td>»;
+     * an opening tag that nothing closes makes such an expression read to the end of the page from every opening
+     * tag in turn. Two hundred thousand of them are a page of a megabyte or two — and were minutes of a server that
+     * answers nobody. Every search is one pass now; each line below is one of the places that was not.
+     */
+    const N = 200000;
+    const timed = (fn) => { const t0 = Date.now(); let err = ''; try { fn(); } catch (e) { err = e.message; } return { ms: Date.now() - t0, err }; };
+    const quick = (what, fn, re) => {
+      const r = timed(fn);
+      check(r.ms < 2000 && (!re || re.test(r.err)), `${N} unclosed ${what}: ${r.ms} ms${r.err ? ' — ' + r.err.slice(0, 50) : ''}`);
+    };
+    const tbody = (rowsHtml) => page.replace(/<tbody>[\s\S]*<\/tbody>/, '<tbody>' + rowsHtml + '</tbody>');
+    const oneRow = '<tr><td>1</td><td>Тестовое имя</td><td>1,5</td><td>0,5</td><td>1,0%</td><td>10.03.2031</td><td>14.03.2031</td></tr>';
+    quick('«<» in a cell', () => U.text('<'.repeat(N)));
+    quick('lists of weeks', () => U.parseWeeks('<select id="ImportId">'.repeat(N)), /списка недель/);
+    quick('lists cut off inside the tag', () => U.parseWeeks('<select '.repeat(N)), /списка недель/);
+    quick('weeks in the list', () => U.parseWeeks('<select id="ImportId">' + '<option>'.repeat(N) + '</select>'), /список недель пуст/);
+    quick('weeks cut off inside the tag', () => U.parseWeeks('<select id="ImportId">' + '<option '.repeat(N) + '</select>'), /список недель пуст/);
+    quick('table headers', () => U.parseWeek(page.replace('</thead>', '').replace('<thead>', '<thead>'.repeat(N)), 204, 'internal'), /заголовок/);
+    quick('header cells', () => U.parseWeek(page.replace('<thead>', '<thead>' + '<th>'.repeat(N)).replace(/<\/th>/g, ''), 204, 'internal'), /заголовок/);
+    quick('table bodies', () => U.parseWeek(page.replace('</tbody>', '').replace('<tbody>', '<tbody>'.repeat(N)), 204, 'internal'), /без строк/);
+    quick('rows cut off inside the tag', () => U.parseWeek(tbody('<tr '.repeat(N)), 204, 'internal'), /нет строк/);
+    quick('cells', () => U.parseWeek(tbody('<tr>' + '<td>'.repeat(N) + '</tr>'), 204, 'internal'), /ячеек 0/);
+    quick('cells cut off inside the tag', () => U.parseWeek(tbody('<tr>' + '<td '.repeat(N) + '</tr>'), 204, 'internal'), /ячеек 0/);
+    check(U.parseWeek(page.replace(/<(\/?)(select|option|table|thead|tbody|tr|th|td)\b/g, (m, sl, name) => '<' + sl + name.toUpperCase()), 204, 'internal').length === 10,
+      'tags in capitals are still tags');
+
+    // what a page may hold
+    const L = U.LIMITS;
+    check(throws(() => U.parseWeeks(page + ' '.repeat(L.page)), /слишком большая/), `a page longer than ${L.page / 1048576} MB is refused before it is read`);
+    check(throws(() => U.parseWeek(tbody(oneRow.replace('Тестовое имя', '<i></i>'.repeat(L.cell) + 'Тестовое имя')), 204, 'internal'), /ячейка длиннее/), 'a cell longer than ' + L.cell + ' characters refuses the week');
+    check(throws(() => U.parseWeek(tbody('<tr>' + '<td>1</td>'.repeat(50000) + '</tr>'), 204, 'internal'), /ячеек больше 7/), 'a row of fifty thousand cells is refused at the eighth');
+    const numbered = (n) => Array.from({ length: n }, (_, i) => oneRow.replace('<td>1</td>', '<td>' + (i + 1) + '</td>')).join('');
+    check(U.parseWeek(tbody(numbered(L.rows)), 204, 'internal').length === L.rows, `a week of ${L.rows} rows — as many as are asked for — is read`);
+    check(throws(() => U.parseWeek(tbody(numbered(L.rows + 1)), 204, 'internal'), /больше \d+ строк/), 'one row more refuses the week');
+    const manyWeeks = (n) => '<select id="ImportId">' + Array.from({ length: n }, (_, i) => `<option value="${i + 1}"${i ? '' : ' selected'}>10.03.2031 - 14.03.2031 (Внутренние)</option>`).join('') + '</select>';
+    check(U.parseWeeks(manyWeeks(L.weeks)).weeks.length === L.weeks && throws(() => U.parseWeeks(manyWeeks(L.weeks + 1)), /больше \d+ недель/),
+      `a list of ${L.weeks} weeks is read, one more is refused`);
     const uz = await get('importId=204&length=5000&culture=uz&ui-culture=uz');
     check(throws(() => U.parseWeeks(uz), /русском/) && throws(() => U.parseWeek(uz, 204, 'internal'), /русском/), 'another language is refused');
     check(throws(() => U.parseWeek(rowsHtml(page, 'Наименование товара', 'Товар'), 204, 'internal'), /заголовок/), 'a changed column title is refused');

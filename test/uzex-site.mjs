@@ -6,6 +6,8 @@
  *   const site = await startSite(8145);
  *   site.weeks       the weeks it lists (edit freely: push a week, change rows)
  *   site.mode        'ok' | 'down' (503) | 'uz' (another language) | 'stuck' (always shows the newest week)
+ *                    | 'unclosed' (a week page of 300 000 cells that are never closed) | 'huge' (a week page of 9 MB)
+ *   site.delay       milliseconds every answer waits (0)
  *   site.hits        requests answered, by importId ('' for the list)
  *   site.stop()
  */
@@ -80,7 +82,7 @@ ${rows}
 
 export async function startSite(port) {
   const site = {
-    port, base: `http://127.0.0.1:${port}`, mode: 'ok', hits: {},
+    port, base: `http://127.0.0.1:${port}`, mode: 'ok', delay: 0, hits: {},
     weeks: [
       week(204, '2031-03-10', '2031-03-14', 'internal', sampleRows(['2031-03-03', '2031-03-07'])),
       week(205, '2031-03-10', '2031-03-14', 'export', [['Тестовый кокс', 190.03, 0.03], ['Тестовый шрот 1 сорт', 405, -65]]),
@@ -97,9 +99,14 @@ export async function startSite(port) {
     // the real site ignores the language cookie when the query names a culture, and answers an unknown week with the newest
     const lang = site.mode === 'uz' ? 'uz' : (u.searchParams.get('culture') === 'ru' && u.searchParams.get('ui-culture') === 'ru' ? 'ru' : 'uz');
     const want = site.mode === 'stuck' ? null : site.weeks.find((w) => String(w.id) === id);
-    const body = page(site, want || site.weeks[0], lang);
-    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    res.end(body);
+    let body = page(site, want || site.weeks[0], lang);
+    // a week's page that is not what it should be (the list of weeks stays honest, so the week is asked for)
+    if (id && site.mode === 'unclosed') body = body.replace('<tbody>', '<tbody><tr>' + '<td>'.repeat(300000));
+    if (id && site.mode === 'huge') body = body.replace('</body>', '<!--' + 'x'.repeat(9 * 1024 * 1024) + '--></body>');
+    setTimeout(() => {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      res.end(body);
+    }, site.delay || 0);
   });
   await new Promise((r) => server.listen(port, '127.0.0.1', r));
   site.stop = () => server.close();

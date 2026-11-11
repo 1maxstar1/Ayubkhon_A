@@ -371,14 +371,38 @@ dasturning o'z sahifasiga beriladi — brauzerda ochiq boshqa sayt
 | `sh server/laptop.sh autostart` | kompyuter yonganda o'zi ishga tushsin |
 | `sh server/laptop.sh status` | ishlayaptimi, baza hajmi, oxirgi zaxira |
 | `sh server/laptop.sh backup` | hoziroq zaxira olish |
+| `sh server/laptop.sh drive` / `drive <papka>` / `drive off` | ikkinchi nusxa qayerga yozilishini ko'rsatish / boshqa papkani tayinlash / o'chirish |
+| `sh server/laptop.sh restore` / `restore <fayl.zip>` | zaxiralar ro'yxati / bazani o'sha nusxadan tiklash |
 | `sh server/laptop.sh update` | yangi versiyani olib, qayta ishga tushirish |
 | `sh server/laptop.sh stop` | to'xtatish |
 | `sh server/laptop.sh uninstall` | o'zi ishga tushishini bekor qilish (ma'lumot qoladi) |
 
-**Ma'lumot** `server/pb_data/` ichida — `git pull` unga tegmaydi. **Zaxira**
-har ishga tushganda (kuniga bir marta) olinadi va `~/Backups/smeta` ga
-nusxalanadi, oxirgi 14 tasi saqlanadi. Zaxira `pb_data` dan **tashqarida**
-turadi: diskdagi papka yo'qolsa, uning ichidagi zaxira ham yo'qoladi.
+**Ma'lumot** `server/pb_data/` ichida — `git pull` unga tegmaydi.
+
+**Zaxira** kuniga bir marta olinadi: dastur ishga tushganda, va ishlab turgan
+dastur har soatda zaxira eskirmaganini tekshiradi (v2.9.3 — Mac haftalab
+o'chirilmasa ham zaxira har kuni olinadi). Nusxa ikki joyga yoziladi:
+
+1. `~/Backups/smeta` — shu diskda, lekin `pb_data` dan tashqarida;
+2. **ikkinchi joy — shu diskdan tashqarida** (v2.9.3). Kompyuterda Google Drive
+   yoki iCloud Drive papkasi bo'lsa, dastur uni o'zi topadi va nusxani
+   `Smeta zaxira (Mac)` papkasiga qo'yadi — bulut uni o'zi yuklaydi. Boshqa
+   papka (masalan tashqi disk): `sh server/laptop.sh drive /Volumes/Disk/zaxira`;
+   o'chirish: `drive off`. Ikkinchi joy bo'lmasa, har bir buyruq «ikkinchi
+   nusxa: YO'Q» deb ochiq aytadi — disk buzilsa yoki noutbuk yo'qolsa, baza va
+   barcha zaxiralar birga ketadi.
+
+Har ikki joyda: oxirgi 14 nusxa, undan keyin 8 hafta davomida haftasiga bitta,
+undan keyin 12 oy davomida oyiga bitta (`server/backup-prune.cjs`) — uchinchi
+haftada payqalgan xatoni ham qaytarish mumkin.
+
+**Tiklash:** `sh server/laptop.sh restore` nusxalar ro'yxatini beradi,
+`sh server/laptop.sh restore <fayl.zip>` bazani o'sha nusxadan tiklaydi.
+Hozirgi baza **o'chirilmaydi** — `server/pb_data.before-restore-…` ga suriladi;
+tiklangach nechta ariza, ish maydoni va narx tuzatishi qaytgani chiqadi.
+Zaxira bo'lmagan fayl hech narsaga tegmasdan rad etiladi. Zaxira ZIP i butun
+bazani ochiq holda saqlaydi (hisoblar, sozlamalar, yuklangan smetalar va narx
+paketi) — uni kimga bersangiz, hammasi unda.
 
 ### Windows'da
 
@@ -665,9 +689,9 @@ Paket yuklanishi, sana o'zgarishi, qayta hisoblash narxlarga tegmaydi.
   `node test/refs-privacy.cjs` har commitdan oldin (va butun shox tarixini)
   tekshiradi.
 * **Serverda paket `pb_data/storage` ichida turadi, shuning uchun u har bir
-  zaxiraga tushadi:** noutbukdagi kunlik zaxiralarga (oxirgi 14 tasi,
-  `~/Backups/smeta`, Windows'da `%USERPROFILE%\Backups\smeta`), `laptop.cmd
-  drive` yoqilgan bo'lsa — Google Drive'dagi `Smeta zaxira` papkasiga ham,
+  zaxiraga tushadi:** noutbukdagi kunlik zaxiralarga (`~/Backups/smeta`,
+  Windows'da `%USERPROFILE%\Backups\smeta`), bulut papkasidagi ikkinchi nusxaga
+  ham (Windows'da `laptop.cmd drive` — `Smeta zaxira`, Mac'da `Smeta zaxira (Mac)`),
   VPS da — `server/deploy/pull-backup.sh` olib keladigan zaxiraga ham. Zaxirani
   kimga bersangiz, paket ham unda. Har bir paket — bir necha MB; eski nofaol
   paketlarni «Пакеты» jadvalida «✕ Удалить» bilan o'chirib turing (eski

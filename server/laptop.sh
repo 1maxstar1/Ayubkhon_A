@@ -6,7 +6,9 @@
 #   sh server/laptop.sh autostart    ... and from now on start at every login
 #   sh server/laptop.sh stop         stop it
 #   sh server/laptop.sh status       is it running, how big is the database
-#   sh server/laptop.sh backup       make a copy now (kept in ~/Backups/smeta)
+#   sh server/laptop.sh backup       make a copy now (kept in ~/Backups/smeta, and in a second place)
+#   sh server/laptop.sh drive [dir]  where the second copy goes: show it, set it, or «off»
+#   sh server/laptop.sh restore [zip]  put the database back from a copy (no argument: list the copies)
 #   sh server/laptop.sh update       take the newest version and restart
 #   sh server/laptop.sh uninstall    stop, and stop starting at login
 #
@@ -22,7 +24,13 @@ LOG=server/pb_data/serve.log
 BACKUPS="$HOME/Backups/smeta"
 AGENT="$HOME/Library/LaunchAgents/uz.taqqoslash.smeta.plist"
 LABEL=uz.taqqoslash.smeta
-KEEP=14                                   # backups kept on this disk
+KEEP=14                                   # the newest copies kept; then one a week and one a month:
+KEEP_WEEKS=8                              #   see server/backup-prune.cjs
+KEEP_MONTHS=12
+# The folder made inside the cloud drive for the second copy. Not the Windows launcher's «Smeta zaxira»: with one
+# Google account on both machines the two databases' copies would land in one folder, and each launcher's
+# pruning would delete the other's.
+COPY_NAME="Smeta zaxira (Mac)"
 
 say() { printf '%s\n' "$*"; }
 die() { say "$*" >&2; exit 1; }
@@ -149,30 +157,89 @@ setup() {
   node build.mjs --serve >/dev/null
 }
 
+# Write KEY=VALUE into server/.env, replacing the line if it is there.
+set_env_val() {
+  touch "$ENV_FILE"
+  grep -v "^$1=" "$ENV_FILE" > "$ENV_FILE.tmp" || true
+  printf '%s=%s\n' "$1" "$2" >> "$ENV_FILE.tmp"
+  mv "$ENV_FILE.tmp" "$ENV_FILE"
+  chmod 600 "$ENV_FILE" 2>/dev/null || true
+}
+
+# Where the second copy of a backup goes — a place that is not this disk. Both copies used to sit on the
+# laptop's own disk (pb_data/backups and ~/Backups/smeta): a laptop lost, or a disk that died, took the price
+# memory and every backup of it together.
+#
+# BACKUP_COPY_DIR in server/.env names the folder («sh server/laptop.sh drive <folder>»); «off» means none.
+# Unset, a cloud drive that keeps a folder on this machine is used when there is one: Google Drive for desktop
+# (as the Windows launcher does), then iCloud Drive. Prints the folder, or fails when there is none.
+copy_dir() {
+  D=$(getenv_val BACKUP_COPY_DIR)
+  if [ "$D" = off ]; then return 1; fi
+  if [ -n "$D" ]; then printf '%s\n' "$D"; return 0; fi
+  for g in "$HOME"/Library/CloudStorage/GoogleDrive-*; do
+    if [ -d "$g" ]; then
+      for n in "My Drive" "Мой диск" "Mening diskim"; do
+        if [ -d "$g/$n" ]; then printf '%s\n' "$g/$n/$COPY_NAME"; return 0; fi
+      done
+    fi
+  done
+  for g in "$HOME/Google Drive/My Drive" "$HOME/Google Drive" "$HOME/Library/Mobile Documents/com~apple~CloudDocs"; do
+    if [ -d "$g" ]; then printf '%s\n' "$g/$COPY_NAME"; return 0; fi
+  done
+  return 1
+}
+
+# The newest $KEEP copies, then one a week, then one a month (server/backup-prune.cjs).
+prune() {
+  if command -v node >/dev/null 2>&1 && [ -f server/backup-prune.cjs ]; then
+    node server/backup-prune.cjs "$1" "$KEEP" "$KEEP_WEEKS" "$KEEP_MONTHS" || true
+  else
+    ls -t "$1"/*.zip 2>/dev/null | tail -n +$((KEEP + 1)) | while read -r f; do rm -f "$f"; done
+  fi
+}
+
 # A copy of the whole database, kept outside pb_data — a disk that loses
-# pb_data loses the backups inside it too.
+# pb_data loses the backups inside it too — and once more outside this disk.
 backup_now() {
   SU=$(su_token)
   [ -n "$SU" ] || { say "zaxira olinmadi: bazaga kirib bo'lmadi"; return 1; }
   CODE=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$URL/api/backups" -H "Authorization: $SU" \
     -H 'content-type: application/json' -d '{}')
   case "$CODE" in 2*) ;; *) say "zaxira olinmadi: HTTP $CODE"; return 1;; esac
-  mkdir -p "$BACKUPS"
   NEWEST=$(ls -t server/pb_data/backups/*.zip 2>/dev/null | head -1)
   [ -n "$NEWEST" ] || { say "zaxira fayli topilmadi"; return 1; }
-  cp "$NEWEST" "$BACKUPS/" 2>/dev/null || true
-  # keep the newest $KEEP, here and in pb_data
-  ls -t "$BACKUPS"/*.zip 2>/dev/null | tail -n +$((KEEP + 1)) | while read -r f; do rm -f "$f"; done
+  # It used to say «zaxira: …» whether or not the copy had been written.
+  if ! { mkdir -p "$BACKUPS" && cp "$NEWEST" "$BACKUPS/"; } 2>/dev/null; then
+    say "ZAXIRA NUSXALANMADI: $BACKUPS ga yozib bo'lmadi (nusxa faqat server/pb_data/backups ichida)"; return 1
+  fi
+  prune "$BACKUPS"
+  # inside pb_data only the newest few: it is the same disk, and the folder is part of what gets copied around
   ls -t server/pb_data/backups/*.zip 2>/dev/null | tail -n +$((KEEP + 1)) | while read -r f; do rm -f "$f"; done
   say "zaxira: $BACKUPS/$(basename "$NEWEST")"
+  COPY=$(copy_dir) || COPY=''
+  if [ -z "$COPY" ]; then
+    say "ikkinchi nusxa: YO'Q — zaxira faqat shu diskda. Sozlash: sh server/laptop.sh drive <papka>"
+  elif { mkdir -p "$COPY" && cp "$NEWEST" "$COPY/"; } 2>/dev/null; then
+    prune "$COPY"
+    say "ikkinchi nusxa: $COPY/$(basename "$NEWEST")"
+  else
+    say "DIQQAT: ikkinchi nusxa yozilmadi: $COPY"
+  fi
 }
 
-# Once a day is enough, and it is taken at start-up rather than at three in the
-# morning: a laptop is asleep at three.
+# Once a day is enough. Taken at start-up — a laptop is asleep at three in the morning — and looked at again
+# every hour while the program runs: a Mac is closed and opened for weeks without the program ever being
+# started again, and for all those weeks no copy was made.
 backup_if_stale() {
   NEWEST=$(ls -t "$BACKUPS"/*.zip 2>/dev/null | head -1)
   if [ -n "$NEWEST" ] && [ -z "$(find "$NEWEST" -mmin +1200 2>/dev/null)" ]; then return 0; fi
   backup_now || true
+}
+
+# How many records the database holds, for «restore» to show what came back.
+count_of() {
+  curl -sS -m 10 "$URL/api/collections/$1/records?perPage=1&fields=id" -H "Authorization: $SU" | json '.totalItems'
 }
 
 open_browser() { command -v open >/dev/null 2>&1 && open "$URL/" 2>/dev/null || true; }
@@ -189,6 +256,9 @@ banner() {
   say ""
   say "  Ma'lumot shu yerda:  $ROOT/server/pb_data"
   say "  Zaxiralar:           $BACKUPS"
+  COPY=$(copy_dir) || COPY=''
+  if [ -n "$COPY" ]; then say "  Ikkinchi nusxa:      $COPY"
+  else say "  Ikkinchi nusxa:      YO'Q — sozlash: sh server/laptop.sh drive <papka>"; fi
   say "─────────────────────────────────────────────────────────────"
   if [ "${NEW_PASS:-0}" = 1 ]; then
     say ""
@@ -243,7 +313,11 @@ case "${1:-start}" in
     say "  To'xtatish: Ctrl+C"
     stop() { stop_server; say ""; say "to'xtatildi"; exit 0; }
     trap stop INT TERM
-    while running; do sleep 1; done
+    n=0
+    while running; do
+      sleep 1; n=$((n + 1))
+      if [ $n -ge 3600 ]; then n=0; backup_if_stale; fi
+    done
     ;;
 
   # What launchd runs: no browser, no banner, and it stays in the foreground so
@@ -255,7 +329,11 @@ case "${1:-start}" in
     ensure_user
     backup_if_stale
     trap 'stop_server; exit 0' INT TERM
-    while running; do sleep 5; done
+    n=0
+    while running; do
+      sleep 5; n=$((n + 1))
+      if [ $n -ge 720 ]; then n=0; backup_if_stale; fi
+    done
     ;;
 
   autostart)
@@ -292,7 +370,12 @@ case "${1:-start}" in
     [ -d server/pb_data ] && say "ma'lumot: $(du -sh server/pb_data 2>/dev/null | cut -f1)  ($ROOT/server/pb_data)" || true
     N=$(ls -1 "$BACKUPS"/*.zip 2>/dev/null | wc -l | tr -d ' ')
     LAST=$(ls -t "$BACKUPS"/*.zip 2>/dev/null | head -1)
-    [ -n "$LAST" ] && say "zaxira: $N ta, oxirgisi $(basename "$LAST")" || say "zaxira: hali yo'q"
+    [ -n "$LAST" ] && say "zaxira: $N ta, oxirgisi $(basename "$LAST")  ($BACKUPS)" || say "zaxira: hali yo'q"
+    COPY=$(copy_dir) || COPY=''
+    if [ -n "$COPY" ]; then
+      N2=$(ls -1 "$COPY"/*.zip 2>/dev/null | wc -l | tr -d ' ')
+      say "ikkinchi nusxa: $N2 ta  ($COPY)"
+    else say "ikkinchi nusxa: YO'Q — zaxira faqat shu diskda. Sozlash: sh server/laptop.sh drive <papka>"; fi
     ;;
 
   backup)
@@ -300,6 +383,91 @@ case "${1:-start}" in
     answering || { start_server; STARTED=1; }
     backup_now
     [ "${STARTED:-0}" = 1 ] && stop_server || true
+    ;;
+
+  # Where the second copy goes. No argument: say where. A folder: use it. «off»: keep no second copy.
+  drive)
+    if [ -z "${2:-}" ]; then
+      COPY=$(copy_dir) || COPY=''
+      SET=$(getenv_val BACKUP_COPY_DIR)
+      if [ -n "$COPY" ]; then say "ikkinchi nusxa: $COPY$([ -z "$SET" ] && printf ' (o%szi topildi)' "'")"
+      elif [ "$SET" = off ]; then say "ikkinchi nusxa: o'chirilgan"
+      else say "ikkinchi nusxa: YO'Q — bulut papkasi topilmadi (Google Drive, iCloud Drive)"; fi
+      say "o'zgartirish:  sh server/laptop.sh drive <papka>     o'chirish:  sh server/laptop.sh drive off"
+    elif [ "$2" = off ]; then
+      set_env_val BACKUP_COPY_DIR off
+      say "ikkinchi nusxa o'chirildi — zaxira endi faqat shu diskda"
+    else
+      mkdir -p "$2" 2>/dev/null && [ -w "$2" ] || die "papkaga yozib bo'lmaydi: $2"
+      D=$(cd "$2" && pwd)
+      set_env_val BACKUP_COPY_DIR "$D"
+      say "ikkinchi nusxa endi shu yerga yoziladi: $D"
+      LAST=$(ls -t "$BACKUPS"/*.zip 2>/dev/null | head -1)
+      if [ -n "$LAST" ] && cp "$LAST" "$D/" 2>/dev/null; then say "oxirgi zaxira nusxalandi: $(basename "$LAST")"; fi
+    fi
+    ;;
+
+  # Put the database back from a copy. The database that is there now is moved aside, never deleted.
+  restore)
+    need_tools
+    command -v unzip >/dev/null 2>&1 || die "unzip topilmadi"
+    COPY=$(copy_dir) || COPY=''
+    if [ -z "${2:-}" ]; then
+      say "Zaxira nusxalari (yangisi birinchi):"
+      ls -t "$BACKUPS"/*.zip 2>/dev/null | head -40 | while read -r f; do say "  $f"; done
+      if [ -n "$COPY" ]; then ls -t "$COPY"/*.zip 2>/dev/null | head -40 | while read -r f; do say "  $f"; done; fi
+      say ""
+      say "Tiklash:  sh server/laptop.sh restore <fayl.zip>"
+      exit 0
+    fi
+    ZIP="$2"
+    if [ ! -f "$ZIP" ] && [ -f "$BACKUPS/$ZIP" ]; then ZIP="$BACKUPS/$ZIP"; fi
+    if [ ! -f "$ZIP" ] && [ -n "$COPY" ] && [ -f "$COPY/$2" ]; then ZIP="$COPY/$2"; fi
+    [ -f "$ZIP" ] || die "fayl topilmadi: $2"
+    ZIP=$(cd "$(dirname "$ZIP")" && pwd)/$(basename "$ZIP")
+    unzip -tq "$ZIP" >/dev/null 2>&1 || die "zaxira fayli buzilgan yoki zip emas: $ZIP"
+    unzip -l "$ZIP" 2>/dev/null | grep -q ' data\.db$' || die "bu dastur zaxirasi emas (ichida data.db yo'q): $ZIP"
+    if [ "${RESTORE_YES:-0}" != 1 ]; then
+      [ -t 0 ] || die "tasdiq kerak: RESTORE_YES=1 sh server/laptop.sh restore <fayl.zip>"
+      say "Baza shu nusxadan tiklanadi:  $ZIP"
+      say "Hozirgi baza o'chirilmaydi — chetga olinadi (server/pb_data.before-restore-…)."
+      printf 'Davom etilsinmi? (ha / yo%sq): ' "'"
+      read -r ANSWER
+      case "$ANSWER" in ha|HA|Ha|y|yes) ;; *) die "bekor qilindi" ;; esac
+    fi
+    ensure_env
+    HAD_AGENT=0
+    if [ -f "$AGENT" ]; then HAD_AGENT=1; launchctl unload "$AGENT" 2>/dev/null || true; fi
+    stop_server; stop_port_holder
+    if answering; then die "$PORT-port band — avval dasturni to'xtating: sh server/laptop.sh stop"; fi
+    ASIDE="server/pb_data.before-restore-$(date +%Y%m%d-%H%M%S)"
+    if [ -d server/pb_data ]; then mv server/pb_data "$ASIDE"; fi
+    mkdir -p server/pb_data
+    if ! unzip -q "$ZIP" -d server/pb_data; then
+      rm -rf server/pb_data
+      if [ -d "$ASIDE" ]; then mv "$ASIDE" server/pb_data; fi
+      die "ochib bo'lmadi — avvalgi baza joyiga qaytarildi"
+    fi
+    # a copy carries the pid and the log of the server it was taken from
+    rm -f server/pb_data/serve.pid server/pb_data/serve.log server/pb_data/autostart.log
+    # the copies kept inside the old database folder stay reachable from the page
+    if [ -d "$ASIDE/backups" ]; then mkdir -p server/pb_data/backups; cp "$ASIDE"/backups/*.zip server/pb_data/backups/ 2>/dev/null || true; fi
+    setup
+    start_server
+    ensure_user
+    SU=$(su_token)
+    say ""
+    say "tiklandi: $(basename "$ZIP")"
+    say "  arizalar: $(count_of applications)   ish maydonlari: $(count_of workspaces)   narx tuzatishlari: $(count_of corrections)"
+    if [ -d "$ASIDE" ]; then say "  avvalgi baza: $ROOT/$ASIDE  (hammasi joyida ekaniga ishonch hosil qilgach o'chirishingiz mumkin)"; fi
+    if [ "$HAD_AGENT" = 1 ]; then
+      stop_server
+      launchctl load "$AGENT"
+      say "  dastur yana o'zi ishga tushirildi"
+    else
+      stop_server
+      say "  ishga tushirish:  sh server/laptop.sh"
+    fi
     ;;
 
   update)
@@ -322,5 +490,5 @@ case "${1:-start}" in
     say "o'chirildi: endi o'zi ishga tushmaydi. Ma'lumot joyida: $ROOT/server/pb_data"
     ;;
 
-  *) die "usage: sh server/laptop.sh [start|autostart|stop|status|backup|update|uninstall]" ;;
+  *) die "usage: sh server/laptop.sh [start|autostart|stop|status|backup|drive|restore|update|uninstall]" ;;
 esac

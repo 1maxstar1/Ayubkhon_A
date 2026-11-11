@@ -92,8 +92,10 @@ if [ -n "$REFS_KIT" ] && [ -n "$S1" ]; then run refs-measure node test/refs-meas
 smeta_run pipeline       node test/pipeline.cjs "$S1" "$S2" --out test/out.xlsx
 smeta_run hints          node test/hints.cjs "$S1" "$S2"
 run registry-parse   node test/registry.cjs
+run backup-prune     node test/backup-prune.cjs
 run deploy-target    sh test/deploy-target.sh
 run pb-smoke         sh test/pb-smoke.sh
+run laptop-backup    sh test/laptop-backup.sh
 run install          node test/install.mjs
 run registry-import  sh test/registry-import.sh
 run admin-api        sh test/admin-api.sh

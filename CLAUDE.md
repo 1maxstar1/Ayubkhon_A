@@ -32,10 +32,12 @@ node test/compare.cjs; node test/e2e-compare.mjs      # «Сравнение в�
 node test/e2e-compare-keep.mjs                        # ... va ish maydonida: yuklangan fayllar qayta yuklashdan keyin qaytadi
 node test/browser.mjs a.xlsx b.xlsx                   # haqiqiy brauzerda (bitta-fayl rejim)
 sh server/setup.sh && sh server/run.sh                # PocketBase (server rejimi), README «Server rejimi»
-sh server/laptop.sh [autostart|status|backup|update|stop]   # noutbuk rejimi: bitta odam, baza shu diskda
+sh server/laptop.sh [autostart|status|backup|drive|restore|update|stop]   # noutbuk rejimi: bitta odam, baza shu diskda; zaxira ikki joyga
 server\laptop.cmd [autostart|status|backup|update|rollback|autoupdate|drive|stop|debug|doctor]   # xuddi shu, Windows'da (Node/Git kerak emas)
 irm https://raw.githubusercontent.com/1maxstar1/Ayubkhon_A/HEAD/server/install-windows.ps1 | iex   # Windows: bitta qator bilan o'rnatish/yangilash
 sh test/laptop-windows.sh                             # Windows ishga tushirgichi, pwsh ostida
+sh test/laptop-backup.sh; node test/backup-prune.cjs  # Mac ishga tushirgichi: zaxira, ikkinchi joy, tiklash; qaysi nusxalar saqlanadi
+node test/upload-fail.mjs; node test/two-tabs.mjs     # serverga yuklanmagan smeta «saqlangan» emas; bitta ariza ikki vkladkada
 sh test/pb-smoke.sh; node test/e2e-workspace.mjs      # server rejimi testlari
 node test/normalize.cjs; node test/sections.cjs; node test/regions.cjs   # NLP o'lchovlari
 node test/hints.cjs a.xlsx b.xlsx                      # o'xshash resurs takliflari o'lchovi

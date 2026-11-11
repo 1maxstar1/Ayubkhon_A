@@ -70,6 +70,7 @@ run xlsx-guard       node test/xlsx-guard.cjs
 run smeta-form4a     node test/smeta-form4a.cjs
 run compare          node test/compare.cjs
 run export-formulas  node test/export-formulas.cjs
+run worker-parity    node test/worker-parity.cjs
 run uzex             node test/uzex.cjs
 run sections         node test/sections.cjs
 run regions          node test/regions.cjs

@@ -12,15 +12,12 @@
     try {
       var t0 = Date.now();
       var wb = S.readXlsx(new Uint8Array(msg.buffer));
+      // The objects go back as the parser made them. They used to be copied field by field here, and a field
+      // the parser gained later (`equipTitle`) was never added to the copy: the rule that rests on it worked
+      // in every test and not in the page. test/worker-parity.cjs holds the two together.
       var objects = S.smeta.parseWorkbook(wb, msg.name);
-      var slim = objects.map(function (o) {
-        return {
-          name: o.name, title: o.title, subtitle: o.subtitle, index: o.index,
-          layout: o.layout, rows: o.rows, items: o.items, maxCol: o.maxCol, file: o.file
-        };
-      });
       self.postMessage({
-        ok: true, id: msg.id, name: msg.name, objects: slim,
+        ok: true, id: msg.id, name: msg.name, objects: objects,
         sheetCount: wb.sheets.length, ms: Date.now() - t0
       });
     } catch (err) {

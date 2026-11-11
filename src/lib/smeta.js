@@ -79,8 +79,13 @@
    * КОЛ-ВО · ЦЕНА · СУММА on one row. The local resource estimate of form 4А
    * (АВС-4): «Шифр ресурсов» between № and the name, «Количество единиц», and
    * «Сметная стоимость» split on the next row into «на единицу» and «общая».
+   *
+   * `folded` also accepts the header as the name key leaves it. The key folds the hyphen of «КОЛ-ВО» and the
+   * slash of «N п/п» to spaces, so the two tests below that spell them with their punctuation have never
+   * matched, and an ordinary resource sheet has always been read by the shape of its lines (inferLayout).
+   * That reading stays as it is — see byHeader() for when the header is asked instead.
    */
-  function layoutAt(rows, r) {
+  function layoutAt(rows, r, folded) {
     var cells = rows[r];
     if (!cells) return null;
     var L = null, noRaw = 0;
@@ -90,9 +95,10 @@
       if (!u) continue;
       if (!noRaw && /^\s*№/.test(raw)) noRaw = c;
       if (u.indexOf('НАИМЕНОВАНИЕ') >= 0) { L = L || {}; L.name = c; }
-      else if (/^N\s*П\/П$|^№/.test(u) || u === 'N П/П') { L = L || {}; L.no = c; }
+      else if (/^N\s*П\/П$|^№/.test(u) || u === 'N П/П' || (folded && u === 'N П П')) { L = L || {}; L.no = c; }
       else if (u.indexOf('ЕД') === 0 && u.indexOf('ИЗМ') > 0) { L = L || {}; L.unit = c; }
-      else if (u.indexOf('КОЛ-ВО') >= 0 || u.indexOf('КОЛВО') >= 0 || u.indexOf('КОЛИЧЕСТВО') === 0) { L = L || {}; L.qty = c; }
+      else if (u.indexOf('КОЛ-ВО') >= 0 || u.indexOf('КОЛВО') >= 0 || u.indexOf('КОЛИЧЕСТВО') === 0 ||
+               (folded && u.indexOf('КОЛ ВО') >= 0)) { L = L || {}; L.qty = c; }
       else if (u.indexOf('ЦЕНА') >= 0) { L = L || {}; if (!L.price) L.price = c; }
       else if (u.indexOf('СУММА') >= 0) { L = L || {}; if (!L.sum) L.sum = c; }
       else if (u.indexOf('ШИФР') === 0) { L = L || {}; L.code = c; }
@@ -122,9 +128,9 @@
   }
 
   /** Locate the header row and the six meaningful columns. */
-  function findLayout(rows) {
+  function findLayout(rows, folded) {
     for (var r = 1; r < Math.min(rows.length, 40); r++) {
-      var L = layoutAt(rows, r);
+      var L = layoutAt(rows, r, folded);
       if (L) return L;
     }
     return null;
@@ -305,6 +311,46 @@
   }
 
   /**
+   * A sheet that names its own columns — N п/п · НАИМЕНОВАНИЕ · ЕД. ИЗМ. · КОЛ-ВО · ЦЕНА · СУММА — and still
+   * could not be read by the shape of its lines: its bands are written in the name column, or it has none, or
+   * a column stands between the six. Such a sheet was refused with «листы ресурсов не найдены», and the advice
+   * under that message is to add the very header it already had.
+   *
+   * The header gives the columns; the rows are then read exactly as on every other ordinary sheet (from the
+   * first line of the table, the header itself left out), so the document looks the same whichever way a
+   * sheet was recognised. A sheet the shape reading accepts never comes here: every document made so far was
+   * read that way and must come out as it did.
+   *
+   * Only an estimate's header counts: one quantity, one price, one sum. A table with «Кол-во было | Кол-во
+   * стало» or with a smeta price and a market price side by side — the program's own comparison and its own
+   * document among them — is somebody's report about an estimate, not an estimate.
+   */
+  function byHeader(sheet) {
+    var rows = sheet.rows;
+    var H = findLayout(rows, true);
+    if (!H || H.code) return null;
+    var head = rows[H.headerRow], qtys = 0, prices = 0, sums = 0;
+    for (var c = 1; c < head.length; c++) {
+      var u = up(txt(head[c]));
+      if (u.indexOf('КОЛ ВО') >= 0 || u.indexOf('КОЛИЧЕСТВО') === 0) qtys++;
+      else if (u.indexOf('ЦЕНА') >= 0) prices++;
+      else if (u.indexOf('СУММА') >= 0) sums++;
+    }
+    if (qtys !== 1 || prices !== 1 || sums !== 1) return null;
+    var first = (H.subRow || H.headerRow) + 1;
+    H.headerRow = 0; H.subRow = 0; H.numRow = 0;
+    for (var r = first; r < rows.length; r++) {
+      var cells = rows[r];
+      if (!cells) continue;
+      var noTxt = txt(cells[H.no]);
+      if ((noTxt && isSection(noTxt)) || (txt(cells[H.name]) && S.num(cells[H.qty] && cells[H.qty].v) != null)) {
+        return parseRange(sheet, H, r, lastContentRow(rows), null);
+      }
+    }
+    return null;
+  }
+
+  /**
    * Every resource object on one sheet. Usually one; a form 4А export stacks
    * many local estimates on a single sheet, each with its own title block and
    * header, and each becomes an object of its own («РА · 1», «РА · 2» …) that
@@ -314,11 +360,11 @@
   function parseSheetObjects(sheet) {
     var rows = sheet.rows;
     var L = findLayout(rows) || inferLayout(rows);
-    if (!L) return [];
     // Only form 4А is split: an ordinary resource sheet that repeats its header
     // on every printed page stays one object, as it always was.
-    if (!L.code) {
-      var one = parseRange(sheet, L, L.headerRow || firstBodyRow(rows, L), lastContentRow(rows), null);
+    if (!L || !L.code) {
+      var one = L ? parseRange(sheet, L, L.headerRow || firstBodyRow(rows, L), lastContentRow(rows), null) : null;
+      if (!one) one = byHeader(sheet);
       return one ? [one] : [];
     }
     var heads = headerRows(rows, L);

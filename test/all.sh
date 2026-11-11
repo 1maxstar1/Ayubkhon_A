@@ -68,6 +68,7 @@ run build            node build.mjs
 run normalize        node test/normalize.cjs
 run xlsx-guard       node test/xlsx-guard.cjs
 run smeta-form4a     node test/smeta-form4a.cjs
+run smeta-header     node test/smeta-header.cjs
 run compare          node test/compare.cjs
 run export-formulas  node test/export-formulas.cjs
 run worker-parity    node test/worker-parity.cjs

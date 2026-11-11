@@ -364,31 +364,96 @@
   App.prototype.readOne = function (file, slot) {
     var self = this;
     this.pending++;
+    this.parseBook(file, function (res) { self.onParsed(file.name, res, slot, file); });
+  };
+
+  /*
+   * Reading one workbook: in the worker when there is one, on the page otherwise. `done` is always called, once,
+   * with what the worker answers — { ok, objects, sheetCount } or { ok: false, error }.
+   *
+   * The worker reads the files it is given one after another, and a file is somebody else's: if one of them never
+   * comes back, everything behind it — and the «Чтение файлов…» screen — used to wait with it for as long as the
+   * tab lived. So the worker is given a minute per file, which is some eighty times what the largest real
+   * estimate takes. A worker that stays silent longer, or dies, is stopped and replaced; the file it was on is
+   * refused in words, and the files that were waiting behind it are read again by the new one.
+   */
+  var READ_LIMIT_MS = 60 * 1000;
+  App.prototype.parseBook = function (file, done) {
+    var self = this;
     var reader = new FileReader();
+    reader.onerror = function () { done({ ok: false, error: 'Не удалось прочитать файл' }); };
     reader.onload = function () {
       var buf = reader.result;
       if (self.worker) {
-        var id = ++self.seq;
-        var onMsg = function (e) {
-          if (e.data.id !== id) return;
-          self.worker.removeEventListener('message', onMsg);
-          self.onParsed(file.name, e.data, slot);
-        };
-        self.worker.addEventListener('message', onMsg);
-        self.worker.postMessage({ cmd: 'parse', id: id, name: file.name, buffer: buf }, [buf]);
+        var job = { id: ++self.seq, file: file, done: done };
+        if (!self.jobs) self.jobs = [];
+        self.jobs.push(job);
+        self.listenWorker();
+        if (self.jobs.length === 1) self.watchWorker();
+        self.worker.postMessage({ cmd: 'parse', id: job.id, name: file.name, buffer: buf }, [buf]);
       } else {
+        var res;
         try {
           var wb = S.readXlsx(new Uint8Array(buf));
-          self.onParsed(file.name, { ok: true, objects: S.smeta.parseWorkbook(wb, file.name), sheetCount: wb.sheets.length }, slot);
+          res = { ok: true, objects: S.smeta.parseWorkbook(wb, file.name), sheetCount: wb.sheets.length };
         } catch (err) {
-          self.onParsed(file.name, { ok: false, error: String(err.message || err) }, slot);
+          res = { ok: false, error: String(err.message || err) };
         }
+        done(res);
       }
     };
-    reader.onerror = function () { self.onParsed(file.name, { ok: false, error: 'Не удалось прочитать файл' }, slot); };
     reader.readAsArrayBuffer(file);
   };
 
+  /** One listener per worker, whoever asked: the answer goes to the job it names. */
+  App.prototype.listenWorker = function () {
+    var self = this, w = this.worker;
+    if (!w || w.__heard) return;
+    w.__heard = true;
+    w.addEventListener('message', function (e) {
+      if (self.worker !== w) return;
+      var jobs = self.jobs || [];
+      for (var i = 0; i < jobs.length; i++) {
+        if (jobs[i].id !== e.data.id) continue;
+        var job = jobs.splice(i, 1)[0];
+        self.watchWorker();
+        job.done(e.data);
+        return;
+      }
+    });
+    w.addEventListener('error', function (e) {
+      if (self.worker !== w) return;
+      if (e && e.preventDefault) e.preventDefault();
+      self.dropWorker('файл не удалось прочитать: ошибка при разборе. Проверьте, что это книга Excel (.xlsx).');
+    });
+  };
+
+  /** The clock runs for the file the worker is on now; every answer starts it again for the next one. */
+  App.prototype.watchWorker = function () {
+    var self = this;
+    clearTimeout(this.workerTimer);
+    if (!this.jobs || !this.jobs.length) return;
+    this.workerTimer = setTimeout(function () {
+      self.dropWorker('файл не прочитан за ' + Math.round((S.READ_LIMIT_MS || READ_LIMIT_MS) / 1000) +
+        ' секунд — он повреждён или слишком велик для сметы. Остальные файлы читаются заново.');
+    }, S.READ_LIMIT_MS || READ_LIMIT_MS);
+  };
+
+  /** Stop the worker, refuse the file it was on, and give the ones behind it to a new worker. */
+  App.prototype.dropWorker = function (why) {
+    var jobs = this.jobs || [];
+    clearTimeout(this.workerTimer);
+    try { this.worker.terminate(); } catch (e) { /* already gone */ }
+    this.worker = makeWorker();
+    this.jobs = [];
+    var stuck = jobs.shift();
+    var self = this;
+    // their bytes went to the worker that is gone, so they are read from the files again
+    jobs.forEach(function (j) { self.parseBook(j.file, j.done); });
+    if (stuck) stuck.done({ ok: false, error: why });
+  };
+
+  /** `file` is the File that was read (kept by whoever stores the workspace's files). */
   App.prototype.onParsed = function (name, res, slot) {
     this.pending--;
     var entry = this.queue && this.queue[slot];

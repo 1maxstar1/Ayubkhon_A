@@ -126,31 +126,13 @@
     failed = failed || function () {};
     if (!/\.xls[xm]?$/i.test(file.name)) { app.toast('Принимаются только файлы .xlsx', true); failed(); return; }
     app.busy(true, 'Чтение файла: ' + file.name + '…');
-    var reader = new FileReader();
-    reader.onerror = function () { app.busy(false); app.toast('Не удалось прочитать файл', true); failed(); };
-    reader.onload = function () {
-      var buf = reader.result;
-      var finish = function (res) {
-        app.busy(false);
-        if (!res.ok) { app.toast(file.name + ': ' + res.error, true); failed(); return; }
-        if (!res.objects.length) { app.toast(file.name + ': листы ресурсов не найдены', true); failed(); return; }
-        done(res.objects);
-      };
-      if (app.worker) {
-        var id = ++app.seq;
-        var onMsg = function (e) {
-          if (e.data.id !== id) return;
-          app.worker.removeEventListener('message', onMsg);
-          finish(e.data);
-        };
-        app.worker.addEventListener('message', onMsg);
-        app.worker.postMessage({ cmd: 'parse', id: id, name: file.name, buffer: buf }, [buf]);
-      } else {
-        try { finish({ ok: true, objects: S.smeta.parseWorkbook(S.readXlsx(new Uint8Array(buf)), file.name) }); }
-        catch (err) { finish({ ok: false, error: String(err.message || err) }); }
-      }
-    };
-    reader.readAsArrayBuffer(file);
+    // read the way a project is: in the worker, which is stopped if the file never comes back
+    app.parseBook(file, function (res) {
+      app.busy(false);
+      if (!res.ok) { app.toast(file.name + ': ' + res.error, true); failed(); return; }
+      if (!res.objects.length) { app.toast(file.name + ': листы ресурсов не найдены', true); failed(); return; }
+      done(res.objects);
+    });
   };
 
   /** Which first version is chosen, in words that outlive a reload: the project's file, or «a file of its own». */

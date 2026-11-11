@@ -40,6 +40,7 @@
     seq: 0,                 // which open() is the current one; see open()
     unsaved: {},            // file name -> { file, why, retry }: estimates on screen whose file is not on the server
     frozen: false,          // this application was opened in another tab after this one: nothing is saved from here
+    read: [],               // files read as estimates and not yet handed to upload(): the batch still being read
 
     init: function () {
       var self = this;
@@ -56,8 +57,16 @@
         var sc = $(id);
         if (sc) sc.addEventListener('focusout', function () { self.flush(); });
       });
-      wrap(P, 'addFiles', function (files) { self.upload(files); });
-      wrap(P, 'onParsed', function () { if (self.loading && this.pending <= 0) self.restore(); });
+      /*
+       * A file goes to the server once it has been read as an estimate, and not before. It used to go the
+       * moment it was dropped in, so a file the reader could not get through — damaged, or made to be — was
+       * stored in the application first and read second.
+       */
+      wrap(P, 'onParsed', function (name, res, slot, file) {
+        if (self.loading) { if (this.pending <= 0) self.restore(); return; }
+        if (file && res && res.ok && res.objects.length) self.read.push(file);
+        if (this.pending <= 0 && self.read.length) { var batch = self.read; self.read = []; self.upload(batch); }
+      });
       var build = S.buildWorkbook;
       S.buildWorkbook = function (model, opts) {
         var bytes = build(model, opts);
@@ -96,6 +105,7 @@
       this.cmp = { old: sc.old || null, new: sc.new || null, reply: sc.reply || null, base: sc.base || '' };
       this.corr = {};
       this.unsaved = {};
+      this.read = [];
       clearTimeout(this.ut);
       this.loading = true;
       var app = A();
@@ -532,7 +542,7 @@
       var self = this, box = $('wsUnsaved');
       if (!box) return;
       // A held file whose project was taken off the list is no longer waited for. Not while files are still
-      // being read, though: the upload starts with the reading, and can fail before its project is on the list.
+      // being read, though: a batch being read can sit beside a file held from the one before it.
       if (!(A().pending > 0)) {
         var live = {};
         A().projects.forEach(function (p) { live[p.file] = 1; });
@@ -776,7 +786,7 @@
         }
       }).then(function () {
         self.ws = null; self.app = null; self.files = {}; self.corr = {}; self.marks = {}; self.cmp = {};
-        self.unsaved = {}; clearTimeout(self.ut); self.renderUnsaved();
+        self.unsaved = {}; self.read = []; clearTimeout(self.ut); self.renderUnsaved();
         self.thaw();
         S.hashSet('ws', '');
         self.loading = true;

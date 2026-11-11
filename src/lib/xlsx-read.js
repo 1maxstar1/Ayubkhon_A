@@ -5,6 +5,13 @@
  * and formula text. Scanner-based rather than DOM-based, because the real
  * workbooks here run to tens of thousands of cells and DOMParser on a 20 MB
  * sheet is exactly where the old build stalled.
+ *
+ * The file comes from outside, so the reader must finish on anything: every
+ * search below walks the text once. They used to be regular expressions of
+ * the form «<row …>…</row>», and an opening tag that is never closed makes
+ * such an expression read to the end of the sheet from every opening tag in
+ * turn — a few hundred kilobytes of «<row>» kept the page busy for hours.
+ * test/xlsx-guard.cjs holds the reader to that.
  */
 (function (S) {
   'use strict';
@@ -20,31 +27,98 @@
       if (e.charAt(0) === '#') {
         var code = e.charAt(1) === 'x' || e.charAt(1) === 'X'
           ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
-        return isFinite(code) ? String.fromCodePoint(code) : m;
+        // past the last code point there is no character to make, and asking for one throws
+        return code >= 0 && code <= 0x10FFFF ? String.fromCodePoint(code) : m;
       }
       return ENT[e] !== undefined ? ENT[e] : m;
     });
   }
 
+  /** What may follow a tag's name: «>», «/» or white space. «<c» is not «<col». */
+  function edge(c) { return c === 62 || c === 47 || c === 32 || c === 9 || c === 10 || c === 13; }
+
+  /**
+   * Every element `name` of `xml`, in order, in one pass.
+   *   fn(attrs, inner, start, end) — `attrs` is the text between the name and «>»; `inner` is the text up to
+   *   the closing tag, or undefined for «<name/>»; start/end bound the whole element. Returning true stops.
+   * An opening tag with no closing tag after it is not an element and is stepped over — and once one closing
+   * tag has not been found, no later one will be either, so it is not looked for again.
+   */
+  function each(xml, name, fn) {
+    var open = '<' + name, close = '</' + name + '>', n = open.length;
+    var p = 0, unclosed = false;
+    while ((p = xml.indexOf(open, p)) >= 0) {
+      var a = p + n;
+      if (!edge(xml.charCodeAt(a))) { p = a; continue; }
+      var gt = xml.indexOf('>', a);
+      if (gt < 0) break;
+      if (xml.charCodeAt(gt - 1) === 47) {
+        if (fn(xml.slice(a, gt - 1), undefined, p, gt + 1)) return;
+        p = gt + 1;
+        continue;
+      }
+      var end = unclosed ? -1 : xml.indexOf(close, gt + 1);
+      if (end < 0) { unclosed = true; p = gt + 1; continue; }
+      if (fn(xml.slice(a, gt), xml.slice(gt + 1, end), p, end + close.length)) return;
+      p = end + close.length;
+    }
+  }
+
+  /** The content of the first `name` element that has any, or null. */
+  function inner(xml, name) {
+    var out = null;
+    each(xml, name, function (a, body) {
+      if (body === undefined) return false;
+      out = body;
+      return true;
+    });
+    return out;
+  }
+
+  /** `xml` with every `name` element cut out. */
+  function without(xml, name) {
+    var out = '', last = 0;
+    each(xml, name, function (a, body, start, end) {
+      if (body === undefined) return;
+      out += xml.slice(last, start);
+      last = end;
+    });
+    return last ? out + xml.slice(last) : xml;
+  }
+
   /** Concatenated <t> runs of one <si>, honouring xml:space and skipping <rPh>. */
   function siText(xml) {
     var out = '';
-    var re = /<t[^>]*>([\s\S]*?)<\/t>|<t\/>/g, m;
     // Phonetic hints (<rPh>) must not leak into the string.
-    var body = xml.indexOf('<rPh') < 0 ? xml : xml.replace(/<rPh[\s\S]*?<\/rPh>/g, '');
-    while ((m = re.exec(body))) out += m[1] === undefined ? '' : unesc(m[1]);
+    var body = xml.indexOf('<rPh') < 0 ? xml : without(xml, 'rPh');
+    each(body, 't', function (a, text) { if (text !== undefined) out += unesc(text); });
     return out;
+  }
+
+  /* A workbook is read whole into memory, so how much it may hold is decided here and not by the file. These
+     are far past anything an estimate has — the real ones run to tens of thousands of cells and a few megabytes
+     of XML — and well short of what stops a browser tab. */
+  var MAX_XML = 256 * 1024 * 1024;      // bytes of XML in the parts that are read, unpacked
+  var MAX_ITEMS = 5000000;              // cells in the workbook; shared strings
+
+  function tooBig() {
+    return new Error('файл слишком большой для чтения: в нём больше данных, чем бывает в смете. ' +
+      'Если это настоящая смета, сохраните в отдельный файл только нужные листы.');
   }
 
   function sharedStrings(xml) {
     var out = [];
     if (!xml) return out;
-    var re = /<si>([\s\S]*?)<\/si>|<si\/>/g, m;
-    while ((m = re.exec(xml))) out.push(m[1] === undefined ? '' : siText(m[1]));
+    each(xml, 'si', function (a, body) {
+      if (out.length >= MAX_ITEMS) throw tooBig();
+      out.push(body === undefined ? '' : siText(body));
+    });
     return out;
   }
 
-  var ATTR = /([a-zA-Z:]+)="([^"]*)"/g;
+  /* Attributes are found only where one can start — after white space — so a long run of letters is read once
+     and not once from each of its letters. */
+  var ATTR = /(?:^|\s)([a-zA-Z:]+)="([^"]*)"/g;
   function attrs(tag) {
     var o = {}, m;
     ATTR.lastIndex = 0;
@@ -58,14 +132,11 @@
       var c = ref.charCodeAt(i);
       if (c < 65 || c > 90) break;
       n = n * 26 + (c - 64);
+      if (n > MAX_COL) break;           // a reference of a million letters is not a column
     }
     return n;
   }
 
-  /**
-   * Parse one worksheet.
-   * @returns {{rows: Array<Array<?{v:*,f:?string}>>, maxCol:number, cols:Array, merges:Array<string>}}
-   */
   /* A row and column number are read straight out of the file and used as array
      indices, so they are the one thing in a workbook that can hurt the reader
      before anybody looks at it: «r="900000000"» costs a billion empty slots,
@@ -74,37 +145,30 @@
   var MAX_ROW = 1048576;
   var MAX_COL = 16384;
 
-  function parseSheet(xml, sst) {
+  /**
+   * Parse one worksheet.
+   * @param {{cells:number}} count  cells read so far in the whole workbook
+   * @returns {{rows: Array<Array<?{v:*,f:?string}>>, maxCol:number, cols:Array, merges:Array<string>}}
+   */
+  function parseSheet(xml, sst, count) {
     var rows = [], maxCol = 0;
 
-    var dim = /<dimension ref="([^"]*)"/.exec(xml);
-    void dim; // informational only; real bounds come from the cells we see
-
-    var rowRe = /<row([^>]*)\/>|<row([^>]*)>([\s\S]*?)<\/row>/g;
-    var cellRe = /<c([^>]*)\/>|<c([^>]*)>([\s\S]*?)<\/c>/g;
-    var rm;
-    while ((rm = rowRe.exec(xml))) {
-      var rowAttr = rm[1] !== undefined ? rm[1] : rm[2];
-      var inner = rm[3];
-      var ra = attrs(rowAttr);
-      var r = +ra.r;
-      if (!r || r > MAX_ROW) continue;
-      if (!inner) { continue; }
+    each(xml, 'row', function (rowAttr, rowBody) {
+      if (!rowBody) return;
+      var r = +attrs(rowAttr).r;
+      if (!r || r > MAX_ROW) return;
       var cells = rows[r] || (rows[r] = []);
-      cellRe.lastIndex = 0;
-      var cm;
-      while ((cm = cellRe.exec(inner))) {
-        var ca = attrs(cm[1] !== undefined ? cm[1] : cm[2]);
-        var body = cm[3] || '';
+      each(rowBody, 'c', function (cellAttr, body) {
+        var ca = attrs(cellAttr);
+        body = body || '';
         var ci = ca.r ? refCol(ca.r) : 0;
-        if (!ci || ci > MAX_COL) continue;
+        if (!ci || ci > MAX_COL) return;
         if (ci > maxCol) maxCol = ci;
 
         var f = null;
-        var fi = body.indexOf('<f');
-        if (fi >= 0) {
-          var fm = /<f[^>]*>([\s\S]*?)<\/f>/.exec(body);
-          if (fm) f = '=' + unesc(fm[1]);
+        if (body.indexOf('<f') >= 0) {
+          var ft = inner(body, 'f');
+          if (ft !== null) f = '=' + unesc(ft);
         }
 
         var v = null;
@@ -112,35 +176,36 @@
         if (t === 'inlineStr') {
           v = siText(body);
         } else {
-          var vm = /<v[^>]*>([\s\S]*?)<\/v>/.exec(body);
-          if (vm) {
-            var raw = vm[1];
+          var raw = inner(body, 'v');
+          if (raw !== null) {
             if (t === 's') v = sst[+raw];
             else if (t === 'str' || t === 'e') v = unesc(raw);
             else if (t === 'b') v = raw === '1';
             else { v = +raw; if (!isFinite(v)) v = unesc(raw); }
           }
         }
-        if (v === null && f === null) continue;
+        if (v === null && f === null) return;
+        if (++count.cells > MAX_ITEMS) throw tooBig();
         cells[ci] = f ? { v: v, f: f } : { v: v };
-      }
-    }
+      });
+    });
 
     var cols = [];
-    var colsBlock = /<cols>([\s\S]*?)<\/cols>/.exec(xml);
-    if (colsBlock) {
-      var cre = /<col([^>]*)\/>/g, cmm;
-      while ((cmm = cre.exec(colsBlock[1]))) {
-        var a = attrs(cmm[1]);
+    var colsBlock = inner(xml, 'cols');
+    if (colsBlock !== null) {
+      each(colsBlock, 'col', function (colAttr) {
+        var a = attrs(colAttr);
         cols.push({ min: +a.min, max: +a.max, width: +a.width, hidden: a.hidden === '1' });
-      }
+      });
     }
 
     var merges = [];
-    var mergeBlock = /<mergeCells[^>]*>([\s\S]*?)<\/mergeCells>/.exec(xml);
-    if (mergeBlock) {
-      var mre = /<mergeCell ref="([^"]*)"/g, mmm;
-      while ((mmm = mre.exec(mergeBlock[1]))) merges.push(mmm[1]);
+    var mergeBlock = inner(xml, 'mergeCells');
+    if (mergeBlock !== null) {
+      each(mergeBlock, 'mergeCell', function (mergeAttr) {
+        var ref = attrs(mergeAttr).ref;
+        if (ref !== undefined) merges.push(ref);
+      });
     }
 
     return { rows: rows, maxCol: maxCol, cols: cols, merges: merges };
@@ -151,11 +216,19 @@
    * @returns {{sheets: Array<{name:string, rows:Array, maxCol:number, cols:Array, merges:Array}>}}
    */
   function read(bytes) {
+    /* The archive says how large each part is once unpacked, and that is asked before anything is unpacked: a
+       sheet of two gigabytes of spaces packs into a file smaller than an ordinary estimate. A part that claims
+       less than it holds gains nothing by it — it is unpacked into exactly the room it asked for. */
+    var total = 0;
     var files = fflate.unzipSync(bytes, {
       filter: function (f) {
         var n = f.name;
-        return n === 'xl/workbook.xml' || n === 'xl/_rels/workbook.xml.rels' ||
+        var wanted = n === 'xl/workbook.xml' || n === 'xl/_rels/workbook.xml.rels' ||
           n === 'xl/sharedStrings.xml' || /^xl\/worksheets\/[^/]+\.xml$/.test(n);
+        if (!wanted) return false;
+        total += f.originalSize || 0;
+        if (total > MAX_XML) throw tooBig();
+        return true;
       }
     });
 
@@ -165,29 +238,29 @@
 
     var rels = {};
     if (files['xl/_rels/workbook.xml.rels']) {
-      var relXml = decodeText(files['xl/_rels/workbook.xml.rels']);
-      var rre = /<Relationship([^>]*)\/>/g, rm2;
-      while ((rm2 = rre.exec(relXml))) {
-        var a = attrs(rm2[1]);
+      each(decodeText(files['xl/_rels/workbook.xml.rels']), 'Relationship', function (relAttr) {
+        var a = attrs(relAttr);
+        if (a.Id === undefined || a.Target === undefined) return;
         rels[a.Id] = a.Target.replace(/^\/?xl\//, '').replace(/^\.\//, '');
-      }
+      });
     }
 
     var sst = sharedStrings(files['xl/sharedStrings.xml'] ? decodeText(files['xl/sharedStrings.xml']) : null);
 
-    var sheets = [];
-    var sre = /<sheet([^>]*)\/>/g, sm;
-    while ((sm = sre.exec(wbXml))) {
-      var sa = attrs(sm[1]);
+    var sheets = [], count = { cells: 0 };
+    each(wbXml, 'sheet', function (sheetAttr) {
+      var sa = attrs(sheetAttr);
       var target = rels[sa['r:id']] || rels[sa['id']];
       var key = target ? 'xl/' + target : null;
       var raw = key && files[key];
-      if (!raw) continue;
-      var parsed = parseSheet(decodeText(raw), sst);
+      if (!raw) return;
+      // a part is one sheet: a workbook that lists the same part a million times is not read a million times
+      delete files[key];
+      var parsed = parseSheet(decodeText(raw), sst, count);
       parsed.name = unesc(sa.name || '');
       parsed.hidden = sa.state === 'hidden' || sa.state === 'veryHidden';
       sheets.push(parsed);
-    }
+    });
     return { sheets: sheets };
   }
 

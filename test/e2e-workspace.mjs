@@ -1,41 +1,36 @@
 /*
  * Server-mode workspace in a real browser: open an application, choose the
  * region, upload smeta files, change a price, reload, continue, export, close.
- * Needs node build.mjs --serve. Smeta files: args or the two dev uploads.
+ * Smeta files: the two given, or two invented ones.
  *
  *   node test/e2e-workspace.mjs [a.xlsx b.xlsx]
  */
 import { chromium } from 'playwright';
 import { launchOpts } from './chromium.mjs';
-import { spawn, execSync } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { readFileSync, writeFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { startServer } from './server.mjs';
 
+const require = createRequire(import.meta.url);
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const UP = '/root/.claude/uploads/8af525ef-a19a-5966-9772-c57eec709e1c/';
-const smetas = process.argv.slice(2).length ? process.argv.slice(2) :
-  ['bb932e59-_______________07_07_2026__2___2025.xlsx', 'f668c710-_____________4______27_12_2024__4_2022_2________.xlsx'].map((f) => UP + f);
-if (!smetas.every(existsSync)) { console.error('smeta files not found; pass two .xlsx paths'); process.exit(1); }
-const PORT = 8096, BASE = `http://127.0.0.1:${PORT}`;
-const DATA = join(root, 'server/pb_data_test');
-
-execSync('sh test/pb-smoke.sh', { cwd: root, stdio: 'ignore' });
-execSync('node test/registry.cjs --json server/pb_data_test/rows.json', { cwd: root, stdio: 'ignore' });
-const server = spawn('sh', ['server/run.sh'], {
-  cwd: root, env: { ...process.env, UZEX_AUTO: '0', PB_DATA_DIR: 'pb_data_test', PB_HTTP: `127.0.0.1:${PORT}`, PB_DEV: '1' }, stdio: 'ignore'
-});
-process.on('exit', () => server.kill());
-for (let i = 0; i < 20; i++) {
-  try { if ((await fetch(BASE + '/api/health')).ok) break; } catch (e) { /* not up yet */ }
-  await new Promise((r) => setTimeout(r, 500));
+// Without files it runs on two invented estimates (test/synth.cjs): the default used to be two paths on one
+// machine, and everywhere else the test ended before it began.
+const tmp = mkdtempSync(join(tmpdir(), 'workspace-'));
+let smetas = process.argv.slice(2);
+if (!smetas.length) {
+  const { load } = require('./load.cjs');
+  const S0 = load(load.PIPELINE), synth = require('./synth.cjs');
+  smetas = [synth.write(S0, join(tmp, 'first.xlsx'), 1), synth.write(S0, join(tmp, 'second.xlsx'), 2)];
 }
-const api = async (path, opts = {}, token) => {
-  const r = await fetch(BASE + path, { ...opts, headers: { 'content-type': 'application/json', ...(token ? { Authorization: token } : {}), ...(opts.headers || {}) } });
-  return r.json();
-};
-const su = (await api('/api/collections/_superusers/auth-with-password', { method: 'POST', body: JSON.stringify({ identity: 'admin@example.com', password: 'adminpass1234' }) })).token;
-const rows = JSON.parse(readFileSync(join(DATA, 'rows.json'), 'utf8'));
+if (smetas.length !== 2 || !smetas.every(existsSync)) { console.error('smeta files not found; pass two .xlsx paths'); process.exit(1); }
+const PORT = 8096;
+const pb = await startServer({ port: PORT, registry: true, build: true });
+const { api, su } = pb;
+const BASE = pb.base;
+const rows = pb.rows();
 const imp = await api('/api/registry/import', { method: 'POST', body: JSON.stringify({ rows }) }, su);
 console.log('registry imported:', imp.added, 'rows');
 
@@ -64,7 +59,7 @@ await page.fill('#loginEmail', 'test@example.com');
 await page.click('#loginBtn');
 await page.waitForSelector('#codeBox:not([hidden])');
 await new Promise((r) => setTimeout(r, 700));
-const code = readFileSync(join(DATA, 'dev-otp.txt'), 'utf8').trim().split('\n').pop().match(/code=(\d+)/)[1];
+const code = pb.lastCode('test@example.com');
 await page.fill('#loginCode', code);
 await page.click('#loginBtn');
 await page.waitForSelector('#screen-list:not([hidden])');
@@ -174,7 +169,15 @@ check((await count('corrections')) === 1, 'restore did not duplicate corrections
  * the report preview kept counting rows an unticked street had taken away.
  */
 await page.click('.tab[data-pane="sheet"]');
-await page.fill('#q2', 'БЕТОН');
+// a word of the estimate itself — some of its lines have it and not all (it used to be one fixed word, which
+// an estimate either has or has not)
+const word = await page.evaluate(() => {
+  const items = app.model.rows.filter((r) => r.kind === 'item');
+  const seen = {};
+  items.forEach((r) => { (String(r.cells[3] && r.cells[3].v || '').match(/[А-ЯЁ]{5,}/g) || []).forEach((w) => { seen[w] = (seen[w] || 0) + 1; }); });
+  return Object.keys(seen).filter((w) => seen[w] >= 2 && seen[w] < items.length / 2).sort((a, b) => seen[b] - seen[a])[0] || '';
+});
+await page.fill('#q2', word);
 await page.waitForFunction(() => app.sheetView.length !== app.sheetRows.length, null, { timeout: 10000 });
 const before2 = await page.evaluate(() => ({ rows: app.sheetView.length, all: app.sheetRows.length }));
 check(before2.rows > 0 && before2.rows < before2.all,
@@ -192,7 +195,7 @@ await page.waitForFunction((n) => app.sheetRows.length !== n, before2.all, { tim
 const kept = await page.evaluate(() => ({
   q: document.getElementById('q2').value, rows: app.sheetView.length, all: app.sheetRows.length
 }));
-check(kept.q === 'БЕТОН' && kept.rows < kept.all,
+check(kept.q === word && kept.rows < kept.all,
   `the search box still means what it says (${kept.rows} of ${kept.all})`);
 check(kept.rows === before2.rows || kept.rows < before2.rows,
   'and it did not quietly widen back to everything');
@@ -436,7 +439,7 @@ await page.fill('#loginEmail', 'test@example.com');
 await page.click('#loginBtn');
 await page.waitForSelector('#codeBox:not([hidden])');
 await new Promise((r) => setTimeout(r, 700));
-const code2 = readFileSync(join(DATA, 'dev-otp.txt'), 'utf8').trim().split('\n').pop().match(/code=(\d+)/)[1];
+const code2 = pb.lastCode('test@example.com');
 await page.fill('#loginCode', code2);
 await page.click('#loginBtn');
 await page.waitForSelector('#screen-list:not([hidden])', { timeout: 15000 });
@@ -506,7 +509,8 @@ await page.selectOption('#appRegion', '');
 
 await page.screenshot({ path: join(root, 'test/shot-list.png') });
 await browser.close();
-server.kill();
+pb.stop();
+rmSync(tmp, { recursive: true, force: true });
 if (errors.length) { console.log(errors.join('\n')); fail++; }
 console.log(fail ? `FAILED (${fail})` : 'e2e-workspace OK');
 process.exit(fail ? 1 : 0);

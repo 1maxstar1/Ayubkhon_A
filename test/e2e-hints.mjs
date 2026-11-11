@@ -7,31 +7,29 @@
  */
 import { chromium } from 'playwright';
 import { launchOpts } from './chromium.mjs';
-import { spawn, execSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { startServer } from './server.mjs';
 
+const require = createRequire(import.meta.url);
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const UP = '/root/.claude/uploads/8af525ef-a19a-5966-9772-c57eec709e1c/';
-const smeta = process.argv[2] || UP + 'f668c710-_____________4______27_12_2024__4_2022_2________.xlsx';
-if (!existsSync(smeta)) { console.error('smeta file not found; pass an .xlsx path'); process.exit(1); }
-const PORT = 8097, BASE = `http://127.0.0.1:${PORT}`;
-const DATA = join(root, 'server/pb_data_test');
-
-execSync('sh test/pb-smoke.sh', { cwd: root, stdio: 'ignore' });
-execSync('node test/registry.cjs --json server/pb_data_test/rows.json', { cwd: root, stdio: 'ignore' });
-const server = spawn('sh', ['server/run.sh'], {
-  cwd: root, env: { ...process.env, UZEX_AUTO: '0', PB_DATA_DIR: 'pb_data_test', PB_HTTP: `127.0.0.1:${PORT}`, PB_DEV: '1' }, stdio: 'ignore'
-});
-process.on('exit', () => server.kill());
-for (let i = 0; i < 20; i++) {
-  try { if ((await fetch(BASE + '/api/health')).ok) break; } catch (e) { /* not up yet */ }
-  await new Promise((r) => setTimeout(r, 500));
+// Without a file it runs on an invented estimate (test/synth.cjs). The default used to be a path on one
+// machine, long gone: the test then ended before it began.
+const dir = mkdtempSync(join(tmpdir(), 'hints-'));
+let smeta = process.argv[2];
+if (!smeta) {
+  const { load } = require('./load.cjs');
+  smeta = require('./synth.cjs').write(load(load.PIPELINE), join(dir, 'first.xlsx'), 1);
 }
-const api = async (path, opts = {}, token) => (await fetch(BASE + path, { ...opts, headers: { 'content-type': 'application/json', ...(token ? { Authorization: token } : {}) } })).json();
-const su = (await api('/api/collections/_superusers/auth-with-password', { method: 'POST', body: JSON.stringify({ identity: 'admin@example.com', password: 'adminpass1234' }) })).token;
-const rows = JSON.parse(readFileSync(join(DATA, 'rows.json'), 'utf8'));
+if (!existsSync(smeta)) { console.error('smeta file not found: ' + smeta); process.exit(1); }
+const PORT = 8097;
+const pb = await startServer({ port: PORT, registry: true, build: true });
+const { api, su } = pb;
+const BASE = pb.base;
+const rows = pb.rows();
 await api('/api/registry/import', { method: 'POST', body: JSON.stringify({ rows }) }, su);
 // three applications: A (first), B (other contragent), C (same contragent as A, if any)
 const A = rows[0];
@@ -71,8 +69,13 @@ async function openApp(number, region) {
     await page.click('#regionForm button[type=submit]');
   }
   await page.waitForSelector('#wsBox:not([hidden])');
-  await page.setInputFiles('#pick', [smeta]);
-  await page.waitForFunction(() => window.app && window.app.model && window.app.model.rows.length > 50 && S.Sync.ws.files.length === 1 && !S.Sync.loading, null, { timeout: 90000 });
+  // An application opened before has its estimate already: it comes back from the server by itself. The file
+  // used to be given again every time, while the first copy was still on its way back — which of the two won
+  // depended on the size of the file.
+  await page.waitForFunction(() => window.app && S.Sync.ws && !S.Sync.loading && app.pending === 0, null, { timeout: 90 * 1000 });
+  if (await page.evaluate(() => app.projects.length === 0)) await page.setInputFiles('#pick', [smeta]);
+  await page.waitForFunction(() => window.app && window.app.model && window.app.model.rows.length > 50 && S.Sync.ws.files.length === 1 && !S.Sync.loading &&
+    app.pending === 0 && app.projects.length === 1, null, { timeout: 90 * 1000 });
 }
 async function closeApp() {
   await page.click('#wsList');
@@ -84,8 +87,7 @@ await page.fill('#loginEmail', 'test@example.com');
 await page.click('#loginBtn');
 await page.waitForSelector('#codeBox:not([hidden])');
 await new Promise((r) => setTimeout(r, 700));
-const code = readFileSync(join(DATA, 'dev-otp.txt'), 'utf8').trim().split('\n').pop().match(/code=(\d+)/)[1];
-await page.fill('#loginCode', code);
+await page.fill('#loginCode', pb.lastCode('test@example.com'));
 await page.click('#loginBtn');
 
 // A: set two prices
@@ -201,22 +203,29 @@ if (C) {
 await openApp(B.number);          // the region was chosen the first time round
 await page.waitForFunction(() => Object.keys(S.Hints.map).length > 0, null, { timeout: 20000 });
 const near = await page.evaluate(() => {
-  // A long name with one character dropped is the everyday typo. It must still
+  // A long name with one letter dropped is the everyday typo. It must still
   // find its resource, and «АНКЕР М5» must still never find «АНКЕР М8».
+  //
+  // A letter, from the middle of the longest word. This used to drop whatever stood at the middle of the
+  // name, and on some estimates that was a comma or a space: the name was then the same resource written
+  // another way — which the first tier answers, and which the second, asked for near names, rightly does not.
   const names = app.model.resources.map((r) => r.name).filter((n) => n.length > 25);
   const src = names.sort((a, b) => b.length - a.length)[0];
-  const cut = Math.floor(src.length / 2);
-  const typo = src.slice(0, cut) + src.slice(cut + 1);
+  const words = src.match(/[А-ЯЁа-яё]{7,}/g) || [];
+  const word = words.sort((a, b) => b.length - a.length)[0] || '';
+  const at = src.indexOf(word) + Math.floor(word.length / 2);
+  const typo = word ? src.slice(0, at) + src.slice(at + 1) : src;
   const cands = [{ name: src, unit: '', price: 1000 }];
   return {
-    src: src, typo: typo,
+    src: src, typo: typo, word: word,
     score: S.similarity(typo, src, S.idfOf([src])),
     best: S.bestMatches(typo, '', cands).length,
     sizes: S.similarity('АНКЕР М5', 'АНКЕР М8', {})
   };
 });
-check(near.score >= 0.85 && near.best === 1,
-  `a mistyped name still finds its resource (${near.score}, ${near.best} suggestion)`);
+check(near.word.length >= 7 && near.typo !== near.src, 'the estimate has a long name with a long word to mistype');
+check(near.score >= 0.85 && near.score < 1 && near.best === 1,
+  `a mistyped name still finds its resource (${near.score.toFixed(3)}, ${near.best} suggestion)`);
 check(near.sizes === 0, 'and two sizes of one part never do');
 
 /*
@@ -230,7 +239,14 @@ check(near.sizes === 0, 'and two sizes of one part never do');
  */
 // The neighbourhood is fetched in the background after the exact matches, so
 // wait until there is something to score before counting the scoring.
-await page.waitForFunction(() => S.Hints.pool.length > 0, null, { timeout: 20000 });
+await page.waitForFunction(() => S.Hints.pool.length > 0, null, { timeout: 20 * 1000 }).catch(async (e) => {
+  console.log('DEBUG no neighbourhood:', JSON.stringify(await page.evaluate(() => ({
+    prefixed: Object.keys(S.Hints.prefixed), fetched: Object.keys(S.Hints.fetched).length, map: Object.keys(S.Hints.map),
+    open: app.model.resources.filter((r) => !S.Hints.hasRow(r)).length
+  }))).slice(0, 900));
+  console.log('corrections:', JSON.stringify((await api('/api/collections/corrections/records?perPage=20&fields=name,match_key,workspace,region', {}, su)).items).slice(0, 900));
+  throw e;
+});
 const scoring = await page.evaluate(() => {
   const open = app.model.resources.filter((r) => !S.Hints.hasRow(r));
   const real = S.bestMatches;
@@ -247,10 +263,14 @@ const scoring = await page.evaluate(() => {
   const afterWiden = calls - second;
   S.Hints.pool.length = widened;
   S.bestMatches = real;
-  return { open: open.length, first, second, afterWiden };
+  // Scored by name and unit together: two lines of one name at two estimate prices are two resources and one
+  // question. The count used to be compared with the number of resources, and was two short on an estimate
+  // that had two such names.
+  const pairs = new Set(open.map((r) => r.mk || S.matchPair(r.name, r.unit || ''))).size;
+  return { open: pairs, resources: open.length, first, second, afterWiden };
 });
 check(scoring.first === scoring.open,
-  `every unmatched resource is scored once (${scoring.first} of ${scoring.open})`);
+  `every unmatched name is scored once (${scoring.first} of ${scoring.open} names of ${scoring.resources} resources)`);
 check(scoring.second === 0, `and not again for the same pool (${scoring.second})`);
 check(scoring.afterWiden === scoring.open,
   `but all of them again once the pool widens (${scoring.afterWiden})`);
@@ -266,7 +286,8 @@ await page.screenshot({ path: join(root, 'test/shot-hints.png') });
 await closeApp();
 
 await browser.close();
-server.kill();
+pb.stop();
+rmSync(dir, { recursive: true, force: true });
 if (errors.length) { console.log(errors.join('\n')); fail++; }
 console.log(fail ? `FAILED (${fail})` : 'e2e-hints OK');
 process.exit(fail ? 1 : 0);

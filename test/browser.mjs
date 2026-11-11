@@ -1,101 +1,158 @@
 /*
- * End-to-end smoke test of dist/smeta-taqqoslash.html in a real browser:
- * load two smeta workbooks, adjust a price, export, and check the result.
+ * The single-file program (dist/smeta-taqqoslash.html) in a real browser, start to finish: estimates are
+ * loaded, a price is typed the way a person types it, the three tabs draw, the document is downloaded — and
+ * the downloaded document is read back and checked.
  *
- *   node test/browser.mjs <file1.xlsx> <file2.xlsx>
+ *   node test/browser.mjs [<file1.xlsx> <file2.xlsx>]
+ *
+ * Without files it runs on two invented estimates (test/synth.cjs), so it runs anywhere.
+ *
+ * This test used to look for one resource by its name — a name from one particular estimate — and timed out
+ * on every other workbook; and where it did run it checked nothing: it printed what it saw and passed unless
+ * the page threw. It now takes the first priced resource of whatever it is given, and every step is a check.
  */
 import { chromium } from 'playwright';
 import { launchOpts } from './chromium.mjs';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+
+const require = createRequire(import.meta.url);
+const { load } = require('./load.cjs');
+const synth = require('./synth.cjs');
+const S = load(load.PIPELINE);
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const inputs = process.argv.slice(2);
-if (inputs.length === 0) { console.error('usage: node test/browser.mjs <file.xlsx>…'); process.exit(1); }
+const dir = mkdtempSync(join(tmpdir(), 'browser-'));
+let inputs = process.argv.slice(2);
+if (!inputs.length) inputs = [synth.write(S, join(dir, 'first.xlsx'), 1), synth.write(S, join(dir, 'second.xlsx'), 2)];
+
+let fail = 0;
+const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) fail++; };
 
 const browser = await chromium.launch(launchOpts);
 const page = await browser.newPage({ viewport: { width: 1500, height: 950 } });
-
 const errors = [];
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
 page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
 
 await page.goto('file://' + join(root, 'dist/smeta-taqqoslash.html'));
 
+/* loading */
 const t0 = Date.now();
 await page.setInputFiles('#pick', inputs);
-await page.waitForFunction(() => window.app && window.app.model && window.app.model.rows.length > 100, null,
-  { timeout: 60000 });
+await page.waitForFunction((n) => window.app && app.pending === 0 && app.projects.length === n && app.model && app.model.rows.length > 0, inputs.length,
+  { timeout: 90 * 1000 });
 const loadMs = Date.now() - t0;
-
 const stats = await page.evaluate(() => ({
-  projects: app.projects.length,
-  objects: app.projects.map((p) => p.objects.length),
-  rows: app.model.rows.length,
-  resources: app.model.resources.length,
-  spans: app.model.spans.length,
-  buildMs: app._buildMs,
+  projects: app.projects.length, objects: app.projects.map((p) => p.objects.length),
+  rows: app.model.rows.length, items: app.model.rows.filter((r) => r.kind === 'item').length,
+  resources: app.model.resources.length, buildMs: app._buildMs
 }));
-console.log('loaded in', loadMs, 'ms', stats);
-
+console.log('loaded in', loadMs, 'ms', JSON.stringify(stats));
+check(stats.projects === inputs.length && stats.objects.every((n) => n > 0), `every file gave a project with sheets (${stats.objects.join(', ')})`);
+check(stats.resources > 0 && stats.items >= stats.resources, `${stats.items} lines of ${stats.resources} resources`);
+check(await page.evaluate(() => !document.getElementById('export').disabled), '«Скачать Excel» is offered');
+check(await page.evaluate(() => app.model.resources.every((r) => r.market === r.price)), 'before anything is typed every resource stands at its estimate price');
 await page.screenshot({ path: join(root, 'test/shot-prices.png') });
 
-// Edit one price through the UI exactly as a user would.
-await page.fill('#q', 'DUB');
-await page.waitForTimeout(250);
-const before = await page.evaluate(() => app.prices_ui.view.length);
-const firstInput = page.locator('#priceScroll .pin').first();
-await firstInput.click();
-await firstInput.fill('80000');
-await page.waitForTimeout(300);
-const after = await page.evaluate(() => {
-  const r = app.model.resources.find((x) => x.name.trim().toUpperCase() === 'DUB');
-  const rows = app.model.rows.filter((x) => x.kind === 'item' && x.key === (r && r.key));
-  return { found: !!r, market: r && r.market, rowCount: rows.length, allApplied: rows.every((x) => x.market === 80000) };
+/* a price, typed into the box of the first priced resource — whatever the estimate calls it */
+const res = await page.evaluate(() => {
+  const r = app.model.resources.find((x) => x.price > 0 && x.name.trim().length >= 4);
+  return { key: r.key, name: r.name, price: r.price, lines: app.model.rows.filter((x) => x.kind === 'item' && x.key === r.key).length };
 });
-console.log('price edit:', { matched: before, ...after });
+const typed = Math.round(res.price * 0.9 * 100) / 100;
+await page.fill('#q', res.name.trim());
+// the search waits a moment after the last key before it filters
+await page.waitForFunction((a) => app.prices_ui.view.length < a.all && !!document.querySelector('#priceScroll .pin[data-key="' + CSS.escape(a.k) + '"]'),
+  { k: res.key, all: stats.resources }, { timeout: 10 * 1000 }).catch(() => { /* said by the check */ });
+const box = page.locator('#priceScroll .pin[data-key="' + res.key.replace(/(["\\])/g, '\\$1') + '"]');
+const shownOf = await page.evaluate(() => app.prices_ui.view.length);
+check(shownOf >= 1 && shownOf < stats.resources, `the search narrows the list to the resource (${shownOf} of ${stats.resources})`);
+await box.click();
+await box.fill(String(typed).replace('.', ','));
+await box.press('Tab');
+await page.waitForTimeout(300);
+const after = await page.evaluate((k) => {
+  const r = app.model.resources.find((x) => x.key === k);
+  const rows = app.model.rows.filter((x) => x.kind === 'item' && x.key === k);
+  const others = app.model.resources.filter((x) => x.key !== k && x.market !== x.price).length;
+  return { market: r.market, rows: rows.length, applied: rows.filter((x) => x.market === r.market).length, others };
+}, res.key);
+check(Math.abs(after.market - typed) < 1e-9, `the typed price is the resource's market price (${after.market})`);
+check(after.rows === res.lines && after.applied === after.rows, `and it is on every one of its ${after.rows} lines`);
+check(after.others === 0, 'no other resource is touched');
 
-await page.selectOption('#filter', 'changed');
-await page.waitForTimeout(200);
 await page.fill('#q', '');
-await page.waitForTimeout(250);
+await page.selectOption('#filter', 'changed');
+await page.waitForTimeout(300);
+check(await page.evaluate(() => app.prices_ui.view.length) === 1, 'the filter «изменённые» shows exactly that one');
 await page.screenshot({ path: join(root, 'test/shot-changed.png') });
 
-// Sheet + report tabs render.
+/* the document lists a change only above a threshold (five million by default): here every change counts */
+await page.click('.tab[data-pane="settings"]');
+await page.fill('#optMinDiff', '0');
+await page.locator('#optMinDiff').press('Tab');
+
+/* the other two tabs */
 await page.click('.tab[data-pane="sheet"]');
 await page.waitForTimeout(300);
-const sheetRows = await page.locator('#priceScroll,#sheetScroll .vrow').count();
+const drawn = await page.locator('#sheetScroll .vrow').count();
+check(drawn > 0 && await page.evaluate((n) => app.sheetView.length === n, stats.rows), `the assembled sheet draws its rows (${drawn} on screen of ${stats.rows})`);
 await page.screenshot({ path: join(root, 'test/shot-sheet.png') });
 await page.click('.tab[data-pane="report"]');
 await page.waitForTimeout(400);
+const reportInfo = (await page.textContent('#reportCount')).trim();
+const inPreview = await page.evaluate((k) => app.reportRows.filter((x) => x.kind === 'item' && x.key === k).length, res.key);
+check(inPreview >= 1, `the document preview has the changed resource (${reportInfo})`);
 await page.screenshot({ path: join(root, 'test/shot-report.png') });
-const reportInfo = await page.textContent('#reportCount');
-console.log('sheet rows rendered:', sheetRows, '| report:', reportInfo);
 
-// Scroll performance of the assembled sheet.
+// the assembled sheet scrolls: sixty frames, however long the estimate
 await page.click('.tab[data-pane="sheet"]');
 const scrollMs = await page.evaluate(async () => {
   const el = document.getElementById('sheetScroll');
   const t = performance.now();
-  for (let i = 0; i < 60; i++) {
-    el.scrollTop += 900;
-    await new Promise((r) => requestAnimationFrame(r));
-  }
+  for (let i = 0; i < 60; i++) { el.scrollTop += 900; await new Promise((r) => requestAnimationFrame(r)); }
   return Math.round(performance.now() - t);
 });
-console.log('60 scroll frames over the assembled sheet:', scrollMs, 'ms');
+check(scrollMs < 5000, `sixty frames of scrolling take ${scrollMs} ms`);
 
-// Export.
-const dl = page.waitForEvent('download', { timeout: 120000 });
+/* the document: downloaded, read back, and the typed price is in it */
+const dl = page.waitForEvent('download', { timeout: 120 * 1000 });
 await page.click('#export');
 const download = await dl;
-const out = join(root, 'test/export-browser.xlsx');
+const out = join(dir, 'export.xlsx');
 await download.saveAs(out);
-console.log('exported ->', out, existsSync(out) ? (readFileSync(out).length / 1024).toFixed(0) + ' KB' : 'MISSING');
+const bytes = readFileSync(out);
+check(bytes.length > 2000, `the document is downloaded (${(bytes.length / 1024).toFixed(0)} KB)`);
+const wb = S.readXlsx(new Uint8Array(bytes));
+const cells = [];
+wb.sheets.forEach((sh) => sh.rows.forEach((row) => (row || []).forEach((c) => { if (c) cells.push(c); })));
+const nameCell = S.nameKey(res.name);
+const hasName = wb.sheets.some((sh) => sh.rows.some((row) => (row || []).some((c) => c && typeof c.v === 'string' && S.nameKey(c.v) === nameCell)));
+const hasPrice = wb.sheets.some((sh) => sh.rows.some((row) => {
+  const cs = (row || []).filter(Boolean);
+  return cs.some((c) => typeof c.v === 'string' && S.nameKey(c.v) === nameCell) && cs.some((c) => typeof c.v === 'number' && Math.abs(c.v - typed) < 1e-6);
+}));
+check(wb.sheets.length >= 1 && cells.length > 20, `it opens: ${wb.sheets.length} sheet(s), ${cells.length} cells`);
+check(hasName && hasPrice, 'the changed resource is in it, with the price that was typed');
+// ... and on the comparison table itself, not only on the copy of the estimate that goes with it
+const big = wb.sheets.reduce((m, sh) => Math.max(m, sh.rows.length), 0);
+const table = wb.sheets.find((sh) => sh.rows.length < big) || wb.sheets[0];
+const onTable = table.rows.some((row) => {
+  const cs = (row || []).filter(Boolean);
+  return cs.some((c) => typeof c.v === 'string' && S.nameKey(c.v) === nameCell) && cs.some((c) => typeof c.v === 'number' && Math.abs(c.v - typed) < 1e-6);
+});
+check(wb.sheets.length < 2 || onTable, `the comparison table («${table.name}», ${table.rows.length} rows) has that line`);
+check(cells.some((c) => c.f && /^\+?[A-Z]+\d+[*-]/.test(String(c.f).replace(/^=/, ''))) && cells.some((c) => c.f && /SUM\(/i.test(c.f)),
+  'and its sums are formulas, not numbers');
 
 writeFileSync(join(root, 'test/browser-errors.txt'), errors.join('\n'));
-console.log(errors.length ? 'PAGE ERRORS:\n' + errors.slice(0, 12).join('\n') : 'no page errors');
+check(errors.length === 0, errors.length ? 'page errors:\n' + errors.slice(0, 12).join('\n') : 'no page errors');
 
 await browser.close();
-process.exit(errors.length ? 1 : 0);
+rmSync(dir, { recursive: true, force: true });
+console.log(fail ? `FAILED (${fail})` : 'browser OK');
+process.exit(fail ? 1 : 0);

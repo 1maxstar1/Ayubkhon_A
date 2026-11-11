@@ -116,6 +116,7 @@ browser_run e2e-compare  node test/e2e-compare.mjs
 browser_run e2e-compare-keep node test/e2e-compare-keep.mjs
 browser_run upload-order node test/upload-order.mjs
 browser_run upload-fail  node test/upload-fail.mjs
+browser_run two-tabs     node test/two-tabs.mjs
 both_run  e2e-workspace  node test/e2e-workspace.mjs "$S1" "$S2"
 both_run  e2e-hints      node test/e2e-hints.mjs "$S1"
 if [ -n "$REG" ]; then browser_run e2e-fullregistry node test/e2e-fullregistry.mjs "$REG"; else skip e2e-fullregistry "reyestr fayli berilmagan"; fi

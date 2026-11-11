@@ -39,6 +39,7 @@
     cmp: {},                // «Сравнение версий»: the files chosen there (slot → { name, id }) and its «Было»
     seq: 0,                 // which open() is the current one; see open()
     unsaved: {},            // file name -> { file, why, retry }: estimates on screen whose file is not on the server
+    frozen: false,          // this application was opened in another tab after this one: nothing is saved from here
 
     init: function () {
       var self = this;
@@ -67,11 +68,12 @@
       document.addEventListener('cmp:base', function (e) { if (self.ws && !self.loading) { self.cmp.base = e.detail.base || ''; self.touch(); } });
       $('projects').addEventListener('input', function () { self.touch(); });
       $('reportMode').addEventListener('change', function () { self.touch(); });
+      this.listen();
       window.addEventListener('beforeunload', function (e) {
         self.flush();
         if (self.dirty) self.saveNow();
         // an estimate whose file is not on the server would not be there after the reload: the browser asks
-        if (self.ws && self.hasUnsaved()) { e.preventDefault(); e.returnValue = ''; }
+        if (self.ws && !self.frozen && self.hasUnsaved()) { e.preventDefault(); e.returnValue = ''; }
       });
     },
 
@@ -100,6 +102,7 @@
       app.projects = []; app.prices = {}; app.looseBook = null; app.queue = [];
       app.rebuild(); app.renderSide();
       this.renderBox();
+      this.announce(w);
       document.dispatchEvent(new CustomEvent('ws:open', { detail: w }));
 
       var by = w.expand && w.expand.updated_by;
@@ -263,7 +266,7 @@
      */
     compareFile: function (slot, file) {
       var self = this, app = A(), ws = this.ws;
-      if (!ws || this.loading) return;
+      if (!ws || this.loading || this.frozen) return;
       this.enqueue(function () {
         if (self.ws !== ws) return;
         var was = self.cmp[slot], had = {};
@@ -307,9 +310,69 @@
       });
     },
 
+    /* ------------------------------------------------------- two tabs */
+    /*
+     * One application in two tabs of one browser. Every save writes the whole state, so the tab that saved last
+     * won: a price set in one tab was wiped by the next save of the other, both showed a green «✓», and nothing
+     * said so until a reload. It happens without anybody meaning it — the launcher opens a new tab at every start.
+     *
+     * The tabs now talk (BroadcastChannel; a browser without it works as before). A tab that opens an
+     * application says so. A tab that already has it open saves what it has not saved yet, answers, and stops:
+     * it is covered by a notice with one way on — «Обновить и работать здесь», which reloads it and makes it the
+     * one that works. The newer tab, told that the older one had something unsaved, reads the application again.
+     * So there is one working tab at a time, the newest, and nothing typed in the other is lost on the way.
+     *
+     * Two people in two browsers are not helped by this: that needs the server to refuse a stale save.
+     */
+    listen: function () {
+      var self = this;
+      if (typeof BroadcastChannel === 'undefined') return;
+      this.tab = Math.random().toString(36).slice(2);
+      this.bc = new BroadcastChannel('smeta-workspace');
+      this.bc.onmessage = function (e) {
+        var m = e.data || {}, ws = self.ws;
+        if (!ws || m.tab === self.tab || m.ws !== ws.id || self.frozen) return;
+        if (m.type === 'open') {
+          // only a tab that opened it after this one supersedes it: two tabs restored together must not stop each other
+          if (!(m.at > self.openedAt || (m.at === self.openedAt && m.tab > self.tab))) return;
+          var had = self.dirty || Object.keys(self.pend).length > 0;
+          self.flush();
+          var done = self.dirty ? self.saveNow() : self.q;
+          self.freeze();
+          Promise.resolve(done).catch(function () { /* said by saveNow */ }).then(function () {
+            self.bc.postMessage({ type: 'released', ws: ws.id, tab: self.tab, changed: had });
+          });
+        } else if (m.type === 'released' && m.changed) {
+          // the older tab has just written something this tab opened without
+          if (self.dirty || self.hasUnsaved()) {
+            A().toast('В другой вкладке были несохранённые правки этой заявки. Обновите страницу, чтобы увидеть их.', true);
+          } else location.reload();
+        }
+      };
+    },
+    announce: function (w) {
+      this.thaw();
+      this.openedAt = Date.now();
+      if (this.bc) this.bc.postMessage({ type: 'open', ws: w.id, tab: this.tab, at: this.openedAt });
+    },
+    freeze: function () {
+      var self = this, box = $('wsFrozen');
+      this.frozen = true;
+      clearTimeout(this.t); clearTimeout(this.ct); clearTimeout(this.ut);
+      if (!box) return;
+      box.hidden = false;
+      $('wsFrozenHere').onclick = function () { location.reload(); };
+      $('wsFrozenList').onclick = function () { self.close(true); };
+    },
+    thaw: function () {
+      this.frozen = false;
+      var box = $('wsFrozen');
+      if (box) box.hidden = true;
+    },
+
     /* ------------------------------------------------------------- save */
     touch: function () {
-      if (!this.ws || this.loading) return;
+      if (!this.ws || this.loading || this.frozen) return;
       this.dirty = true;
       this.mark('●');
       clearTimeout(this.t);
@@ -341,7 +404,7 @@
 
     saveNow: function () {
       var self = this, app = A();
-      if (!this.ws || this.loading) return Promise.resolve();
+      if (!this.ws || this.loading || this.frozen) return Promise.resolve();
       this.flush();
       clearTimeout(this.t);
       var st = this.state();
@@ -395,7 +458,7 @@
      */
     upload: function (files) {
       var self = this, app = A();
-      if (!this.ws || this.loading) return;
+      if (!this.ws || this.loading || this.frozen) return;
       files = files.filter(function (f) { return XLSX_RE.test(f.name); });
       if (!files.length) return;
       var ws = this.ws;
@@ -500,7 +563,7 @@
      */
     correctSoon: function (key, value) {
       var self = this;
-      if (!this.ws || this.loading) return;
+      if (!this.ws || this.loading || this.frozen) return;
       this.pend[key] = value;
       clearTimeout(this.ct);
       this.ct = setTimeout(function () { self.flush(); }, CORRECT_MS);
@@ -530,7 +593,7 @@
       this.pend = {};
       var keys = Object.keys(waiting);
       if (!keys.length) return;
-      if (!this.ws || this.loading || !app.model) return;
+      if (!this.ws || this.loading || this.frozen || !app.model) return;
 
       var by = {}, rs = app.model.resources;
       for (var i = 0; i < rs.length; i++) by[rs[i].key] = rs[i];
@@ -626,7 +689,7 @@
     /* ---------------------------------------------------------- exports */
     saveExport: function (bytes, opts) {
       var self = this, app = A();
-      if (!this.ws) return;
+      if (!this.ws || this.frozen) return;
       var d = new Date(), pad = function (n) { return (n < 10 ? '0' : '') + n; };
       var name = 'Zayavka_' + this.app.number + '_sopostavlenie_' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) +
         '_' + pad(d.getHours()) + pad(d.getMinutes()) + '.xlsx';
@@ -704,7 +767,8 @@
         '.\n\nЕсли закрыть заявку сейчас, этих смет в ней не будет. Закрыть?')) return Promise.reject(new Error('unsaved'));
       this.seq++;                             // anything still arriving is for a workspace nobody is in
       this.flush();
-      var done = this.dirty ? this.saveNow() : this.q;
+      // a tab that was superseded leaves without a word to the server: what it holds is older than what is there
+      var done = this.frozen ? null : this.dirty ? this.saveNow() : this.q;
       return Promise.resolve(done).catch(function (e) {
         if (!force) {
           app.toast('Рабочая область не закрыта: последние изменения не сохранены (' + S.pbErr(e) + ')', true);
@@ -713,6 +777,7 @@
       }).then(function () {
         self.ws = null; self.app = null; self.files = {}; self.corr = {}; self.marks = {}; self.cmp = {};
         self.unsaved = {}; clearTimeout(self.ut); self.renderUnsaved();
+        self.thaw();
         S.hashSet('ws', '');
         self.loading = true;
         app.projects = []; app.prices = {}; app.looseBook = null; app.queue = [];

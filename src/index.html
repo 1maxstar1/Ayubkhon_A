@@ -183,6 +183,12 @@
 
 <!--__SCREENS__-->
 <div id="toast" class="toasts"></div>
+<div id="wsFrozen" class="frozen" hidden><div class="card">
+  <b>Эта заявка открыта в другой вкладке</b>
+  <p>Чтобы вкладки не стирали правки друг друга, здесь сохранение остановлено. Всё, что было введено в этой вкладке, уже записано.</p>
+  <div class="acts"><button type="button" class="btn primary" id="wsFrozenHere">Обновить и работать здесь</button>
+    <button type="button" class="btn" id="wsFrozenList">‹ К списку заявок</button></div>
+</div></div>
 <div id="busy" class="busy"><div class="spin"></div><span id="busyText">Обработка…</span></div>
 
 <input type="file" id="bookInput" accept=".json,.xlsx" hidden>

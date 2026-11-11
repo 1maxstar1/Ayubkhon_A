@@ -252,7 +252,7 @@ Hujjatga nima tushishi o'zgarmadi.
 
 ## B. Hech narsa yo'qolmasin
 
-### [ ] B1 Mac: zaxira faqat ishga tushganda olinadi va o'sha diskda turadi
+### [x] B1 Mac: zaxira faqat ishga tushganda olinadi va o'sha diskda turadi
 
 `server/laptop.sh:154-176,240,256` — **yuqori** · M
 
@@ -280,6 +280,22 @@ bajaradigan test; (4) 14 kunlik + 8 haftalik + 12 oylik nusxa; (5) nusxalash
 xatosi baland ovozda. Windows ishga tushirgichidagi **kelishuv o'zgarmaydi** —
 `restore` yangi buyruq, eskilariga tegmaydi.
 
+**Bajarildi — v2.9.3, commit `3787069` (Mac/Linux ishga tushirgichi).**
+Ishlab turgan dastur har soatda zaxirani tekshiradi. Ikkinchi nusxa — Google
+Drive yoki iCloud Drive papkasi o'zi topiladi (`Smeta zaxira (Mac)`; Windows'ning
+`Smeta zaxira` papkasidan ataylab alohida — bitta hisobdagi ikki kompyuter
+bir-birining nusxalarini o'chirib yubormasin), `drive <papka>` boshqasini
+tayinlaydi, `drive off` o'chiradi; ikkinchi joy bo'lmasa har bir buyruq buni
+ochiq aytadi. Saqlanadi: oxirgi 14 ta + 8 haftalik + 12 oylik
+(`server/backup-prune.cjs`). `restore` ro'yxat beradi, `restore <zip>` faylni
+tekshiradi, hozirgi bazani chetga suradi, tiklaydi va nechta yozuv qaytganini
+aytadi. Testlar: `test/laptop-backup.sh` (ishga tushirgich vaqtinchalik nusxada
+haqiqatan yuradi, 25 tekshiruv), `test/backup-prune.cjs` (ikki yil, kuniga bitta
+nusxa). **Qolgani:** Windows'da `restore` buyrug'i yo'q (G3 bilan birga);
+haqiqiy Mac'da sinalmagan narsa — macOS login paytida ishga tushgan dasturga
+bulut papkasiga yozishga so'rovsiz ruxsat beradimi (`status` ikkinchi nusxalar
+sonini ko'rsatadi — bir kundan keyin qarab qo'yish kerak).
+
 ### [ ] B2 Oxirgi narx vkladka yopilganda yo'qolishi mumkin
 
 `src/ui/sync.js:65-68,368-372` — **yuqori** (LAN/VPS da), **o'rta** (noutbukda) · M
@@ -300,7 +316,7 @@ ikkala so'rovni **parallel** va `keepalive` bilan jo'natish; (3) tiklashda
 holatdagi narxlarni shu ish maydonining o'z tuzatishlari bilan birlashtirish
 (ular baribir yuklanadi) — serverga yetgan narx jadvaldan tushib qolmaydi.
 
-### [ ] B3 Ikki vkladka bir-birining narxlarini jimgina o'chiradi
+### [x] B3 Ikki vkladka bir-birining narxlarini jimgina o'chiradi
 
 `src/ui/sync.js:96-99,310-359` — **yuqori** · S (vkladkalar) + M (server)
 
@@ -318,7 +334,15 @@ va saqlashni to'xtatadi. (M, ko'p foydalanuvchi uchun shart) sahifa o'zi
 yuklagan `updated` ni yuboradi; server yozuv yangiroq bo'lsa 409 qaytaradi;
 sahifa holatni qayta yuklab, o'zining kutilayotgan narxlarini ustiga qo'yadi.
 
-### [ ] B4 Yuklanmagan smeta yashil «✓» ostida qoladi
+**Bajarildi — v2.9.3, commit `ebcf313` — vkladkalar qismi.** Bir vaqtda bitta
+vkladka ishlaydi — eng yangisi. Eskisi saqlamaganini saqlaydi, to'xtaydi va
+«Эта заявка открыта в другой вкладке» oynasi bilan yopiladi; «Обновить и
+работать здесь» uni yana ishchi qiladi. Yangi vkladka eskisida saqlanmagan narsa
+bo'lganini bilsa, arizani qayta o'qiydi. Test: `test/two-tabs.mjs` (uch vkladka).
+**Qolgani (7-bosqich):** ikki kishi ikki brauzerda — server eskirgan saqlashni
+rad etishi (409).
+
+### [x] B4 Yuklanmagan smeta yashil «✓» ostida qoladi
 
 `src/ui/sync.js:375-402,113-115` — **yuqori** · S–M
 
@@ -334,7 +358,13 @@ panelda doimiy qator «файл не сохранён на сервере — п
 `saveNow` kabi qayta uriniladi; cheklovlar (30 ta, 60 MB) yuklashdan **oldin**
 ruscha aytiladi — ikkalasi ham brauzerda ma'lum.
 
-### [ ] B5 «Сбросить выбранные» — so'rovsiz, qaytarishsiz
+**Bajarildi — v2.9.3, commit `35e201e`.** Yuklanmagan fayl sababi bilan ushlab
+turiladi: belgi «!», loyihalar ro'yxati ustida qator va «Повторить»; aloqa yoki
+server xatosi o'zi qayta uriniladi; 30 ta fayl va 60 MB cheklovi serverdan
+so'ramasdan aytiladi; loyihani ro'yxatdan olish masalani yopadi; arizadan yoki
+sahifadan chiqishda so'raladi. Test: `test/upload-fail.mjs` (16 tekshiruv).
+
+### [x] B5 «Сбросить выбранные» — so'rovsiz, qaytarishsiz
 
 `src/ui/prices.js:144-149` — **yuqori** · S
 
@@ -348,7 +378,14 @@ yechim sifatida — narx o'zgarishlari uchun **bir bosqichli «Отменить�
 ommaviy amaldan oldingi narxlar xotirada saqlanadi, xabar ichida 10 soniya
 «Отменить» tugmasi turadi. Dasturda hozir hech qayerda qaytarish yo'q (B8).
 
-### [ ] B6 Oldingi arizaning sozlamalari yangisiga o'tib ketadi
+**Bajarildi — v2.9.3, commit `636e26e`.** Tugma «Сбросить показанные»: faqat
+smeta narxidan farq qiladigan narxlarga tegadi, nechtaligini aytib so'raydi.
+«Сбросить», «Применить %» va «Автоподбор» dan keyingi xabarda 10 soniya
+«Отменить» turadi — narxlar ham, qo'llangan narxning manbasi (taklif,
+справочник, UZEX) ham qaytadi; faqat oxirgi ommaviy amal uchun. Brauzer testida
+949 ta narx va ularning serverdagi yozuvlari to'liq qaytdi.
+
+### [x] B6 Oldingi arizaning sozlamalari yangisiga o'tib ketadi
 
 `src/ui/sync.js:224` (`Object.assign(app.opts, st.opts)`), yopishda `opts`
 tozalanmaydi — **o'rta** · S
@@ -360,6 +397,11 @@ bo'lsa — hisobotga tushadigan qatorlar ham boshqa.
 
 Reja: ariza yopilganda `opts` ni standart qiymatga qaytarish; test: A da
 chegara o'zgartiriladi, B ochiladi, B da standart turadi.
+
+**Bajarildi — v2.9.3, commit `10bfc6a`.** Ariza o'zining saqlangan sozlamalari
+bilan ochiladi (yo'q bo'lsa — standart), yopilganda standart qaytadi; hisobot
+turi ham. Eslatma: oldin bir arizada o'zgartirilgan shtamp yoki eslatma matni
+keyingisiga «o'tib» qolardi — endi har arizada alohida yoziladi.
 
 ### [ ] B7 Holat 5 MB dan oshsa, ish maydoni boshqa saqlanmaydi
 
@@ -381,7 +423,7 @@ soni cheklangan joyda tutish; eski kalit nusxasida faqat yangi kalitdan
 **farq qiladigan** yozuvlarni qoldirish (qaytish qoidasi saqlanadi); 400/413
 ni takrorlamaslik va ruscha tushuntirish.
 
-### [ ] B8 Qaytarib bo'lmaydigan amallar so'rovsiz
+### [x] B8 Qaytarib bo'lmaydigan amallar so'rovsiz
 
 **o'rta** · S (har biri)
 
@@ -393,6 +435,11 @@ ni takrorlamaslik va ruscha tushuntirish.
 
 Reja: birinchi ikkitasiga tasdiqlash (o'z hisobini o'chirishni taqiqlash);
 «Завершить» uchun admin sahifasida «вернуть в работу».
+
+**Bajarildi — v2.9.3, commit `10bfc6a` — birinchi ikkitasi.** «Отключить»
+so'raydi va o'z hisobingizda rad etadi; loyihaning «×» i so'raydi (fayl
+serverdan ham o'chishini aytib). **Qolgani (5-bosqich):** «Завершить» ni
+qaytarish va viloyatni o'zgartirish.
 
 ### [ ] B9 Ofis tarmog'i rejimi (`lan.sh`) umuman zaxira olmaydi
 
@@ -565,8 +612,8 @@ jamini «внимание» darajasiga ko'tarish.
 
 | № | Nima | Jiddiylik | Tuzatish | Hajm |
 |---|---|---|---|---|
-| E1 | Yon paneldagi «–» tugmasi sahifani 0 kenglikka yig'adi, qaytarish yo'li yo'q (faqat qayta yuklash) — `src/app.css:89-90`, `src/ui/app.js:101-102` | o'rta | Yig'ilganda ingichka tasma va «+» qoladi | S |
-| E2 | Bitta `#toast`: xabarlar 10–400 ms ichida bir-birini almashtiradi, xato xabari ma'lumot xabari ostida yo'qoladi (B4 ning sababi) — `src/ui/app.js:272-279` | o'rta | Navbat; xato xabari yopilmaguncha turadi | S |
+| E1 ✓ v2.9.3 | Yon paneldagi «–» tugmasi sahifani 0 kenglikka yig'adi, qaytarish yo'li yo'q (faqat qayta yuklash) — `src/app.css:89-90`, `src/ui/app.js:101-102` | o'rta | Yig'ilganda ingichka tasma va «+» qoladi | S |
+| E2 ✓ v2.9.3 | Bitta `#toast`: xabarlar 10–400 ms ichida bir-birini almashtiradi, xato xabari ma'lumot xabari ostida yo'qoladi (B4 ning sababi) — `src/ui/app.js:272-279` | o'rta | Navbat; xato xabari yopilmaguncha turadi | S |
 | E3 | Taklif oynasi uni ochgan bosishning o'zida yopiladi; `Esc` yozilayotgan narxni o'chiradi — `src/ui/hints.js:73-90`, `src/ui/prices.js:114-117` | past | Bosishni bir kadrga kechiktirish; `Esc` avval oynani yopadi | S |
 | E4 | Taklifni qo'llash ro'yxatni boshiga aylantiradi — `src/ui/hints.js:299` | past | Joyni saqlash (`apply(true)`) | S |
 | E5 | 1366 kenglikda «Сводная таблица» kesiladi, sarlavha gorizontal aylantirishga ergashmaydi; «Цены» da 15 qator ko'rinadi (UZEX bilan 13), nom ustuni 320 px — nomlarning 42 % i kesilgan | o'rta | Ixcham rejim: kichikroq qator, kengayadigan nom ustuni, yopishqoq sarlavha | M |

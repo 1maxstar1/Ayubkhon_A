@@ -23,3 +23,4 @@ v2.9.0 fd09d6599479582a44361608f0d2f8033f30fb2e UZEX (birja) haftalik kotirovkal
 v2.9.1 41e9e7ce278e03bc14d4c41108a117c4534eb6b1 UZEX narxlari QQSsiz korsatiladi va qollanadi (birja QQS bilan kotirovka qiladi)
 v2.9.2 b4a5803d9e775ee2a29523af87b6be5ccc0550e4 Hujjat jamilari togri: Polnaya kopiya ITOGO, 4A jamilari SUM, uskunalar izohi, sarlavhali varaq, bosh hisobot izohi
 v2.9.3 dd28a625e283d34be93f061c7f57e97edc1a72cc Hech narsa yoqolmasin: Otmenit, ikki vkladka, yuklanmagan fayl, sozlamalar, Mac zaxirasi va restore
+v2.9.4 1487d990badb8e80d4ba32dcc67e6ab0fbe59525 Begona fayl va chetdagi holatlar: xlsx oquvchi chegaralari, formulalar royxati, sonlar qatiy, yopilgan vkladkada narx yoqolmaydi, holat hajmi

@@ -45,6 +45,16 @@ const MSG = opt('--msg');
 const KIT = process.env.REFS_KIT;
 const git = (...a) => execFileSync('git', a, { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28 });
 
+// The check reads what the branch has added since its base. A checkout without that history (a shallow clone:
+// CI's default, some downloads) cannot be checked, and used to end in a stack trace about a «bad revision».
+if (!STAGED) {
+  try { git('cat-file', '-e', BASE + '^{commit}'); } catch (e) {
+    console.error('refs-privacy: the base commit ' + BASE + ' is not in this checkout — its history is cut short.\n' +
+      '  Get the whole history (git fetch --unshallow; in CI: fetch-depth: 0) and run again.');
+    process.exit(1);
+  }
+}
+
 const hits = [];
 const allowed = new Set();
 const ALLOW = path.join(ROOT, 'test/refs-privacy.allow');

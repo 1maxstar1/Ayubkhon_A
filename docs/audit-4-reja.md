@@ -873,6 +873,12 @@ Yo'l-yo'lakay topildi: `test/refs-parity.stamp` v2.9.0 dan beri eskirgan edi —
 o'lchov har safar «bir xil» chiqqan, lekin yangilangan muhr commit
 qilinmagan (fayllarsiz ishga tushirilganda «NOT MEASURED» deb yiqilardi).
 Bugungi o'lchov muhri commit qilindi; qoida `CLAUDE.md` ga yozildi.
+GitHub'dagi birinchi ishga tushish ikki narsani ko'rsatdi, ikkalasi ham
+testning o'zida: maxfiylik tekshiruvi sayoz git tarixida ishlay olmaydi
+(CI endi to'liq tarixni oladi, tekshiruv esa buni so'z bilan aytadi), va
+`laptop-backup` ning «yozib bo'lmaydigan papka» qismi faqat root bo'lmagan
+foydalanuvchida ishlaydi — u birinchi marta CI da ishga tushdi va noto'g'ri
+yozilgan ekan (tuzatildi).
 
 ### [~] H4 Qamrovdagi bo'shliqlar
 

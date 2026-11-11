@@ -108,11 +108,20 @@ sh "$L" backup >/dev/null
 check '[ "$(zips "$T/usb")" = 2 ] && [ "$(zips "$COPY")" = 2 ]' "the next backup goes there, not to the place found before"
 OUT=$(sh "$L" drive off; sh "$L" backup; sh "$L" status)
 check 'echo "$OUT" | grep -q "ikkinchi nusxa: YO.Q" && [ "$(zips "$T/usb")" = 2 ]' "«drive off» keeps no second copy, and every command says so plainly"
-chmod 500 "$T/usb" 2>/dev/null || true
 if [ "$(id -u)" != 0 ]; then
+  # A folder that cannot be written to is not taken as the second place; one that stops being writable later
+  # (a drive unplugged, a cloud folder signed out) is said out loud at the next backup. This half ran for the
+  # first time on CI — everywhere else the tests run as root — and was wrong: it named the folder after
+  # closing it, which the launcher rightly refuses, and then looked for the warning of a place that was never set.
+  chmod 500 "$T/usb"
+  OUT=$(sh "$L" drive "$T/usb" 2>&1 || true)
+  check 'echo "$OUT" | grep -q "papkaga yozib bo.lmaydi"' "a folder that cannot be written to is not taken as the second place"
+  chmod 700 "$T/usb"
   sh "$L" drive "$T/usb" >/dev/null 2>&1 || true
   chmod 500 "$T/usb"
+  sleep 1
   OUT=$(sh "$L" backup 2>&1 || true)
+  chmod 700 "$T/usb"
   check 'echo "$OUT" | grep -q "DIQQAT: ikkinchi nusxa yozilmadi"' "a second place that cannot be written to is said out loud"
 else
   ok "a second place that cannot be written to is said out loud (not checked: running as root, which can write anywhere)"

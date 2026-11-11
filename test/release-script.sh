@@ -34,7 +34,9 @@ NEXT=$(node -e "const v=process.argv[1].split('.').map(Number); process.stdout.w
 printf '%s\n%s\n' '**Sinov relizi.** Ikki qatorli matn,' 'bitta katakka yoziladi.' > "$T/row.md"
 HEAD0=$(git rev-parse HEAD)
 unchanged() { [ "$(git rev-parse HEAD)" = "$HEAD0" ] && [ -z "$(git status --porcelain)" ]; }
-run() { RELEASE_SUITE="${SUITE:-true}" sh server/release.sh "$@" >"$T/out.txt" 2>&1; }
+# Without the private kit: the privacy check of a commit reads the history it is added to, and this repository
+# has a history of one commit made a moment ago. That check has a test of its own (test/refs-privacy.cjs).
+run() { REFS_KIT= RELEASE_SUITE="${SUITE:-true}" sh server/release.sh "$@" >"$T/out.txt" 2>&1; }
 
 # ---- refused, nothing changed
 run "$CUR" "same version" --row "$T/row.md"; R=$?

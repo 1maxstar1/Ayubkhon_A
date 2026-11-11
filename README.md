@@ -287,48 +287,97 @@ tayyor fayl **≈ 0,5 MB**.
 
 ```
 src/
-  index.html          dastur oynasi
+  index.html, screens.html   dastur oynasi (bitta-fayl va server rejimi)
+  admin.html                 admin sahifasi
   app.css
-  worker.js           .xlsx ni fon oqimida o'qish
-  vendor/fflate.umd.js
-  lib/
+  worker.js                  .xlsx ni fon oqimida o'qish
+  refs-worker.js, uzex-worker.js   справочник va UZEX takliflari — fon oqimida
+  vendor/                    fflate, PocketBase mijozi
+  lib/                       yadro — ikkala mahsulotga umumiy, brauzersiz ham ishlaydi
     normalize.js      nom kaliti: klaviatura almashinuvi, Ё/Ъ, tinish belgilari
     match.js          transliteratsiya, moslik kaliti, TF-IDF + Levenshtein o'xshashlik
     sections.js       nomdan bo'lim (материалы / машины / труд / оборудование)
     regions.js        ariza matnidan viloyat (gazetteer + ball)
-    util.js           umumiy yordamchilar, raqam formatlari
-    formula.js        formulalarni ustun/qator xaritasi bo'yicha ko'chirish
-    xlsx-read.js      .xlsx o'qish (skaner, DOM emas)
+    util.js           umumiy yordamchilar: sonni o'qish (`S.num`), raqam formatlari
+    formula.js        formulalarni ko'chirish; tirik ko'chadigan funksiyalar ro'yxati
+    xlsx-read.js      .xlsx o'qish (bir o'tishli skaner, hajm cheklovlari)
     xlsx-write.js     to'liq formatli .xlsx yozish
-    smeta.js          obyekt varaqlarini tanish va qatorlarga ajratish
-    assemble.js       Лист1 ni yig'ish + resurslar ro'yxati
+    smeta.js          obyekt varaqlarini tanish (shakli, 4А, sarlavhasi bo'yicha)
+    assemble.js       Лист1 ni yig'ish + resurslar ro'yxati + jamilar formulalari
     report.js         TAQQOSLASH JADVALI №2 (uch rejim) + Mundarija
     export.js         uslublar va tayyor kitob
+    compare.js, reply.js   «Сравнение версий», «Наш ответ (Excel)»
+    registry-parse.js      arizalar reyestrini o'qish
+    refs/             справочные цены: paket, qidiruv, taklif (faqat o'lchov bilan o'zgaradi)
+    uzex.js           UZEX kotirovkalari: moslash, birlik, QQSsiz narx
+    pb.js             PocketBase mijozi (server rejimi)
   ui/
     grid.js           virtual jadval
-    prices.js         narx ustaxonasi
-    app.js            ulanish
+    prices.js         «Проверка цен»
+    app.js            ulanish, xabarlar, narxlar kitobi
+    sync.js           ish maydoni: saqlash, tuzatishlar, ikki vkladka, yopilgan vkladka
+    hints.js, refs.js, uzex.js   takliflar: oldingi loyihalar, справочник, birja
+    compare.js, registry.js, auth.js, admin.js, *-admin.js
+server/
+  pb_schema.json, pb_hooks/  PocketBase sxemasi va server qoidalari
+  laptop.sh, laptop.cmd, laptop.ps1, install-windows.ps1   noutbuk rejimi
+  lan.sh, deploy/            ofis tarmog'i va VPS
+  releases.txt, release.sh   relizlar ro'yxati va reliz buyrug'i
 test/
-  pipeline.cjs        brauzersiz to'liq o'tkazish (node)
-  fixtures.cjs        o'lchov ma'lumotini haqiqiy hujjatlardan qayta yasash
-  normalize.cjs       ikki kalit va o'xshashlik, haqiqiy 903 nom ustida
-  sections.cjs        bo'lim klassifikatori, 2085 belgilangan resurs
-  regions.cjs         viloyat klassifikatori, 1247 belgilangan ariza
-  browser.mjs         haqiqiy brauzerda uchidan-uchiga test
-  fixtures/           haqiqiy hujjatlardan olingan tekshiruv ma'lumotlari
-build.mjs             hammasini bitta HTML ga yig'adi
-dist/smeta-taqqoslash.html
+  all.sh              hamma test, tartib bilan; natija — bitta jadval va chiqish kodi
+  synth.cjs           o'ylab topilgan smetalar: haqiqiy faylsiz ham hamma test ishlaydi
+  server.mjs, pb-smoke.sh    test serveri (har test o'z portida, yetim server qolmaydi)
+  *.cjs               yadro testlari (node): o'qish, yig'ish, eksport formulalari, NLP o'lchovlari
+  *.mjs               brauzer testlari (playwright): sahifa, ish maydoni, takliflar, admin
+  laptop-*.sh, release-script.sh   ishga tushirgichlar va reliz skripti
+  fixtures/           haqiqiy hujjatlardan olingan tekshiruv ma'lumotlari (nom va belgilar, narxsiz)
+build.mjs             hammasini yig'adi: dist/smeta-taqqoslash.html, index.html, admin.html
+.github/workflows/tests.yml   har bir push'da to'plam GitHub'da ishlaydi
 ```
 
 ### Yig'ish
 
 ```sh
-node build.mjs                       # dist/smeta-taqqoslash.html
+node build.mjs                       # dist/ dagi uchala sahifa
 node build.mjs --watch               # ishlab chiqish paytida
-
-node test/pipeline.cjs a.xlsx b.xlsx --out out.xlsx   # yadro testi
-npm i -D playwright && node test/browser.mjs a.xlsx b.xlsx
 ```
+
+### Testlar
+
+```sh
+npm i && npx playwright install chromium     # bir marta
+sh test/all.sh                               # hamma test, o'ylab topilgan smetalarda (≈ 12 daqiqa)
+sh test/all.sh reyestr.xls smeta1.xlsx smeta2.xlsx    # ... va haqiqiy fayllaringizda
+```
+
+To'plam **yashil bo'lishi shart**: oxirgi qatori «N ok, 0 fail», chiqish kodi 0.
+Fayl berilmasa, butun dastur testlari (`pipeline`, `browser`, `e2e-workspace`,
+`e2e-hints`) `test/synth.cjs` yasagan ikki o'ylab topilgan smetada ishlaydi —
+shuning uchun to'plam istalgan kompyuterda va GitHub'da to'liq yuradi. Faqat
+egasining kompyuterida qoladiganlari jadvalda SKIP deb, sababi bilan ko'rinadi:
+`hints` (o'xshash nomlarni narx bo'yicha o'lchaydi — haqiqiy smeta kerak),
+`refs-parity`/`refs-measure` (maxfiy to'plam, `REFS_KIT`), `e2e-fullregistry`
+(to'liq reyestr).
+
+Har bir push'da shu to'plam GitHub Actions'da o'zi ishlaydi (repo → «Actions»
+vkladkasi → «tests»). Qizil belgi — biror test yiqilgan; qaysi biri ekanini
+o'sha yerdagi «What failed» qadami ko'rsatadi.
+
+### Reliz
+
+```sh
+sh server/release.sh 2.9.5 "bir qatorli izoh (ASCII)" --row matn.md      # matn.md — docs/versiyalar.md qatori uchun
+sh server/release.sh 2.9.5 "..." --row matn.md --dry                    # hammasini tekshiradi, hech narsa commit qilmaydi
+```
+
+Bitta buyruq: versiyani ko'taradi, yig'adi, to'plamni ishga tushiradi, reliz
+commit'ini qiladi va push qiladi, keyin **alohida commit** bilan
+`server/releases.txt` ga o'sha commit'ning to'liq hash'ini va
+`docs/versiyalar.md` ga qatorni qo'shadi. Rad etadi (hech narsani
+o'zgartirmasdan): versiya yangi bo'lmasa, ishchi papkada o'zgarish bo'lsa,
+to'plam yashil bo'lmasa, справочник o'lchovi commit qilinmagan bo'lsa.
+`RELEASE_SMETA1`, `RELEASE_SMETA2`, `RELEASE_REGISTRY`, `REFS_KIT` — haqiqiy
+fayllar va maxfiy to'plam bilan to'liqroq tekshiruv uchun.
 
 ## Versiyalar va orqaga qaytish
 

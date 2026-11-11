@@ -30,6 +30,21 @@ for F in "$REG" "$S1" "$S2"; do
   exit 1
 done
 
+# The tests of the whole program — the pipeline, the page in a browser, the workspace, the hints between
+# applications — need estimates. The owner's are not in the repository. Given none, those tests used to be
+# skipped, which left the larger half of the program untested everywhere but on one machine; they now run on
+# two invented estimates (test/synth.cjs). Only the measurement of «Похожие ресурсы» stays with real files:
+# it judges names by prices, and invented names have nothing to say about that.
+SYN=0; HINT2="$S2"
+if [ -z "$S1" ]; then
+  SYN=1; S1=test/.synth-1.xlsx; S2=test/.synth-2.xlsx
+  node test/synth.cjs "$S1" "$S2" >/dev/null || { echo "sintetik smeta yaratilmadi"; exit 1; }
+elif [ -z "$S2" ]; then
+  # one real estimate given: the tests that take two get an invented second
+  S2=test/.synth-2.xlsx
+  node test/synth.cjs test/.synth-1.xlsx "$S2" >/dev/null || { echo "sintetik smeta yaratilmadi"; exit 1; }
+fi
+
 # The browser tests need a browser. Without playwright each of them ends in the
 # same twelve-line «Cannot find package» trace, which reads like seven separate
 # failures of the program rather than one missing dependency.
@@ -89,13 +104,16 @@ else
   printf '%-22s %-12s %s\n' refs-parity "NOT MEASURED" "$PARITY"
   printf 'refs-parity\tFAIL\t0\n' >> "$OUT"
 fi
-if [ -n "$REFS_KIT" ] && [ -n "$S1" ]; then run refs-measure node test/refs-measure.cjs "$S1"; else skip refs-measure "REFS_KIT yoki smeta berilmagan"; fi
+if [ -n "$REFS_KIT" ] && [ "$SYN" = 0 ]; then run refs-measure node test/refs-measure.cjs "$S1"; else skip refs-measure "REFS_KIT yoki smeta berilmagan"; fi
 smeta_run pipeline       node test/pipeline.cjs "$S1" "$S2" --out test/out.xlsx
-smeta_run hints          node test/hints.cjs "$S1" "$S2"
+if [ "$SYN" = 0 ] && [ -n "$HINT2" ]; then run hints node test/hints.cjs "$S1" "$HINT2"
+elif [ "$SYN" = 0 ]; then run hints node test/hints.cjs "$S1"; else skip hints "o'lchov faqat haqiqiy smetada (sintetik nomlar narx haqida hech narsa demaydi)"; fi
 run registry-parse   node test/registry.cjs
 run backup-prune     node test/backup-prune.cjs
 run deploy-target    sh test/deploy-target.sh
+run release-script   sh test/release-script.sh
 run pb-smoke         sh test/pb-smoke.sh
+run server-helper    node test/server-helper.mjs
 run laptop-backup    sh test/laptop-backup.sh
 run install          node test/install.mjs
 run registry-import  sh test/registry-import.sh
@@ -109,6 +127,7 @@ run uzex-api         node test/uzex-api.mjs
 run ownership        node test/ownership.mjs
 run disable-user     node test/disable-user.mjs
 both_run  browser        node test/browser.mjs "$S1" "$S2"
+browser_run price-book   node test/price-book.mjs
 browser_run e2e-auth     node test/e2e-auth.mjs
 browser_run laptop       node test/laptop.mjs
 pwsh_run  laptop-windows sh test/laptop-windows.sh

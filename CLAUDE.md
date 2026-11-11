@@ -8,8 +8,9 @@ Versiyalar, orqaga qaytish va NLP jadvallarini o'lchov bilan o'zgartirish —
 `docs/versiyalar.md`. Uchta to'liq tekshiruv va ularning natijalari — `docs/audit-plan.md`
 (birinchi), `docs/audit-2-reja.md` (ikkinchi) va `docs/audit-3-reja.md`
 (uchinchi, o'lchov bilan: rad etilgan takliflar ham yozilgan). To'rtinchisi —
-`docs/audit-4-reja.md` — butun dastur bo'yicha **hali bajarilmagan reja**:
-topilmalar, ustuvorlik tartibi va egasi hal qiladigan savollar.
+`docs/audit-4-reja.md` — butun dastur bo'yicha **bosqichma-bosqich bajarilayotgan
+reja**: topilmalar, ustuvorlik tartibi va egasi hal qiladigan savollar; 1–4-bosqichlar
+bajarilgan (v2.9.2 – v2.9.4, yashil to'plam va CI), 5–7 navbatda — har bir band yonida holati yozilgan.
 
 ## Muloqot tili
 
@@ -30,7 +31,11 @@ node test/export-formulas.cjs                         # eksport qayta o'qiladi, 
 node test/worker-parity.cjs                           # sahifadagi worker o'quvchi qaytargan narsani aynan qaytaradi
 node test/compare.cjs; node test/e2e-compare.mjs      # «Сравнение версий» va «Наш ответ (Excel)»: qaytgan smetani birinchisi va jadvalimiz bilan solishtirish
 node test/e2e-compare-keep.mjs                        # ... va ish maydonida: yuklangan fayllar qayta yuklashdan keyin qaytadi
-node test/browser.mjs a.xlsx b.xlsx                   # haqiqiy brauzerda (bitta-fayl rejim)
+node test/browser.mjs [a.xlsx b.xlsx]                 # haqiqiy brauzerda (bitta-fayl rejim); faylsiz — o'ylab topilgan smetada
+node test/price-book.mjs                              # «Книга цен»: saqlash, qayta yuklash, jadval ko'rinishidagi narxlar ro'yxati
+sh test/all.sh [reyestr.xls smeta1.xlsx smeta2.xlsx]  # hamma test; faylsiz — sintetik smetalarda (test/synth.cjs). Yashil bo'lishi shart
+sh server/release.sh X.Y.Z "izoh" --row matn.md [--dry]   # reliz bitta buyruq bilan: versiya, qurish, to'plam, ikki commit, push
+node test/server-helper.mjs; sh test/release-script.sh    # test serveri yetim qolmaydi; reliz skripti vaqtinchalik nusxada
 sh server/setup.sh && sh server/run.sh                # PocketBase (server rejimi), README «Server rejimi»
 sh server/laptop.sh [autostart|status|backup|drive|restore|update|stop]   # noutbuk rejimi: bitta odam, baza shu diskda; zaxira ikki joyga
 server\laptop.cmd [autostart|status|backup|update|rollback|autoupdate|drive|stop|debug|doctor]   # xuddi shu, Windows'da (Node/Git kerak emas)
@@ -42,7 +47,7 @@ node test/close-tab.mjs; node test/state-size.mjs    # yopilgan vkladkada oxirgi
 sh test/pb-smoke.sh; node test/e2e-workspace.mjs      # server rejimi testlari
 node test/num.cjs; node test/xlsx-guard.cjs           # son qat'iy o'qiladi («1,234.50» — ha, yonida so'z bo'lsa — yo'q); begona .xlsx o'quvchini osib qo'ymaydi
 node test/normalize.cjs; node test/sections.cjs; node test/regions.cjs   # NLP o'lchovlari
-node test/hints.cjs a.xlsx b.xlsx                      # o'xshash resurs takliflari o'lchovi
+node test/hints.cjs a.xlsx [b.xlsx]                    # o'xshash resurs takliflari o'lchovi — har bir smeta alohida (faqat haqiqiy smetada)
 node test/refs.cjs                                    # справочные цены: yadro, sintetik ma'lumotda
 node test/uzex.cjs; node test/uzex-api.mjs; node test/e2e-uzex.mjs   # UZEX haftalik kotirovkalari: sahifani o'qish, sinxronlash, «Проверка цен» (soxta sayt: test/uzex-site.mjs)
 REFS_KIT=<kit> node test/refs-parity.cjs               # dastur o'lchangan natijani aynan qaytaradimi (kit — maxfiy, repoda emas)
@@ -101,6 +106,13 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   so'mda bo'lmagan kotirovka hech qachon narx sifatida taklif qilinmaydi; «Автоподбор» UZEX dan olmaydi.
   Birja narxi QQS bilan: bazada bosilganidek saqlanadi, taklif va qo'llanadigan narx esa QQSsiz (`S.uzex.net`, ÷ 1,12).
   Testlar faqat soxta saytda (`UZEX_BASE`), test serverlari saytga o'zi chiqmaydi (`UZEX_AUTO=0`).
+* **To'plam yashil turadi** (4-tekshiruv, 4-bosqich): `sh test/all.sh` «0 fail»
+  bilan tugashi shart, va har bir push'da GitHub Actions'da ishlaydi
+  (`.github/workflows/tests.yml`, faqat sintetik ma'lumotda). Test yiqilsa —
+  yo dastur, yo test tuzatiladi; «doim qizil» test qoldirilmaydi. Testga
+  kerakli smeta `test/synth.cjs` da o'ylab topiladi — haqiqiy smeta, narx
+  yoki hujjat nomi repoga test sifatida ham tushmaydi. `test/refs-parity.stamp`
+  o'lchovdan keyin yangilansa — **commit qilinadi** (qaytarib qo'yilmaydi).
 * Raqamlar hech qachon yo'qolmaydi: `АНКЕР М5` ≠ `АНКЕР М8`, `4.1.1` ≠ `4.11`;
   ikki raqam orasidagi ajratgich o'chirilmaydi.
 * **Xavfsizlik bo'limi hozircha o'chirilgan (egasining qarori, 2026-10-24).**
@@ -121,10 +133,11 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   saqlaydi, shuning uchun qaytish ma'lumot yo'qotmaydi.
 * **Windows noutbuk o'zi yangilanadi** — faqat `server/releases.txt` dagi
   relizga (o'rnatuvchi `install-windows.ps1` ham shu ro'yxatdan oladi). Reliz
-  chiqarish: `package.json` versiyasini ko'tarish → `node build.mjs` →
-  testlar (`test/laptop-windows.sh` ham) → commit + push; keyin **alohida
+  chiqarish — `sh server/release.sh X.Y.Z "izoh" --row matn.md`: u
+  `package.json` versiyasini ko'taradi → `node build.mjs` → to'plam
+  (`test/all.sh`, yashil bo'lishi shart) → commit + push; keyin **alohida
   commit** bilan `releases.txt` ga `vX.Y.Z <o'sha commit hash>` qatori va
-  `docs/versiyalar.md` ga qator. Versiya raqami hech qachon qayta
+  `docs/versiyalar.md` ga qator. Qo'lda qilinsa ham tartib shu. Versiya raqami hech qachon qayta
   ishlatilmaydi — buzilgan relizni keyingi patch-versiya tuzatadi. Har bir
   versiya `%LOCALAPPDATA%\Taqqoslash\app\` da o'z papkasida turadi,
   `current.txt` qaysi biri ishlashini aytadi; yangi versiya o'zini sinovdan

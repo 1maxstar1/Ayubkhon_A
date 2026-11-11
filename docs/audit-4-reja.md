@@ -728,7 +728,7 @@ keyin bu muhim: mijoz narxlar **QQSsiz** bo'lishini talab qilgan.
 | F4 | Tugallangan ariza qatorida «Сравнить версию» | Qaytgan smetani bir bosishda solishtirish | S |
 | F5 | UZEX haftasini arizaning ro'yxatga olingan sanasi bo'yicha tanlash | Hozir qo'lda → egasining qarori 7 | S |
 | F6 | Ochiq sahifa server versiyasi o'zgarganini bilib, «обновите страницу» deyishi | Hozir yangilanishdan keyin eski sahifa yangi server bilan ishlayveradi | S |
-| F7 | Reliz skripti: versiya, qurish, testlar, `releases.txt`, `versiyalar.md` — bitta buyruq va tekshiruvlar | Hozir 6 qadam qo'lda; `releases.txt` 14/14 to'g'ri, lekin faqat ehtiyotkorlik hisobiga | M |
+| F7 ✓ | Reliz skripti: versiya, qurish, testlar, `releases.txt`, `versiyalar.md` — bitta buyruq va tekshiruvlar. **Bajarildi — commit `ffccdc2`:** `sh server/release.sh X.Y.Z "izoh" --row matn.md [--dry]`; test — `test/release-script.sh` | Hozir 6 qadam qo'lda; `releases.txt` 14/14 to'g'ri, lekin faqat ehtiyotkorlik hisobiga | M |
 
 ### [ ] F8 `docs/2-bosqich-reja.md` dagi bajarilmagan talablar
 
@@ -803,7 +803,7 @@ keyin tuzatish. Versiyalar orasidagi kelishuv o'zgarmaydi.
 
 ## H. Testlar va kodni yuritish
 
-### [ ] H1 Uchta «doim qizil» test — testning o'z nuqsoni
+### [x] H1 Uchta «doim qizil» test — testning o'z nuqsoni
 
 **o'rta** · M
 
@@ -818,7 +818,20 @@ Reja: `hints` — har fayl uchun alohida chegara va «taklif yo'q = yiqilish»;
 `e2e-hints` — harf almashtiradigan xato, to'g'ri hisob. **NLP jadvallari va
 o'xshashlik bahosiga tegilmaydi** — o'zgaradigani faqat testlar.
 
-### [ ] H2 Test serverlari testdan keyin tirik qoladi
+**Bajarildi — commit `7ca64e4`.** `hints` har bir smetani alohida o'lchaydi
+(o'sha chegaralar bilan: haqiqiy ikki smetada 92 % va 90 %); ikkalasi birga
+bergan raqam ma'lumot sifatida chop etiladi; taklif umuman bo'lmasa —
+yiqiladi. `browser` berilgan smetaning birinchi narxli resursini oladi va
+har bir qadami tekshiruv: narx hamma qatoriga tushgani, filtr, uch vkladka,
+yuklab olingan hujjat qayta o'qilib, taqqoslash varag'ida o'sha qator va
+yozilgan narx borligi. `e2e-hints` — eng uzun so'zdan **harf** tushiradi
+(avval o'rtadagi belgi vergul chiqib qolardi), baholash sonini «nom +
+birlik» juftliklari bilan solishtiradi, tiklangan faylni qayta yuklamaydi.
+NLP jadvallari va o'xshashlik bahosiga tegilmadi. Qo'shimcha:
+`test/synth.cjs` ikki o'ylab topilgan smeta yasaydi — `browser`,
+`e2e-hints`, `e2e-workspace` endi haqiqiy faylsiz ham ishlaydi.
+
+### [x] H2 Test serverlari testdan keyin tirik qoladi
 
 `test/server.mjs` — **o'rta** · S–M
 
@@ -830,7 +843,16 @@ server hali yozib turadi — vaqti-vaqti bilan yiqiladigan testlarning (masalan
 Reja: band portni rad etish, bola jarayon tirikligini tekshirish, chiqishini
 kutish, har port uchun o'z ma'lumot papkasi.
 
-### [ ] H3 To'plam natijasi hech narsani anglatmaydi → CI
+**Bajarildi — commit `477ba58`.** Har bir test boshlanishida
+(`test/pb-smoke.sh`) oldingi testdan qolgan server to'xtatiladi va chiqishi
+kutiladi; shundan keyin ham band port — so'z bilan rad etiladi; ishga
+tushayotib o'lgan server darhol, chiqish kodi bilan aytiladi; `stop()` server
+ketgach tugaydi; Ctrl-C va `kill` ham serverni to'xtatadi. Test:
+`test/server-helper.mjs`. **Qilinmadi:** har port uchun alohida ma'lumot
+papkasi — yetim server qolmagach umumiy papka xavfsiz, va uni yo'l bo'yicha
+o'qiydigan testlar o'zgarmay qoldi.
+
+### [x] H3 To'plam natijasi hech narsani anglatmaydi → CI
 
 **o'rta** · S–M
 
@@ -840,7 +862,19 @@ to'plam yashil bo'lishi shart, va har bir push'da GitHub Actions'da ishlaydi
 (maxfiy to'plamsiz 30 ta test ≈ 3,5 daqiqa; ochiq repo uchun bepul). Reliz
 commit'i qizil to'plam bilan o'tmaydi (F7).
 
-### [ ] H4 Qamrovdagi bo'shliqlar
+**Bajarildi (4-bosqich).** `sh test/all.sh` endi «0 fail» bilan tugaydi:
+fayllarsiz — 50 ta test o'tadi, 4 tasi sababi bilan o'tkazib yuboriladi
+(`hints`, `refs-measure`, `e2e-fullregistry` — faqat egasining fayllarida;
+`refs-parity` — maxfiy to'plamsiz faqat muhri tekshiriladi);
+haqiqiy fayllar va maxfiy to'plam bilan — hammasi. Har bir push'da to'plam
+GitHub Actions'da ishlaydi (`.github/workflows/tests.yml`, faqat sintetik
+ma'lumotda). Reliz skripti (F7) qizil to'plam bilan reliz qilmaydi.
+Yo'l-yo'lakay topildi: `test/refs-parity.stamp` v2.9.0 dan beri eskirgan edi —
+o'lchov har safar «bir xil» chiqqan, lekin yangilangan muhr commit
+qilinmagan (fayllarsiz ishga tushirilganda «NOT MEASURED» deb yiqilardi).
+Bugungi o'lchov muhri commit qilindi; qoida `CLAUDE.md` ga yozildi.
+
+### [~] H4 Qamrovdagi bo'shliqlar
 
 Bu tekshiruvdagi har bir yuqori darajali topilma — test yo'q joyda:
 
@@ -852,6 +886,17 @@ Bu tekshiruvdagi har bir yuqori darajali topilma — test yo'q joyda:
 * `laptop.sh` buyruqlari va zaxiradan tiklash (B1);
 * `uzex-catchup` cron'i; xato yo'llari (server 400/413/500 qaytarganda sahifa).
 
+**Holati (4-bosqichdan keyin).** Yopildi: eksport formulalarini hisoblaydigan
+test va worker tengligi (1-bosqich); ikki vkladka, yuklash xatosi, `laptop.sh`
+zaxira/tiklash, admin «Отключить» (2-bosqich); sekin tarmoqda yopish, server
+400 qaytarganda sahifa (3-bosqich); **«Книга цен»** — `test/price-book.mjs`
+(commit `3508500`): saqlash, qayta yuklash, bir nomning ikki narxi, jadval
+ko'rinishidagi ro'yxat, kitob smetadan oldin, kitob bo'lmagan fayl.
+`uzex-catchup` cron'ining ro'yxatda borligi `test/uzex-api.mjs` da
+tekshiriladi. **Qoldi:** cron'ning o'zi vaqt o'tishi bilan ishlashi (soxta
+soat kerak) va admin sahifasining «bazani tozalash» tugmasi sahifa orqali —
+ikkalasi 6-bosqichda, yangilanish kanali bilan birga.
+
 ### [ ] H5 Takrorlangan kod
 
 `src/ui/uzex.js` ↔ `src/ui/refs.js` — **past** · M
@@ -861,9 +906,12 @@ matni). Bitta umumiy «manba ko'rinishi» moduliga chiqarish mumkin. Xavf:
 справочник interfeysiga tegadi — `e2e-refs` va `e2e-uzex` bilan. Shoshilinch
 emas; uchinchi narx manbai qo'shilishidan **oldin** qilinadi.
 
-### [ ] H6 README eskirgan
+### [x] H6 README eskirgan
 
 Tuzilma va buyruqlar bo'limi bir necha versiya orqada — S.
+
+**Bajarildi (4-bosqich).** «Loyiha tuzilishi» hozirgi fayllar bo'yicha qayta
+yozildi; «Testlar» va «Reliz» bo'limlari qo'shildi.
 
 ### [~] H7 `dist/` ni git'dan olib tashlash — rad etildi
 
@@ -997,7 +1045,7 @@ tuzatiladi (2-tekshiruvdagi tartib).
 | 1 · v2.9.2 ✓ | Hujjat to'g'ri chiqsin | A1, A2, A3, A4, A8 + hisoblaydigan eksport testi | 3 kun |
 | 2 · v2.9.3 ✓ | Hech narsa yo'qolmasin | B1, B5 (+«Отменить»), B3 (vkladkalar), B4, B6, B8, E1, E2 | 4 kun |
 | 3 · v2.9.4 ✓ | Begona fayl va chetdagi holatlar | C2, C3, C4, C5, A5, A6, B2, B7 | 3–4 kun |
-| 4 | Testlar yashil va avtomatik | H1, H2, H3, H4 (qolganlari), F7 | 3 kun |
+| 4 ✓ | Testlar yashil va avtomatik | H1, H2, H3, H4 (qolganlari), F7 | 3 kun |
 | 5 · v2.10.0 | Qulaylik va QQS | E10–E12, E3–E9, E14–E20, F1–F6, A7, D1–D3 | 5–6 kun, bo'lib-bo'lib |
 | 6 · v2.11.0 | Xavfsiz yangilanish, Mac o'zi yangilanadi | C1, G1, G2, G3 — shundan keyin repo yopiq bo'lishi mumkin | 5 kun |
 | 7 | Ikkinchi odam qo'shilishidan oldin | C6–C9, B3 (server), B9, F8, G4, I1 | 5 kun |

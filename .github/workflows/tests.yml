@@ -1,0 +1,44 @@
+# The whole suite, on every push.
+#
+# It runs on invented estimates (test/synth.cjs) and a synthetic reference package: nothing of the owner's is in
+# the repository, and nothing of the owner's is needed here. What stays with the owner's machine — the
+# measurement of the reference prices against the private kit, the measure of «Похожие ресурсы» on real
+# estimates, the full registry — is named in the summary as skipped, with the reason.
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: The suite
+        run: sh test/all.sh
+      - name: What failed
+        if: failure()
+        run: |
+          cat test/all-results.txt || true
+          for f in $(awk -F'\t' '$2 == "FAIL" { print $1 }' test/all-results.txt); do
+            echo "::group::$f"; tail -60 "test/.log-$f.txt" || true; echo "::endgroup::"
+          done

@@ -58,6 +58,18 @@ try {
   check(!(await note()).shown, 'without a threshold there is nothing to say');
   await page.evaluate(() => { app.opts.minDiff = 1; app.buildReportPreview(); });
 
+  // the list of projects folds to a strip that keeps its button, and comes back (folded to nothing, the whole
+  // page went blank and only a reload brought it back)
+  const widths = () => page.evaluate(() => ({ side: Math.round(document.getElementById('side').getBoundingClientRect().width),
+    work: Math.round(document.getElementById('work').getBoundingClientRect().width), btn: document.getElementById('collapseAll').textContent,
+    seen: !!document.getElementById('collapseAll').offsetParent, pane: !!document.querySelector('.pane.on, .pane:not([hidden])') }));
+  await page.click('#collapseAll');
+  let wd = await widths();
+  check(wd.side > 0 && wd.side <= 40 && wd.work > 1300 && wd.btn === '+' && wd.seen, 'folding the list leaves a strip with «+» on it and gives the work area the room (' + JSON.stringify(wd) + ')');
+  await page.click('#collapseAll');
+  wd = await widths();
+  check(wd.side > 250 && wd.btn === '–', 'and «+» brings the list back (' + wd.side + ' px)');
+
   await page.click('.tab[data-pane="compare"]');
   check(await page.isVisible('#pane-compare'), 'the compare tab opens');
   check(/исправленную смету/.test(await page.textContent('#cmpSummary')), 'before a file is chosen, the pane says what to do');

@@ -92,8 +92,12 @@ body.nows .bar > .btn,body.nows .bar > .pickmode{display:none}
 
 /* ------------------------------------------------------------------ shell */
 main{display:grid;grid-template-columns:288px 1fr;flex:1;min-height:0}
-main.narrow{grid-template-columns:0 1fr}
-main.narrow aside{display:none}
+/* folded, the list keeps a strip with its own button on it — the way back */
+main.narrow{grid-template-columns:30px 1fr}
+main.narrow aside{overflow:hidden}
+main.narrow aside > :not(.side-head){display:none}
+main.narrow .side-head{justify-content:center;padding:8px 0;border-bottom:0}
+main.narrow .side-head > span{display:none}
 aside{background:var(--sf);border-right:1px solid var(--rule);overflow:auto;display:flex;flex-direction:column}
 .side-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;font-size:11px;
   text-transform:uppercase;letter-spacing:.07em;color:var(--mute);border-bottom:1px solid var(--rule);position:sticky;top:0;background:var(--sf);z-index:2}
@@ -508,7 +512,7 @@ body.src-norefs #refAsof{display:none !important}
   <aside id="side">
     <div class="side-head">
       <span>Проекты</span>
-      <button class="link" id="collapseAll" title="Свернуть список листов">–</button>
+      <button class="link" id="collapseAll" title="Свернуть список проектов">–</button>
     </div>
     <div id="projects" class="projects"></div>
     <div class="drop-hint" id="dropHint">
@@ -5873,8 +5877,12 @@ if (typeof self !== 'undefined') self.S = S;
       });
     });
 
+    // The list of projects folds to a strip that keeps this very button, so there is a way back. (Folded to
+    // nothing, as it was, the grid put the work area into the emptied column: the whole page went blank.)
     document.getElementById('collapseAll').addEventListener('click', function () {
-      document.getElementById('main').classList.toggle('narrow');
+      var narrow = document.getElementById('main').classList.toggle('narrow');
+      this.textContent = narrow ? '+' : '–';
+      this.title = narrow ? 'Показать список проектов' : 'Свернуть список проектов';
     });
 
     document.getElementById('export').addEventListener('click', function () { self.exportWorkbook(); });
@@ -6028,6 +6036,19 @@ if (typeof self !== 'undefined') self.S = S;
     var el = document.getElementById(id);
     el.addEventListener('change', function () { app.opts[key] = el.checked; app.saveOpts(); });
   }
+
+  /**
+   * The document settings of one application: the defaults, with what that application saved over them.
+   *
+   * In a workspace the settings are the application's own — they are stored with it and decide what its
+   * document says. They used to be one object for the whole page, filled once and only ever written over: an
+   * application opened after another began with the other's threshold, note and report kind, and nothing on
+   * screen said so. Sync calls this when a workspace opens and when it closes.
+   */
+  App.prototype.resetOpts = function (saved) {
+    this.opts = Object.assign({}, DEFAULTS, saved || {});
+    this.fillSettings();
+  };
 
   App.prototype.fillSettings = function () {
     document.getElementById('optStamp').value = this.opts.stamp;
@@ -6246,7 +6267,12 @@ if (typeof self !== 'undefined') self.S = S;
       } else if (act === 'obj-on') {
         el.addEventListener('change', function () { obj.enabled = el.checked; self.rebuild(); self.renderSide(); });
       } else if (act === 'del') {
+        // The «×» sits a few pixels from the arrows that reorder the list, and in a workspace it takes the
+        // stored file off the server as well: it asks.
         el.addEventListener('click', function () {
+          var stored = !!(S.Sync && S.Sync.ws);
+          if (!window.confirm('Убрать «' + proj.name + '» из списка?' + (stored ? ' Файл будет удалён с сервера.' : '') +
+            '\n\nЦены, введённые для его ресурсов, останутся и вернутся, если загрузить этот файл снова.')) return;
           self.projects.splice(self.projects.indexOf(proj), 1);
           self.rebuild(); self.renderSide();
         });
@@ -7946,8 +7972,9 @@ if (typeof self !== 'undefined') self.S = S;
       });
       Object.keys(byFile).forEach(function (k) { ordered.push(byFile[k]); });
       app.projects = ordered;
-      if (st.opts) { Object.assign(app.opts, st.opts); app.fillSettings(); }
-      if (st.mode) $('reportMode').value = st.mode;
+      // this application's settings, or the defaults — never the ones of the application opened before it
+      app.resetOpts(st.opts);
+      $('reportMode').value = st.mode || 'changed';
       app.looseBook = st.looseBook || null;
       app.rebuild(); app.renderSide();
       // `prices2` is this version's keying; `prices` is the previous one's, kept
@@ -8345,6 +8372,8 @@ if (typeof self !== 'undefined') self.S = S;
         S.hashSet('ws', '');
         self.loading = true;
         app.projects = []; app.prices = {}; app.looseBook = null; app.queue = [];
+        app.resetOpts();
+        $('reportMode').value = 'changed';
         app.rebuild(); app.renderSide();
         self.loading = false;
         self.renderBox();

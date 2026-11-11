@@ -346,6 +346,14 @@
           b.addEventListener('click', function () {
             var tr = b.closest('tr');
             var u = items.find(function (x) { return x.id === tr.dataset.id; });
+            // «Отключить» ends that person's session at once. On one's own record it locked the administrator
+            // out of the page they were on, with nobody left to switch them back on — so not one's own, and
+            // anybody else's only after a question.
+            if (u.active) {
+              var me = S.me && S.me();
+              if (me && me.id === u.id) { toast('Свою учётную запись отключить нельзя: вы потеряете вход, и включить её обратно будет некому', true); return; }
+              if (!window.confirm('Отключить ' + u.email + '?\n\nЭтот человек сразу потеряет доступ и не сможет войти, пока вы не включите запись снова.')) return;
+            }
             S.pb.collection('users').update(u.id, { active: !u.active }).then(function () { self.loadUsers(); })
               .catch(function (e) { toast(S.pbErr(e), true); });
           });

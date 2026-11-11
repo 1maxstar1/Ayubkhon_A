@@ -219,6 +219,7 @@ await page.waitForFunction((n) => app.sheetRows.length === n, before2.all, { tim
 await page.waitForFunction(() => document.getElementById('wsSave').textContent === '✓' && !S.Sync.dirty, null, { timeout: 20000 });
 
 // remove one project -> its file leaves the server too
+page.once('dialog', (d) => d.accept());      // «Убрать … из списка? Файл будет удалён с сервера.»
 await page.click('#projects .proj:last-child button[data-act=del]');
 await page.waitForFunction(() => !S.Sync.dirty && document.getElementById('wsSave').textContent === '✓', null, { timeout: 15000 });
 await page.evaluate(() => S.Sync.q);
@@ -345,6 +346,17 @@ await page.evaluate(() => S.Sync.q);
 await page.waitForFunction(() => document.getElementById('wsSave').textContent === '✓' && !S.Sync.dirty, null, { timeout: 20000 });
 check((await count('corrections')) === 0, 'and clearing them afterwards leaves none');
 
+// The document settings belong to the application: a threshold typed here is stored with it …
+await page.click('.tab[data-pane="settings"]');
+const ownLimit = 43 * 101;      // any number that is not the default
+await page.fill('#optMinDiff', String(ownLimit));
+await page.selectOption('#reportMode', 'dedup');
+await page.waitForFunction((n) => app.opts.minDiff === n && !S.Sync.dirty && document.getElementById('wsSave').textContent === '✓', ownLimit, { timeout: 20 * 1000 });
+await page.evaluate(() => S.Sync.q);
+const wOpts = (await api('/api/collections/workspaces/records?perPage=1', {}, su)).items[0];
+check(wOpts.state.opts.minDiff === ownLimit && wOpts.state.mode === 'dedup', 'the settings typed in a workspace are saved with it');
+await page.click('.tab[data-pane="prices"]');
+
 // finish and go back to the list
 await page.click('#wsDone');
 await page.waitForFunction(() => document.querySelector('#wsBox .done'));
@@ -383,6 +395,9 @@ await page.waitForFunction(() => document.querySelectorAll('#appTable tbody tr')
 check(true, 'region filter works on the list');
 await page.selectOption('#appRegion', '');
 check(await page.evaluate(() => app.projects.length === 0 && !S.Sync.ws), 'app cleared after closing the workspace');
+// … and not carried into whatever is opened next: back at the list they are the program's own again
+check(await page.evaluate(() => app.opts.minDiff === 5 * 1000 * 1000 && +document.getElementById('optMinDiff').value === 5 * 1000 * 1000 &&
+  document.getElementById('reportMode').value === 'changed'), 'the next application starts from the default settings, not from this one\'s');
 
 /* ------------------------------------------------- files are not public ---- */
 // The uploaded estimates hang on a record id that every signed-in expert can

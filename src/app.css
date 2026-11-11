@@ -86,8 +86,12 @@ body.nows .bar > .btn,body.nows .bar > .pickmode{display:none}
 
 /* ------------------------------------------------------------------ shell */
 main{display:grid;grid-template-columns:288px 1fr;flex:1;min-height:0}
-main.narrow{grid-template-columns:0 1fr}
-main.narrow aside{display:none}
+/* folded, the list keeps a strip with its own button on it — the way back */
+main.narrow{grid-template-columns:30px 1fr}
+main.narrow aside{overflow:hidden}
+main.narrow aside > :not(.side-head){display:none}
+main.narrow .side-head{justify-content:center;padding:8px 0;border-bottom:0}
+main.narrow .side-head > span{display:none}
 aside{background:var(--sf);border-right:1px solid var(--rule);overflow:auto;display:flex;flex-direction:column}
 .side-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;font-size:11px;
   text-transform:uppercase;letter-spacing:.07em;color:var(--mute);border-bottom:1px solid var(--rule);position:sticky;top:0;background:var(--sf);z-index:2}

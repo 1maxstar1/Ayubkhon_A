@@ -119,6 +119,14 @@ await page.click('#userForm button[type=submit]');
 await page.waitForFunction(() => document.body.textContent.includes('new@example.com'));
 const rows = await page.$$eval('#userTable tbody tr', (trs) => trs.map((t) => t.textContent.replace(/\s+/g, ' ').trim()));
 check(rows.some((r) => r.includes('new@example.com') && r.includes('активен')), 'new user listed as active');
+// it ends that person's session at once, so it asks; «нет» changes nothing
+let offAsked = '';
+page.once('dialog', (d) => { offAsked = d.message(); d.dismiss(); });
+await page.click('#userTable tbody tr:has-text("new@example.com") button');
+await new Promise((r) => setTimeout(r, 400));
+check(/Отключить new@example\.com\?/.test(offAsked) && /new@example\.com.*активен/.test((await page.textContent('#userTable')).replace(/\s+/g, ' ')),
+  '«Отключить» asks first, and «нет» leaves the user active');
+page.once('dialog', (d) => d.accept());
 await page.click('#userTable tbody tr:has-text("new@example.com") button');
 await page.waitForFunction(() => /new@example\.com.*отключён/.test(document.querySelector('#userTable').textContent));
 check(true, 'user can be deactivated');
@@ -202,6 +210,16 @@ await page.fill('#findQ', '9001');
 await page.click('#findForm button[type=submit]');
 await page.waitForFunction(() => /Не найдено/.test(document.querySelector('#findTable tbody').textContent));
 check(true, 'admin page: find reports nothing left');
+
+// «Отключить» on one's own record would end the session one is in, with nobody left to switch it back on
+await page.waitForFunction(() => document.querySelectorAll('#userTable tbody tr').length > 0);
+const meRow = await page.evaluate(() => { const id = S.me().id; const tr = document.querySelector('#userTable tbody tr[data-id="' + id + '"]'); return tr ? tr.cells[3].textContent : null; });
+check(meRow === 'активен', 'admin page: the administrator is in the list of users (' + meRow + ')');
+await page.evaluate(() => document.querySelector('#userTable tbody tr[data-id="' + S.me().id + '"] button[data-act=toggle]').click());
+await page.waitForFunction(() => /Свою учётную запись отключить нельзя/.test(document.getElementById('toast').textContent));
+const stillOn = (await (await fetch(BASE + '/api/collections/users/records?perPage=50', { headers: { Authorization: su } })).json()).items.filter((u) => u.active).length;
+check(stillOn >= 1 && await page.evaluate(() => S.pb.authStore.isValid && document.querySelector('#userTable tbody tr[data-id="' + S.me().id + '"]').cells[3].textContent === 'активен'),
+  'admin page: one\'s own record cannot be switched off — the page says why and nothing changes');
 
 await page.screenshot({ path: join(root, 'test/shot-admin.png'), fullPage: true });
 await browser.close();

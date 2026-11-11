@@ -221,8 +221,9 @@
       });
       Object.keys(byFile).forEach(function (k) { ordered.push(byFile[k]); });
       app.projects = ordered;
-      if (st.opts) { Object.assign(app.opts, st.opts); app.fillSettings(); }
-      if (st.mode) $('reportMode').value = st.mode;
+      // this application's settings, or the defaults — never the ones of the application opened before it
+      app.resetOpts(st.opts);
+      $('reportMode').value = st.mode || 'changed';
       app.looseBook = st.looseBook || null;
       app.rebuild(); app.renderSide();
       // `prices2` is this version's keying; `prices` is the previous one's, kept
@@ -620,6 +621,8 @@
         S.hashSet('ws', '');
         self.loading = true;
         app.projects = []; app.prices = {}; app.looseBook = null; app.queue = [];
+        app.resetOpts();
+        $('reportMode').value = 'changed';
         app.rebuild(); app.renderSide();
         self.loading = false;
         self.renderBox();

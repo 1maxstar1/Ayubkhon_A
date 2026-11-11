@@ -92,8 +92,12 @@ body.nows .bar > .btn,body.nows .bar > .pickmode{display:none}
 
 /* ------------------------------------------------------------------ shell */
 main{display:grid;grid-template-columns:288px 1fr;flex:1;min-height:0}
-main.narrow{grid-template-columns:0 1fr}
-main.narrow aside{display:none}
+/* folded, the list keeps a strip with its own button on it — the way back */
+main.narrow{grid-template-columns:30px 1fr}
+main.narrow aside{overflow:hidden}
+main.narrow aside > :not(.side-head){display:none}
+main.narrow .side-head{justify-content:center;padding:8px 0;border-bottom:0}
+main.narrow .side-head > span{display:none}
 aside{background:var(--sf);border-right:1px solid var(--rule);overflow:auto;display:flex;flex-direction:column}
 .side-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;font-size:11px;
   text-transform:uppercase;letter-spacing:.07em;color:var(--mute);border-bottom:1px solid var(--rule);position:sticky;top:0;background:var(--sf);z-index:2}
@@ -3448,6 +3452,14 @@ var S = (typeof S !== 'undefined' && S) || {};
           b.addEventListener('click', function () {
             var tr = b.closest('tr');
             var u = items.find(function (x) { return x.id === tr.dataset.id; });
+            // «Отключить» ends that person's session at once. On one's own record it locked the administrator
+            // out of the page they were on, with nobody left to switch them back on — so not one's own, and
+            // anybody else's only after a question.
+            if (u.active) {
+              var me = S.me && S.me();
+              if (me && me.id === u.id) { toast('Свою учётную запись отключить нельзя: вы потеряете вход, и включить её обратно будет некому', true); return; }
+              if (!window.confirm('Отключить ' + u.email + '?\n\nЭтот человек сразу потеряет доступ и не сможет войти, пока вы не включите запись снова.')) return;
+            }
             S.pb.collection('users').update(u.id, { active: !u.active }).then(function () { self.loadUsers(); })
               .catch(function (e) { toast(S.pbErr(e), true); });
           });

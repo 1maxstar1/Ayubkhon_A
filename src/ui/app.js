@@ -98,8 +98,12 @@
       });
     });
 
+    // The list of projects folds to a strip that keeps this very button, so there is a way back. (Folded to
+    // nothing, as it was, the grid put the work area into the emptied column: the whole page went blank.)
     document.getElementById('collapseAll').addEventListener('click', function () {
-      document.getElementById('main').classList.toggle('narrow');
+      var narrow = document.getElementById('main').classList.toggle('narrow');
+      this.textContent = narrow ? '+' : '–';
+      this.title = narrow ? 'Показать список проектов' : 'Свернуть список проектов';
     });
 
     document.getElementById('export').addEventListener('click', function () { self.exportWorkbook(); });
@@ -253,6 +257,19 @@
     var el = document.getElementById(id);
     el.addEventListener('change', function () { app.opts[key] = el.checked; app.saveOpts(); });
   }
+
+  /**
+   * The document settings of one application: the defaults, with what that application saved over them.
+   *
+   * In a workspace the settings are the application's own — they are stored with it and decide what its
+   * document says. They used to be one object for the whole page, filled once and only ever written over: an
+   * application opened after another began with the other's threshold, note and report kind, and nothing on
+   * screen said so. Sync calls this when a workspace opens and when it closes.
+   */
+  App.prototype.resetOpts = function (saved) {
+    this.opts = Object.assign({}, DEFAULTS, saved || {});
+    this.fillSettings();
+  };
 
   App.prototype.fillSettings = function () {
     document.getElementById('optStamp').value = this.opts.stamp;
@@ -471,7 +488,12 @@
       } else if (act === 'obj-on') {
         el.addEventListener('change', function () { obj.enabled = el.checked; self.rebuild(); self.renderSide(); });
       } else if (act === 'del') {
+        // The «×» sits a few pixels from the arrows that reorder the list, and in a workspace it takes the
+        // stored file off the server as well: it asks.
         el.addEventListener('click', function () {
+          var stored = !!(S.Sync && S.Sync.ws);
+          if (!window.confirm('Убрать «' + proj.name + '» из списка?' + (stored ? ' Файл будет удалён с сервера.' : '') +
+            '\n\nЦены, введённые для его ресурсов, останутся и вернутся, если загрузить этот файл снова.')) return;
           self.projects.splice(self.projects.indexOf(proj), 1);
           self.rebuild(); self.renderSide();
         });

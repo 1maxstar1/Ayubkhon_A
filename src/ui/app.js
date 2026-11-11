@@ -27,6 +27,9 @@
     this.seq = 0;
     this.pending = 0;
     this.worker = makeWorker();
+    this.jobs = [];          // files handed to the worker and not answered yet, in the order it reads them
+    var app = this;
+    if (this.worker) this.worker.addEventListener('error', function () { app.workerStuck('ошибка при чтении'); });
     this.bind();
     this.prices_ui = new S.Prices(this);
     this.compare_ui = S.Compare ? new S.Compare(this) : null;
@@ -356,10 +359,16 @@
     if (!this.queue) this.queue = [];
     var base = this.queue.length;
     files.forEach(function (f, i) {
-      self.queue.push({ slot: base + i, project: null });
+      self.queue.push({ slot: base + i, project: null, file: f });
       self.readOne(f, base + i);
     });
   };
+
+  /**
+   * A file was read and gave a project. Nothing here; the workspace stores the file when this is called — only
+   * then, so a file that could not be read, or that is no estimate, is never put on the server.
+   */
+  App.prototype.fileRead = function (file) { void file; };
 
   App.prototype.readOne = function (file, slot) {
     var self = this;
@@ -368,14 +377,19 @@
     reader.onload = function () {
       var buf = reader.result;
       if (self.worker) {
-        var id = ++self.seq;
+        var id = ++self.seq, worker = self.worker;
+        var job = { id: id, file: file, slot: slot };
         var onMsg = function (e) {
           if (e.data.id !== id) return;
-          self.worker.removeEventListener('message', onMsg);
+          worker.removeEventListener('message', onMsg);
+          self.jobs.splice(self.jobs.indexOf(job), 1);
+          self.watchWorker();
           self.onParsed(file.name, e.data, slot);
         };
-        self.worker.addEventListener('message', onMsg);
-        self.worker.postMessage({ cmd: 'parse', id: id, name: file.name, buffer: buf }, [buf]);
+        worker.addEventListener('message', onMsg);
+        self.jobs.push(job);
+        self.watchWorker();
+        worker.postMessage({ cmd: 'parse', id: id, name: file.name, buffer: buf }, [buf]);
       } else {
         try {
           var wb = S.readXlsx(new Uint8Array(buf));
@@ -387,6 +401,34 @@
     };
     reader.onerror = function () { self.onParsed(file.name, { ok: false, error: 'Не удалось прочитать файл' }, slot); };
     reader.readAsArrayBuffer(file);
+  };
+
+  /*
+   * The worker reads one file at a time and answers each. If it stops answering — a file it cannot get through,
+   * a fault in the worker itself — the page used to say «Чтение файлов…» for ever, with nothing to press. The
+   * file it is on is given a time; past it the worker is replaced, that file is reported as unreadable, and the
+   * files waiting behind it are read by the new worker.
+   */
+  var READ_LIMIT_MS = 90 * 1000;
+  App.prototype.watchWorker = function () {
+    var self = this;
+    clearTimeout(this._wd);
+    if (!this.jobs.length) return;
+    var limit = this.readLimit || READ_LIMIT_MS;
+    this._wd = setTimeout(function () {
+      self.workerStuck('не прочитан за ' + Math.round(limit / 1000) + ' секунд — файл повреждён или слишком велик');
+    }, limit);
+  };
+  App.prototype.workerStuck = function (why) {
+    var stuck = this.jobs.shift(), rest = this.jobs, self = this;
+    this.jobs = [];
+    clearTimeout(this._wd);
+    try { this.worker.terminate(); } catch (e) { /* gone already */ }
+    this.worker = makeWorker();
+    if (this.worker) this.worker.addEventListener('error', function () { self.workerStuck('ошибка при чтении'); });
+    // the ones that were waiting were never started: read them again, without counting them twice
+    rest.forEach(function (j) { self.pending--; self.readOne(j.file, j.slot); });
+    if (stuck) this.onParsed(stuck.file.name, { ok: false, error: why }, stuck.slot);
   };
 
   App.prototype.onParsed = function (name, res, slot) {
@@ -410,6 +452,7 @@
           enabled: true,
           open: true
         };
+        if (entry.file) this.fileRead(entry.file);
       }
       this.toast(name + ': найдено листов объектов: ' + res.objects.length);
     }

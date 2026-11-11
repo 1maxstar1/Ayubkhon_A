@@ -24,13 +24,15 @@ import { startServer } from './server.mjs';
 
 const require = createRequire(import.meta.url);
 const { load } = require('./load.cjs');
-const { book, xlsx } = require('./compare-books.cjs');
+const { book, xlsx, replyBook } = require('./compare-books.cjs');
 const S = load(load.PIPELINE);
 const fflate = S.__fflate;
 
 const dir = mkdtempSync(join(tmpdir(), 'upfail-'));
 const file = (name) => { const p = join(dir, name); writeFileSync(p, xlsx(S, book(1))); return p; };
 const F1 = file('first.xlsx'), F2 = file('second.xlsx'), F3 = file('third.xlsx');
+const NOT = join(dir, 'not-an-estimate.xlsx');
+writeFileSync(NOT, xlsx(S, replyBook()));       // a workbook, but no resource sheet in it
 
 const PORT = 8119;
 const pb = await startServer({ port: PORT, registry: true, build: true });
@@ -110,6 +112,15 @@ check(await line() === '' && await mark() === '✓', 'the line goes and the mark
 await page.reload();
 await page.waitForFunction(() => window.app && app.projects.length === 1 && app.model && app.model.rows.length > 0, null, { timeout: 30 * 1000 });
 check(await page.evaluate(() => app.model.resources.some((r) => !S.near(r.price, r.market))), 'after a reload the estimate and its price are there');
+
+/* a file that is read and is no estimate is not put on the server at all (it used to go up, and come off again) */
+uploads = 0;
+await page.setInputFiles('#pick', NOT);
+await page.waitForFunction(() => /листы ресурсов не найдены/.test(document.getElementById('toast').textContent) && app.pending === 0, null, { timeout: 30 * 1000 });
+await page.evaluate(() => S.Sync.q);
+await settled();
+check(uploads === 0 && (await stored()).files.length === 1 && await page.evaluate(() => app.projects.length === 1 && !S.Sync.hasUnsaved()),
+  'a workbook that is no estimate is refused in words and never sent to the server (' + uploads + ' uploads)');
 
 /* 2 — the server refuses: the workspace is full (filled behind the page's back, so the page has to be told) */
 const fd = new FormData();

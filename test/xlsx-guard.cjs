@@ -108,6 +108,73 @@ const parseMs = Date.now() - t0;
 check(parseMs < 2000, `parseWorkbook finishes on the hostile file (${parseMs} ms)`);
 check(Array.isArray(objects), 'and returns a list, whatever it decided about the sheet');
 
+/* ------------------------------------------- tags that are opened and never closed */
+/*
+ * The reader looked for <row…>…</row> with an expression that, on an opening tag with no closing one, read to
+ * the end of the sheet and started over at the next opening tag: eighty thousand of them, two kilobytes zipped,
+ * took a quarter of a minute, and twice as many a minute. The same went for cells, for a cell's formula and
+ * value, and for the shared strings. Each case here is small enough to send by e-mail and, before the reader
+ * went through the text once, large enough to stop the page for the time it takes to give up on it.
+ */
+console.log('-- tags that are opened and never closed --');
+const N = 200 * 1000;
+const timed = (what, bytes, extraOk) => {
+  const r = read(bytes, what);
+  check(!r.err && r.ms < 2000 && (!extraOk || extraOk(r.wb)), `${what}: read in ${r.ms} ms, ${bytes.length} bytes of file`);
+};
+const real = '<row r="2">' + cell('A2', 'настоящая строка') + '</row>';
+timed(N + ' <row> tags never closed', book('<row r="1">'.repeat(N)));
+timed('a real row before them is still read', book(real + '<row r="3">'.repeat(N)), (wb) => wb.sheets[0].rows[2][1].v === 'настоящая строка');
+timed(N + ' <c> tags never closed in one row', book('<row r="1">' + '<c r="A1">'.repeat(N) + '</row>' + real), (wb) => wb.sheets[0].rows[2][1].v === 'настоящая строка');
+timed(N + ' <f> tags never closed in one cell', book('<row r="1"><c r="A1">' + '<f>'.repeat(N) + '<v>5</v></c></row>'), (wb) => wb.sheets[0].rows[1][1].v === 5);
+timed(N + ' <v> tags never closed in one cell', book('<row r="1"><c r="A1">' + '<v>'.repeat(N) + '</c></row>' + real));
+timed(N + ' <t> tags never closed in one string', book('<row r="1"><c r="A1" t="inlineStr"><is>' + '<t>'.repeat(N) + '</is></c></row>' + real));
+timed(N + ' <rPh> tags never closed in one string', book('<row r="1"><c r="A1" t="inlineStr"><is>' + '<rPh>'.repeat(N) + '<t>x</t></is></c></row>'));
+{
+  const enc = new TextEncoder();
+  const files = fflate.unzipSync(plain);
+  files['xl/sharedStrings.xml'] = enc.encode('<sst>' + '<si>'.repeat(N) + '</sst>');
+  timed(N + ' <si> tags never closed in the shared strings', fflate.zipSync(files));
+}
+
+/* ------------------------------------------- what the expressions found, the walk finds */
+console.log('-- a sheet as Excel writes it --');
+const excel = book(
+  '<row r="1" spans="1:3"><c r="A1" t="inlineStr"><is><r><t>Сме</t></r><r><t xml:space="preserve">та </t></r><rPh sb="0" eb="1"><t>ФОН</t></rPh></is></c>' +
+  '<c r="B1"><f>SUM(B2:B3)</f><v>12</v></c><c r="C1" s="3"/></row>' +
+  '<row r="2"><c r="B2"><v>5</v></c><c r="C2" t="b"><v>1</v></c><c r="D2" t="str"><f t="shared" si="0"/><v>a&amp;b</v></c></row>' +
+  '<row r="3" hidden="1"/><row r="4"><c r="B4"><v>7</v></c></row>') ;
+const ex = read(excel, 'excel').wb.sheets[0].rows;
+check(ex[1][1].v === 'Смета ' && !/ФОН/.test(ex[1][1].v), 'runs of one string are joined, its phonetic hint left out');
+check(ex[1][2].f === '=SUM(B2:B3)' && ex[1][2].v === 12 && ex[1][3] === undefined, 'a formula with its value; an empty styled cell is no cell');
+check(ex[2][2].v === 5 && ex[2][3].v === true && ex[2][4].v === 'a&b' && !ex[2][4].f, 'numbers, booleans, text; a shared-formula reference carries no formula text');
+check(ex[3] === undefined && ex[4][2].v === 7, 'a self-closing row is skipped and the one after it read');
+const withCols = fflate.unzipSync(plain);
+withCols['xl/worksheets/sheet1.xml'] = new TextEncoder().encode('<worksheet><cols><col min="1" max="2" width="9" hidden="1"/></cols><sheetData>' +
+  '<row r="1">' + cell('A1', 'x') + '</row></sheetData><rowBreaks count="1"><brk id="1"/></rowBreaks><colBreaks count="1"><brk id="1"/></colBreaks></worksheet>');
+const wc = read(fflate.zipSync(withCols), 'cols').wb.sheets[0];
+check(wc.rows[1][1].v === 'x' && wc.cols.length === 1 && wc.cols[0].hidden === true, '<cols>, <rowBreaks> and <colBreaks> are not taken for cells or rows');
+
+/* ------------------------------------------- a character that does not exist */
+console.log('-- a character reference past the last character --');
+const ref = read(book('<row r="1">' + cell('A1', 'a&#x110000;b&#99999999999;c&#x41;') + '</row>'), 'ref');
+check(!ref.err && ref.wb.sheets[0].rows[1][1].v === 'a&#x110000;b&#99999999999;cA', 'is left as it is written, and the workbook still reads (it made the whole file unreadable)');
+
+/* ------------------------------------------- small in the file, enormous unpacked */
+console.log('-- a sheet that is small zipped and enormous unpacked --');
+{
+  const mb = 200;
+  const sheet = new Uint8Array(mb * 1024 * 1024).fill(32);
+  const files = fflate.unzipSync(plain);
+  files['xl/worksheets/sheet1.xml'] = sheet;
+  const bomb = fflate.zipSync(files, { level: 9 });
+  const before = process.memoryUsage().rss;
+  const r = read(bomb, 'bomb');
+  const grew = Math.round((process.memoryUsage().rss - before) / 1024 / 1024);
+  check(bomb.length < 1024 * 1024 && !!r.err && /слишком велик/.test(r.err.message), `${mb} MB of sheet in ${Math.round(bomb.length / 1024)} kB of file is refused in words`);
+  check(r.ms < 1000 && grew < 50, `before it is unpacked (${r.ms} ms, +${grew} MB)`);
+}
+
 /* ------------------------------------------------------- nothing else broke */
 console.log('-- a file that is not a workbook at all --');
 const junk = read(new Uint8Array([1, 2, 3, 4, 5]), 'junk');

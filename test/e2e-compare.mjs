@@ -207,6 +207,25 @@ try {
   await page.waitForFunction(() => app.compare_ui.res, null, { timeout: 30 * 1000 })
     .then(() => check(true, 'the same file can be chosen again'), () => check(false, 'the same file can be chosen again'));
 
+  // The worker that reads a file stops answering. The page used to say «Чтение файлов…» for ever; now the file
+  // it was on is given up after its time, the worker is replaced, and the file waiting behind it is read.
+  const fStuck = join(dir, 'Зависший.xlsx'), fNext = join(dir, 'Следующий.xlsx');
+  writeFileSync(fStuck, xlsx(S, book(1)));
+  writeFileSync(fNext, xlsx(S, book(2)));
+  const had = await page.evaluate(() => {
+    app.readLimit = 700;
+    const w = app.worker, send = w.postMessage.bind(w);
+    let first = true;
+    w.postMessage = (m, t) => { if (first) { first = false; return; } send(m, t); };   // the first file is never answered
+    window.__oldWorker = w;
+    return app.projects.length;
+  });
+  await page.setInputFiles('#pick', [fStuck, fNext]);
+  await page.waitForFunction((n) => app.projects.length === n + 1 && app.pending === 0, had, { timeout: 30 * 1000 });
+  check(/Зависший\.xlsx: не прочитан за 1 секунд/.test(await page.textContent('#toast')), 'a file the worker never answers for is reported as unreadable');
+  check(await page.evaluate(() => app.projects[app.projects.length - 1].file === 'Следующий.xlsx' && app.worker !== window.__oldWorker && !document.getElementById('busy').classList.contains('on')),
+    'the worker is replaced, the file behind it is read, and the page is not left «reading»');
+
   check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' / ') : ''));
 } finally {
   await browser.close();

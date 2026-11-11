@@ -40,6 +40,7 @@
     seq: 0,                 // which open() is the current one; see open()
     unsaved: {},            // file name -> { file, why, retry }: estimates on screen whose file is not on the server
     frozen: false,          // this application was opened in another tab after this one: nothing is saved from here
+    read: [],               // files of the batch being read that have given a project and are to be stored
 
     init: function () {
       var self = this;
@@ -56,8 +57,16 @@
         var sc = $(id);
         if (sc) sc.addEventListener('focusout', function () { self.flush(); });
       });
-      wrap(P, 'addFiles', function (files) { self.upload(files); });
-      wrap(P, 'onParsed', function () { if (self.loading && this.pending <= 0) self.restore(); });
+      // A file is stored once it has been read and has given a project, and the files of one batch go up
+      // together. Stored at the moment it was picked, as it used to be, a file that could not be read or was no
+      // estimate went to the server first and was taken off it again a moment later.
+      wrap(P, 'fileRead', function (file) { self.read.push(file); });
+      wrap(P, 'onParsed', function () {
+        if (this.pending > 0) return;
+        var files = self.read;
+        self.read = [];
+        if (self.loading) self.restore(); else if (files.length) self.upload(files);
+      });
       var build = S.buildWorkbook;
       S.buildWorkbook = function (model, opts) {
         var bytes = build(model, opts);

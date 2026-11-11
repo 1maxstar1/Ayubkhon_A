@@ -89,6 +89,84 @@
     }
   }
 
+  /* ----------------------------------------------------------- typed totals */
+
+  /*
+   * A total the estimate carries as a number, not as a formula (every ИТОГО of a form 4А export), has nothing
+   * to mirror onto the market side: copied there as it stands, the market total stays the smeta total
+   * whatever is re-priced above it. So the number is traced back to what it is the sum of — the lines of its
+   * band, or the totals written before it («ИТОГО ПРЯМЫЕ ЗАТРАТЫ») — and, when the lines do come to that
+   * number, written as that sum on both sides: the document then adds up, and goes on adding up when a price
+   * changes.
+   *
+   * The estimate prints its totals in whole sums, so «comes to that number» allows for half a sum of rounding
+   * per number added. A total that its own lines do not explain is written as their sum plus what the estimate
+   * has on top of them (=SUM(G30:G31)+7): the smeta side still shows the typed number, the market side moves
+   * by exactly as much as the lines moved, and the unexplained part stands in the formula for anyone to see.
+   */
+  var MAX_FORMULA = 4000, MAX_RUNS = 200;
+
+  function Tally() { this.open = []; this.mixed = false; this.subs = []; }
+  /** A band begins: its lines are counted from here. */
+  Tally.prototype.band = function () { this.open = []; this.mixed = false; };
+  Tally.prototype.item = function (t, sum) { this.open.push({ t: t, s: sum }); };
+  /** A line that is not a resource but sits among them: a number in its sum column would be caught by a plain range. */
+  Tally.prototype.other = function (cell) {
+    if (this.open.length && cell && (cell.f || typeof cell.v === 'number')) this.mixed = true;
+  };
+  /** The lines of the open band as SUM arguments in column `col`: one range, or one per unbroken run. */
+  Tally.prototype.refs = function (col) {
+    var o = this.open;
+    if (!this.mixed) return col + o[0].t + ':' + col + o[o.length - 1].t;
+    var runs = [], from = o[0].t, prev = from;
+    for (var i = 1; i < o.length; i++) {
+      if (o[i].t !== prev + 1) { runs.push(col + from + ':' + col + prev); from = o[i].t; }
+      prev = o[i].t;
+    }
+    runs.push(col + from + ':' + col + prev);
+    return runs.length > MAX_RUNS ? null : runs.join(',');
+  };
+  function plus(list, col) { return list.map(function (x) { return col + x.t; }).join('+'); }
+  function close(a, b, parts) { return Math.abs(a - b) <= 0.5 * parts + 1e-6; }
+  /** «+7» / «-0.25»: what a typed total has over the sum of its parts, free of binary-float tails. */
+  function over(v, sum) {
+    var d = Math.round((v - sum) * 1e6) / 1e6;
+    return d < 0 ? '-' + (-d) : '+' + d;
+  }
+
+  /**
+   * The total at row `t` whose typed value is `v` (null: not a number): {smeta, market} formulas, absent when
+   * there is nothing it could be the sum of and the row keeps what it has.
+   */
+  Tally.prototype.total = function (t, v, gCol, iCol) {
+    var out = {}, open = this.open, subs = this.subs, i, rest;
+    if (v != null && open.length) {
+      var sum = 0;
+      for (i = 0; i < open.length; i++) sum += open[i].s;
+      var g = this.refs(gCol), m = this.refs(iCol);
+      if (g && g.length < MAX_FORMULA) {
+        rest = close(sum, v, 1) ? '' : over(v, sum);
+        out.smeta = '=SUM(' + g + ')' + rest; out.market = '=SUM(' + m + ')' + rest;
+      }
+    } else if (v != null && v !== 0 && subs.length) {
+      // the longest run of earlier totals that comes to this number: «ПРЯМЫЕ ЗАТРАТЫ» is every band before it
+      var acc = 0, found = 0;
+      for (i = subs.length - 1; i >= 0; i--) {
+        acc += subs[i].v;
+        if (close(acc, v, subs.length - i + 1)) found = subs.length - i;
+      }
+      var part = found ? subs.slice(subs.length - found) : subs.slice();
+      if (plus(part, gCol).length < MAX_FORMULA) {
+        rest = found ? '' : over(v, acc);
+        out.smeta = '=' + plus(part, gCol) + rest; out.market = '=' + plus(part, iCol) + rest;
+        subs.length -= part.length;
+      }
+    }
+    if (v != null) subs.push({ t: t, v: v });
+    this.band();
+    return out;
+  };
+
   /**
    * @param {Array} projects  [{id, name, title, objects:[parsedSheet], enabled}]
    * @param {Object} prices   resource key -> market unit price
@@ -140,6 +218,7 @@
         span.objects.push(objSpan);
         push({ kind: 'object', pi: pi, oi: oi, cells: cellsOf(C_NO, obj.subtitle || obj.name) });
         blank(1);
+        var tally = new Tally();
 
         obj.rows.forEach(function (sr) {
           var cells = {};
@@ -181,6 +260,7 @@
             cells[C_MPRICE] = { v: mp };
             cells[C_MSUM] = { f: '=E' + target + '*H' + target };
             cells[C_DIFF] = { f: '=+G' + target + '-I' + target };
+            tally.item(target, (sr.qty || 0) * sp);
 
             var rec = resMap.get(key);
             if (!rec) {
@@ -205,6 +285,14 @@
             var g = cells[C_SUM], f = cells[C_PRICE];
             if (g && g.f) cells[C_MSUM] = { f: S.formula.translate(g.f, marketMap, 0) };
             else if (g && g.v != null) cells[C_MSUM] = { v: g.v };
+            if (sr.kind === 'extra') tally.other(g);
+            else {
+              // a typed total becomes the sum it stands for (see Tally); one that is a formula already is only counted
+              var typed = g && !g.f ? S.num(g.v) : null;
+              var sums = tally.total(target, g && g.f ? sr.sum : typed, S.col(C_SUM), S.col(C_MSUM));
+              if (typed != null && sums.smeta) cells[C_SUM] = { f: sums.smeta };
+              if (typed != null && sums.market) cells[C_MSUM] = { f: sums.market };
+            }
             if (f && f.f) cells[C_MPRICE] = { f: S.formula.translate(f.f, marketMap, 0) };
             else if (f && f.v != null && sr.kind === 'extra') cells[C_MPRICE] = { v: f.v };
             for (var e = 0; e < nExtra; e++) {
@@ -213,7 +301,7 @@
               cells[C_EXTRA + nExtra + e] = src.f
                 ? { f: S.formula.translate(src.f, marketMap, 0) } : { v: src.v };
             }
-          }
+          } else if (sr.kind === 'section') tally.band();
           push(row);
         });
 

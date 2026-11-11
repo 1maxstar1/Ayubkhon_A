@@ -243,5 +243,18 @@ S.smeta.parseWorkbook(standardBook(), 'a.xlsx').forEach((o) => o.rows.forEach((r
 }));
 run('standard, all −10 %', S.smeta.parseWorkbook(standardBook(), 'a.xlsx'), every);
 
+// form 4А. The second estimate's band total says 70 where its lines come to 63: the document keeps those 7 on
+// both sides, and the «ПРЯМЫЕ ЗАТРАТЫ» line that repeats the 70 keeps them too.
+const slack = {};
+slack[S.nameKey('ИТОГО СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ') + '#1'] = 7;
+slack[S.nameKey('ИТОГО ПРЯМЫЕ ЗАТРАТЫ') + '#1'] = 7;
+run('form 4А, no prices', S.smeta.parseWorkbook(form4aBook(), 'b.xlsx'), {}, slack);
+const f4 = {};
+f4[k('КРАН ТЕСТОВЫЙ 10 Т', 'МАШ.-Ч', 13)] = 11;
+f4[k('ЩЕБЕНЬ ТЕСТОВЫЙ', 'М3', 17)] = 15;
+f4[k('АНКЕР ТЕСТОВЫЙ М8', 'ШТ', 19)] = 16;
+f4[k('ТРУБА ТЕСТОВАЯ 50 ММ', 'М', 17)] = 12;
+run('form 4А, re-priced', S.smeta.parseWorkbook(form4aBook(), 'b.xlsx'), f4, slack);
+
 console.log(fail ? '\nFAILED: ' + fail : '\nall passed');
 process.exit(fail ? 1 : 0);

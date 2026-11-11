@@ -7981,6 +7981,23 @@ if (typeof self !== 'undefined') self.S = S;
 
   function $(id) { return document.getElementById(id); }
   function A() { return window.app; }
+  /*
+   * Prices typed and not yet confirmed by the server, kept in this browser (localStorage, one entry per
+   * application): resource key -> { v: price, at: when, s: where it was applied from }. See Sync.note().
+   */
+  var JOURNAL = 'smeta.unsaved.';
+  function journalRead(id) {
+    try { return JSON.parse(localStorage.getItem(JOURNAL + id) || '{}') || {}; } catch (e) { return {}; }
+  }
+  function journalWrite(id, j) {
+    try {
+      if (Object.keys(j).length) localStorage.setItem(JOURNAL + id, JSON.stringify(j));
+      else localStorage.removeItem(JOURNAL + id);
+    } catch (e) { /* no room, or no storage: the page works as it did without it */ }
+  }
+  // a request that must outlive the page may carry this much (the browser's limit is 64 KB for all of them together)
+  var KEEPALIVE_MAX = 28 * 1024;
+
   /** How many bytes `v` is as the JSON the server will store. */
   function bytesOf(v) {
     var json = JSON.stringify(v);
@@ -8009,10 +8026,15 @@ if (typeof self !== 'undefined') self.S = S;
       var P = S.App.prototype;
       wrap(P, 'rebuild', function () { self.touch(); });
       wrap(P, 'saveOpts', function () { self.touch(); });
-      wrap(P, 'setPrice', function (key, value) { self.touch(); self.priceSet(key); self.correctSoon(key, value); });
+      wrap(P, 'setPrice', function (key, value) {
+        var one = {};
+        one[key] = value;
+        self.touch(); self.priceSet(key); self.note(one); self.correctSoon(key, value);
+      });
       wrap(P, 'setPrices', function (map) {
         self.touch();
         Object.keys(map).forEach(function (k) { self.priceSet(k); self.correctSoon(k, map[k]); });
+        self.note(map);
       });
       // Leaving the field is the moment the number is finished being typed.
       ['priceScroll', 'sheetScroll'].forEach(function (id) {
@@ -8041,11 +8063,97 @@ if (typeof self !== 'undefined') self.S = S;
       $('reportMode').addEventListener('change', function () { self.touch(); });
       this.listen();
       window.addEventListener('beforeunload', function (e) {
-        self.flush();
-        if (self.dirty) self.saveNow();
+        self.leaving();
         // an estimate whose file is not on the server would not be there after the reload: the browser asks
         if (self.ws && !self.frozen && self.hasUnsaved()) { e.preventDefault(); e.returnValue = ''; }
       });
+      window.addEventListener('pagehide', function () { self.leaving(); });
+    },
+
+    /* ------------------------------------------------- the last price */
+    /*
+     * A price is written to the server twice: as a correction (the price memory) and in the application's
+     * state (the table). The two go one after the other, and the second is not sent until the first is
+     * answered. On this computer that is seven milliseconds. Over a network it is long enough to close the tab
+     * in: the correction arrived, the state did not, and on the next open the price was in neither the table nor
+     * the document — while other applications were being offered it as «a price an expert set».
+     *
+     * Three things hold it now:
+     *   - note(): every price is written into this browser at once and taken out when the state that carries
+     *     it is confirmed. replay() puts back, on the next open, whatever is still there and newer than the
+     *     state — a closed tab, a crashed browser, the power going;
+     *   - leaving(): when the page goes, what is waiting is sent at once — the two requests side by side, not
+     *     in a queue, and marked to outlive the page where the browser lets them be that large;
+     *   - mergeCorr(): a correction of this application that is newer than its saved state is a price that
+     *     reached the server and missed the state; it is put back into the table, on any computer.
+     */
+    note: function (map) {
+      if (!this.ws || this.loading || this.frozen) return;
+      var self = this, j = journalRead(this.ws.id), now = Date.now();
+      Object.keys(map).forEach(function (k) {
+        var m = self.priceSource(k, map[k]);
+        j[k] = { v: map[k], at: now, s: m && m.source && m.source !== 'typed' ? m.source : '' };
+      });
+      journalWrite(this.ws.id, j);
+    },
+
+    /** The state that carried these entries is on the server: they are no longer waited for. */
+    noted: function (id, sent) {
+      var j = journalRead(id), n = 0;
+      Object.keys(sent).forEach(function (k) { if (j[k] && j[k].at === sent[k].at) { delete j[k]; n++; } });
+      if (n) journalWrite(id, j);
+    },
+
+    /** After the application is back: prices this browser holds that its saved state does not. */
+    replay: function () {
+      var self = this, app = A(), ws = this.ws;
+      if (!ws || !app.model) return;
+      var j = journalRead(ws.id), keys = Object.keys(j);
+      if (!keys.length) return;
+      var savedAt = Date.parse((ws.state && ws.state.savedAt) || '') || 0;
+      var by = {}, map = {}, n = 0;
+      app.model.resources.forEach(function (r) { by[r.key] = r; });
+      keys.forEach(function (k) {
+        var e = j[k], r = by[k];
+        // older than the state: the state has it, or something newer was saved from elsewhere
+        if (!e || typeof e.v !== 'number' || !(e.at > savedAt) || !r) { delete j[k]; return; }
+        self.replayed[k] = 1;
+        if (S.near(r.market, e.v)) { delete j[k]; return; }
+        if (e.s) self.markSource(k, e.v, e.s);
+        map[k] = e.v; n++;
+      });
+      journalWrite(ws.id, j);
+      if (!n) return;
+      app.setPrices(map);                 // through the watched method: saved, and written to the price memory
+      app.toast('Восстановлены цены, которые не успели сохраниться перед закрытием страницы: ' + n);
+    },
+
+    /** Corrections of this application newer than its saved state: prices that reached the server and missed the state. */
+    mergeCorr: function () {
+      var self = this, app = A();
+      if (!this.ws || !this.corrReady || !this.restored || this.merged || !app.model) return;
+      this.merged = true;
+      var since = this.openedWith || '', map = {}, n = 0;
+      app.model.resources.forEach(function (r) {
+        var c = self.corr[r.key];
+        if (!c || !c.updated || !(c.updated > since)) return;
+        if (self.replayed[r.key] || self.pend[r.key] !== undefined || S.near(r.market, c.market)) return;
+        if (c.source && c.source !== 'typed') self.markSource(r.key, c.market, c.source);
+        map[r.key] = c.market; n++;
+      });
+      if (!n) return;
+      app.setPrices(map);
+      app.toast('Возвращены цены, которые были записаны на сервер, но не попали в сохранённую заявку: ' + n);
+    },
+
+    /** The page is going: what is waiting is sent now, side by side, to outlive it. */
+    leaving: function () {
+      if (!this.ws || this.loading || this.frozen) return;
+      this.urgent = true;
+      try {
+        this.flush();
+        if (this.dirty) this.saveNow().catch(function () { /* said by saveNow; the journal holds the prices */ });
+      } finally { this.urgent = false; }
     },
 
     /* ------------------------------------------------------------- open */
@@ -8066,6 +8174,8 @@ if (typeof self !== 'undefined') self.S = S;
       var sc = (w.state && w.state.compare) || {};
       this.cmp = { old: sc.old || null, new: sc.new || null, reply: sc.reply || null, base: sc.base || '' };
       this.corr = {};
+      this.corrReady = false; this.restored = false; this.merged = false; this.replayed = {};
+      this.openedWith = w.updated || '';      // the server's time of the state this open starts from
       this.unsaved = {};
       this.read = [];
       clearTimeout(this.ut);
@@ -8084,11 +8194,13 @@ if (typeof self !== 'undefined') self.S = S;
 
       this.corrList = [];
       this.marks = {};
-      S.pb.collection('corrections').getFullList({ filter: S.pb.filter('workspace = {:w}', { w: w.id }), fields: 'id,res_key,market_price,source' })
+      S.pb.collection('corrections').getFullList({ filter: S.pb.filter('workspace = {:w}', { w: w.id }), fields: 'id,res_key,market_price,source,updated' })
         .then(function (list) {
           if (!current()) return;
           self.corrList = list;
           self.indexCorr();
+          self.corrReady = true;
+          self.mergeCorr();
         }).catch(function (e) {
           if (current()) app.toast('Правки не загружены: ' + S.pbErr(e), true);
         });
@@ -8174,7 +8286,7 @@ if (typeof self !== 'undefined') self.S = S;
     /** Server corrections, keyed the way the live rows are keyed. */
     indexCorr: function () {
       var raw = {};
-      (this.corrList || []).forEach(function (c) { raw[c.res_key] = { id: c.id, market: c.market_price, source: c.source || '' }; });
+      (this.corrList || []).forEach(function (c) { raw[c.res_key] = { id: c.id, market: c.market_price, source: c.source || '', updated: c.updated || '' }; });
       this.corr = this.reindex(raw).map;
     },
 
@@ -8225,6 +8337,9 @@ if (typeof self !== 'undefined') self.S = S;
       this.renderBox();
       if (remapped) this.touch();          // write the workspace back under the new keys
       if (app.projects.length) app.toast('Рабочая область восстановлена: файлов ' + app.projects.length);
+      this.restored = true;
+      this.replay();
+      this.mergeCorr();
       this.restoreCompare();
     },
 
@@ -8461,8 +8576,12 @@ if (typeof self !== 'undefined') self.S = S;
       }
       this.bigSaid = null;
       this.dirty = false;
+      var id = this.ws.id, sent = journalRead(id);
       return this.enqueue(function () {
-        return S.pb.collection('workspaces').update(self.ws.id, body).then(function (w) {
+        var opts = self.urgent && size < KEEPALIVE_MAX ? { keepalive: true } : {};
+        return S.pb.collection('workspaces').update(id, body, opts).then(function (w) {
+          self.noted(id, sent);
+          if (!self.ws || self.ws.id !== id) return;
           self.ws.updated = w.updated; self.ws.files = w.files; self.ws.changed = w.changed;
           self.mark('✓');
         }).catch(function (e) {
@@ -8489,8 +8608,15 @@ if (typeof self !== 'undefined') self.S = S;
      * promise, which does not.
      */
     enqueue: function (fn) {
-      var attempt = this.q.then(fn, fn);
-      this.q = attempt.catch(function () { /* the retry timer owns this */ });
+      var attempt, quiet = function () { /* the retry timer owns this */ };
+      if (this.urgent) {
+        // the page is going: not behind whatever is still on its way, but now — and whatever comes later waits for both
+        try { attempt = Promise.resolve(fn()); } catch (e) { attempt = Promise.reject(e); }
+        this.q = Promise.all([this.q, attempt.catch(quiet)]);
+        return attempt;
+      }
+      attempt = this.q.then(fn, fn);
+      this.q = attempt.catch(quiet);
       return attempt;
     },
 
@@ -8693,12 +8819,13 @@ if (typeof self !== 'undefined') self.S = S;
     sendBulk: function (ws, part, marks, waiting) {
       var self = this, app = A();
       this.enqueue(function () {
-        return S.pb.send('/api/corrections/bulk', {
-          method: 'POST', body: { workspace: ws.id, set: part.set, del: part.del }
-        }).then(function (r) {
+        var body = { workspace: ws.id, set: part.set, del: part.del };
+        var req = { method: 'POST', body: body };
+        if (self.urgent && bytesOf(body) < KEEPALIVE_MAX) req.keepalive = true;
+        return S.pb.send('/api/corrections/bulk', req).then(function (r) {
           part.set.forEach(function (row) {
             var k = row.res_key;
-            self.corr[k] = { id: (r.ids && r.ids[k]) || (self.corr[k] && self.corr[k].id), market: marks[k], source: row.source };
+            self.corr[k] = { id: (r.ids && r.ids[k]) || (self.corr[k] && self.corr[k].id), market: marks[k], source: row.source, updated: '' };
           });
         });
       }).catch(function (e) {

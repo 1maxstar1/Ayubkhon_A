@@ -27,10 +27,81 @@ const CURRENCY = { "доллар сша": "USD", "рубль": "RUB", "евро"
 
 const NAMED = { amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: "\u00A0", laquo: "«", raquo: "»", ndash: "–", mdash: "—" };
 
+/*
+ * How much of a page is read. The page is somebody else's: the site itself on a bad day, or whatever stands
+ * between this machine and it. It used to be read with expressions like <td…>([\s\S]*?)</td>, which on a tag
+ * that is never closed read to the end and start again at the next one — a page of 79 kB kept the server busy
+ * for a minute, each doubling four times as long, with nothing to cancel it and the same sync starting again
+ * half a minute after every restart. The page is now walked in one pass, and everything about it has a size:
+ * the real week is 1.7 MB, about 1 300 rows, eight weeks listed, cells of a few hundred characters.
+ */
+const MAX_PAGE = 8 * 1024 * 1024;     // bytes of one page
+const MAX_LISTED = 60;                // weeks in the page's list
+const MAX_ROWS = 5000;                // rows of one week: what the request asks for
+const MAX_CELL = 4000;                // characters of one cell, markup included
+const MAX_NEW_WEEKS = 12;             // weeks fetched by one sync; the rest wait for the next
+const MAX_SYNC_MS = 4 * 60 * 1000;    // one sync, all its pages
+
+/** «<td » and «<td>» are a cell, «<tdx» is not: the character after the name. */
+function nameEnds(s, at) {
+  const c = s.charCodeAt(at);
+  return c === 32 || c === 62 || c === 47 || c === 9 || c === 10 || c === 13;
+}
+/**
+ * The elements <name …>…</name> of `html`, in order, in one pass: fn(attributeText, innerText). `low` is the same
+ * text in lower case (the page writes its tags either way). An element that is opened and never closed ends the
+ * walk — nothing after it can be whole — and is reported by the return value: false.
+ */
+function eachEl(html, low, name, fn) {
+  const open = "<" + name, close = "</" + name + ">";
+  let pos = 0;
+  for (;;) {
+    const a = low.indexOf(open, pos);
+    if (a < 0) return true;
+    const nameEnd = a + open.length;
+    if (!nameEnds(low, nameEnd)) { pos = nameEnd; continue; }
+    const gt = low.indexOf(">", nameEnd);
+    if (gt < 0) return false;
+    const z = low.indexOf(close, gt + 1);
+    if (z < 0) return false;
+    fn(html.slice(nameEnd, gt), html.slice(gt + 1, z));
+    pos = z + close.length;
+  }
+}
+/** The first <name …>…</name>: { attrs, inner } or null. */
+function firstEl(html, low, name) {
+  let found = null;
+  const open = "<" + name;
+  let pos = 0;
+  for (;;) {
+    const a = low.indexOf(open, pos);
+    if (a < 0) return null;
+    const nameEnd = a + open.length;
+    if (!nameEnds(low, nameEnd)) { pos = nameEnd; continue; }
+    const gt = low.indexOf(">", nameEnd);
+    if (gt < 0) return null;
+    const z = low.indexOf("</" + name + ">", gt + 1);
+    if (z >= 0) found = { attrs: html.slice(nameEnd, gt), inner: html.slice(gt + 1, z) };
+    return found;
+  }
+}
+/** `html` with every tag replaced by a space, in one pass. A «<» that opens nothing stays what it is. */
+function untag(html) {
+  if (html.indexOf("<") < 0) return html;
+  let out = "", pos = 0;
+  for (;;) {
+    const a = html.indexOf("<", pos);
+    if (a < 0) return out + html.slice(pos);
+    const z = html.indexOf(">", a + 1);
+    if (z < 0) return out + html.slice(pos);
+    out += html.slice(pos, a) + " ";
+    pos = z + 1;
+  }
+}
+
 /** Text of a cell: tags out, entities decoded, white space (the no-break kinds too) to single spaces. */
 function text(html) {
-  return String(html == null ? "" : html)
-    .replace(/<[^>]*>/g, " ")
+  return untag(String(html == null ? "" : html))
     .replace(/&(#x[0-9a-fA-F]{1,6}|#\d{1,7}|[a-zA-Z]{2,8});/g, function (all, e) {
       if (e.charAt(0) === "#") {
         const code = e.charAt(1) === "x" || e.charAt(1) === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
@@ -92,24 +163,33 @@ function attr(tag, name) {
 
 /** The weeks the page offers: [{ id, label, from, to, market }], and which one it is showing. */
 function parseWeeks(html) {
-  const sel = /<select\b[^>]*\bid\s*=\s*"ImportId"[^>]*>([\s\S]*?)<\/select>/i.exec(String(html || ""));
-  if (!sel) throw new Error("на странице нет списка недель (ImportId)");
+  html = String(html || "");
+  if (html.length > MAX_PAGE) throw new Error("страница слишком велика (" + Math.round(html.length / 1024 / 1024) + " МБ)");
+  const low = html.toLowerCase();
+  let sel = null;
+  eachEl(html, low, "select", function (attrs, inner) {
+    if (sel === null && /\sid\s*=\s*"ImportId"/i.test(" " + attrs)) sel = inner;
+  });
+  if (sel === null) throw new Error("на странице нет списка недель (ImportId)");
   const out = { weeks: [], selected: null };
-  const re = /<option\b([^>]*)>([\s\S]*?)<\/option>/gi;
-  let m;
-  while ((m = re.exec(sel[1]))) {
-    const id = Number(attr(m[1], "value"));
-    const label = text(m[2]);
-    if (!(id > 0) || id !== Math.floor(id)) continue;
-    if (/\sselected\b/i.test(m[1])) out.selected = id;
+  let failed = "";
+  eachEl(sel, sel.toLowerCase(), "option", function (attrs, inner) {
+    if (failed || out.weeks.length > MAX_LISTED) return;
+    const id = Number(attr(attrs, "value"));
+    if (!(id > 0) || id !== Math.floor(id)) return;
+    if (inner.length > MAX_CELL) { failed = "неделя " + id + ": подпись слишком длинная"; return; }
+    const label = text(inner);
+    if (/\sselected\b/i.test(attrs)) out.selected = id;
     const p = /^(\d{2}\.\d{2}\.\d{4})\s*[-–—]\s*(\d{2}\.\d{2}\.\d{4})\s*\(([^()]*)\)$/.exec(label);
-    if (!p) throw new Error("неделя " + id + ": подпись не разобрана");
+    if (!p) { failed = "неделя " + id + ": подпись не разобрана"; return; }
     const from = isoDate(p[1]), to = isoDate(p[2]);
     const market = /^внутр/i.test(p[3]) ? "internal" : /^экспорт/i.test(p[3]) ? "export" : "";
     // the Russian page says «Внутренние» / «Экспортные»; the Uzbek and English ones are other datasets
-    if (!from || !to || !market) throw new Error("страница не на русском языке или подпись недели изменилась");
+    if (!from || !to || !market) { failed = "страница не на русском языке или подпись недели изменилась"; return; }
     out.weeks.push({ id: id, label: label, from: from, to: to, market: market });
-  }
+  });
+  if (failed) throw new Error(failed);
+  if (out.weeks.length > MAX_LISTED) throw new Error("в списке недель больше " + MAX_LISTED + " — страница не та, что ожидалась");
   if (!out.weeks.length) throw new Error("список недель пуст");
   return out;
 }
@@ -123,21 +203,24 @@ function parseWeek(html, id, market) {
   const shown = parseWeeks(html).selected;
   if (shown !== id) throw new Error("сайт показал неделю " + shown + " вместо " + id);
   if ((html.match(/<table\b/gi) || []).length !== 1) throw new Error("на странице не одна таблица");
-  const head = /<thead\b[^>]*>([\s\S]*?)<\/thead>/i.exec(html);
+  const low = html.toLowerCase();
+  const head = firstEl(html, low, "thead");
   const cols = [];
-  if (head) { const th = /<th\b[^>]*>([\s\S]*?)<\/th>/gi; let h; while ((h = th.exec(head[1]))) cols.push(text(h[1])); }
+  if (head) eachEl(head.inner, head.inner.toLowerCase(), "th", function (attrs, inner) { if (cols.length <= HEADER.length) cols.push(text(inner.slice(0, MAX_CELL))); });
   if (cols.length !== HEADER.length || cols.some(function (c, i) { return c !== HEADER[i]; })) {
     throw new Error("заголовок таблицы не тот (страница не на русском языке?)");
   }
-  const body = /<tbody\b[^>]*>([\s\S]*?)<\/tbody>/i.exec(html);
+  const body = firstEl(html, low, "tbody");
   if (!body) throw new Error("таблица без строк");
   const rows = [], seen = {};
-  const parts = body[1].split(/<tr\b[^>]*>/i);
+  const parts = body.inner.split(/<tr\b[^>]*>/i);
+  if (parts.length - 1 > MAX_ROWS) throw new Error("строк " + (parts.length - 1) + " — больше, чем запрошено (" + MAX_ROWS + ")");
   for (let i = 1; i < parts.length; i++) {
     const cells = [];
-    const td = /<td\b[^>]*>([\s\S]*?)<\/td>/gi;
-    let c;
-    while ((c = td.exec(parts[i]))) cells.push(text(c[1]));
+    // a row is seven short cells: one that is not is refused before it is read
+    if (parts[i].length > MAX_CELL * (HEADER.length + 1)) throw new Error("строка " + i + ": слишком длинная");
+    const whole = eachEl(parts[i], parts[i].toLowerCase(), "td", function (attrs, inner) { cells.push(text(inner)); });
+    if (!whole) throw new Error("строка " + i + ": ячейка не закрыта");
     if (cells.length !== HEADER.length) throw new Error("строка " + i + ": ячеек " + cells.length + " вместо " + HEADER.length);
     const no = num(cells[0]), price = num(cells[2]), change = num(cells[3]), pct = num(cells[4]);
     const from = isoDate(cells[5]), to = isoDate(cells[6]);
@@ -170,6 +253,7 @@ function fetchPage(query) {
       const res = $http.send({ url: url, method: "GET", timeout: 90, headers: { "User-Agent": UA, "Accept": "text/html", "Accept-Language": "ru" } });
       if (res.statusCode === 200) {
         const body = res.raw || (res.body ? toString(res.body) : "");
+        if (body && body.length > MAX_PAGE) throw new Error("страница слишком велика (" + Math.round(body.length / 1024 / 1024) + " МБ)");
         if (body) return body;
         last = "пустой ответ";
       } else last = "HTTP " + res.statusCode;
@@ -256,13 +340,18 @@ function sync(app, opts) {
   const out = { ok: true, listed: 0, added: [], kept: 0, errors: [], message: "" };
   try {
     const nlp = require(`${__hooks}/lib/nlp.js`);
-    const weeks = parseWeeks(fetchPage(LANG)).weeks;
+    const started = Date.now();
+    // newest first: if there are more new weeks than one sync takes, the ones that wait are the oldest
+    const weeks = parseWeeks(fetchPage(LANG)).weeks.slice().sort(function (a, b) { return b.id - a.id; });
     out.listed = weeks.length;
+    let fetched = 0, waiting = 0;
     for (let i = 0; i < weeks.length; i++) {
       const w = weeks[i];
       let have = false;
       try { have = !!app.findFirstRecordByData("uzex_imports", "import_id", w.id); } catch (_) { have = false; }
       if (have && !force) { out.kept++; continue; }
+      if (fetched >= MAX_NEW_WEEKS || Date.now() - started > MAX_SYNC_MS) { waiting++; continue; }
+      fetched++;
       try {
         const rows = parseWeek(fetchPage("importId=" + w.id + "&page=1&length=5000&" + LANG), w.id, w.market);
         storeWeek(app, w, rows, nlp);
@@ -273,6 +362,8 @@ function sync(app, opts) {
     }
     out.ok = !out.errors.length;
     out.message = out.errors.length ? out.errors.map(function (e) { return e.import_id + ": " + e.message; }).join("; ").slice(0, 900) : "";
+    if (waiting) out.message = (out.message ? out.message + "; " : "") + "ещё недель: " + waiting + " — при следующем обновлении";
+    out.waiting = waiting;
   } catch (err) {
     out.ok = false;
     out.message = String((err && err.message) || err).slice(0, 900);
@@ -317,6 +408,7 @@ function catchUp(app) {
 }
 
 module.exports = {
-  HEADER: HEADER, text: text, num: num, isoDate: isoDate, parseName: parseName, parseWeeks: parseWeeks, parseWeek: parseWeek,
+  HEADER: HEADER, LIMITS: { page: MAX_PAGE, listed: MAX_LISTED, rows: MAX_ROWS, cell: MAX_CELL, newWeeks: MAX_NEW_WEEKS },
+  text: text, num: num, isoDate: isoDate, parseName: parseName, parseWeeks: parseWeeks, parseWeek: parseWeek,
   status: status, setAuto: setAuto, sync: sync, auto: auto, catchUp: catchUp
 };

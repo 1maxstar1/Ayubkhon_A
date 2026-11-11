@@ -163,6 +163,21 @@ try {
   const man = (await call('POST', '/api/uzex/sync', boss)).body;
   check(man.ok && man.added.length === 1 && man.added[0].import_id === 216, 'the button still works');
   check((await call('POST', '/api/uzex/auto', boss, { on: true })).body.auto === true, 'and the switch goes back on');
+
+  // A page that lists far more new weeks than the site ever keeps: one sync takes the newest twelve and says
+  // how many wait, the next takes the rest — it used to fetch and store every one of them in a single request.
+  const before = await pb.count('uzex_imports', 'id != ""');
+  for (let i = 0; i < 15; i++) site.weeks.unshift(week(300 + i, '2031-05-05', '2031-05-09', 'internal', sampleRows().slice(0, 2)));
+  const many = (await call('POST', '/api/uzex/sync', boss)).body;
+  check(many.added.length === 12 && many.waiting === 3 && /ещё недель: 3/.test(many.message) && Math.min(...many.added.map((a) => a.import_id)) === 303,
+    'a sync takes the twelve newest of fifteen new weeks and says three are waiting (' + many.added.length + ', «' + many.message + '»)');
+  const rest = (await call('POST', '/api/uzex/sync', boss)).body;
+  check(rest.added.length === 3 && !rest.waiting && await pb.count('uzex_imports', 'id != ""') === before + 15, 'the next sync takes the rest');
+  // and a week whose page is not a week's page leaves nothing behind
+  site.weeks.unshift(week(400, '2031-05-12', '2031-05-16', 'internal', Array.from({ length: 5001 }, (_, i) => ['Тестовый товар ' + i, 10, 0])));
+  const big = (await call('POST', '/api/uzex/sync', boss)).body;
+  check(!big.ok && big.errors.length === 1 && /больше, чем запрошено/.test(big.errors[0].message) && await pb.count('uzex_imports', 'import_id = 400') === 0,
+    'a week of more rows than were asked for is refused whole (' + (big.errors[0] && big.errors[0].message) + ')');
 } catch (err) {
   check(false, 'the run stopped: ' + (err && err.stack || err));
 } finally {

@@ -71,6 +71,40 @@ check(n('Тестовый кокс', 'export').currency === 'VAL' && n('X (до�
     site.weeks[0].rows.push(['', 5, 0]);
     const nameless = await get(WEEK);
     check(throws(() => U.parseWeek(nameless, 204, 'internal'), /пустое название/), 'so does a row without a name');
+
+    /*
+     * A page that is not what the site should send — the site on a bad day, or something between this machine
+     * and it. The reader used expressions that, on a tag never closed, read to the end and started over at the
+     * next one: 79 kB kept the server busy for a minute, with nothing to cancel it. Each of these is refused,
+     * and quickly; the same sync runs by itself half a minute after every start.
+     */
+    site.weeks[0].rows.pop();
+    const good = await get(WEEK);
+    const N = 200 * 1000;
+    const quick = (what, html, re, fn) => {
+      const t0 = Date.now();
+      const run = fn || ((h) => U.parseWeek(h, 204, 'internal'));
+      // `re` null: whatever it decides about the page, it must decide at once
+      let refused = true;
+      if (re) refused = throws(() => run(html), re); else { try { run(html); } catch (e) { /* either way */ } }
+      const ms = Date.now() - t0;
+      check(refused && ms < 2000, what + ' (' + ms + ' ms, ' + Math.round(html.length / 1024) + ' kB)');
+    };
+    check(U.parseWeek(good, 204, 'internal').length === 10, 'the good page reads');
+    quick('a cell of ' + N + ' «<» is refused', good.replace('<td>1</td>', '<td>' + '<'.repeat(N) + '</td>'), /слишком длинная/);
+    quick('a row of ' + N + ' cells never closed is refused', good.replace('<td>1</td>', '<td>'.repeat(N) + '<td>1</td>'), /слишком длинная/);
+    quick('a short row with a cell never closed is refused', good.replace('<td>1</td>', '<td>1'), /не закрыта|ячеек/);
+    quick(N + ' <thead> tags never closed do not slow it', good.replace('<thead', '<thead>'.repeat(N) + '<thead'), null);
+    quick(N + ' <tbody> tags never closed do not slow it', good.replace('<tbody', '<tbody>'.repeat(N) + '<tbody'), null);
+    quick(N + ' <select> tags never closed do not slow it', '<select>'.repeat(N) + good, null);
+    quick(N + ' <option> tags never closed do not slow it', good.replace('<option', '<option>'.repeat(N) + '<option'), null);
+    const oneRow = /<tr>\s*<td>1<\/td>[\s\S]*?<\/tr>/.exec(good)[0];
+    quick((U.LIMITS.rows + 1) + ' rows — more than the request asks for', good.replace(oneRow, Array.from({ length: U.LIMITS.rows + 1 }, () => oneRow).join('')), /больше, чем запрошено/);
+    const oneOpt = /<option value="204"[^>]*>[\s\S]*?<\/option>/.exec(good)[0];
+    quick((U.LIMITS.listed + 5) + ' weeks in the list', good.replace(oneOpt, Array.from({ length: U.LIMITS.listed + 5 }, (_, i) => oneOpt.replace('value="204"', 'value="' + (3000 + i) + '"').replace(' selected="selected"', '')).join('') + oneOpt),
+      /больше 60/, (h) => U.parseWeeks(h));
+    quick('a page of ' + Math.round(U.LIMITS.page / 1024 / 1024 + 1) + ' MB', good + ' '.repeat(U.LIMITS.page), /слишком велика/, (h) => U.parseWeeks(h));
+    check(U.text('a<b>c</b>d < e > f <') === 'a c d f <' && U.text('<'.repeat(N)).length === N, 'tags come out of a cell in one pass; a «<» that opens nothing stays');
   } catch (e) {
     check(false, 'the page part stopped: ' + (e.stack || e));
   }

@@ -281,6 +281,12 @@ try {
     const pin = r.querySelector('.pin'), pill = r.querySelector('.upill.u');
     return { uz: pin.classList.contains('uz'), color: getComputedStyle(pin).color, pill: pill ? pill.textContent : '', title: pill ? pill.title : '' };
   });
+  // the mark comes with the repaint of the row, a frame or two after the price: waited for, then read
+  const markOn = async (sel) => {
+    await ep.waitForSelector(sel + ' .pin.uz', { timeout: 10 * 1000 }).catch(() => null);
+    await ep.waitForSelector(sel + ' .upill.u', { timeout: 10 * 1000 }).catch(() => null);
+  };
+  await markOn(row(PIPE, 'т'));
   let c = await cell();
   check(c.uz && c.color === 'rgb(83, 74, 183)' && c.pill === 'U' && /неделя 10\.03–14\.03\.2031/.test(c.title), 'the applied price is violet in its cell, with the «U» pill naming the week');
   check(!(await ep.$(row(PIPE, 'м') + ' .upill.u')), 'the same pipe by the metre, not applied, has none');
@@ -317,9 +323,12 @@ try {
   await ep.waitForFunction(() => window.app && app.model && app.model.resources.length > 60 && !S.Sync.loading, null, T);
   check((await cards()).map((x) => x.split(':').slice(0, 2).join(':')).join(' ') === 'refs:true uzex:false', 'the choice of sources is remembered');
   await show(PIPE);
+  // after a reload the mark comes with the corrections from the server, after the prices
+  await markOn(row(PIPE, 'т'));
   c = await cell();
   check(c && c.uz && c.color === 'rgb(83, 74, 183)' && c.pill === 'U', 'after a reload the cell is still violet with its «U»');
   await show(PAINT);
+  await markOn(row(PAINT));
   check(await ep.$eval(row(PAINT), (r) => !!r.querySelector('.pin.uz') && !!r.querySelector('.upill.u')), 'so is the converted one');
 
   // typed over: the expert's own price again

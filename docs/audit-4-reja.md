@@ -641,7 +641,7 @@ butun himoya shu.
 
 Haqiqiy v1 → v2 juftligida natija to'g'ri. Quyidagilar sun'iy fayllarda topildi.
 
-### [ ] D1 Varaqlar va qatorlarni juftlash
+### [x] D1 Varaqlar va qatorlarni juftlash
 
 `src/lib/compare.js:102-150,227-238,293` — **o'rta** · M
 
@@ -657,7 +657,27 @@ qoldirish, aks holda «лист без пары» deb ko'rsatish; (b) raqamlari 
 juftlikni rad etish — `match.js` dagi mavjud tekshiruvdan foydalanib,
 bahoga tegmasdan; (c) ko'chgan qatorni butun kitob bo'yicha qidirish.
 
-### [ ] D2 «Наш ответ (Excel)» ni o'qish
+**Bajarildi — 5-bosqich (reliz hali chiqmagan).** (a) Varaqlar bosqichma-bosqich
+juftlanadi: aynan sarlavha → raqamsiz sarlavha («№ 3 — …» = «№ 4 — …») → umumiy
+qatorlar ulushi (2·umumiy / (A + B), 0,5 dan **katta**; teng bo'lsa tartibda
+yaqinrog'i) → o'rin bo'yicha faqat ikkala versiya bittadan varaq bo'lsa. Qolgani
+«лист без пары (только в первой версии / только в исправленной)» bo'lib sahifada
+va Excel'da ko'rinadi. (b) Nomi o'zgargan qatorni juftlashda `S.numberRelation`
+«conflict» desa — juftlanmaydi (М5 → М8 = o'chirildi + qo'shildi); `match.js` ga
+tegilmadi. (c) Ko'chgan qator butun kitob bo'yicha nom almashishini taxmin
+qilishdan **oldin** qidiriladi: avval narxi ham bir xili, keyin shu varaqdagisi,
+keyin eng yaqini; boshqa varaqqa — faqat miqdori bir xil bo'lsa. Faqat joyi
+o'zgargani «Строка перенесена» (kulrang); narxi ham o'zgargani o'z holatida qoladi
+(masalan «Не исправлено (строка перенесена)»), «Лист» ustunida «A → B». Ko'chgan
+qator tejamga qo'shilmaydi, har varaq o'z qatorlarini yig'adi. Test:
+`test/compare.cjs` (o'ylab topilgan kitoblar, `compare-books.cjs` `bookOf`).
+Ataylab: chegara rejadagi «≥ 0,5» emas, «> 0,5» — mehnat qatori umumiy bo'lgan
+ikki qatorli ikki smeta aynan 0,5 beradi va juftlanib qolardi. Qoldi: ham nomi,
+ham tarkibi o'zgargan varaq ko'p varaqli kitobda juftsiz chiqadi (o'zgarmagan
+qatorlari «перенесено» bo'lib topiladi); `e2e-compare.mjs` ga «перенесено 0»
+tekshiruvi qo'shilmadi — bu ishda brauzer testlari ishga tushirilmadi.
+
+### [x] D2 «Наш ответ (Excel)» ni o'qish
 
 `src/lib/reply.js:70,102-112` — **o'rta** · S–M
 
@@ -669,7 +689,25 @@ Reja: birliksiz qatorni faqat nom bitta birlikda uchrasa qo'llash, aks holda
 «не применено: N» ro'yxatiga; zaxira qidiruvga raqam tekshiruvi; hamma
 varaqlar; `S.num` (A5 dan keyin).
 
-### [ ] D3 «Итоги листов»
+**Bajarildi — 5-bosqich (reliz hali chiqmagan).** Birliksiz qator nomi smetada
+bir necha birlikda bo'lsa, hech biriga narx qo'ymaydi — «Не применено: N»
+ro'yxatiga (birliklari bilan: «КГ / М»). Zaxira qidiruv (eng yaqin nom) faqat
+raqamlari bir xil nomni oladi (`S.sameNumbers`), bo'shliqsiz kalit esa raqamlar
+ziddiyatida rad etiladi: «ТРУБА 1 20» ≠ ТРУБА 120, «ПЛИТА 4.11» ≠ 4.1.1. Jadvali
+bor **hamma** varaq o'qiladi (har yozuv o'z varag'ini biladi); bir resursga keyingi
+qator boshqa narx bersa, birinchisi qoladi va «Разные цены для одного ресурса»
+da ko'rsatiladi (oldin oxirgisi yutardi). Son bo'lmagan narx («7 500 сум»)
+«Цена не прочитана» ro'yxatiga tushadi; eksportimizning ikkinchi, ikki tilli
+sarlavha qatori bunga kirmaydi. «Не найдено» varaq bo'yicha guruhlanadi: bitta
+qatori ham topilmagan varaq bitta qator («другой проект?»). Matndagi sonlar A5
+dan beri o'qilardi — endi test bilan. Test: `test/compare.cjs` (`replyBook2`,
+`replySmeta`; ikki loyihali o'z eksportimiz qayta o'qilib, ikkala varaqning
+narxlari qaytadi). Qoldi: `src/ui/app.js` («Книга цен» orqali javob) bu ish
+doirasidan tashqarida — eski maydonlar (`cols`) bilan ishlayveradi, lekin «не
+применено» va «цена не прочитана» sonlarini aytmaydi (`rp.hasPrice` ga o'tish va
+toast); e2e testlar ishga tushirilmadi.
+
+### [x] D3 «Итоги листов»
 
 `src/lib/compare.js:54-57,200-221` — **past–o'rta** · S
 
@@ -678,6 +716,23 @@ Ustidan yozilgan umumiy jami faqat «info» darajasida; `samePrice` bardoshligi
 
 Reja: bardoshlikni narxga emas, **summaga** nisbatan olish; ustidan yozilgan
 jamini «внимание» darajasiga ko'tarish.
+
+**Bajarildi — 5-bosqich (reliz hali chiqmagan).** Narx endi qator summasi
+bo'yicha ham solishtiriladi: birlik narxi yaxlitlash ichida bo'lsa ham, farq ×
+miqdor qator summasining 0,01 % idan (yoki 1 so'mdan) oshsa — o'zgargan
+(million × 0,9 so'm endi «Снижено»); so'ralgan narxga «yetdi»
+tekshiruvi ham shunday. Chegara rejadagi 1e-6 emas, 1e-4: 5 000 so'mdan qimmat
+narxni so'mga yaxlitlash har qanday miqdorda «Без изменений» qoladi, kasr bozor
+narximiz (8 928,57) butun yozilsa ham «Исправлено». Narx so'ralganmi — avvalgidek
+narx bo'yicha (hisobot bilan bir xil). «ИТОГО ПРЯМЫЕ» / «ВСЕГО» uchun yangi holat
+«Итог не пересчитан по строкам» (sariq, «требуют внимания» ga kiradi): qatorlar
+(va jamidan oldingi ustama qatorlar) o'zgargan-u, jami joyida qolgan; yoki jami
+o'zgargan-u, ostida hech narsa o'zgarmagan. Qanchaga o'zgargani baholanmaydi
+(ustama va QQS qatorlar bilan birga o'sadi). Fikstura: `book()` da haqiqiy
+ИТОГО ПРЯМЫЕ (325 → 320 va 63), eski «same» tekshiruvi «amount» ga o'zgardi.
+Test: `test/compare.cjs`. Qoldi: egasining haqiqiy v1 → v2 juftligida nechta
+qator «Без изменений» dan chiqishini bir marta, mahalliy (repoga tushirmay)
+ko'rish.
 
 ---
 

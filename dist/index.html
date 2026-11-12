@@ -4529,9 +4529,14 @@ if (typeof self !== 'undefined') self.S = S;
  *                               threshold): shown for reference, never judged as a request
  *   S.compare.workbook(result, opts) → Uint8Array   the comparison as a styled .xlsx
  *
- * Lines are paired inside each sheet by name + unit, in order (longest common subsequence),
+ * Sheets are paired by their title, then by their title without its number («№ 3 — …», so a
+ * sheet inserted in the middle does not shift the ones after it), then by the lines they share;
+ * by position only when each version is a single sheet. The rest are sheets without a pair.
+ * Lines are paired inside each sheet pair by name + unit, in order (longest common subsequence),
  * so a line inserted or deleted by the sender shows as added / removed and does not shift
- * the pairing of the lines after it. Sheets are paired by their name, else by position.
+ * the pairing of the lines after it. A line gone in one place and come in another (another
+ * band, another sheet) is then looked for over the whole book: it is one line moved. Only what
+ * is left is offered to the guess of a rename, and never across a conflict of numbers (М5 / М8).
  */
 (function (S) {
   'use strict';
@@ -4552,6 +4557,7 @@ if (typeof self !== 'undefined') self.S = S;
     removed:  { tone: 'part', label: 'Строка удалена',        rank: 5 },
     renamed:  { tone: 'part', label: 'Изменено наименование / ед. изм.', rank: 6 },
     note:     { tone: 'info', label: 'Замечание (без цены)',  rank: 4 },
+    moved:    { tone: 'info', label: 'Строка перенесена',     rank: 1 },
     same:     { tone: '',     label: 'Без изменений',         rank: 0 }
   };
 
@@ -4564,6 +4570,7 @@ if (typeof self !== 'undefined') self.S = S;
     gap:     { tone: 'bad',  label: 'Итог не равен сумме строк' },
     added:   { tone: 'bad',  label: 'Новая строка' },
     removed: { tone: 'part', label: 'Строка удалена' },
+    typed:   { tone: 'part', label: 'Итог не пересчитан по строкам' },
     amount:  { tone: 'info', label: 'Сумма изменилась' },
     same:    { tone: '',     label: 'Без изменений' }
   };
@@ -4573,8 +4580,21 @@ if (typeof self !== 'undefined') self.S = S;
     var x = a || 0, y = b || 0;
     return Math.abs(x - y) < Math.min(1, Math.max(1e-6, Math.abs(x) * 1e-3));
   }
-  /** The price we asked for counts as reached within 0.1 % (or one sum). */
-  function reached(p, market) { return p <= market || Math.abs(p - market) <= Math.max(1, market * 0.001); }
+  /**
+   * Two prices of one line are the same when they are the same price AND the difference over the
+   * line's quantity is rounding too: at most 0.01 % of the line (or one sum). A price rounded to the
+   * sum stays unchanged at any quantity once it is over 5 000; 0.9 sum on a million units does not.
+   */
+  function sameLine(p1, p2, q) {
+    var d = Math.abs((p1 || 0) - (p2 || 0)), n = Math.abs(q || 0) || 1;
+    return samePrice(p1, p2) && d * n <= Math.max(1, Math.abs((p1 || 0) * n) * 1e-4);
+  }
+  /** The price we asked for counts as reached within 0.1 % (or one sum), and within 0.01 % of the line. */
+  function reached(p, market, q) {
+    var n = Math.abs(q || 0) || 1;
+    return p <= market || (Math.abs(p - market) <= Math.max(1, market * 0.001) &&
+      (p - market) * n <= Math.max(1, market * n * 1e-4));
+  }
   function sameQty(a, b) { var x = a || 0, y = b || 0; return Math.abs(x - y) <= Math.max(1e-9, Math.abs(x) * 1e-9); }
 
   /**
@@ -4584,23 +4604,24 @@ if (typeof self !== 'undefined') self.S = S;
   function classify(a, b, req) {
     if (a && !b) return 'removed';
     if (!a && b) return 'added';
-    var p1 = a.price || 0, p2 = b.price || 0;
+    var p1 = a.price || 0, p2 = b.price || 0, q = Math.max(a.qty || 0, b.qty || 0);
     var qtyUp = !sameQty(a.qty, b.qty) && (b.qty || 0) > (a.qty || 0);
     var qtyDown = !sameQty(a.qty, b.qty) && !qtyUp;
+    // (whether we asked mirrors the report, price against price; what was done is judged by the line)
     if (req && req.market != null && !samePrice(req.market, p1)) {
       var m = req.market;
       if (m < p1) {                                    // we asked for a lower price
-        if (reached(p2, m)) return qtyUp ? 'qtyup' : 'fixed';
-        if (p2 < p1 && !samePrice(p2, p1)) return 'partial';
-        if (p2 > p1 && !samePrice(p2, p1)) return 'worse';
+        if (reached(p2, m, q)) return qtyUp ? 'qtyup' : 'fixed';
+        if (p2 < p1 && !sameLine(p2, p1, q)) return 'partial';
+        if (p2 > p1 && !sameLine(p2, p1, q)) return 'worse';
         return 'notfixed';
       }
       // we asked for a higher price (rare: the smeta was below the market)
       if (samePrice(p2, m) || (p2 > p1 && p2 <= m)) return qtyUp ? 'qtyup' : 'fixed';
-      if (samePrice(p2, p1)) return 'notfixed';
+      if (sameLine(p2, p1, q)) return 'notfixed';
       return p2 < p1 ? 'lowered' : 'raised';
     }
-    if (!samePrice(p1, p2)) return p2 < p1 ? 'lowered' : 'raised';
+    if (!sameLine(p1, p2, q)) return p2 < p1 ? 'lowered' : 'raised';
     if (qtyUp) return 'qtyup';
     if (qtyDown) return 'qtydown';
     if (req && req.note) return 'note';
@@ -4644,7 +4665,8 @@ if (typeof self !== 'undefined') self.S = S;
 
   /**
    * Between two paired lines, a line gone and a line come with the same unit and a close name
-   * (or the same unit, price and quantity) is one line renamed, not a deletion and an addition.
+   * (or the same unit, price and quantity) is one line renamed, not a deletion and an addition —
+   * unless their numbers conflict: «АНКЕР М5» and «АНКЕР М8» are two resources, however alike.
    */
   function pairRenames(A, B, pairs) {
     var out = [], run = [];
@@ -4657,6 +4679,7 @@ if (typeof self !== 'undefined') self.S = S;
           if (used[k]) continue;
           var b = B[add[k][1]];
           if (S.unitKey(a.unit || '') !== S.unitKey(b.unit || '') && S.nameKey(a.nm || '') !== S.nameKey(b.nm || '')) continue;
+          if (S.numberRelation(a.nm || '', b.nm || '') === 'conflict') continue;
           var close = S.charSimilarity(a.nm || '', b.nm || '') >= 0.6 || S.nameKey(a.nm || '') === S.nameKey(b.nm || '') ||
             (samePrice(a.price, b.price) && sameQty(a.qty, b.qty));
           if (!close) continue;
@@ -4709,14 +4732,21 @@ if (typeof self !== 'undefined') self.S = S;
     return s;
   }
   function sameAmount(a, b) { return Math.abs((a || 0) - (b || 0)) <= Math.max(1, Math.abs(a || 0) * 1e-6); }
+  /** A total of the whole estimate: «ИТОГО ПРЯМЫЕ ЗАТРАТЫ», «ВСЕГО …» (the rule test/export-formulas.cjs holds). */
+  function wholeTotal(r) { return r.kind === 'total' && !bandTotal(r) && /ПРЯМЫЕ|^ВСЕГО/.test(S.nameKey(amountLabel(r))); }
+  function sumOf(o) { var t = 0; for (var k in o) t += o[k]; return t; }
 
   /**
    * The sheet's amount lines, before and after. A band «ИТОГО» is checked against the sum of its
    * band's lines: a gap that is new in the returned version (a total typed over instead of summed)
-   * is flagged; a gap both versions share was already there and is left alone.
+   * is flagged; a gap both versions share was already there and is left alone. A whole-estimate
+   * total is flagged when it stayed while the lines under it moved, or moved while nothing under
+   * it did (its lines, and the overhead lines above it). By how much it moved is not judged:
+   * overheads and VAT scale with the lines.
    */
   function compareAmounts(oa, ob) {
     var A = amountRows(oa), B = amountRows(ob), b1 = bandSums(oa), b2 = bandSums(ob), out = [];
+    var dItems = sumOf(b2) - sumOf(b1), dExtra = 0;      // dExtra: the overhead lines met so far
     alignKeys(A.map(amountKey), B.map(amountKey)).forEach(function (p) {
       var a = p[0] >= 0 ? A[p[0]] : null, b = p[1] >= 0 ? B[p[1]] : null;
       var x = { kind: (a || b).kind, section: (a || b).section || '', label1: a ? bandName(a) : '', label2: b ? bandName(b) : '',
@@ -4728,9 +4758,13 @@ if (typeof self !== 'undefined') self.S = S;
         if (bandTotal(a) && a.sum != null && b.sum != null) {
           var g1 = a.sum - (b1[a.section] || 0), g2 = b.sum - (b2[b.section] || 0);
           if (!sameAmount(g1, g2)) { x.st = 'gap'; x.gap = g2; }
+        } else if (wholeTotal(a) && a.sum != null && b.sum != null) {
+          var stayed = sameAmount(a.sum, b.sum);
+          if (stayed ? !sameAmount(dItems + dExtra, 0) : sameAmount(dItems, 0) && sameAmount(dExtra, 0)) x.st = 'typed';
         }
         if (!x.st) x.st = sameAmount(x.s1, x.s2) ? 'same' : 'amount';
       }
+      if (x.kind === 'extra') dExtra += (x.s2 || 0) - (x.s1 || 0);
       out.push(x);
     });
     return out;
@@ -4741,19 +4775,102 @@ if (typeof self !== 'undefined') self.S = S;
 
   function objName(o) { return S.nameKey(o.subtitle || o.name || ''); }
 
-  /** Sheets: by name when the names tell them apart, otherwise by position. */
+  /** The title without its number: «№ 3 — РАБОТЫ — ОБЪЕКТ» is «№ 4 — РАБОТЫ — ОБЪЕКТ» renumbered. */
+  function objShort(o) { return o.subtitle ? S.nameKey(String(o.subtitle).replace(/^№\s*\S+\s+—\s+/, '')) : ''; }
+
+  /** A sheet's resource lines as a multiset of name + unit. */
+  function bagOf(o) {
+    var b = {};
+    itemsOf(o).forEach(function (r) { var k = nuKey(r); b[k] = (b[k] || 0) + 1; });
+    return b;
+  }
+  /** Lines two sheets share, 2·shared / (|A| + |B|): the labour line nearly every estimate has weighs little. */
+  function dice(x, y) {
+    var nx = 0, ny = 0, both = 0, k;
+    for (k in x) { nx += x[k]; if (y[k]) both += Math.min(x[k], y[k]); }
+    for (k in y) ny += y[k];
+    return nx + ny ? 2 * both / (nx + ny) : 0;
+  }
+
+  /**
+   * Sheets, in passes over those still without a pair: the same title; the same title without its
+   * number; more than half of their lines shared (the best first, then the nearer in order, so two
+   * alike blocks keep their order); by position only when each version is one sheet. A sheet left
+   * over has no pair: its lines are new or deleted (or moved, found later over the whole book).
+   */
   function pairObjects(olds, news) {
-    var used = {}, pairs = [];
-    var byName = {};
-    news.forEach(function (o, j) { var k = objName(o); (byName[k] = byName[k] || []).push(j); });
-    olds.forEach(function (o, i) {
-      var cand = (byName[objName(o)] || []).filter(function (j) { return !used[j]; });
-      var j = cand.length ? cand[0] : (i < news.length && !used[i] ? i : -1);
-      if (j >= 0) used[j] = true;
-      pairs.push([i, j]);
-    });
+    var to = olds.map(function () { return -1; }), used = news.map(function () { return false; });
+    function byKey(keyOf) {
+      var idx = {};
+      news.forEach(function (o, j) { var k = !used[j] && keyOf(o); if (k) (idx[k] = idx[k] || []).push(j); });
+      olds.forEach(function (o, i) {
+        var k = to[i] < 0 && keyOf(o), c = k && idx[k];
+        if (c && c.length) { to[i] = c.shift(); used[to[i]] = true; }
+      });
+    }
+    byKey(objName);
+    byKey(objShort);
+    var left = to.some(function (j) { return j < 0; }) && used.some(function (u) { return !u; });
+    if (left) {
+      var cand = [], bn = news.map(function (o, j) { return used[j] ? null : bagOf(o); });
+      olds.forEach(function (o, i) {
+        if (to[i] >= 0) return;
+        var ba = bagOf(o);
+        bn.forEach(function (b, j) { var d = b ? dice(ba, b) : 0; if (d > 0.5) cand.push([d, i, j]); });
+      });
+      cand.sort(function (x, y) { return y[0] - x[0] || Math.abs(x[1] - x[2]) - Math.abs(y[1] - y[2]) || x[1] - y[1] || x[2] - y[2]; });
+      cand.forEach(function (c) { if (to[c[1]] < 0 && !used[c[2]]) { to[c[1]] = c[2]; used[c[2]] = true; } });
+    }
+    if (olds.length === 1 && news.length === 1 && to[0] < 0) { to[0] = 0; used[0] = true; }
+    var pairs = to.map(function (j, i) { return [i, j]; });
     news.forEach(function (o, j) { if (!used[j]) pairs.push([-1, j]); });
     return pairs;
+  }
+
+  /**
+   * Lines gone from one place and come in another, over the whole book: the same name and unit —
+   * the same price first, then the same sheet, then the nearest. Across sheets the quantity must be
+   * the same too: one labour line deleted here and another added there are two changes, not one
+   * move. Each pair found leaves the alignments of its sheets and is kept in `moved` of the sheet
+   * the line went to.
+   */
+  function before(x, y) { for (var z = 0; z < x.length; z++) if (x[z] !== y[z]) return x[z] < y[z]; return false; }
+  function findMoves(sp) {
+    var come = {}, goneOut = sp.map(function () { return {}; }), comeOut = sp.map(function () { return {}; });
+    sp.forEach(function (p, s) {
+      p.raw.forEach(function (q) {
+        if (q[0] >= 0) return;
+        var b = p.B[q[1]], k = nuKey(b);
+        (come[k] = come[k] || []).push({ s: s, j: q[1], rk: S.resKey(b.nm || '', b.unit || '', b.price) });
+      });
+    });
+    sp.forEach(function (p, s) {
+      p.raw.forEach(function (q) {
+        if (q[1] >= 0) return;
+        var a = p.A[q[0]], list = come[nuKey(a)];
+        if (!list) return;
+        var rk = S.resKey(a.nm || '', a.unit || '', a.price), best = -1, bk = null;
+        list.forEach(function (c, t) {
+          if (c.used || (c.s !== s && !sameQty(a.qty, sp[c.s].B[c.j].qty))) return;
+          var key = [c.rk === rk ? 0 : 1, c.s === s ? 0 : 1, Math.abs(c.s - s), Math.abs(c.j - q[0])];
+          if (!bk || before(key, bk)) { best = t; bk = key; }
+        });
+        if (best < 0) return;
+        var c = list[best];
+        c.used = true;
+        goneOut[s][q[0]] = true;
+        comeOut[c.s][c.j] = true;
+        sp[c.s].moved.push({ from: s, i: q[0], j: c.j });
+      });
+    });
+    sp.forEach(function (p, s) {
+      p.raw = p.raw.filter(function (q) { return !(q[1] < 0 && goneOut[s][q[0]]) && !(q[0] < 0 && comeOut[s][q[1]]); });
+    });
+  }
+
+  /** «… — лист без пары (только в первой версии)»: a sheet found in one version only. */
+  function sheetLabel(o) {
+    return o.name + (o.only ? ' — лист без пары (только в ' + (o.only === 'old' ? 'первой версии' : 'исправленной') + ')' : '');
   }
 
   /* -------------------------------------------------------------- result */
@@ -4766,26 +4883,44 @@ if (typeof self !== 'undefined') self.S = S;
               unaskedRows: 0, unaskedUp: 0, unaskedDown: 0, amountFlags: 0, amountRows: 0 };
     Object.keys(STATUS).forEach(function (k) { T.counts[k] = 0; });
 
-    pairObjects(olds, news).forEach(function (op) {
+    // 1. sheets paired, lines aligned inside each pair; 2. moves over the whole book; 3. renames; 4. rows
+    var sp = pairObjects(olds, news).map(function (op) {
       var oa = op[0] >= 0 ? olds[op[0]] : null, ob = op[1] >= 0 ? news[op[1]] : null;
       var A = itemsOf(oa), B = itemsOf(ob);
       var o = { name: (oa || ob).subtitle || (oa || ob).name || '', oldName: oa ? oa.subtitle || oa.name : '',
-                newName: ob ? ob.subtitle || ob.name : '', rows: [], oldSum: 0, newSum: 0, bad: 0, good: 0,
-                amounts: compareAmounts(oa, ob) };
+                newName: ob ? ob.subtitle || ob.name : '', only: !ob ? 'old' : !oa ? 'new' : '',
+                rows: [], oldSum: 0, newSum: 0, bad: 0, good: 0, amounts: compareAmounts(oa, ob) };
+      return { o: o, A: A, B: B, raw: align(A, B), moved: [] };
+    });
+    findMoves(sp);
+
+    sp.forEach(function (p, s) {
+      var o = p.o;
       o.amounts.forEach(function (x) {
         if (x.st !== 'same') T.amountRows++;
         if (AMOUNT[x.st].tone === 'bad' || AMOUNT[x.st].tone === 'part') T.amountFlags++;
       });
-      pairRenames(A, B, align(A, B)).forEach(function (pr) {
-        var a = pr[0] >= 0 ? A[pr[0]] : null, b = pr[1] >= 0 ? B[pr[1]] : null;
+      var seq = pairRenames(p.A, p.B, p.raw).map(function (q) {
+        return { a: q[0] >= 0 ? p.A[q[0]] : null, b: q[1] >= 0 ? p.B[q[1]] : null, j: q[1], from: -1 };
+      });
+      // a moved line stands where it now is: before the first line that comes after it
+      p.moved.sort(function (x, y) { return x.j - y.j; }).forEach(function (m) {
+        var at = seq.length;
+        for (var t = 0; t < seq.length; t++) if (seq[t].j > m.j) { at = t; break; }
+        seq.splice(at, 0, { a: sp[m.from].A[m.i], b: p.B[m.j], j: m.j, from: m.from });
+      });
+      seq.forEach(function (e) {
+        var a = e.a, b = e.b, moved = e.from >= 0;
         var key = a ? S.resKey(a.nm || '', a.unit || '', a.price) : S.resKey(b.nm || '', b.unit || '', b.price);
         var req = a ? requested[key] : null;
         var st = classify(a, b, req);
         var renamed = !!(a && b && (S.nameKey(a.nm || '') !== S.nameKey(b.nm || '') || S.unitKey(a.unit || '') !== S.unitKey(b.unit || '')));
         // a rename is never «fine» on its own: it is shown amber unless the price says worse
         if (renamed && (STATUS[st].tone === 'good' || STATUS[st].tone === '' || st === 'note')) st = 'renamed';
+        // a line that only changed its place; one whose price changed too keeps that status, which is what matters
+        if (moved && st === 'same') st = 'moved';
         var s1 = a ? (a.qty || 0) * (a.price || 0) : 0, s2 = b ? (b.qty || 0) * (b.price || 0) : 0;
-        var row = { st: st, key: key, nm: (a || b).nm || '', unit: (a || b).unit || '', section: (a || b).section || '',
+        var row = { st: st, key: key, nm: (a || b).nm || '', unit: (a || b).unit || '', section: ((moved ? b : a) || b).section || '',
                     no: (b || a).noTxt || '', oldNo: a ? a.noTxt || '' : '', newNo: b ? b.noTxt || '' : '',
                     q1: a ? a.qty || 0 : null, q2: b ? b.qty || 0 : null,
                     p1: a ? a.price || 0 : null, p2: b ? b.price || 0 : null,
@@ -4793,8 +4928,14 @@ if (typeof self !== 'undefined') self.S = S;
                     ours: !req && a && known[key] != null ? known[key] : null,
                     s1: s1, s2: s2, object: o.name,
                     nm2: renamed ? b.nm || '' : '', unit2: renamed ? b.unit || '' : '' };
+        if (moved) {
+          row.moved = true;
+          if (e.from !== s) row.from = sp[e.from].o.name;
+          if ((a.section || '') !== (b.section || '')) row.section1 = a.section || '';
+        }
         o.rows.push(row);
-        o.oldSum += s1; o.newSum += s2;
+        // each sheet sums its own lines: a moved line counts where it was, and where it is
+        (moved ? sp[e.from].o : o).oldSum += s1; o.newSum += s2;
         T.oldSum += s1; T.newSum += s2; T.rows++;
         T.counts[st]++;
         if (st !== 'same') T.changedRows++;
@@ -4905,10 +5046,10 @@ if (typeof self !== 'undefined') self.S = S;
     res.objects.forEach(function (o) {
       o.rows.forEach(function (x) {
         if (x.st === 'same') return;
-        lines.push({ tone: STATUS[x.st].tone, fmt: { 4: '0.000', 5: '0.000' }, cells: [x.object, x.no,
+        lines.push({ tone: STATUS[x.st].tone, fmt: { 4: '0.000', 5: '0.000' }, cells: [x.from ? x.from + ' → ' + x.object : x.object, x.no,
           x.nm2 ? x.nm + '  →  ' + x.nm2 : x.nm, x.unit2 && x.unit2 !== x.unit ? x.unit + ' → ' + x.unit2 : x.unit,
           x.q1, x.q2, x.p1, x.market != null ? x.market : x.ours != null ? S.price(x.ours) + ' (не в таблице)' : null,
-          x.p2, x.s1, x.s2, x.s2 - x.s1, STATUS[x.st].label, unasked(x) ? 'нет' : 'да'] });
+          x.p2, x.s1, x.s2, x.s2 - x.s1, rowLabel(x), unasked(x) ? 'нет' : 'да'] });
       });
     });
     sheet('По строкам',
@@ -4918,7 +5059,7 @@ if (typeof self !== 'undefined') self.S = S;
 
     var amounts = [];
     res.objects.forEach(function (o) {
-      amounts.push({ tone: '', cells: [o.name, 'Строки ресурсов (сумма)', '', o.oldSum, o.newSum, o.newSum - o.oldSum, ''] });
+      amounts.push({ tone: '', cells: [sheetLabel(o), 'Строки ресурсов (сумма)', '', o.oldSum, o.newSum, o.newSum - o.oldSum, ''] });
       o.amounts.forEach(function (x) {
         amounts.push({ tone: AMOUNT[x.st].tone, cells: [o.name, x.label1 || x.label2,
           x.label2 && x.label2 !== x.label1 ? x.label2 : '', x.s1, x.s2,
@@ -4932,6 +5073,9 @@ if (typeof self !== 'undefined') self.S = S;
 
     return S.writeWorkbook({ sheets: sheets, styles: styles, title: title[0] });
   }
+
+  /** A line's status; a moved line whose price says more keeps that, and says it moved. */
+  function rowLabel(x) { return STATUS[x.st].label + (x.moved && x.st !== 'moved' ? ' (строка перенесена)' : ''); }
 
   function statusText(g) {
     var t = STATUS[g.st].label;
@@ -4961,7 +5105,7 @@ if (typeof self !== 'undefined') self.S = S;
   }
 
   S.compare = { versions: versions, workbook: workbook, requested: requested, classify: classify, align: align,
-                STATUS: STATUS, AMOUNT: AMOUNT, statusText: statusText, unasked: unasked };
+                STATUS: STATUS, AMOUNT: AMOUNT, statusText: statusText, rowLabel: rowLabel, sheetLabel: sheetLabel, unasked: unasked };
 })(S);
 
 ;
@@ -4972,9 +5116,15 @@ if (typeof self !== 'undefined') self.S = S;
  * are put on the smeta they were written for, and its lines are what the comparison of
  * versions judges as asked.
  *
- *   S.reply.parse(wb)              → { entries: [{ no, name, unit, price, market, note }], sheet, cols }
+ *   S.reply.parse(wb)              → { entries: [{ no, name, unit, price, market, note, sheet }],
+ *                                       unread: [{ no, name, text, sheet }], sheets: [name],
+ *                                       sheet, cols (of the first sheet read), hasPrice }
  *   S.reply.match(entries, objects) → { prices: key → market, requested: key → { market | note },
- *                                       found: [{ entry, keys }], missing: [entry] }
+ *                                       found: [{ entry, keys }], missing: [entry],
+ *                                       ambiguous: [{ entry, units }], conflicts: [{ entry, key, kept }] }
+ *
+ * Every sheet with such a table is read (our export has one report sheet per project). A price
+ * that cannot be read as a number («7 500 сум») is listed in `unread`, never dropped silently.
  */
 (function (S) {
   'use strict';
@@ -5013,30 +5163,48 @@ if (typeof self !== 'undefined') self.S = S;
     return null;
   }
 
+  function role(name) { for (var k = 0; k < ROLES.length; k++) if (ROLES[k][0] === name) return ROLES[k][1]; return null; }
+  var NAME = role('name'), MARKET = role('market'), PRICE = role('price');
+
   function parse(wb) {
+    var entries = [], unread = [], sheets = [], first = null, hasPrice = false;
     for (var s = 0; s < wb.sheets.length; s++) {
-      var rows = wb.sheets[s].rows || [];
+      var rows = wb.sheets[s].rows || [], sh = wb.sheets[s].name;
       var h = header(rows);
       if (!h) continue;
-      var C = h.cols, out = [];
+      var C = h.cols, n = 0;
       for (var r = h.row + 1; r < rows.length; r++) {
         var row = rows[r];
         if (!row) continue;
         var name = text(row[C.name]).replace(/\s+/g, ' ').trim();
-        var market = S.num(text(row[C.market]));
-        if (!name || market == null || /^\d+$/.test(name)) continue;   // section, total and numbering rows
-        out.push({
-          no: C.no ? text(row[C.no]).trim() : '',
+        var mt = text(row[C.market]).replace(/\s+/g, ' ').trim(), market = S.num(mt);
+        if (!name || /^\d+$/.test(name)) continue;                     // numbering rows
+        var no = C.no ? text(row[C.no]).trim() : '';
+        if (market == null) {
+          // a price written but not a number; a header row repeated (our export's second, bilingual one) is not one
+          if (mt && !NAME.test(key(name)) && !MARKET.test(key(mt)) && !PRICE.test(key(mt))) {
+            unread.push({ no: no, name: name, text: mt, sheet: sh });
+          }
+          continue;                                                    // section and total rows: no price
+        }
+        entries.push({
+          no: no,
           name: name,
           unit: C.unit ? text(row[C.unit]).trim() : '',
           price: C.price ? S.num(text(row[C.price])) : null,
           market: market,
-          note: C.note ? text(row[C.note]).trim() : ''
+          note: C.note ? text(row[C.note]).trim() : '',
+          sheet: sh
         });
+        n++;
       }
-      if (out.length) return { entries: out, sheet: wb.sheets[s].name, cols: C };
+      if (!n) continue;
+      sheets.push(sh);
+      if (!first) first = { sheet: sh, cols: C };
+      if (C.price) hasPrice = true;
     }
-    return { entries: [], sheet: null, cols: null };
+    return { entries: entries, unread: unread, sheets: sheets, sheet: first ? first.sheet : null,
+             cols: first ? first.cols : null, hasPrice: hasPrice };
   }
 
   /* -------------------------------------------------------------- matching */
@@ -5050,7 +5218,11 @@ if (typeof self !== 'undefined') self.S = S;
   /**
    * Each line of the reply to the smeta's resources: name and unit, and the smeta price when the
    * table gives one. A name broken over lines («2-» / «3,75 М») is matched without its spaces and
-   * punctuation; failing that, the closest name of the same unit and price (similarity ≥ 0.9).
+   * punctuation, unless that joins numbers apart («ТРУБА 1 20» is not ТРУБА 120, «4.11» not
+   * 4.1.1); failing that, the closest name of the same unit and price (similarity ≥ 0.9) with the
+   * same numbers — АНКЕР М8 never lands on АНКЕР М5. A line with no unit, whose name the smeta has
+   * in several units, prices none of them (`ambiguous`). A resource priced again by a later line
+   * at another price keeps the first (`conflicts`).
    */
   function match(entries, objects) {
     var res = new Map();
@@ -5059,27 +5231,41 @@ if (typeof self !== 'undefined') self.S = S;
         if (r.kind !== 'item') return;
         var k = S.resKey(r.nm || '', r.unit || '', r.price == null ? 0 : r.price);
         if (!res.has(k)) res.set(k, { key: k, nm: r.nm || '', nk: S.nameKey(r.nm || ''), bk: bare(r.nm || ''),
-                                       uk: S.unitKey(r.unit || ''), price: r.price || 0 });
+                                       uk: S.unitKey(r.unit || ''), unit: r.unit || '', price: r.price || 0 });
       });
     });
     var all = Array.from(res.values());
-    var out = { prices: {}, requested: {}, found: [], missing: [] };
+    var out = { prices: {}, requested: {}, found: [], missing: [], ambiguous: [], conflicts: [] };
+    var given = {};                                         // key → the market price its first line gave
     entries.forEach(function (e) {
       var uk = S.unitKey(e.unit || ''), nk = S.nameKey(e.name), bk = bare(e.name);
       var fits = function (x) { return (!uk || x.uk === uk) && (e.price == null || samePrice(x.price, e.price)); };
       var hit = all.filter(function (x) { return x.nk === nk && fits(x); });
-      if (!hit.length) hit = all.filter(function (x) { return x.bk === bk && fits(x); });
+      if (!hit.length) {
+        hit = all.filter(function (x) { return x.bk === bk && fits(x) && S.numberRelation(x.nm, e.name) !== 'conflict'; });
+      }
       if (!hit.length && e.price != null) {
         var best = null, bs = 0.9;
         all.forEach(function (x) {
-          if (!fits(x)) return;
+          if (!fits(x) || !S.sameNumbers(x.nm, e.name)) return;
           var sim = S.charSimilarity(x.nm, e.name);
           if (sim >= bs) { bs = sim; best = x; }
         });
         if (best) hit = [best];
       }
       if (!hit.length) { out.missing.push(e); return; }
+      if (!uk) {
+        var us = {};
+        hit.forEach(function (x) { if (!(x.uk in us)) us[x.uk] = x.unit; });
+        var ks = Object.keys(us);
+        if (ks.length > 1) { out.ambiguous.push({ entry: e, units: ks.map(function (k) { return us[k]; }) }); return; }
+      }
       hit.forEach(function (x) {
+        if (given[x.key] != null && given[x.key] !== e.market) {
+          out.conflicts.push({ entry: e, key: x.key, kept: given[x.key] });
+          return;
+        }
+        given[x.key] = e.market;
         if (!unchanged(x.price, e.market)) {                // a price we changed (our figure, exact)
           out.prices[x.key] = e.market;
           out.requested[x.key] = { market: e.market };
@@ -5883,13 +6069,16 @@ if (typeof self !== 'undefined') self.S = S;
         return;
       }
       var m = S.reply.match(parsed.entries, objects);
-      self.reply = { base: b, name: file.name, entries: parsed.entries, match: m };
+      self.reply = { base: b, name: file.name, entries: parsed.entries, unread: parsed.unread, match: m };
       if (back) { back(); return; }
       chose('reply', file);
       var n = Object.keys(m.prices).length;
       if (b !== 'file' && n) app.setPrices(m.prices);
       app.toast('Наш ответ: строк ' + parsed.entries.length + ', найдено в смете ' + m.found.length +
-        (m.missing.length ? ', не найдено ' + m.missing.length : '') + (b !== 'file' ? ' · цен проекта обновлено: ' + n : ''));
+        (m.missing.length ? ', не найдено ' + m.missing.length : '') +
+        (m.ambiguous.length ? ', не применено ' + m.ambiguous.length : '') +
+        (parsed.unread.length ? ', цена не прочитана ' + parsed.unread.length : '') +
+        (b !== 'file' ? ' · цен проекта обновлено: ' + n : ''));
       self.run();
     };
     reader.readAsArrayBuffer(file);
@@ -5969,6 +6158,44 @@ if (typeof self !== 'undefined') self.S = S;
     if (filter === 'changed' || filter === 'unasked') return x.st !== 'same';
     return true;
   }
+  /**
+   * What of «Наш ответ» did not land: lines the smeta does not have (by sheet — a sheet none of
+   * whose lines is here is one line: another project), lines not applied for want of a unit,
+   * prices that cannot be read, and a resource priced twice differently (the first price stays).
+   */
+  function replyNotes(rp) {
+    var m = rp.match, unread = rp.unread || [], ambiguous = m.ambiguous || [], conflicts = m.conflicts || [];
+    function line(e) {
+      return (e.no ? e.no + '. ' : '') + e.name + ' · ' + e.unit + ' · ' + (e.price != null ? S.price(e.price) : '—') +
+        ' → ' + S.price(e.market);
+    }
+    function li(t) { return '<li>' + S.esc(t) + '</li>'; }
+    function details(title, items) {
+      return items.length ? '<details class="cmp-miss"><summary>' + S.esc(title) + '</summary><ul>' + items.join('') + '</ul></details>' : '';
+    }
+    var hit = {}, order = [], by = {};
+    m.found.concat(ambiguous).forEach(function (f) { hit[f.entry.sheet || ''] = true; });
+    m.missing.forEach(function (e) {
+      var s = e.sheet || '';
+      if (!by[s]) { by[s] = []; order.push(s); }
+      by[s].push(e);
+    });
+    var miss = [];
+    order.forEach(function (s) {
+      if (s && !hit[s]) miss.push(li('Лист «' + s + '»: ни одна строка не найдена в этой смете (' + by[s].length + ') — другой проект?'));
+      else by[s].forEach(function (e) { miss.push(li(line(e) + (order.length > 1 && s ? ' · лист «' + s + '»' : ''))); });
+    });
+    return details('Не найдено в смете: ' + m.missing.length + ' строк ответа', miss) +
+      details('Не применено: ' + ambiguous.length + ' (нет ед. изм., а ресурс в смете в нескольких единицах)',
+        ambiguous.map(function (a) { return li(line(a.entry) + ' · в смете: ' + a.units.join(' / ')); })) +
+      details('Цена не прочитана: ' + unread.length, unread.map(function (u) {
+        return li((u.no ? u.no + '. ' : '') + u.name + ' · «' + u.text + '»' + (u.sheet ? ' · лист «' + u.sheet + '»' : ''));
+      })) +
+      details('Разные цены для одного ресурса: ' + conflicts.length + ' (оставлена первая)', conflicts.map(function (c) {
+        return li(line(c.entry) + ' · оставлена ' + S.price(c.kept));
+      }));
+  }
+
   function nameCell(x) {
     if (!x.nm2) return S.esc(x.nm);
     return '<s class="mute">' + S.esc(x.nm) + '</s><br>' + S.esc(x.nm2);
@@ -6014,20 +6241,18 @@ if (typeof self !== 'undefined') self.S = S;
       card(T.unaskedUp > 0.5 ? 'bad' : '', 'Без нашего замечания', lines(T.unaskedRows) + ' · ' + delta(T.unaskedUp - T.unaskedDown),
         'снижено на ' + money(T.unaskedDown) + ' · повышено на ' + money(T.unaskedUp) + '<br>цена ↓ ' + (T.counts.lowered || 0) +
         ' · ↑ ' + (T.counts.raised || 0) + ' · объём ↑ ' + (T.counts.qtyup || 0) + ' ↓ ' + (T.counts.qtydown || 0) +
-        ' · переименовано ' + (T.counts.renamed || 0) + ' · новых ' + (T.counts.added || 0) + ' · удалено ' + (T.counts.removed || 0),
+        ' · переименовано ' + (T.counts.renamed || 0) + ' · новых ' + (T.counts.added || 0) + ' · удалено ' + (T.counts.removed || 0) +
+        ' · перенесено ' + (T.counts.moved || 0),
         'unasked') +
       card(T.amountFlags ? 'bad' : 'good', 'Итоги листов (ИТОГО, ЗСР, транспорт)',
         T.amountFlags ? lines(T.amountFlags) + ' требуют внимания' : 'расхождений нет',
-        'изменилась сумма: ' + lines(T.amountRows) + ' · текст/процент и «итог ≠ сумма строк» — красным', 'sheets') +
+        'изменилась сумма: ' + lines(T.amountRows) + ' · текст/процент и «итог ≠ сумма строк» — красным, ' +
+        'итог не пересчитан — жёлтым', 'sheets') +
       '</div>' +
       '<div class="cmp-files">Было: <b>' + S.esc(L.oldLabel) + '</b> · Стало: <b>' + S.esc(L.newLabel) + '</b> · ' +
       (L.reply ? 'замечания из файла «' + S.esc(L.reply.name) + '»: ' + L.asked + ' (строк в файле ' + L.reply.entries.length + ')' :
         'замечаний в нашей таблице: ' + L.asked) + ' · ' + lines(T.rows) + ' · ' + this.ms + ' мс</div>' +
-      (L.reply && L.reply.match.missing.length ? '<details class="cmp-miss"><summary>Не найдено в смете: ' +
-        L.reply.match.missing.length + ' строк ответа</summary><ul>' + L.reply.match.missing.map(function (e) {
-          return '<li>' + S.esc((e.no ? e.no + '. ' : '') + e.name + ' · ' + e.unit + ' · ' + (e.price != null ? S.price(e.price) : '—') +
-            ' → ' + S.price(e.market)) + '</li>';
-        }).join('') + '</ul></details>' : '');
+      (L.reply ? replyNotes(L.reply) : '');
 
     var view = $('cmpView').value, filter = $('cmpFilter').value;
     var q = S.nameKey($('cmpQ').value || '');
@@ -6041,7 +6266,7 @@ if (typeof self !== 'undefined') self.S = S;
           return keepAmount(x, filter) && (!q || S.nameKey(x.label1 + ' ' + x.label2).indexOf(q) >= 0);
         });
         if (!rows.length && filter !== 'all') return;
-        html.push('<tr class="t-head"><td>' + S.esc(o.name) + '</td><td><b>Строки ресурсов (сумма)</b></td>' +
+        html.push('<tr class="t-head"><td>' + S.esc(S.compare.sheetLabel(o)) + '</td><td><b>Строки ресурсов (сумма)</b></td>' +
           '<td class="n">' + money(o.oldSum) + '</td><td class="n">' + money(o.newSum) + '</td>' +
           '<td class="n">' + delta(o.newSum - o.oldSum) + '</td><td></td></tr>');
         rows.forEach(function (x) {
@@ -6089,11 +6314,12 @@ if (typeof self !== 'undefined') self.S = S;
           n++;
           var qty = x.q1 == null ? S.qty(x.q2) : x.q2 == null ? S.qty(x.q1) :
             (Math.abs(x.q1 - x.q2) > 1e-9 ? S.qty(x.q1) + ' → <b>' + S.qty(x.q2) + '</b>' : S.qty(x.q1));
-          html.push('<tr class="t-' + (ST(x.st).tone || 'none') + '"><td>' + S.esc(o.name) + '</td><td>' + S.esc(x.no) + '</td>' +
+          html.push('<tr class="t-' + (ST(x.st).tone || 'none') + '"><td>' + S.esc(x.from ? x.from + ' → ' + o.name : o.name) +
+            '</td><td>' + S.esc(x.no) + '</td>' +
             '<td>' + nameCell(x) + '</td><td>' + unitCell(x) + '</td><td class="n">' + qty + '</td>' +
             '<td class="n">' + pr(x.p1) + '</td><td class="n">' + ours(x) + '</td>' +
             '<td class="n">' + pr(x.p2) + '</td><td class="n">' + money(x.s1) + '</td><td class="n">' + money(x.s2) + '</td>' +
-            '<td class="n">' + delta(x.s2 - x.s1) + '</td><td>' + S.esc(ST(x.st).label) + '</td></tr>');
+            '<td class="n">' + delta(x.s2 - x.s1) + '</td><td>' + S.esc(S.compare.rowLabel(x)) + '</td></tr>');
         });
       });
       body.innerHTML = '<table class="cmp"><colgroup>' + COLS_ROW + '</colgroup>' + html.join('') + '</table>';

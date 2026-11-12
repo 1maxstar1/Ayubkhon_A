@@ -62,18 +62,29 @@ function book(v) {
     [null, null, 'ИТОГО СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ', 'СУМ', null, null, v === 1 ? 189 : 200],
     // an overhead whose percentage the sender changed
     [null, null, v === 1 ? 'ТРАНСПОРТНЫЕ УСЛУГИ=5%' : 'ТРАНСПОРТНЫЕ УСЛУГИ=7%', 'СУМ', null, null, v === 1 ? 9 : 13]
-  ]);
+  ], { direct: v === 1 ? 325 : 320 });   // the direct-cost total follows its lines: 325 → 320
   const second = estimate('ТЕСТОВОЕ ОБОРУДОВАНИЕ', [
     [null, null, 'СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'],
     line(1, 'ТЕСТОВЫЙ АНКЕР М5', 'ШТ', 2, 17),                            // left at the old price here
     [null, null, 'ТЕХНОЛОГИЧЕСКОЕ ОБОРУДОВАНИЕ'],
     line(1, 'ТЕСТОВЫЙ ЩИТ', 'ШТ', 1, 29)
-  ]);
+  ], { direct: 63 });                     // 34 + 29, the same in both versions
   second[0] = [];
   return { sheets: [sheet('РА', [[null, null, null, null, null, 'Форма 4А АВС-4'],
     ['Наименование стройки -', null, 'ТЕСТОВАЯ СТРОЙКА'], [], ...first, ...second])] };
 }
 
+
+/**
+ * Several local estimates on one 4А sheet, the way book() lays out its two: `ests` is
+ * [{ works, rows, no, direct }], each drawn by estimate(). For the pairing of sheets and lines.
+ */
+function bookOf(ests) {
+  const rows = [];
+  ests.forEach((e) => rows.push(...estimate(e.works, e.rows, { no: e.no, direct: e.direct })));
+  return { sheets: [sheet('РА', [[null, null, null, null, null, 'Форма 4А АВС-4'],
+    ['Наименование стройки -', null, 'ТЕСТОВАЯ СТРОЙКА'], [], ...rows])] };
+}
 
 /** Our market prices on the first version, keyed the way the program keys them. */
 function prices(S) {
@@ -115,4 +126,42 @@ function replyBook() {
   ])] };
 }
 
-module.exports = { book, prices, xlsx, replyBook, sheet, estimate, line };
+/**
+ * A reply of two sheets, each with its own table, and the lines a careless match would get wrong.
+ * The smeta it is read against is replySmeta().
+ */
+function replyBook2() {
+  const head = ['№', 'Наименование', 'Ед. изм.', 'Цена по смете', 'Рыночная цена', 'Примечание'];
+  return { sheets: [
+    sheet('A', [
+      ['Ответ на смету, часть 1'], [], head,
+      [1, 'ТЕСТОВАЯ ПРОВОЛОКА', '', 10, 8, ''],              // no unit: the smeta has it in КГ and in М
+      [2, 'ТЕСТОВЫЙ АНКЕР М8', 'ШТ', 17, 15, ''],             // the smeta has only М5 at 17
+      [3, 'ТЕСТОВАЯ ПЛИТА 4.11', 'ШТ', 40, 30, ''],          // the smeta has ПЛИТА 4.1.1
+      [4, 'ТЕСТОВАЯ ТРУБА 1 20', 'М', 9, 7, ''],             // the smeta has ТРУБА 120
+      [5, 'ТЕСТОВЫЙ КАБЕЛЬ', 'М', '1 234,50', '1 000,25', ''],  // numbers typed as text
+      [6, 'ТЕСТОВЫЙ ЩЕБЕНЬ', 'М3', 9990, '7 500 сум', '']   // a price that cannot be read
+    ]),
+    sheet('B', [
+      ['Ответ на смету, часть 2'], [], head,
+      [1, 'ТЕСТОВАЯ ТРУБА 120', 'М', 9, 6, ''],
+      [2, 'ТЕСТОВЫЙ КАБЕЛЬ', 'М', 1234.5, 1100, '']           // the same line priced again, differently
+    ])
+  ] };
+}
+
+/** The smeta replyBook2() answers: one estimate, parsed as the program parses it. */
+function replySmeta() {
+  return bookOf([{ works: 'ТЕСТОВЫЕ РАБОТЫ', rows: [
+    [null, null, 'СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'],
+    line(1, 'ТЕСТОВАЯ ПРОВОЛОКА', 'КГ', 3, 10),
+    line(2, 'ТЕСТОВАЯ ПРОВОЛОКА', 'М', 5, 10),
+    line(3, 'ТЕСТОВЫЙ АНКЕР М5', 'ШТ', 4, 17),
+    line(4, 'ТЕСТОВАЯ ПЛИТА 4.1.1', 'ШТ', 2, 40),
+    line(5, 'ТЕСТОВАЯ ТРУБА 120', 'М', 6, 9),
+    line(6, 'ТЕСТОВЫЙ КАБЕЛЬ', 'М', 1, 1234.5),
+    line(7, 'ТЕСТОВЫЙ ЩЕБЕНЬ', 'М3', 1, 9990)
+  ] }]);
+}
+
+module.exports = { book, bookOf, prices, xlsx, replyBook, replyBook2, replySmeta, sheet, estimate, line };

@@ -257,13 +257,16 @@
         return;
       }
       var m = S.reply.match(parsed.entries, objects);
-      self.reply = { base: b, name: file.name, entries: parsed.entries, match: m };
+      self.reply = { base: b, name: file.name, entries: parsed.entries, unread: parsed.unread, match: m };
       if (back) { back(); return; }
       chose('reply', file);
       var n = Object.keys(m.prices).length;
       if (b !== 'file' && n) app.setPrices(m.prices);
       app.toast('Наш ответ: строк ' + parsed.entries.length + ', найдено в смете ' + m.found.length +
-        (m.missing.length ? ', не найдено ' + m.missing.length : '') + (b !== 'file' ? ' · цен проекта обновлено: ' + n : ''));
+        (m.missing.length ? ', не найдено ' + m.missing.length : '') +
+        (m.ambiguous.length ? ', не применено ' + m.ambiguous.length : '') +
+        (parsed.unread.length ? ', цена не прочитана ' + parsed.unread.length : '') +
+        (b !== 'file' ? ' · цен проекта обновлено: ' + n : ''));
       self.run();
     };
     reader.readAsArrayBuffer(file);
@@ -343,6 +346,44 @@
     if (filter === 'changed' || filter === 'unasked') return x.st !== 'same';
     return true;
   }
+  /**
+   * What of «Наш ответ» did not land: lines the smeta does not have (by sheet — a sheet none of
+   * whose lines is here is one line: another project), lines not applied for want of a unit,
+   * prices that cannot be read, and a resource priced twice differently (the first price stays).
+   */
+  function replyNotes(rp) {
+    var m = rp.match, unread = rp.unread || [], ambiguous = m.ambiguous || [], conflicts = m.conflicts || [];
+    function line(e) {
+      return (e.no ? e.no + '. ' : '') + e.name + ' · ' + e.unit + ' · ' + (e.price != null ? S.price(e.price) : '—') +
+        ' → ' + S.price(e.market);
+    }
+    function li(t) { return '<li>' + S.esc(t) + '</li>'; }
+    function details(title, items) {
+      return items.length ? '<details class="cmp-miss"><summary>' + S.esc(title) + '</summary><ul>' + items.join('') + '</ul></details>' : '';
+    }
+    var hit = {}, order = [], by = {};
+    m.found.concat(ambiguous).forEach(function (f) { hit[f.entry.sheet || ''] = true; });
+    m.missing.forEach(function (e) {
+      var s = e.sheet || '';
+      if (!by[s]) { by[s] = []; order.push(s); }
+      by[s].push(e);
+    });
+    var miss = [];
+    order.forEach(function (s) {
+      if (s && !hit[s]) miss.push(li('Лист «' + s + '»: ни одна строка не найдена в этой смете (' + by[s].length + ') — другой проект?'));
+      else by[s].forEach(function (e) { miss.push(li(line(e) + (order.length > 1 && s ? ' · лист «' + s + '»' : ''))); });
+    });
+    return details('Не найдено в смете: ' + m.missing.length + ' строк ответа', miss) +
+      details('Не применено: ' + ambiguous.length + ' (нет ед. изм., а ресурс в смете в нескольких единицах)',
+        ambiguous.map(function (a) { return li(line(a.entry) + ' · в смете: ' + a.units.join(' / ')); })) +
+      details('Цена не прочитана: ' + unread.length, unread.map(function (u) {
+        return li((u.no ? u.no + '. ' : '') + u.name + ' · «' + u.text + '»' + (u.sheet ? ' · лист «' + u.sheet + '»' : ''));
+      })) +
+      details('Разные цены для одного ресурса: ' + conflicts.length + ' (оставлена первая)', conflicts.map(function (c) {
+        return li(line(c.entry) + ' · оставлена ' + S.price(c.kept));
+      }));
+  }
+
   function nameCell(x) {
     if (!x.nm2) return S.esc(x.nm);
     return '<s class="mute">' + S.esc(x.nm) + '</s><br>' + S.esc(x.nm2);
@@ -388,20 +429,18 @@
       card(T.unaskedUp > 0.5 ? 'bad' : '', 'Без нашего замечания', lines(T.unaskedRows) + ' · ' + delta(T.unaskedUp - T.unaskedDown),
         'снижено на ' + money(T.unaskedDown) + ' · повышено на ' + money(T.unaskedUp) + '<br>цена ↓ ' + (T.counts.lowered || 0) +
         ' · ↑ ' + (T.counts.raised || 0) + ' · объём ↑ ' + (T.counts.qtyup || 0) + ' ↓ ' + (T.counts.qtydown || 0) +
-        ' · переименовано ' + (T.counts.renamed || 0) + ' · новых ' + (T.counts.added || 0) + ' · удалено ' + (T.counts.removed || 0),
+        ' · переименовано ' + (T.counts.renamed || 0) + ' · новых ' + (T.counts.added || 0) + ' · удалено ' + (T.counts.removed || 0) +
+        ' · перенесено ' + (T.counts.moved || 0),
         'unasked') +
       card(T.amountFlags ? 'bad' : 'good', 'Итоги листов (ИТОГО, ЗСР, транспорт)',
         T.amountFlags ? lines(T.amountFlags) + ' требуют внимания' : 'расхождений нет',
-        'изменилась сумма: ' + lines(T.amountRows) + ' · текст/процент и «итог ≠ сумма строк» — красным', 'sheets') +
+        'изменилась сумма: ' + lines(T.amountRows) + ' · текст/процент и «итог ≠ сумма строк» — красным, ' +
+        'итог не пересчитан — жёлтым', 'sheets') +
       '</div>' +
       '<div class="cmp-files">Было: <b>' + S.esc(L.oldLabel) + '</b> · Стало: <b>' + S.esc(L.newLabel) + '</b> · ' +
       (L.reply ? 'замечания из файла «' + S.esc(L.reply.name) + '»: ' + L.asked + ' (строк в файле ' + L.reply.entries.length + ')' :
         'замечаний в нашей таблице: ' + L.asked) + ' · ' + lines(T.rows) + ' · ' + this.ms + ' мс</div>' +
-      (L.reply && L.reply.match.missing.length ? '<details class="cmp-miss"><summary>Не найдено в смете: ' +
-        L.reply.match.missing.length + ' строк ответа</summary><ul>' + L.reply.match.missing.map(function (e) {
-          return '<li>' + S.esc((e.no ? e.no + '. ' : '') + e.name + ' · ' + e.unit + ' · ' + (e.price != null ? S.price(e.price) : '—') +
-            ' → ' + S.price(e.market)) + '</li>';
-        }).join('') + '</ul></details>' : '');
+      (L.reply ? replyNotes(L.reply) : '');
 
     var view = $('cmpView').value, filter = $('cmpFilter').value;
     var q = S.nameKey($('cmpQ').value || '');
@@ -415,7 +454,7 @@
           return keepAmount(x, filter) && (!q || S.nameKey(x.label1 + ' ' + x.label2).indexOf(q) >= 0);
         });
         if (!rows.length && filter !== 'all') return;
-        html.push('<tr class="t-head"><td>' + S.esc(o.name) + '</td><td><b>Строки ресурсов (сумма)</b></td>' +
+        html.push('<tr class="t-head"><td>' + S.esc(S.compare.sheetLabel(o)) + '</td><td><b>Строки ресурсов (сумма)</b></td>' +
           '<td class="n">' + money(o.oldSum) + '</td><td class="n">' + money(o.newSum) + '</td>' +
           '<td class="n">' + delta(o.newSum - o.oldSum) + '</td><td></td></tr>');
         rows.forEach(function (x) {
@@ -463,11 +502,12 @@
           n++;
           var qty = x.q1 == null ? S.qty(x.q2) : x.q2 == null ? S.qty(x.q1) :
             (Math.abs(x.q1 - x.q2) > 1e-9 ? S.qty(x.q1) + ' → <b>' + S.qty(x.q2) + '</b>' : S.qty(x.q1));
-          html.push('<tr class="t-' + (ST(x.st).tone || 'none') + '"><td>' + S.esc(o.name) + '</td><td>' + S.esc(x.no) + '</td>' +
+          html.push('<tr class="t-' + (ST(x.st).tone || 'none') + '"><td>' + S.esc(x.from ? x.from + ' → ' + o.name : o.name) +
+            '</td><td>' + S.esc(x.no) + '</td>' +
             '<td>' + nameCell(x) + '</td><td>' + unitCell(x) + '</td><td class="n">' + qty + '</td>' +
             '<td class="n">' + pr(x.p1) + '</td><td class="n">' + ours(x) + '</td>' +
             '<td class="n">' + pr(x.p2) + '</td><td class="n">' + money(x.s1) + '</td><td class="n">' + money(x.s2) + '</td>' +
-            '<td class="n">' + delta(x.s2 - x.s1) + '</td><td>' + S.esc(ST(x.st).label) + '</td></tr>');
+            '<td class="n">' + delta(x.s2 - x.s1) + '</td><td>' + S.esc(S.compare.rowLabel(x)) + '</td></tr>');
         });
       });
       body.innerHTML = '<table class="cmp"><colgroup>' + COLS_ROW + '</colgroup>' + html.join('') + '</table>';

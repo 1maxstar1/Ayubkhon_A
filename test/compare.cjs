@@ -2,7 +2,9 @@
  * «Сравнение версий»: the first smeta, the smeta the sender returned after our comparison
  * table, and what the table asked for. Every status, the pairing of lines when the sender
  * inserted or deleted one, what counts as «asked» (the report's own mode and threshold), and
- * the .xlsx of the comparison.
+ * the .xlsx of the comparison. Then (audit 4, D1–D3): sheets inserted, deleted or renumbered,
+ * lines moved to another band or estimate, М5 never renamed to М8, prices judged over the
+ * line's sum, whole-estimate totals not recalculated, and «Наш ответ» read sheet by sheet.
  *
  * Both versions are invented and tiny (names, numbers and prices), built as the parser sees a
  * sheet, so no real estimate or price is needed.
@@ -18,7 +20,7 @@ const S = load('fflate', 'normalize', 'match', 'sections', 'util', 'formula', 'x
 let fail = 0;
 const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) fail++; };
 
-const { book, prices: pricesFor, xlsx, replyBook } = require('./compare-books.cjs');
+const { book, bookOf, line, prices: pricesFor, xlsx, replyBook, replyBook2, replySmeta } = require('./compare-books.cjs');
 
 const v1 = S.smeta.parseWorkbook(book(1), 'v1.xlsx');
 const v2 = S.smeta.parseWorkbook(book(2), 'v2.xlsx');
@@ -67,7 +69,8 @@ check(amt(/^ТРАНСПОРТНЫЕ/).st === 'label' && amt(/^ТРАНСПОР�
   'an overhead whose percentage changed (5 % → 7 %) is paired and flagged');
 check(amt(/^ИТОГО СТРОИТЕЛЬНЫЕ/).st === 'gap' && amt(/^ИТОГО СТРОИТЕЛЬНЫЕ/).gap === 12,
   'a band total typed over (200 while its lines sum to 188) is flagged with its gap');
-check(amt(/^ИТОГО ПРЯМЫЕ/).st === 'same', '«ИТОГО ПРЯМЫЕ ЗАТРАТЫ» is not checked against one band');
+check(amt(/^ИТОГО ПРЯМЫЕ/).st === 'amount', '«ИТОГО ПРЯМЫЕ ЗАТРАТЫ» that moves with its lines (325 → 320) is only a changed amount');
+check(res.objects[1].amounts.find((x) => /^ИТОГО ПРЯМЫЕ/.test(x.label1)).st === 'same', 'and is unchanged where its lines are (63)');
 check(res.totals.amountFlags === 2, 'two sheet total lines need attention (' + res.totals.amountFlags + ')');
 // a gap both versions share was already there: not flagged
 const v1gap = S.smeta.parseWorkbook(book(1), 'v1.xlsx'), v2same = S.smeta.parseWorkbook(book(1), 'v1.xlsx');
@@ -149,6 +152,170 @@ const own = S.reply.parse(S.readXlsx(S.buildWorkbook(ownModel, { mode: 'changed'
 const ownM = S.reply.match(own.entries, v1);
 check(own.entries.length > 0 && ownM.missing.length === 0 &&
   Object.keys(rm.prices).every((kk) => ownM.prices[kk] === rm.prices[kk]), 'our own export (321.xlsx sheet) read back gives the same prices');
+
+// each estimate's resource lines add up to that estimate's own line sums, before and after
+const itemSum = (o) => o.rows.filter((r) => r.kind === 'item').reduce((a, r) => a + r.qty * r.price, 0);
+check(res.objects.every((o, i) => Math.abs(o.oldSum - itemSum(v1[i])) < 1e-9 && Math.abs(o.newSum - itemSum(v2[i])) < 1e-9),
+  'each sheet\'s «Строки ресурсов (сумма)» is the sum of its own lines');
+
+/* ------------------------------------------------- pairing sheets and lines (audit 4, D1) */
+
+const LAB = [null, null, 'ТРУДОВЫЕ РЕСУРСЫ'], MAT = [null, null, 'СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'];
+const EQP = [null, null, 'ТЕХНОЛОГИЧЕСКОЕ ОБОРУДОВАНИЕ'];
+const labour = (q) => line(1, 'ЗАТРАТЫ ТРУДА РАБОЧИХ-СТРОИТЕЛЕЙ', 'ЧЕЛ.-Ч', q, 11);
+const parse = (ests) => S.smeta.parseWorkbook(bookOf(ests), 'x.xlsx');
+const one = (rows, direct) => parse([{ no: 1, works: 'ТЕСТОВЫЕ РАБОТЫ', rows, direct }]);
+const allRows = (r) => r.objects.flatMap((o) => o.rows);
+const rowsNamed = (r, nm) => allRows(r).filter((x) => x.nm === nm);
+// an estimate of its own: the labour line nearly every estimate has, and two materials of its own
+const WORDS = { А: ['ПЕСОК', 'ГЛИНА'], Б: ['ЩЕБЕНЬ', 'ГРАВИЙ'], В: ['КИРПИЧ', 'ИЗВЕСТЬ'], Н: ['ГИПС', 'МЕЛ'],
+                П: ['ЛАК', 'КРАСКА'], Q: ['ОЛИФА', 'ГРУНТ'] };
+const est = (no, w, works) => ({ no, works: works || 'РАБОТЫ ' + w, rows: [LAB, labour(10), MAT,
+  line(1, 'ТЕСТОВЫЙ ' + WORDS[w][0], 'Т', 2, 5), line(2, 'ТЕСТОВЫЙ ' + WORDS[w][1], 'КГ', 3, 7)] });
+const objOf = (r, w) => r.objects.find((o) => (o.oldName || o.newName).includes('РАБОТЫ ' + w + ' —'));
+const allSame = (o) => o && o.rows.length > 0 && o.rows.every((x) => x.st === 'same');
+
+// (a) a new estimate inserted in the middle, and the ones after it renumbered
+const r1 = S.compare.versions(parse([est(1, 'А'), est(2, 'Б'), est(3, 'В')]),
+  parse([est(1, 'А'), est(2, 'Н'), est(3, 'Б'), est(4, 'В')]), {}, {});
+check(objOf(r1, 'Б') && objOf(r1, 'Б').newName.includes('РАБОТЫ Б') && objOf(r1, 'В') && objOf(r1, 'В').newName.includes('РАБОТЫ В') &&
+  allSame(objOf(r1, 'Б')) && allSame(objOf(r1, 'В')),
+  'an estimate inserted in the middle does not steal the pair of the ones after it, renumbered or not');
+const n1 = r1.objects.find((o) => o.newName.includes('РАБОТЫ Н'));
+check(n1 && n1.only === 'new' && !n1.oldName && n1.rows.every((x) => x.st === 'added') && r1.totals.counts.renamed === 0,
+  'the inserted estimate is a sheet without a pair: its lines are new, nothing is «renamed»');
+// one deleted at the front, one added at the back
+const r2 = S.compare.versions(parse([est(1, 'П'), est(2, 'А')]), parse([est(1, 'А'), est(2, 'Q')]), {}, {});
+const a2 = objOf(r2, 'А');
+check(a2 && a2.oldName.includes('РАБОТЫ А') && a2.newName.includes('РАБОТЫ А') && allSame(a2), 'the estimate in both versions finds its pair by its title');
+check((objOf(r2, 'П') || {}).only === 'old' && (r2.objects.find((o) => o.newName.includes('РАБОТЫ Q')) || {}).only === 'new',
+  'the deleted and the added estimates are sheets without a pair, not one estimate rewritten');
+// a book of one estimate is the same estimate, whatever its new title and lines
+const r3 = S.compare.versions(parse([est(1, 'А')]), parse([est(1, 'Q')]), {}, {});
+check(r3.objects.length === 1 && !r3.objects[0].only, 'a book of one estimate pairs it, title changed or not');
+// two estimates with the same lines, both titles changed: their order decides
+const r4 = S.compare.versions(parse([est(1, 'А', 'БЛОК 1'), est(2, 'А', 'БЛОК 2')]),
+  parse([est(1, 'А', 'БЛОК 1 ИЗМ'), est(2, 'А', 'БЛОК 2 ИЗМ')]), {}, {});
+check(r4.objects.length === 2 && r4.objects[0].newName.includes('БЛОК 1 ИЗМ') && r4.objects[1].newName.includes('БЛОК 2 ИЗМ'),
+  'two estimates alike in their lines keep their order');
+const wb2 = S.readXlsx(S.compare.workbook(r2, {}));
+check(wb2.sheets[2].rows.some((r) => r && r[1] && /РАБОТЫ П.*лист без пары/.test(String(r[1].v))),
+  'the workbook names a sheet without a pair');
+
+// (b) digits are never lost: М5 renamed to М8 is not one line renamed
+const nail = line(1, 'ТЕСТОВЫЙ ГВОЗДЬ', 'КГ', 1, 5), shield = line(1, 'ТЕСТОВЫЙ ЩИТ', 'ШТ', 1, 29);
+const cable = line(2, 'ТЕСТОВЫЙ КАБЕЛЬ', 'М', 2, 3), plank = line(3, 'ТЕСТОВАЯ ДОСКА', 'М3', 2, 9);
+const m5 = (p) => line(2, 'ТЕСТОВЫЙ АНКЕР М5', 'ШТ', 4, p || 17);
+const r5 = S.compare.versions(one([MAT, nail, m5()]), one([MAT, nail, line(2, 'ТЕСТОВЫЙ АНКЕР М8', 'ШТ', 4, 17)]), {}, {});
+check((rowsNamed(r5, 'ТЕСТОВЫЙ АНКЕР М5')[0] || {}).st === 'removed' && (rowsNamed(r5, 'ТЕСТОВЫЙ АНКЕР М8')[0] || {}).st === 'added' &&
+  r5.totals.counts.renamed === 0, 'М5 → М8 at the same price and quantity is a line removed and a line added');
+
+// (c) a line moved to another band, or another estimate, is the same line
+const askM5 = {};
+askM5[k('ТЕСТОВЫЙ АНКЕР М5', 'ШТ', 17)] = { market: 15 };
+const band1 = one([MAT, nail, m5(), EQP, shield]), band2 = (p) => one([MAT, nail, EQP, shield, m5(p)]);
+const r6 = S.compare.versions(band1, band2(17), askM5, {});
+const x6 = rowsNamed(r6, 'ТЕСТОВЫЙ АНКЕР М5');
+check(x6.length === 1 && x6[0].st === 'notfixed' && x6[0].moved && x6[0].section === 'equipment' && x6[0].section1 === 'materials',
+  'an asked line moved to another band at its old price is one line, not fixed (' + x6.map((x) => x.st).join(',') + ')');
+check(r6.totals.askedSaving === 8 && r6.totals.gotSaving === 0,
+  'and the move is no saving: asked 8, got 0 (' + r6.totals.askedSaving + ', ' + r6.totals.gotSaving + ')');
+const r6b = S.compare.versions(band1, band2(17), {}, {});
+check(rowsNamed(r6b, 'ТЕСТОВЫЙ АНКЕР М5').map((x) => x.st).join() === 'moved' && r6b.totals.counts.moved === 1 &&
+  r6b.totals.unaskedUp === 0 && r6b.totals.unaskedDown === 0, 'moved and nothing else changed: «moved», with no money');
+const r6c = S.compare.versions(band1, band2(15), askM5, {});
+check(rowsNamed(r6c, 'ТЕСТОВЫЙ АНКЕР М5').map((x) => x.st + (x.moved ? '+moved' : '')).join() === 'fixed+moved' && r6c.totals.gotSaving === 8,
+  'moved and brought to our price: fixed, saving 8');
+// to another estimate
+const est2 = (a, b) => parse([{ no: 1, works: 'РАБОТЫ А', rows: a }, { no: 2, works: 'РАБОТЫ Б', rows: b }]);
+const mv1 = est2([MAT, nail, m5(), plank], [EQP, shield, cable]), mv2 = est2([MAT, nail, plank], [EQP, shield, cable, m5()]);
+const r7 = S.compare.versions(mv1, mv2, askM5, {});
+const x7 = rowsNamed(r7, 'ТЕСТОВЫЙ АНКЕР М5');
+check(x7.length === 1 && x7[0].st === 'notfixed' && x7[0].from === r7.objects[0].name && r7.objects[1].rows.includes(x7[0]),
+  'a line moved to another estimate is shown there, with the estimate it came from');
+check(r7.totals.askedSaving === 8 && r7.totals.gotSaving === 0, 'and is no saving either (' + r7.totals.gotSaving + ')');
+check(r7.objects.every((o, i) => Math.abs(o.oldSum - itemSum(mv1[i])) < 1e-9 && Math.abs(o.newSum - itemSum(mv2[i])) < 1e-9),
+  'each sheet still sums its own lines: the moved line counts where it was, and where it is');
+const wb7 = S.readXlsx(S.compare.workbook(r7, {}));
+check(wb7.sheets[1].rows.some((r) => r && r[3] && r[3].v === 'ТЕСТОВЫЙ АНКЕР М5' && r[1] &&
+  r[1].v === r7.objects[0].name + ' → ' + r7.objects[1].name), 'the workbook says where the line came from: «A → B»');
+// a reorder inside one band
+const r8 = S.compare.versions(one([MAT, nail, m5(), cable]), one([MAT, m5(), nail, cable]), {}, {});
+check(r8.totals.counts.moved === 1 && r8.totals.counts.removed === 0 && r8.totals.counts.added === 0,
+  'lines reordered inside one band: one line moved, nothing removed or added');
+// a move is looked for before a rename: М5 went to the equipment, БОЛТ is new
+const r9 = S.compare.versions(one([MAT, nail, m5(), EQP, shield, cable]),
+  one([MAT, nail, line(2, 'ТЕСТОВЫЙ БОЛТ', 'ШТ', 4, 17), EQP, shield, cable, m5()]), {}, {});
+check((rowsNamed(r9, 'ТЕСТОВЫЙ АНКЕР М5').map((x) => x.st).join() === 'moved') && (rowsNamed(r9, 'ТЕСТОВЫЙ БОЛТ')[0] || {}).st === 'added' &&
+  r9.totals.counts.renamed === 0, 'a line moved is found before a rename is guessed: М5 moved, БОЛТ new');
+// across estimates a line moves only with its quantity: one labour line deleted, another added
+const r10 = S.compare.versions(est2([LAB, labour(10), MAT, nail], [EQP, shield]), est2([MAT, nail], [LAB, labour(12), EQP, shield]), {}, {});
+const lab10 = rowsNamed(r10, 'ЗАТРАТЫ ТРУДА РАБОЧИХ-СТРОИТЕЛЕЙ').map((x) => x.st).sort().join();
+check(lab10 === 'added,removed' && r10.totals.counts.moved === 0, 'labour deleted in one estimate and added in another with another quantity: removed + added (' + lab10 + ')');
+
+/* -------------------------------------------- sums judged by the line, not the unit (D3) */
+
+const steel = (q, p1, p2, ask) => {
+  const rq = {};
+  if (ask != null) rq[k('ТЕСТОВЫЙ ПРОКАТ', 'Т', p1)] = { market: ask };
+  return S.compare.versions(one([MAT, line(1, 'ТЕСТОВЫЙ ПРОКАТ', 'Т', q, p1)]), one([MAT, line(1, 'ТЕСТОВЫЙ ПРОКАТ', 'Т', q, p2)]), rq, {});
+};
+const s1 = steel(1e6, 1000.9, 1000);
+check(rowsNamed(s1, 'ТЕСТОВЫЙ ПРОКАТ')[0].st === 'lowered' && Math.abs(s1.totals.unaskedDown - 0.9 * 1e6) < 1e-3,
+  '0,9 sum less on a million tonnes is lowered by 0,9 × a million, not «unchanged» (' + s1.totals.unaskedDown + ')');
+check(rowsNamed(steel(10, 12345.68, 12346), 'ТЕСТОВЫЙ ПРОКАТ')[0].st === 'same', 'a price rounded to the sum on a small quantity is unchanged');
+check(rowsNamed(steel(1e6, 1100, 1000.9, 1000), 'ТЕСТОВЫЙ ПРОКАТ')[0].st === 'partial',
+  'asked 1000, returned 1000,9 on a million: partial, the rest is 0,9 × a million');
+check(rowsNamed(steel(100, 9000, 8929, 8928.57), 'ТЕСТОВЫЙ ПРОКАТ')[0].st === 'fixed',
+  'our fractional price (8 928,57) typed as a whole number is fixed');
+// a direct-cost total that does not follow its lines
+const lines2 = (p) => [MAT, line(1, 'ТЕСТОВЫЙ ПРОКАТ', 'Т', 2, p), line(2, 'ТЕСТОВЫЙ ЛИСТ', 'Т', 1, 50)];
+const direct = (r) => r.objects[0].amounts.find((x) => /ПРЯМЫЕ/.test(x.label1));
+const t1 = S.compare.versions(one(lines2(100), 250), one(lines2(90), 250), {}, {});
+check(direct(t1).st === 'typed' && t1.totals.amountFlags === 1, 'lines lowered by 20, «ИТОГО ПРЯМЫЕ» left at 250: not recalculated, flagged');
+const t2 = S.compare.versions(one(lines2(100), 250), one(lines2(100), 260), {}, {});
+check(direct(t2).st === 'typed' && t2.totals.amountFlags === 1, '«ИТОГО ПРЯМЫЕ» raised by 10 with nothing changed under it: flagged');
+const t3 = S.compare.versions(one(lines2(100), 250), one(lines2(90), 230), {}, {});
+check(direct(t3).st === 'amount' && t3.totals.amountFlags === 0, 'a total that follows its lines (250 → 230) is only a changed amount');
+const wbT = S.readXlsx(S.compare.workbook(t1, {}));
+check(wbT.sheets[2].rows.some((r) => r && r[7] && /Итог не пересчитан по строкам/.test(String(r[7].v))),
+  'the sheet totals sheet says the total was not recalculated');
+
+/* ------------------------------------------------ «Наш ответ» read carefully (D2) */
+
+const rsm = S.smeta.parseWorkbook(replySmeta(), 'r.xlsx');
+const rp2 = S.reply.parse(replyBook2());
+check((rp2.sheets || []).join('|') === 'A|B' && rp2.entries.some((e) => e.sheet === 'B' && e.name === 'ТЕСТОВАЯ ТРУБА 120'),
+  'every sheet with a table is read, and each line knows its sheet');
+const rm2 = S.reply.match(rp2.entries, rsm);
+check(!rm2.prices[k('ТЕСТОВАЯ ПРОВОЛОКА', 'КГ', 10)] && !rm2.prices[k('ТЕСТОВАЯ ПРОВОЛОКА', 'М', 10)] &&
+  (rm2.ambiguous || []).length === 1 && rm2.ambiguous[0].units.join('/') === 'КГ/М',
+  'a line without a unit, for a resource in КГ and in М, prices neither and is listed as not applied');
+check(!rm2.prices[k('ТЕСТОВЫЙ АНКЕР М5', 'ШТ', 17)] && rm2.missing.some((e) => e.name === 'ТЕСТОВЫЙ АНКЕР М8'),
+  'АНКЕР М8 never prices АНКЕР М5, however alike the names: it is not found');
+check(!rm2.prices[k('ТЕСТОВАЯ ПЛИТА 4.1.1', 'ШТ', 40)] && rm2.missing.some((e) => e.name === 'ТЕСТОВАЯ ПЛИТА 4.11'),
+  '«ПЛИТА 4.11» never prices ПЛИТА 4.1.1');
+check(rm2.prices[k('ТЕСТОВАЯ ТРУБА 120', 'М', 9)] === 6 && rm2.missing.some((e) => e.name === 'ТЕСТОВАЯ ТРУБА 1 20'),
+  '«ТРУБА 1 20» never prices ТРУБА 120; sheet B does (6)');
+check(rm2.prices[k('ТЕСТОВЫЙ КАБЕЛЬ', 'М', 1234.5)] === 1000.25, 'numbers typed as text are read («1 234,50» → «1 000,25»)');
+check((rm2.conflicts || []).length === 1 && rm2.conflicts[0].kept === 1000.25 && rm2.conflicts[0].entry.market === 1100,
+  'the same line priced again differently: the first price stays, the second is listed');
+check((rp2.unread || []).length === 1 && rp2.unread[0].name === 'ТЕСТОВЫЙ ЩЕБЕНЬ' && rp2.unread[0].text === '7 500 сум' &&
+  rp2.unread[0].sheet === 'A', 'a price that cannot be read («7 500 сум») is listed, not dropped');
+check(rm2.missing.length === 3 && rm2.missing.every((e) => e.sheet === 'A'), 'what is not found says which sheet it came from');
+// our own export of two projects: one report sheet each, both read back
+const proj2 = S.smeta.parseWorkbook(replySmeta(), 'r.xlsx');
+const p2 = Object.assign({}, rm.prices);
+p2[k('ТЕСТОВАЯ ТРУБА 120', 'М', 9)] = 6;
+p2[k('ТЕСТОВЫЙ КАБЕЛЬ', 'М', 1234.5)] = 1000.25;
+const twoModel = S.assemble([{ id: 'p1', name: 'T1', title: 'T1', objects: v1, enabled: true },
+  { id: 'p2', name: 'T2', title: 'T2', objects: proj2, enabled: true }], p2);
+const twoBack = S.reply.parse(S.readXlsx(S.buildWorkbook(twoModel, { mode: 'changed', minDiff: 0, autoNote: true, noteText: 'X' })));
+const twoM = S.reply.match(twoBack.entries, v1.concat(proj2));
+check(twoModel.spans.length === 2 && (twoBack.sheets || []).length === 2 && Object.keys(p2).every((kk) => twoM.prices[kk] === p2[kk]),
+  'our own export of two projects read back gives the prices of both report sheets (' + (twoBack.sheets || []).join('|') + ')');
+check((twoBack.unread || []).length === 0 && twoM.missing.length === 0 && (twoM.conflicts || []).length === 0,
+  'and its header rows are not taken for prices that cannot be read');
 
 console.log(fail ? '\nFAILED: ' + fail : '\nall compare checks passed');
 process.exit(fail ? 1 : 0);

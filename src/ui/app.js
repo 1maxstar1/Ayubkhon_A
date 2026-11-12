@@ -36,11 +36,16 @@
     this.prices_ui = new S.Prices(this);
     this.compare_ui = S.Compare ? new S.Compare(this) : null;
     this.sheetList = new S.VList(document.getElementById('sheetScroll'), {
-      render: this.renderSheet.bind(this)
+      render: this.renderSheet.bind(this), head: document.getElementById('sheetHead'),
+      minWidth: function () { return colsWidth([IDX_COL].concat(SHEET_COLS)); }
     });
     this.reportList = new S.VList(document.getElementById('reportScroll'), {
-      render: this.renderReport.bind(this)
+      render: this.renderReport.bind(this), head: document.getElementById('reportHead'),
+      minWidth: function () { return colsWidth(SHEET_COLS); }
     });
+    // compact mode: the headings are drawn again with their compact widths (before the lists repaint their rows)
+    var me = this;
+    document.addEventListener('layout:compact', function () { me._sheetHead = false; me._repHead = false; });
     this.fillSettings();
     this.renderSide();
     this.ledger();
@@ -851,21 +856,22 @@
 
   // The continuous 1..N number that lives in column A of the assembled sheet —
   // the one that says which rows belong to which project.
-  var IDX_COL = { w: 62, cls: 'num idx', h: 'A' };
+  var IDX_COL = { w: 62, wc: 48, cls: 'num idx', h: 'A' };
 
   var SHEET_COLS = [
-    { w: 58, cls: 'mid', h: '№' },
+    { w: 58, wc: 44, cls: 'mid', h: '№' },
     { w: 0, h: 'НАИМЕНОВАНИЕ' },
-    { w: 74, cls: 'mid', h: 'ЕД.ИЗМ.' },
-    { w: 96, cls: 'num', h: 'КОЛ-ВО' },
-    { w: 106, cls: 'num', h: 'Цена по смете', sub: 'без НДС' },
-    { w: 128, cls: 'num', h: 'Сумма по смете' },
-    { w: 106, cls: 'num', h: 'Рыночная цена', sub: 'без НДС' },
-    { w: 128, cls: 'num', h: 'Рыночная сумма' },
-    { w: 118, cls: 'num', h: 'Разница' }
+    { w: 74, wc: 58, cls: 'mid', h: 'ЕД.ИЗМ.' },
+    { w: 96, wc: 84, cls: 'num', h: 'КОЛ-ВО' },
+    { w: 106, wc: 96, cls: 'num', h: 'Цена по смете', hc: 'Цена сметы', sub: 'без НДС' },
+    { w: 128, wc: 112, cls: 'num', h: 'Сумма по смете', hc: 'Сумма сметы' },
+    { w: 106, wc: 100, cls: 'num', h: 'Рыночная цена', hc: 'Рын. цена', sub: 'без НДС' },
+    { w: 128, wc: 112, cls: 'num', h: 'Рыночная сумма', hc: 'Рын. сумма' },
+    { w: 118, wc: 104, cls: 'num', h: 'Разница' }
   ];
 
-  function w(c) { return c.w ? 'flex:0 0 ' + c.w + 'px' : 'flex:1 1 auto;min-width:240px'; }
+  function w(c) { var x = S.colW(c); return x ? 'flex:0 0 ' + x + 'px' : 'flex:1 1 auto;min-width:240px'; }
+  function colsWidth(cols) { return cols.reduce(function (n, c) { return n + (S.colW(c) || 240); }, 0); }
 
   App.prototype.fillJump = function () {
     var sel = document.getElementById('jump');
@@ -900,7 +906,7 @@
     if (!this._sheetHead) {
       document.getElementById('sheetHead').innerHTML = [IDX_COL].concat(SHEET_COLS).map(function (c) {
         return '<div class="c' + (c.cls ? ' ' + c.cls : '') + '" style="' + w(c) +
-          '"' + (c === IDX_COL ? ' title="Столбец A «Лист1» — сквозной номер строки"' : c.sub ? ' title="Цена без НДС, сум"' : '') + '>' +
+          '"' + (c === IDX_COL ? ' title="Столбец A «Лист1» — сквозной номер строки"' : '') + '>' +
           S.headText(c) + '</div>';
       }).join('');
       this._sheetHead = true;
@@ -1050,7 +1056,7 @@
   App.prototype.renderReport = function (from, to) {
     if (!this._repHead) {
       document.getElementById('reportHead').innerHTML = SHEET_COLS.map(function (c) {
-        return '<div class="c' + (c.cls ? ' ' + c.cls : '') + '" style="' + w(c) + '"' + (c.sub ? ' title="Цена без НДС, сум"' : '') + '>' + S.headText(c) + '</div>';
+        return '<div class="c' + (c.cls ? ' ' + c.cls : '') + '" style="' + w(c) + '">' + S.headText(c) + '</div>';
       }).join('');
       this._repHead = true;
     }

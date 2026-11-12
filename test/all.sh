@@ -159,6 +159,7 @@ run ownership        node test/ownership.mjs
 run disable-user     node test/disable-user.mjs
 browser_run browser      node test/browser.mjs "$S1" "$S2"
 browser_run price-book   node test/price-book.mjs
+browser_run layout-1366  node test/layout-1366.mjs
 browser_run e2e-auth     node test/e2e-auth.mjs
 browser_run laptop       node test/laptop.mjs
 pwsh_run  laptop-windows sh test/laptop-windows.sh

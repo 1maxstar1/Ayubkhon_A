@@ -157,12 +157,14 @@ body.drag::after{content:"";position:fixed;inset:8px;border:2px dashed var(--acc
 .repnote{display:flex;gap:10px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--rule);background:var(--sf2);font-size:12.5px}
 .repnote.all{background:var(--pink);color:var(--pinktx)}
 .repnote .btn{height:26px;padding:0 10px;flex:0 0 auto}
+/* the headings sit beside the scroller: they keep its sideways scroll (VList.alignHead) and never set its width */
 .thead{border-bottom:1px solid var(--rule2);background:var(--cyan);font-weight:600;font-size:11px;
-  text-transform:uppercase;letter-spacing:.03em;position:sticky;top:0;z-index:3}
-.thead .c{padding:6px 7px;border-right:1px solid #b9dede;display:flex;align-items:center}
+  text-transform:uppercase;letter-spacing:.03em;overflow:hidden;flex:none}
+.thead .c{padding:6px 7px;border-right:1px solid #b9dede;display:flex;align-items:center;min-width:0;overflow:hidden}
+.thead .c .hl{overflow:hidden;text-overflow:ellipsis;min-width:0}
 .thead .th2{display:block;line-height:1.15}
 .thead .th2 small{display:block;text-transform:none;letter-spacing:0;font-weight:400;font-size:10px;color:var(--mute)}
-.vscroll{flex:1;overflow:auto;position:relative;contain:strict}
+.vscroll{flex:1;overflow:auto;position:relative;contain:strict;overflow-anchor:none}   /* a virtual list places its rows itself: the browser must not move it */
 .vspace{position:relative;width:100%}
 .vbody{position:absolute;left:0;right:0;top:0;will-change:transform}
 .vrow{height:var(--row);border-bottom:1px solid #eef0f3;font-size:12px}
@@ -184,7 +186,7 @@ body.drag::after{content:"";position:fixed;inset:8px;border:2px dashed var(--acc
 .vrow .c.diff{color:var(--pinktx);font-weight:600}
 .vrow .c.diff.save{color:var(--good)} .vrow .c.diff.over{color:var(--bad)}   /* a saving green, an overspend red: as in the total */
 .vrow .c.big{background:var(--pink);color:var(--pinktx)}
-.pin{width:100%;border:1px solid transparent;background:none;border-radius:4px;padding:2px 5px;text-align:right;
+.pin{width:100%;border:1px solid transparent;background:none;border-radius:4px;padding:2px 3px;text-align:right;
   font-variant-numeric:tabular-nums;min-width:0}
 .pin:hover{border-color:var(--rule2);background:#fff}
 .pin:focus{border-color:var(--accent);background:#fff;outline:none}
@@ -494,6 +496,32 @@ body.src-norefs #refAsof{display:none !important}
 .up-warnt{color:#8a5a10;font-size:11px;margin-top:2px;overflow-wrap:anywhere}
 .hp-uzex{color:var(--uzex) !important}
 .uz-auto{display:inline-flex;align-items:center;gap:5px;margin-left:10px;font-size:13px;cursor:pointer}
+
+/* ------------------------------------------------- compact mode (E5): a laptop screen, 1366 × 768 — S.compact */
+body.compact .bar{padding:5px 10px;gap:6px}
+body.compact .bar > .btn,body.compact .bar .pickmode{height:28px;font-size:12px;padding:0 9px}
+body.compact .pickmode span{display:none}
+body.compact .pickmode select{max-width:140px}
+body.compact .brand b{font-size:13px}
+body.compact.ws .brand b{display:none}
+body.compact .wsbox .nm{max-width:120px}
+body.compact #who{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.compact .ledger{padding:4px 14px;min-height:0;gap:18px}
+body.compact .ledger .k{display:inline;margin-right:5px}
+body.compact .ledger .v{font-size:13px}
+body.compact .tab{padding:4px 12px}
+body.compact .toolbar{padding:4px 10px}
+body.compact #priceCount{flex:1 1 0;min-width:120px;overflow:hidden;text-overflow:ellipsis;text-align:right}
+body.compact .ra{flex-wrap:nowrap;white-space:nowrap}
+body.compact .srcbar{padding:3px 10px}
+body.compact .srccard{min-height:28px;padding:2px 10px 2px 6px}
+body.compact .srccard .sc-tx{flex-direction:row;gap:6px;align-items:baseline}
+body.compact .thead{font-size:10px}
+body.compact .thead .c{padding:3px 5px;white-space:nowrap}
+body.compact .vrow{font-size:11.5px}
+body.compact .vrow .c{padding:0 5px}
+body.compact .pin{padding:1px 3px}
+body.compact main:not(.narrow){grid-template-columns:232px 1fr}
 </style>
 </head>
 <body>
@@ -546,6 +574,7 @@ body.src-norefs #refAsof{display:none !important}
       <button class="tab" data-pane="report">Вид отчёта</button>
       <button class="tab" data-pane="compare" title="Что отправитель исправил после нашей таблицы">Сравнение версий</button>
       <button class="tab" data-pane="settings">Настройки документа</button>
+      <button class="link" id="compactBtn" style="margin-left:auto">Компактно</button>
     </nav>
 
     <div class="pane on" id="pane-prices">
@@ -4554,18 +4583,78 @@ if (typeof self !== 'undefined') self.S = S;
    */
   document.documentElement.style.setProperty('--row', ROW + 'px');
 
+  /*
+   * Compact mode (E5): on a laptop screen, 1366 × 768, nineteen price rows were on screen, the name column was 315 px and
+   * «Сводная таблица» did not fit sideways. Smaller rows, padding and headings — on by itself below 1440 × 820, or by
+   * the «Компактно» button: auto → on → off, remembered in this browser.
+   */
+  var lists = [];
+  var MQ = typeof matchMedia === 'function' ? matchMedia('(max-width:1440px), (max-height:820px)') : null;
+  function stored() { try { return localStorage.getItem('taq.compact') || 'auto'; } catch (e) { return 'auto'; } }
+  var compact = {
+    on: false,
+    ROW: ROW, ROW_COMPACT: 22,
+    mode: function (m) {
+      if (m === undefined) return stored();
+      try { localStorage.setItem('taq.compact', m); } catch (e) { /* not kept: still applied now */ }
+      this.set(m === 'on' ? true : m === 'off' ? false : !!(MQ && MQ.matches), true);
+      return m;
+    },
+    set: function (on, viaMode) {
+      on = !!on;
+      if (!viaMode) { try { localStorage.setItem('taq.compact', on ? 'on' : 'off'); } catch (e) { /* not kept */ } }
+      var was = this.on;
+      this.on = on;
+      if (document.body) document.body.classList.toggle('compact', on);
+      document.documentElement.style.setProperty('--row', (on ? this.ROW_COMPACT : ROW) + 'px');
+      var b = document.getElementById('compactBtn');
+      if (b) {
+        var m = stored();
+        b.textContent = on ? 'Компактно ✓' : 'Компактно';
+        b.title = 'Компактный вид: ' + (m === 'auto' ? 'сам по размеру экрана (сейчас ' + (on ? 'включён' : 'выключен') + ')' : m === 'on' ? 'всегда' : 'никогда') +
+          '. Нажмите, чтобы сменить: авто → всегда → никогда';
+      }
+      if (was === on && viaMode !== 'init') return;
+      try { document.dispatchEvent(new Event('layout:compact')); } catch (e) { /* old browser */ }
+      lists.forEach(function (l) { l.setRowHeight(on ? compact.ROW_COMPACT : ROW); });
+    }
+  };
+  S.compact = compact;
+  function startCompact() {
+    var m = stored();
+    compact.set(m === 'on' ? true : m === 'off' ? false : !!(MQ && MQ.matches), 'init');
+    var b = document.getElementById('compactBtn');
+    if (b) b.addEventListener('click', function () {
+      var now = stored();
+      compact.mode(now === 'auto' ? 'on' : now === 'on' ? 'off' : 'auto');
+    });
+    if (MQ) {
+      var follow = function () { if (stored() === 'auto') compact.set(MQ.matches, true); };
+      if (MQ.addEventListener) MQ.addEventListener('change', follow); else if (MQ.addListener) MQ.addListener(follow);
+    }
+  }
+  // the scripts sit at the end of the page: the body is there; the lists are made after this runs, and take the mode
+  if (document.body) startCompact(); else document.addEventListener('DOMContentLoaded', startCompact);
+
   function VList(scroller, opts) {
     this.el = scroller;
     this.space = scroller.querySelector('.vspace');
     this.body = scroller.querySelector('.vbody');
-    this.rowHeight = opts.rowHeight || ROW;
+    this.rowHeight = opts.rowHeight || (compact.on ? compact.ROW_COMPACT : ROW);
+    lists.push(this);
     this.render = opts.render;             // (from, to) -> html
     this.overscan = opts.overscan || 8;
+    // the column headings sit beside the scroller, not in it: they follow its sideways scroll and leave room for its
+    // scrollbar, or every heading from the name column on stood over the wrong column (E5)
+    this.head = opts.head || null;
+    this.minWidth = opts.minWidth || null;  // () -> px: the width the columns need; the rows are drawn that wide
     this.count = 0;
     this._from = -1; this._to = -1;
     this._raf = 0;
     var self = this;
     this._onScroll = function () {
+      // first, and every time: most sideways scroll events come between two frames
+      if (self.head && self.head.scrollLeft !== self.el.scrollLeft) self.head.scrollLeft = self.el.scrollLeft;
       if (self._raf) return;
       self._raf = requestAnimationFrame(function () { self._raf = 0; self.paint(); });
     };
@@ -4579,11 +4668,23 @@ if (typeof self !== 'undefined') self.S = S;
   VList.prototype.setCount = function (n, keepScroll) {
     this.count = n;
     this.space.style.height = (n * this.rowHeight) + 'px';
+    if (this.minWidth) this.space.style.minWidth = this.minWidth() + 'px';
     if (!keepScroll) this.el.scrollTop = 0;
     this.paint(true);
   };
 
   VList.prototype.refresh = function () { this.paint(true); };
+
+  /** Another row height (compact mode), keeping the row the list is at. */
+  VList.prototype.setRowHeight = function (h) {
+    if (h === this.rowHeight) return;
+    var top = this.el.scrollTop / this.rowHeight;
+    this.rowHeight = h;
+    this.space.style.height = (this.count * h) + 'px';
+    if (this.minWidth) this.space.style.minWidth = this.minWidth() + 'px';
+    this.el.scrollTop = Math.round(top * h);
+    this.paint(true);
+  };
 
   VList.prototype.scrollToRow = function (i) {
     this.el.scrollTop = Math.max(0, i * this.rowHeight - this.el.clientHeight / 3);
@@ -4625,6 +4726,15 @@ if (typeof self !== 'undefined') self.S = S;
         try { again.setSelectionRange(selStart, selEnd); } catch (e) { /* not a text input */ }
       }
     }
+    this.alignHead();
+  };
+
+  /** The headings over their columns: as far right as the rows' scrollbar leaves them, as far left as the rows are scrolled. */
+  VList.prototype.alignHead = function () {
+    if (!this.head) return;
+    var g = this.el.offsetWidth - this.el.clientWidth;
+    if (g !== this._g) { this._g = g; this.head.style.paddingRight = g + 'px'; }
+    if (this.head.scrollLeft !== this.el.scrollLeft) this.head.scrollLeft = this.el.scrollLeft;
   };
 
   function cssEscape(s) { return String(s).replace(/["\\]/g, '\\$&'); }
@@ -4646,8 +4756,12 @@ if (typeof self !== 'undefined') self.S = S;
     el.classList.toggle('over', chg && d < 0);
   };
   S.headText = function (c) {
-    return c.sub ? '<span class="th2">' + S.esc(c.h) + '<small>' + S.esc(c.sub) + '</small></span>' : S.esc(c.h);
+    var t = S.esc(c.t || c.h), h = S.esc(compact.on && c.hc ? c.hc : c.h);
+    return c.sub ? '<span class="hl th2" title="' + t + ', ' + S.esc(c.sub) + '">' + h + '<small>' + S.esc(c.sub) + '</small></span>'
+      : '<span class="hl" title="' + t + '">' + h + '</span>';
   };
+  /** A column's width now: its compact width in compact mode, when it has one. */
+  S.colW = function (c) { return compact.on && c.wc != null ? c.wc : c.w; };
 })(S);
 
 ;
@@ -4662,15 +4776,15 @@ if (typeof self !== 'undefined') self.S = S;
   'use strict';
 
   var COLS = [
-    { k: 'n', w: 46, cls: 'mid', h: '№' },
+    { k: 'n', w: 46, wc: 38, cls: 'mid', h: '№' },
     { k: 'name', w: 0, h: 'Наименование ресурса' },
-    { k: 'unit', w: 70, cls: 'mid', h: 'Ед. изм.' },
-    { k: 'count', w: 54, cls: 'num', h: 'Повторов' },
-    { k: 'qty', w: 100, cls: 'num', h: 'Общее кол-во' },
-    { k: 'price', w: 126, cls: 'num', h: 'Цена по смете', sub: 'без НДС' },
-    { k: 'market', w: 126, cls: 'num', h: 'Рыночная цена', sub: 'без НДС' },
-    { k: 'delta', w: 88, cls: 'num', h: 'Разница, %' },
-    { k: 'econ', w: 138, cls: 'num', h: 'Разница, сум' }
+    { k: 'unit', w: 70, wc: 58, cls: 'mid', h: 'Ед. изм.' },
+    { k: 'count', w: 54, wc: 48, cls: 'num', h: 'Повт.', t: 'Повторов' },
+    { k: 'qty', w: 100, wc: 84, cls: 'num', h: 'Общее кол-во', hc: 'Кол-во' },
+    { k: 'price', w: 126, wc: 104, cls: 'num', h: 'Цена по смете', hc: 'Цена сметы', sub: 'без НДС' },
+    { k: 'market', w: 132, wc: 122, cls: 'num', h: 'Рыночная цена', hc: 'Рын. цена', sub: 'без НДС' },
+    { k: 'delta', w: 88, wc: 62, cls: 'num', h: 'Разница, %', hc: 'Δ, %' },
+    { k: 'econ', w: 138, wc: 112, cls: 'num', h: 'Разница, сум', hc: 'Δ, сум' }
   ];
 
   /**
@@ -4714,16 +4828,23 @@ if (typeof self !== 'undefined') self.S = S;
     this.view = [];
     this.head = document.getElementById('priceHead');
     this.list = new S.VList(document.getElementById('priceScroll'), {
-      render: this.renderRange.bind(this)
+      render: this.renderRange.bind(this),
+      head: this.head,
+      minWidth: function () { return COLS.reduce(function (n, c) { return n + (S.colW(c) || 220); }, 0); }
     });
-    this.head.innerHTML = COLS.map(function (c) {
-      return '<div class="c' + (c.cls ? ' ' + c.cls : '') + '" style="' + width(c) + '"' + (c.sub ? ' title="Цена без НДС, сум"' : '') + '>' +
-        S.headText(c) + '</div>';
-    }).join('');
+    this.paintHead();
+    var self = this;
+    document.addEventListener('layout:compact', function () { self.paintHead(); });
     this.bind();
   }
 
-  function width(c) { return c.w ? 'flex:0 0 ' + c.w + 'px' : 'flex:1 1 auto;min-width:220px'; }
+  function width(c) { var w = S.colW(c); return w ? 'flex:0 0 ' + w + 'px' : 'flex:1 1 auto;min-width:220px'; }
+
+  Prices.prototype.paintHead = function () {
+    this.head.innerHTML = COLS.map(function (c) {
+      return '<div class="c' + (c.cls ? ' ' + c.cls : '') + '" style="' + width(c) + '">' + S.headText(c) + '</div>';
+    }).join('');
+  };
 
   Prices.prototype.bind = function () {
     var self = this;
@@ -5524,11 +5645,16 @@ if (typeof self !== 'undefined') self.S = S;
     this.prices_ui = new S.Prices(this);
     this.compare_ui = S.Compare ? new S.Compare(this) : null;
     this.sheetList = new S.VList(document.getElementById('sheetScroll'), {
-      render: this.renderSheet.bind(this)
+      render: this.renderSheet.bind(this), head: document.getElementById('sheetHead'),
+      minWidth: function () { return colsWidth([IDX_COL].concat(SHEET_COLS)); }
     });
     this.reportList = new S.VList(document.getElementById('reportScroll'), {
-      render: this.renderReport.bind(this)
+      render: this.renderReport.bind(this), head: document.getElementById('reportHead'),
+      minWidth: function () { return colsWidth(SHEET_COLS); }
     });
+    // compact mode: the headings are drawn again with their compact widths (before the lists repaint their rows)
+    var me = this;
+    document.addEventListener('layout:compact', function () { me._sheetHead = false; me._repHead = false; });
     this.fillSettings();
     this.renderSide();
     this.ledger();
@@ -6339,21 +6465,22 @@ if (typeof self !== 'undefined') self.S = S;
 
   // The continuous 1..N number that lives in column A of the assembled sheet —
   // the one that says which rows belong to which project.
-  var IDX_COL = { w: 62, cls: 'num idx', h: 'A' };
+  var IDX_COL = { w: 62, wc: 48, cls: 'num idx', h: 'A' };
 
   var SHEET_COLS = [
-    { w: 58, cls: 'mid', h: '№' },
+    { w: 58, wc: 44, cls: 'mid', h: '№' },
     { w: 0, h: 'НАИМЕНОВАНИЕ' },
-    { w: 74, cls: 'mid', h: 'ЕД.ИЗМ.' },
-    { w: 96, cls: 'num', h: 'КОЛ-ВО' },
-    { w: 106, cls: 'num', h: 'Цена по смете', sub: 'без НДС' },
-    { w: 128, cls: 'num', h: 'Сумма по смете' },
-    { w: 106, cls: 'num', h: 'Рыночная цена', sub: 'без НДС' },
-    { w: 128, cls: 'num', h: 'Рыночная сумма' },
-    { w: 118, cls: 'num', h: 'Разница' }
+    { w: 74, wc: 58, cls: 'mid', h: 'ЕД.ИЗМ.' },
+    { w: 96, wc: 84, cls: 'num', h: 'КОЛ-ВО' },
+    { w: 106, wc: 96, cls: 'num', h: 'Цена по смете', hc: 'Цена сметы', sub: 'без НДС' },
+    { w: 128, wc: 112, cls: 'num', h: 'Сумма по смете', hc: 'Сумма сметы' },
+    { w: 106, wc: 100, cls: 'num', h: 'Рыночная цена', hc: 'Рын. цена', sub: 'без НДС' },
+    { w: 128, wc: 112, cls: 'num', h: 'Рыночная сумма', hc: 'Рын. сумма' },
+    { w: 118, wc: 104, cls: 'num', h: 'Разница' }
   ];
 
-  function w(c) { return c.w ? 'flex:0 0 ' + c.w + 'px' : 'flex:1 1 auto;min-width:240px'; }
+  function w(c) { var x = S.colW(c); return x ? 'flex:0 0 ' + x + 'px' : 'flex:1 1 auto;min-width:240px'; }
+  function colsWidth(cols) { return cols.reduce(function (n, c) { return n + (S.colW(c) || 240); }, 0); }
 
   App.prototype.fillJump = function () {
     var sel = document.getElementById('jump');
@@ -6388,7 +6515,7 @@ if (typeof self !== 'undefined') self.S = S;
     if (!this._sheetHead) {
       document.getElementById('sheetHead').innerHTML = [IDX_COL].concat(SHEET_COLS).map(function (c) {
         return '<div class="c' + (c.cls ? ' ' + c.cls : '') + '" style="' + w(c) +
-          '"' + (c === IDX_COL ? ' title="Столбец A «Лист1» — сквозной номер строки"' : c.sub ? ' title="Цена без НДС, сум"' : '') + '>' +
+          '"' + (c === IDX_COL ? ' title="Столбец A «Лист1» — сквозной номер строки"' : '') + '>' +
           S.headText(c) + '</div>';
       }).join('');
       this._sheetHead = true;
@@ -6538,7 +6665,7 @@ if (typeof self !== 'undefined') self.S = S;
   App.prototype.renderReport = function (from, to) {
     if (!this._repHead) {
       document.getElementById('reportHead').innerHTML = SHEET_COLS.map(function (c) {
-        return '<div class="c' + (c.cls ? ' ' + c.cls : '') + '" style="' + w(c) + '"' + (c.sub ? ' title="Цена без НДС, сум"' : '') + '>' + S.headText(c) + '</div>';
+        return '<div class="c' + (c.cls ? ' ' + c.cls : '') + '" style="' + w(c) + '">' + S.headText(c) + '</div>';
       }).join('');
       this._repHead = true;
     }

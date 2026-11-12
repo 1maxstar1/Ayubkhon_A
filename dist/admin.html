@@ -157,12 +157,14 @@ body.drag::after{content:"";position:fixed;inset:8px;border:2px dashed var(--acc
 .repnote{display:flex;gap:10px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--rule);background:var(--sf2);font-size:12.5px}
 .repnote.all{background:var(--pink);color:var(--pinktx)}
 .repnote .btn{height:26px;padding:0 10px;flex:0 0 auto}
+/* the headings sit beside the scroller: they keep its sideways scroll (VList.alignHead) and never set its width */
 .thead{border-bottom:1px solid var(--rule2);background:var(--cyan);font-weight:600;font-size:11px;
-  text-transform:uppercase;letter-spacing:.03em;position:sticky;top:0;z-index:3}
-.thead .c{padding:6px 7px;border-right:1px solid #b9dede;display:flex;align-items:center}
+  text-transform:uppercase;letter-spacing:.03em;overflow:hidden;flex:none}
+.thead .c{padding:6px 7px;border-right:1px solid #b9dede;display:flex;align-items:center;min-width:0;overflow:hidden}
+.thead .c .hl{overflow:hidden;text-overflow:ellipsis;min-width:0}
 .thead .th2{display:block;line-height:1.15}
 .thead .th2 small{display:block;text-transform:none;letter-spacing:0;font-weight:400;font-size:10px;color:var(--mute)}
-.vscroll{flex:1;overflow:auto;position:relative;contain:strict}
+.vscroll{flex:1;overflow:auto;position:relative;contain:strict;overflow-anchor:none}   /* a virtual list places its rows itself: the browser must not move it */
 .vspace{position:relative;width:100%}
 .vbody{position:absolute;left:0;right:0;top:0;will-change:transform}
 .vrow{height:var(--row);border-bottom:1px solid #eef0f3;font-size:12px}
@@ -184,7 +186,7 @@ body.drag::after{content:"";position:fixed;inset:8px;border:2px dashed var(--acc
 .vrow .c.diff{color:var(--pinktx);font-weight:600}
 .vrow .c.diff.save{color:var(--good)} .vrow .c.diff.over{color:var(--bad)}   /* a saving green, an overspend red: as in the total */
 .vrow .c.big{background:var(--pink);color:var(--pinktx)}
-.pin{width:100%;border:1px solid transparent;background:none;border-radius:4px;padding:2px 5px;text-align:right;
+.pin{width:100%;border:1px solid transparent;background:none;border-radius:4px;padding:2px 3px;text-align:right;
   font-variant-numeric:tabular-nums;min-width:0}
 .pin:hover{border-color:var(--rule2);background:#fff}
 .pin:focus{border-color:var(--accent);background:#fff;outline:none}
@@ -494,6 +496,32 @@ body.src-norefs #refAsof{display:none !important}
 .up-warnt{color:#8a5a10;font-size:11px;margin-top:2px;overflow-wrap:anywhere}
 .hp-uzex{color:var(--uzex) !important}
 .uz-auto{display:inline-flex;align-items:center;gap:5px;margin-left:10px;font-size:13px;cursor:pointer}
+
+/* ------------------------------------------------- compact mode (E5): a laptop screen, 1366 × 768 — S.compact */
+body.compact .bar{padding:5px 10px;gap:6px}
+body.compact .bar > .btn,body.compact .bar .pickmode{height:28px;font-size:12px;padding:0 9px}
+body.compact .pickmode span{display:none}
+body.compact .pickmode select{max-width:140px}
+body.compact .brand b{font-size:13px}
+body.compact.ws .brand b{display:none}
+body.compact .wsbox .nm{max-width:120px}
+body.compact #who{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.compact .ledger{padding:4px 14px;min-height:0;gap:18px}
+body.compact .ledger .k{display:inline;margin-right:5px}
+body.compact .ledger .v{font-size:13px}
+body.compact .tab{padding:4px 12px}
+body.compact .toolbar{padding:4px 10px}
+body.compact #priceCount{flex:1 1 0;min-width:120px;overflow:hidden;text-overflow:ellipsis;text-align:right}
+body.compact .ra{flex-wrap:nowrap;white-space:nowrap}
+body.compact .srcbar{padding:3px 10px}
+body.compact .srccard{min-height:28px;padding:2px 10px 2px 6px}
+body.compact .srccard .sc-tx{flex-direction:row;gap:6px;align-items:baseline}
+body.compact .thead{font-size:10px}
+body.compact .thead .c{padding:3px 5px;white-space:nowrap}
+body.compact .vrow{font-size:11.5px}
+body.compact .vrow .c{padding:0 5px}
+body.compact .pin{padding:1px 3px}
+body.compact main:not(.narrow){grid-template-columns:232px 1fr}
 </style>
 </head>
 <body class="admin">

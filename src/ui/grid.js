@@ -20,18 +20,78 @@
    */
   document.documentElement.style.setProperty('--row', ROW + 'px');
 
+  /*
+   * Compact mode (E5): on a laptop screen, 1366 × 768, nineteen price rows were on screen, the name column was 315 px and
+   * «Сводная таблица» did not fit sideways. Smaller rows, padding and headings — on by itself below 1440 × 820, or by
+   * the «Компактно» button: auto → on → off, remembered in this browser.
+   */
+  var lists = [];
+  var MQ = typeof matchMedia === 'function' ? matchMedia('(max-width:1440px), (max-height:820px)') : null;
+  function stored() { try { return localStorage.getItem('taq.compact') || 'auto'; } catch (e) { return 'auto'; } }
+  var compact = {
+    on: false,
+    ROW: ROW, ROW_COMPACT: 22,
+    mode: function (m) {
+      if (m === undefined) return stored();
+      try { localStorage.setItem('taq.compact', m); } catch (e) { /* not kept: still applied now */ }
+      this.set(m === 'on' ? true : m === 'off' ? false : !!(MQ && MQ.matches), true);
+      return m;
+    },
+    set: function (on, viaMode) {
+      on = !!on;
+      if (!viaMode) { try { localStorage.setItem('taq.compact', on ? 'on' : 'off'); } catch (e) { /* not kept */ } }
+      var was = this.on;
+      this.on = on;
+      if (document.body) document.body.classList.toggle('compact', on);
+      document.documentElement.style.setProperty('--row', (on ? this.ROW_COMPACT : ROW) + 'px');
+      var b = document.getElementById('compactBtn');
+      if (b) {
+        var m = stored();
+        b.textContent = on ? 'Компактно ✓' : 'Компактно';
+        b.title = 'Компактный вид: ' + (m === 'auto' ? 'сам по размеру экрана (сейчас ' + (on ? 'включён' : 'выключен') + ')' : m === 'on' ? 'всегда' : 'никогда') +
+          '. Нажмите, чтобы сменить: авто → всегда → никогда';
+      }
+      if (was === on && viaMode !== 'init') return;
+      try { document.dispatchEvent(new Event('layout:compact')); } catch (e) { /* old browser */ }
+      lists.forEach(function (l) { l.setRowHeight(on ? compact.ROW_COMPACT : ROW); });
+    }
+  };
+  S.compact = compact;
+  function startCompact() {
+    var m = stored();
+    compact.set(m === 'on' ? true : m === 'off' ? false : !!(MQ && MQ.matches), 'init');
+    var b = document.getElementById('compactBtn');
+    if (b) b.addEventListener('click', function () {
+      var now = stored();
+      compact.mode(now === 'auto' ? 'on' : now === 'on' ? 'off' : 'auto');
+    });
+    if (MQ) {
+      var follow = function () { if (stored() === 'auto') compact.set(MQ.matches, true); };
+      if (MQ.addEventListener) MQ.addEventListener('change', follow); else if (MQ.addListener) MQ.addListener(follow);
+    }
+  }
+  // the scripts sit at the end of the page: the body is there; the lists are made after this runs, and take the mode
+  if (document.body) startCompact(); else document.addEventListener('DOMContentLoaded', startCompact);
+
   function VList(scroller, opts) {
     this.el = scroller;
     this.space = scroller.querySelector('.vspace');
     this.body = scroller.querySelector('.vbody');
-    this.rowHeight = opts.rowHeight || ROW;
+    this.rowHeight = opts.rowHeight || (compact.on ? compact.ROW_COMPACT : ROW);
+    lists.push(this);
     this.render = opts.render;             // (from, to) -> html
     this.overscan = opts.overscan || 8;
+    // the column headings sit beside the scroller, not in it: they follow its sideways scroll and leave room for its
+    // scrollbar, or every heading from the name column on stood over the wrong column (E5)
+    this.head = opts.head || null;
+    this.minWidth = opts.minWidth || null;  // () -> px: the width the columns need; the rows are drawn that wide
     this.count = 0;
     this._from = -1; this._to = -1;
     this._raf = 0;
     var self = this;
     this._onScroll = function () {
+      // first, and every time: most sideways scroll events come between two frames
+      if (self.head && self.head.scrollLeft !== self.el.scrollLeft) self.head.scrollLeft = self.el.scrollLeft;
       if (self._raf) return;
       self._raf = requestAnimationFrame(function () { self._raf = 0; self.paint(); });
     };
@@ -45,11 +105,23 @@
   VList.prototype.setCount = function (n, keepScroll) {
     this.count = n;
     this.space.style.height = (n * this.rowHeight) + 'px';
+    if (this.minWidth) this.space.style.minWidth = this.minWidth() + 'px';
     if (!keepScroll) this.el.scrollTop = 0;
     this.paint(true);
   };
 
   VList.prototype.refresh = function () { this.paint(true); };
+
+  /** Another row height (compact mode), keeping the row the list is at. */
+  VList.prototype.setRowHeight = function (h) {
+    if (h === this.rowHeight) return;
+    var top = this.el.scrollTop / this.rowHeight;
+    this.rowHeight = h;
+    this.space.style.height = (this.count * h) + 'px';
+    if (this.minWidth) this.space.style.minWidth = this.minWidth() + 'px';
+    this.el.scrollTop = Math.round(top * h);
+    this.paint(true);
+  };
 
   VList.prototype.scrollToRow = function (i) {
     this.el.scrollTop = Math.max(0, i * this.rowHeight - this.el.clientHeight / 3);
@@ -91,6 +163,15 @@
         try { again.setSelectionRange(selStart, selEnd); } catch (e) { /* not a text input */ }
       }
     }
+    this.alignHead();
+  };
+
+  /** The headings over their columns: as far right as the rows' scrollbar leaves them, as far left as the rows are scrolled. */
+  VList.prototype.alignHead = function () {
+    if (!this.head) return;
+    var g = this.el.offsetWidth - this.el.clientWidth;
+    if (g !== this._g) { this._g = g; this.head.style.paddingRight = g + 'px'; }
+    if (this.head.scrollLeft !== this.el.scrollLeft) this.head.scrollLeft = this.el.scrollLeft;
   };
 
   function cssEscape(s) { return String(s).replace(/["\\]/g, '\\$&'); }
@@ -112,6 +193,10 @@
     el.classList.toggle('over', chg && d < 0);
   };
   S.headText = function (c) {
-    return c.sub ? '<span class="th2">' + S.esc(c.h) + '<small>' + S.esc(c.sub) + '</small></span>' : S.esc(c.h);
+    var t = S.esc(c.t || c.h), h = S.esc(compact.on && c.hc ? c.hc : c.h);
+    return c.sub ? '<span class="hl th2" title="' + t + ', ' + S.esc(c.sub) + '">' + h + '<small>' + S.esc(c.sub) + '</small></span>'
+      : '<span class="hl" title="' + t + '">' + h + '</span>';
   };
+  /** A column's width now: its compact width in compact mode, when it has one. */
+  S.colW = function (c) { return compact.on && c.wc != null ? c.wc : c.w; };
 })(S);

@@ -325,7 +325,9 @@ for (let top = 0; top < 6000 && !low; top += 96) {
     return t ? t.dataset.res : null;
   });
 }
-if (low) await ep.click('#priceScroll .tagr[data-res="' + low.replace(/["\\]/g, '\\$&') + '"]');
+// clicked where it is: a pointer click scrolls the list first when the message box lies over the tag (it sits at the
+// bottom right, where the low rows are), and the scroll closes the popover
+if (low) await ep.evaluate((k) => [...document.querySelectorAll('#priceScroll .tagr')].find((b) => b.dataset.res === k).click(), low);
 await ep.waitForSelector('#refPop:not([hidden])').catch(() => null);
 const lowCover = await ep.evaluate(() => {
   const p = document.getElementById('refPop').getBoundingClientRect();

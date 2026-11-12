@@ -9,15 +9,15 @@
   'use strict';
 
   var COLS = [
-    { k: 'n', w: 46, cls: 'mid', h: '№' },
+    { k: 'n', w: 46, wc: 38, cls: 'mid', h: '№' },
     { k: 'name', w: 0, h: 'Наименование ресурса' },
-    { k: 'unit', w: 70, cls: 'mid', h: 'Ед. изм.' },
-    { k: 'count', w: 54, cls: 'num', h: 'Повторов' },
-    { k: 'qty', w: 100, cls: 'num', h: 'Общее кол-во' },
-    { k: 'price', w: 126, cls: 'num', h: 'Цена по смете', sub: 'без НДС' },
-    { k: 'market', w: 126, cls: 'num', h: 'Рыночная цена', sub: 'без НДС' },
-    { k: 'delta', w: 88, cls: 'num', h: 'Разница, %' },
-    { k: 'econ', w: 138, cls: 'num', h: 'Разница, сум' }
+    { k: 'unit', w: 70, wc: 58, cls: 'mid', h: 'Ед. изм.' },
+    { k: 'count', w: 54, wc: 48, cls: 'num', h: 'Повт.', t: 'Повторов' },
+    { k: 'qty', w: 100, wc: 84, cls: 'num', h: 'Общее кол-во', hc: 'Кол-во' },
+    { k: 'price', w: 126, wc: 104, cls: 'num', h: 'Цена по смете', hc: 'Цена сметы', sub: 'без НДС' },
+    { k: 'market', w: 132, wc: 122, cls: 'num', h: 'Рыночная цена', hc: 'Рын. цена', sub: 'без НДС' },
+    { k: 'delta', w: 88, wc: 62, cls: 'num', h: 'Разница, %', hc: 'Δ, %' },
+    { k: 'econ', w: 138, wc: 112, cls: 'num', h: 'Разница, сум', hc: 'Δ, сум' }
   ];
 
   /**
@@ -61,16 +61,23 @@
     this.view = [];
     this.head = document.getElementById('priceHead');
     this.list = new S.VList(document.getElementById('priceScroll'), {
-      render: this.renderRange.bind(this)
+      render: this.renderRange.bind(this),
+      head: this.head,
+      minWidth: function () { return COLS.reduce(function (n, c) { return n + (S.colW(c) || 220); }, 0); }
     });
-    this.head.innerHTML = COLS.map(function (c) {
-      return '<div class="c' + (c.cls ? ' ' + c.cls : '') + '" style="' + width(c) + '"' + (c.sub ? ' title="Цена без НДС, сум"' : '') + '>' +
-        S.headText(c) + '</div>';
-    }).join('');
+    this.paintHead();
+    var self = this;
+    document.addEventListener('layout:compact', function () { self.paintHead(); });
     this.bind();
   }
 
-  function width(c) { return c.w ? 'flex:0 0 ' + c.w + 'px' : 'flex:1 1 auto;min-width:220px'; }
+  function width(c) { var w = S.colW(c); return w ? 'flex:0 0 ' + w + 'px' : 'flex:1 1 auto;min-width:220px'; }
+
+  Prices.prototype.paintHead = function () {
+    this.head.innerHTML = COLS.map(function (c) {
+      return '<div class="c' + (c.cls ? ' ' + c.cls : '') + '" style="' + width(c) + '">' + S.headText(c) + '</div>';
+    }).join('');
+  };
 
   Prices.prototype.bind = function () {
     var self = this;

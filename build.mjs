@@ -67,6 +67,7 @@ const SERVER_SCRIPTS = [
   'src/ui/sync.js',
   'src/ui/version.js',
   'src/ui/hints.js',
+  'src/ui/contragent-prices.js',
   // reference prices: the main thread only shows the lines (Russian texts) and keeps the as-of date; the pool, the
   // parsers and the suggester run in their own worker (REFS_WORKER_LIBS below)
   'src/lib/refs/view.js',

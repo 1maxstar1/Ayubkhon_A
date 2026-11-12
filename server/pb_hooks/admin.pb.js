@@ -3,6 +3,9 @@
 // half-finished clean-up cannot be left behind.
 //   POST   /api/admin/workspaces/{id}/clear  -> files, state, corrections and
 //                                               exports removed; region kept
+//   POST   /api/admin/workspaces/{id}/region {region} -> the application moved to
+//                                               another region, its price
+//                                               corrections with it
 //   DELETE /api/admin/workspaces/{id}        -> workspace gone (corrections and
 //                                               exports cascade); the
 //                                               application stays in the registry
@@ -30,6 +33,31 @@ routerAdd("POST", "/api/admin/workspaces/{id}/clear", (e) => {
     tx.save(w);
   });
   return e.json(200, { cleared: id, corrections: corrections, exports: exports });
+}, $apis.requireAuth());
+
+// A region picked by mistake used to be for good: the application's prices stood as hints for the wrong region,
+// and the only way out was to clear the workspace and price it again (B8). The corrections move with it — written
+// with SQL, so that their `updated` (the order of the hint list) is not stamped with this minute.
+routerAdd("POST", "/api/admin/workspaces/{id}/region", (e) => {
+  const { requireAdmin } = require(`${__hooks}/lib/admin.js`);
+  requireAdmin(e);
+  const id = e.request.pathValue("id");
+  const body = e.requestInfo().body || {};
+  const region = String(body.region || "");
+  const field = $app.findCollectionByNameOrId("workspaces").fields.getByName("region");
+  if (!region || field.values.indexOf(region) < 0) throw new BadRequestError("Неизвестный регион");
+  let corrections = 0, was = "";
+  $app.runInTransaction((tx) => {
+    const w = tx.findRecordById("workspaces", id);
+    was = w.getString("region");
+    if (was === region) return;
+    w.set("region", region);
+    if (e.auth && !e.auth.isSuperuser()) w.set("updated_by", e.auth.id);
+    tx.save(w);
+    const res = tx.db().newQuery("UPDATE corrections SET region = {:r} WHERE workspace = {:id}").bind({ r: region, id: id }).execute();
+    corrections = res.rowsAffected();
+  });
+  return e.json(200, { workspace: id, from: was, region: region, corrections: corrections });
 }, $apis.requireAuth());
 
 routerAdd("DELETE", "/api/admin/workspaces/{id}", (e) => {

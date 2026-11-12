@@ -258,6 +258,7 @@
           '<td>' + S.esc(a.status) + '</td>' +
           '<td>' + work + '</td>' +
           '<td class="act"><button class="btn sm ' + (w ? 'ok' : 'cyan') + '" data-act="open">' + (w ? 'Продолжить' : 'Открыть') + '</button>' +
+          (w && w.status === 'done' ? '<button class="btn sm" data-act="cmpv" title="Загрузить смету, которую прислали после нашей таблицы, и сравнить">Сравнить версию</button>' : '') +
           (admin ? '<div class="adm">' +
             (w ? '<button class="btn xs" data-act="clear" title="Удалить файлы, правки и экспорты, начать заново">Очистить</button>' +
               '<button class="btn xs danger" data-act="delws" title="Удалить рабочую область (заявка остаётся)">Удалить работу</button>' : '') +
@@ -267,6 +268,23 @@
       $('appCount').textContent = shown + ' / ' + (this.total || 0) + ' заявок';
       tb.querySelectorAll('button[data-act=open]').forEach(function (b) {
         b.addEventListener('click', function () { self.open(self.items[+b.closest('tr').dataset.i]); });
+      });
+      // «Сравнить версию» (F4): the file is asked for at once — the click is what lets the page open the chooser — and
+      // the application opens on «Сравнение версий» with it
+      tb.querySelectorAll('button[data-act=cmpv]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          self.cmpFor = self.items[+b.closest('tr').dataset.i];
+          var inp = $('appCmpFile');
+          if (!inp) {
+            inp = document.createElement('input'); inp.type = 'file'; inp.id = 'appCmpFile'; inp.accept = '.xlsx,.xlsm'; inp.hidden = true;
+            document.body.appendChild(inp);
+            inp.addEventListener('change', function () {
+              var f = inp.files && inp.files[0]; inp.value = '';
+              if (f && self.cmpFor) self.open(self.cmpFor, { compareNew: f });
+            });
+          }
+          inp.click();
+        });
       });
       tb.querySelectorAll('button[data-act=card]').forEach(function (b) {
         b.addEventListener('click', function () { self.card(self.items[+b.closest('tr').dataset.i]); });
@@ -326,13 +344,13 @@
     },
 
     /* ------------------------------------------------------------- open */
-    open: function (a) {
+    open: function (a, opts) {
       var self = this;
       var w = this.ws[a.id];
       if (w) {
         S.pb.collection('workspaces').getOne(w.id, { expand: 'updated_by' }).then(function (full) {
           self.hide();
-          S.Sync.open(full, a);
+          S.Sync.open(full, a, opts);
         }).catch(function (e) { window.app.toast(S.pbErr(e), true); });
         return;
       }
@@ -355,6 +373,42 @@
       $('regionErr').hidden = true;
       this.hide();
       $('screen-region').hidden = false;
+      // the contractor's earlier applications (F2): their region is offered when the text says nothing sure
+      this.touched = false;
+      if (!this._regionWatch) { this._regionWatch = true; $('regionSel').addEventListener('change', function () { self.touched = true; }); }
+      if (a.contragent) {
+        S.pb.collection('workspaces').getList(1, 30, {
+          filter: S.pb.filter('application.contragent = {:c} && application != {:a}', { c: a.contragent, a: a.id }), sort: '-updated',
+          expand: 'application', fields: 'region,expand.application.number'
+        }).then(function (res) {
+          if (self.pendingApp !== a || $('screen-region').hidden || self.touched) return;
+          var hist = (res.items || []).map(function (x) { return { region: x.region, number: x.expand && x.expand.application && x.expand.application.number }; });
+          var p = Registry.pickRegion(g, hist);
+          if (p.region !== $('regionSel').value) $('regionSel').value = p.region;
+          if (p.hint) $('regionHint').textContent = p.hint;
+        }).catch(function () { /* the text's guess stands */ });
+      }
+    },
+
+    /**
+     * The region to offer, from the text's guess `g` and the regions of the contractor's earlier applications `hist`
+     * (newest first): a sure guess stands — the history is said beside it when it differs; else a region that most of
+     * the earlier applications had is offered, said as such; else the guess, as before. Nothing is chosen for the
+     * expert: the screen still asks.
+     */
+    pickRegion: function (g, hist) {
+      var n = {}, all = 0, best = '', top = 0;
+      (hist || []).forEach(function (h) { if (!h.region) return; n[h.region] = (n[h.region] || 0) + 1; all++; });
+      Object.keys(n).forEach(function (r) { if (n[r] > top) { top = n[r]; best = r; } });
+      var nums = function (r) { return (hist || []).filter(function (h) { return h.region === r && h.number; }).slice(0, 3).map(function (h) { return '№ ' + h.number; }).join(', '); };
+      if (g.region && g.confidence >= 0.6) {
+        return { region: g.region, hint: best && best !== g.region ? 'В прежних заявках этого контрагента — ' + S.regionLabel(best) + ' (' + nums(best) + '). Проверьте.' : '' };
+      }
+      if (best && top * 2 > all) {
+        return { region: best, hint: 'Предложение: ' + S.regionLabel(best) + ' — так в прежних заявках этого контрагента (' + top + ' из ' + all + ': ' + nums(best) + ')' +
+          (g.region && g.region !== best ? '; по тексту заявки — ' + S.regionLabel(g.region) : '') + '. Проверьте.' };
+      }
+      return { region: g.region || '', hint: '' };
     },
 
     createWorkspace: function () {

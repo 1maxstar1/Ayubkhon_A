@@ -164,6 +164,49 @@ try {
   await page.waitForFunction(() => app.compare_ui.res, null, T);
   check(await page.textContent('#cmpNewName') === 'Тест_v3.xlsx', 'and the first one, opened from the list, has its own back');
 
+  // «Наш ответ (Excel)» from the exports this application keeps on the server (F3)
+  await page.click('#wsList');
+  await page.waitForSelector('#screen-list:not([hidden])');
+  await openApp(rows[2].number);
+  await page.setInputFiles('#pick', f1);
+  await page.waitForFunction(() => app.model && app.model.rows.length > 0 && S.Sync.ws.files.length === 1 && !S.Sync.loading, null, T);
+  await page.evaluate(() => { const r = app.model.resources.find((x) => x.name === 'ТЕСТОВЫЙ АНКЕР М8'); const p = {}; p[r.key] = 13; app.setPrices(p); });
+  // every resource on the sheet: «Только изменённые» would leave out a change under the threshold, and the sheet empty
+  await page.selectOption('#reportMode', 'dedup');
+  const dl = page.waitForEvent('download', T);
+  await page.click('#export');
+  await dl;
+  await page.waitForFunction(() => S.Sync.exportsList && S.Sync.exportsList.length === 1, null, T);
+  await page.click('.tab[data-pane="compare"]');
+  await page.click('#cmpReplyBtn');
+  await page.waitForSelector('#replyPop:not([hidden])', T);
+  const pop = await page.$$eval('#replyPop button', (b) => b.map((x) => x.textContent));
+  check(pop.length === 2 && /Файл с диска/.test(pop[1]), '«Наш ответ» offers the export kept for this application, and the disk after (' + pop.join(' | ') + ')');
+  await page.click('#replyPop button[data-i="0"]');
+  await page.waitForFunction(() => app.compare_ui.reply, null, T).catch(async (e) => { console.log('toast: ' + await page.textContent('#toast')); throw e; });
+  check(await page.isHidden('#replyPop'), 'the export is read as our reply, without a file dialog');
+  // the reply sets its prices on the project: the one typed before the export is the one it carries
+  check(await page.evaluate(() => { const r = app.model.resources.find((x) => x.name === 'ТЕСТОВЫЙ АНКЕР М8'); return app.prices[r.key]; }) === 13,
+    'and its price is the one the export was made with');
+
+  // «Сравнить версию» from the list for a finished application (F4): the returned smeta goes straight to the compare tab
+  await saved();
+  await page.click('.tab[data-pane="prices"]');
+  await page.click('#wsDone');
+  await page.waitForFunction(() => document.querySelector('#wsBox .done'), null, T);
+  await page.click('#wsList');
+  await page.waitForSelector('#screen-list:not([hidden])');
+  await page.fill('#appQ', rows[2].number);
+  await page.waitForFunction(() => document.querySelector('#appTable tbody tr button[data-act=cmpv]'), null, T);
+  const chooser = page.waitForEvent('filechooser', T);
+  await page.click('#appTable tbody tr button[data-act=cmpv]');
+  await (await chooser).setFiles(f2);
+  await page.waitForSelector('#wsBox:not([hidden])', T);
+  await page.waitForFunction(() => app.compare_ui.res && app.compare_ui.newFile, null, T);
+  check(await page.evaluate(() => document.getElementById('pane-compare').classList.contains('on')) && await page.textContent('#cmpNewName') === 'Тест_v2.xlsx',
+    '«Сравнить версию» opens the application on the compare tab, with the returned smeta compared');
+  check(await page.evaluate(() => app.projects.length) === 1, 'the returned smeta did not become a project');
+
   check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' / ') : ''));
 } catch (e) {
   check(false, 'the run stopped: ' + (e.message || e).split('\n')[0]);

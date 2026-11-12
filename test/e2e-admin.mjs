@@ -179,6 +179,37 @@ await page.waitForSelector('#adminMain:not([hidden])');
 await page.waitForFunction(() => document.querySelectorAll('#wsTable tbody tr[data-id]').length === 1);
 const wsRow = await page.textContent('#wsTable tbody tr');
 check(wsRow.includes('900123') && wsRow.includes('Ферган') && wsRow.includes('завершена'), 'workspaces panel lists the workspace: ' + wsRow.replace(/\s+/g, ' ').trim());
+// «Вернуть в работу» from the admin page: in work again, nothing deleted (B8)
+const wsGet = async () => (await (await fetch(BASE + '/api/collections/workspaces/records?perPage=1', { headers: { Authorization: su } })).json()).items[0];
+const wsBefore = await wsGet();
+await page.click('#wsTable tbody tr button[data-act=reopen]');
+await page.waitForFunction(() => /в работе/.test(document.querySelector('#wsTable tbody tr').textContent), null, { timeout: 10 * 1000 }).catch(() => null);
+const wsAfter = await wsGet();
+check(wsAfter.status === 'in_progress' && wsAfter.changed === wsBefore.changed && JSON.stringify(wsAfter.state) === JSON.stringify(wsBefore.state),
+  '«Вернуть в работу» on the admin page: the application is in work again and nothing of it is deleted');
+await fetch(BASE + '/api/collections/workspaces/records/' + wsAfter.id, { method: 'PATCH', headers: { 'content-type': 'application/json', Authorization: su }, body: JSON.stringify({ status: 'done' }) });
+// another region (B8): the workspace and its price corrections move together; the corrections keep their time
+const corr = await (await fetch(BASE + '/api/collections/corrections/records', { method: 'POST', headers: { 'content-type': 'application/json', Authorization: su },
+  body: JSON.stringify({ workspace: wsAfter.id, application: rec.id, contragent: rec.contragent, region: 'fargona', res_key: 'k1', name: 'ЦЕМЕНТ М400', unit: 'т',
+    smeta_price: 900, market_price: 800 }) })).json();
+await page.reload();
+await page.waitForSelector('#adminMain:not([hidden])');
+await page.waitForFunction(() => document.querySelectorAll('#wsTable tbody tr[data-id]').length === 1);
+let regionAsked = '';
+page.once('dialog', (d) => { regionAsked = d.message(); d.accept(); });
+await page.selectOption('#wsTable tbody tr select[data-region]', 'xorazm');
+await page.waitForFunction(() => /перенесена/.test(document.getElementById('toast').textContent), null, { timeout: 10 * 1000 }).catch(() => null);
+const moved = await wsGet();
+const corrAfter = await (await fetch(BASE + '/api/collections/corrections/records/' + corr.id, { headers: { Authorization: su } })).json();
+check(/Ферган/.test(regionAsked) && /Хорезм/.test(regionAsked), 'another region asks first, naming both regions');
+check(moved.region === 'xorazm' && corrAfter.region === 'xorazm', 'the application is moved to the other region, and its prices with it');
+check(corrAfter.updated === corr.updated, 'the moved prices keep their time (the order of the hints)');
+check(/перенесено цен: 1/.test(await page.textContent('#toast')), 'and the page says how many prices moved');
+const direct = await page.evaluate((id) => S.pb.collection('workspaces').update(id, { region: 'andijon' }).then(() => 'saved', (e) => S.pbErr(e)), wsAfter.id);
+check(/администратор/.test(direct) && (await wsGet()).region === 'xorazm', 'the region cannot be changed past the admin route, where the prices would stay behind (' + direct + ')');
+await page.reload();
+await page.waitForSelector('#adminMain:not([hidden])');
+await page.waitForFunction(() => document.querySelectorAll('#wsTable tbody tr[data-id]').length === 1);
 page.once('dialog', (d) => d.accept());
 await page.click('#wsTable tbody tr button[data-act=clear]');
 await page.waitForFunction(() => /в работе/.test(document.querySelector('#wsTable tbody').textContent));

@@ -498,6 +498,14 @@ so'raydi va o'z hisobingizda rad etadi; loyihaning «×» i so'raydi (fayl
 serverdan ham o'chishini aytib). **Qolgani (5-bosqich):** «Завершить» ni
 qaytarish va viloyatni o'zgartirish.
 
+**Qolgani ham bajarildi — v2.10.0.** Tugallangan arizani ekspert ish maydonining o'zida
+(«Вернуть в работу»), admin esa admin sahifasida qaytaradi — hech narsa o'chmaydi. Viloyatni
+admin sahifasidagi ro'yxatda o'zgartiradi: avval so'raydi, ariza bilan birga uning narx
+tuzatishlari ham ko'chadi (ular o'sha viloyatga taklif bo'ladi), vaqti esa o'zgarmaydi (taklif
+tartibi buzilmaydi); sahifa nechta narx ko'chganini aytadi. Viloyatni boshqa yo'l bilan
+(yozuvlar API) o'zgartirish server tomonidan rad etiladi — aks holda narxlar eski viloyatda
+qolib ketardi. Testlar — `test/e2e-admin.mjs`, `test/e2e-workspace.mjs`.
+
 ### [ ] B9 Ofis tarmog'i rejimi (`lan.sh`) umuman zaxira olmaydi
 
 `server/lan.sh`, `server/deploy/configure.sh:38-42` — **yuqori** (o'sha rejimga
@@ -782,6 +790,26 @@ yo'qoladi. Faqat fayl yuklash uzilsa — fayl qatori o'z xabarini aytadi (panel 
 (`S.uzex.weekFor`); sana barcha haftalardan oldin bo'lsa — eng yangisi, sababi bilan; qo'lda
 tanlangan hafta ariza bilan saqlanadi, «по дате заявки» bilan qaytariladi.
 
+**F1 — bajarildi (v2.10.0).** Ish maydonida «Цены этого контрагента…» tugmasi (faqat server rejimida,
+kontragenti bor arizada): shu kontragentning shu viloyatdagi oldingi arizalaridan har bir resursga eng
+yangi arizasi bergan narx — bitta ro'yxatda (smeta narxi, oldingi narx, qatorma-qator tejam, qaysi ariza);
+hech narsa «Применить выбранные» bosilmaguncha qo'yilmaydi, belgisi olingan qator qo'yilmaydi. Ekspert
+narx yozgan resurs (birorta varianti bo'lsa ham) ro'yxatga kirmaydi va «пропущено» da aytiladi — bitta
+nom va birlikda ikki bozor narxi bo'lmaydi; bitta arizada ikki xil narx olgan resurs ham kirmaydi. UZEX dan
+qo'llangan narx belgisiz turadi («проверьте НДС»). Qo'yilgan narx «П» belgisi va serverda manbasi bilan
+yoziladi; «Отменить» bilan butun bosish qaytadi. Test — `test/contragent-prices.mjs`.
+
+**F2 — bajarildi (v2.10.0).** Viloyat oynasi kontragentning oldingi arizalari viloyatini ham so'raydi:
+matndagi taxmin ishonchli bo'lsa (≥ 0,6) — o'zi turadi, tarix boshqa bo'lsa yonida aytiladi; bo'lmasa —
+oldingi arizalarning ko'pchiligidagi viloyat taklif qilinadi («2 из 3: № …»). Ekspert ro'yxatni o'zi
+o'zgartirgan bo'lsa tegilmaydi; baribir tanlashni so'raydi (`Registry.pickRegion`).
+
+**F3 — bajarildi (v2.10.0).** «Наш ответ (Excel)» avval shu arizaning serverdagi eksportlarini ko'rsatadi
+(sana, kim, turi), oxirida «Файл с диска…»; eksport bo'lmasa — avvalgidek disk.
+
+**F4 — bajarildi (v2.10.0).** Ro'yxatda tugallangan ariza qatorida «Сравнить версию»: qaytgan smeta
+tanlanadi, ariza ochiladi va to'g'ri «Сравнение версий» ga tushadi (loyiha bo'lib qo'shilmaydi).
+
 **F6 — bajarildi (v2.10.0).** Ochiq sahifa vaqti-vaqti bilan (vkladka ko'ringanda, tarmoq
 qaytganda, har 5 daqiqada) server bergan versiyani ishga tushirgichlar o'qiydigan yorliqdan
 o'qiydi; boshqa bo'lsa — doimiy panel va «Обновить страницу» (avval ish maydonini saqlaydi);
@@ -871,10 +899,10 @@ keyin bu muhim: mijoz narxlar **QQSsiz** bo'lishini talab qilgan.
 
 | № | Taklif | Izoh | Hajm |
 |---|---|---|---|
-| F1 | Aynan shu kontragentning aynan shu resursi uchun oldingi narxni **bir tugma bilan hammasiga** taklif qilish | «Taklif faqat „Применить“ bosilganda qo'yiladi» qoidasi saqlanadi: bitta ro'yxat, bitta tasdiqlash → egasining qarori 3 | M |
-| F2 | Viloyatni kontragent bo'yicha oldindan tanlash | Oldingi arizalardan | S |
-| F3 | «Наш ответ» uchun saqlangan eksportni taklif qilish | Hozir fayl diskdan so'raladi, holbuki eksportlar serverda turadi | S |
-| F4 | Tugallangan ariza qatorida «Сравнить версию» | Qaytgan smetani bir bosishda solishtirish | S |
+| F1 ✓ v2.10.0 | Aynan shu kontragentning aynan shu resursi uchun oldingi narxni **bir tugma bilan hammasiga** taklif qilish | «Taklif faqat „Применить“ bosilganda qo'yiladi» qoidasi saqlanadi: bitta ro'yxat, bitta tasdiqlash → egasining qarori 3 | M |
+| F2 ✓ v2.10.0 | Viloyatni kontragent bo'yicha oldindan tanlash | Oldingi arizalardan | S |
+| F3 ✓ v2.10.0 | «Наш ответ» uchun saqlangan eksportni taklif qilish | Hozir fayl diskdan so'raladi, holbuki eksportlar serverda turadi | S |
+| F4 ✓ v2.10.0 | Tugallangan ariza qatorida «Сравнить версию» | Qaytgan smetani bir bosishda solishtirish | S |
 | F5 ✓ v2.10.0 | UZEX haftasini arizaning ro'yxatga olingan sanasi bo'yicha tanlash | Hozir qo'lda → egasining qarori 7 | S |
 | F6 ✓ v2.10.0 | Ochiq sahifa server versiyasi o'zgarganini bilib, «обновите страницу» deyishi | Hozir yangilanishdan keyin eski sahifa yangi server bilan ishlayveradi | S |
 | F7 ✓ | Reliz skripti: versiya, qurish, testlar, `releases.txt`, `versiyalar.md` — bitta buyruq va tekshiruvlar. **Bajarildi — commit `ffccdc2`:** `sh server/release.sh X.Y.Z "izoh" --row matn.md [--dry]`; test — `test/release-script.sh`. Kod ko'rigidan keyin: PowerShell, playwright va shox (`claude/excel-price-validation-5ehbvb` — Windows `releases.txt` ni shundan o'qiydi) to'plamdan oldin tekshiriladi; natijalarda skript bilmagan test bo'lsa — rad; origin oldinga ketsa reliz commit'i rebase qilinmaydi (tashlab, qaytadan); `--row` yo'li skript ishga tushirilgan papkadan o'qiladi | Hozir 6 qadam qo'lda; `releases.txt` 14/14 to'g'ri, lekin faqat ehtiyotkorlik hisobiga | M |

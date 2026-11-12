@@ -280,6 +280,7 @@ form.grid .foot{grid-column:1 / -1;display:flex;gap:8px;align-items:center}
 .denied{text-align:center;color:var(--mute);margin-top:60px}
 .ws{font-size:11px;border-radius:3px;padding:1px 5px;background:#fde7c7;color:#8a5300}
 .ws.done{background:var(--green);color:var(--greentx)}
+.wsreg{font-size:12px;max-width:170px;padding:1px 2px}
 
 /* ---------------------------------------------------------- application list */
 .screen.list{align-items:stretch;padding:0;z-index:60;border-top:1px solid var(--rule)}
@@ -548,6 +549,28 @@ body.compact main:not(.narrow){grid-template-columns:232px 1fr}
 .srvdown{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;z-index:60;max-width:880px;padding:10px 14px;
   background:#fff4e5;border:1px solid #f0b46a;border-radius:8px;box-shadow:0 4px 18px rgba(0,0,0,.14);font-size:13px;line-height:1.4}
 .srvdown code{background:#fff;border:1px solid #f0d2a8;border-radius:4px;padding:0 4px}
+
+/* «Наш ответ» from the exports kept on the server (F3) */
+.replypop{position:fixed;z-index:55;min-width:300px;max-width:380px;background:#fff;border:1px solid var(--rule2);border-radius:8px;
+  box-shadow:0 6px 24px rgba(0,0,0,.14);padding:6px;display:flex;flex-direction:column;align-items:stretch}
+.replypop .rp-h{font-weight:600;font-size:12px;padding:4px 6px 6px}
+.replypop .rp-h small{display:block;font-weight:400;color:var(--mute)}
+.replypop .link{text-align:left;padding:6px 8px;color:var(--ink)}
+.replypop .link:hover{background:var(--accent-w)}
+.cpbox{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center}
+.cpbox[hidden]{display:none}
+.cpbox .cp-in{background:#fff;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.2);width:min(1000px,94vw);max-height:86vh;display:flex;flex-direction:column}
+.cpbox .cp-h{padding:10px 14px;border-bottom:1px solid var(--rule2);display:flex;gap:8px;align-items:baseline}
+.cpbox .cp-h small{color:var(--mute)}
+.cpbox .cp-h .link{margin-left:auto;font-size:18px}
+.cpbox .cp-list{overflow:auto;flex:1}
+.cpbox table{border-collapse:collapse;width:100%;font-size:12px}
+.cpbox th,.cpbox td{padding:4px 8px;border-bottom:1px solid var(--rule2);text-align:left;vertical-align:top}
+.cpbox th{position:sticky;top:0;background:#f6f8fa}
+.cpbox .num{text-align:right;white-space:nowrap}
+.cpbox td small{display:block;color:var(--mute)}
+.cpbox .cp-f{padding:10px 14px;border-top:1px solid var(--rule2);display:flex;gap:8px;align-items:center}
+.cpbox .cp-f .count{flex:1;color:var(--mute);font-size:12px}
 </style>
 </head>
 <body class="admin">
@@ -3369,22 +3392,52 @@ var S = (typeof S !== 'undefined' && S) || {};
         return '<tr data-id="' + w.id + '">' +
           '<td class="mono"><b>' + S.esc(a.number || '?') + '</b></td>' +
           '<td>' + S.esc(org) + (a.inn ? '<br><span class="mute">ИНН ' + S.esc(a.inn) + '</span>' : '') + '</td>' +
-          '<td>' + S.esc(S.regionLabel(w.region)) + '</td>' +
+          '<td><select class="wsreg" data-region title="Регион заявки: цены этой заявки — подсказки для этого региона. Сменить можно, правки переедут вместе с ней">' +
+            S.REGIONS.map(function (r) { return '<option value="' + r[0] + '"' + (r[0] === w.region ? ' selected' : '') + '>' + S.esc(r[1]) + '</option>'; }).join('') + '</select></td>' +
           '<td><span class="ws ' + S.esc(w.status) + '">' + (w.status === 'done' ? 'завершена' : 'в работе') + '</span></td>' +
           '<td>' + ((w.files || []).length) + '</td>' +
           '<td>' + (w.changed || 0) + '</td>' +
           '<td>' + when(w.updated) + (by ? '<br><span class="mute">' + S.esc(by.name || by.email) + '</span>' : '') + '</td>' +
-          '<td class="act"><button class="btn sm" data-act="clear" title="Удалить файлы, правки и экспорты, начать заново">Очистить</button>' +
+          '<td class="act">' + (w.status === 'done' ? '<button class="btn sm" data-act="reopen" title="Снять отметку «завершена»: заявка снова в работе, ничего не удаляется">Вернуть в работу</button>' : '') +
+          '<button class="btn sm" data-act="clear" title="Удалить файлы, правки и экспорты, начать заново">Очистить</button>' +
           '<button class="btn sm danger" data-act="delete" title="Удалить рабочую область полностью">✕ Удалить</button></td></tr>';
       }).join('') || '<tr><td colspan="8" class="mute">Никто ещё не открывал заявки</td></tr>';
       $('wsCount').textContent = shown + ' / ' + this.wsItems.length;
+      tb.querySelectorAll('select[data-region]').forEach(function (sel) {
+        sel.addEventListener('change', function () {
+          var w = self.wsItems.find(function (x) { return x.id === sel.closest('tr').dataset.id; });
+          self.moveRegion(w, sel.value, function () { sel.value = w.region; });
+        });
+      });
       tb.querySelectorAll('button[data-act]').forEach(function (b) {
         b.addEventListener('click', function () {
           var tr = b.closest('tr');
           var w = self.wsItems.find(function (x) { return x.id === tr.dataset.id; });
-          if (b.dataset.act === 'clear') self.clearWs(w); else self.deleteWs(w);
+          if (b.dataset.act === 'clear') self.clearWs(w);
+          else if (b.dataset.act === 'reopen') {
+            S.pb.collection('workspaces').update(w.id, { status: 'in_progress' }).then(function () {
+              var ap = self.appOf(w); toast('Заявка ' + (ap && ap.number ? '№ ' + ap.number + ' ' : '') + 'снова в работе');
+              self.loadWs();
+            }).catch(function (e) { toast(S.pbErr(e), true); });
+          } else self.deleteWs(w);
         });
       });
+    },
+
+    /**
+     * Another region for an application (B8): a region picked by mistake was for good. Its price corrections move with
+     * it — they are hints for the region they stand in — and the server says how many did.
+     */
+    moveRegion: function (w, region, back) {
+      var self = this, ap = this.appOf(w);
+      if (!w || region === w.region) return;
+      if (!confirm('Перенести заявку ' + (ap.number ? '№ ' + ap.number + ' ' : '') + 'из региона «' + S.regionLabel(w.region) + '» в «' + S.regionLabel(region) + '»?\n\n' +
+        'Её цены станут подсказками для нового региона и перестанут подсказываться в прежнем. Файлы и цены заявки не меняются.')) { back(); return; }
+      S.pb.send('/api/admin/workspaces/' + w.id + '/region', { method: 'POST', body: { region: region } }).then(function (r) {
+        toast('Заявка ' + (ap.number ? '№ ' + ap.number + ' ' : '') + 'перенесена в регион «' + S.regionLabel(region) + '»' +
+          (r.corrections ? '; перенесено цен: ' + r.corrections : ''));
+        self.loadWs();
+      }).catch(function (e) { back(); toast(S.pbErr(e), true); });
     },
 
     appOf: function (w) { return (w.expand && w.expand.application) || {}; },

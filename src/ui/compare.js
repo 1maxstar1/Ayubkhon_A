@@ -26,6 +26,18 @@
   function chose(slot, file) { document.dispatchEvent(new CustomEvent('cmp:file', { detail: { slot: slot, file: file || null } })); }
   function option(sel, v) { return !!v && Array.prototype.some.call(sel.options, function (o) { return o.value === v; }); }
 
+  /** «Наш ответ (Excel)»: the file chooser — the page without a server has nothing else to offer. */
+  Compare.prototype.pickReply = function () { $('cmpReplyFile').click(); };
+
+  /** The returned estimate, from a file (F4: also handed over by «Сравнить версию» of the list of applications). */
+  Compare.prototype.takeNew = function (f) {
+    var self = this, gen = this.gen;
+    this.read(f, function (objs) {
+      if (gen !== undefined && gen !== self.gen) return;
+      self.newFile = { name: f.name, objects: objs }; chose('new', f); self.run();
+    });
+  };
+
   Compare.prototype.bind = function () {
     var self = this;
     if (!$('cmpOld')) return;
@@ -49,7 +61,8 @@
       }, function () { self.fillOld(); });
     });
     $('cmpNewBtn').addEventListener('click', function () { $('cmpNewFile').click(); });
-    $('cmpReplyBtn').addEventListener('click', function () { $('cmpReplyFile').click(); });
+    // looked up at the click: the server page offers the exports it keeps before the disk (F3, sync.js)
+    $('cmpReplyBtn').addEventListener('click', function (e) { self.pickReply(e.currentTarget); });
     $('cmpReplyFile').addEventListener('change', function (e) {
       var f = e.target.files[0]; e.target.value = '';
       if (f) self.loadReply(f);
@@ -57,7 +70,7 @@
     $('cmpNewFile').addEventListener('change', function (e) {
       var f = e.target.files[0]; e.target.value = '';
       if (!f) return;
-      self.read(f, function (objs) { self.newFile = { name: f.name, objects: objs }; chose('new', f); self.run(); });
+      self.takeNew(f);
     });
     // back on the view and the filter the page was reloaded with
     if (option($('cmpView'), S.hashGet('cv'))) $('cmpView').value = S.hashGet('cv');

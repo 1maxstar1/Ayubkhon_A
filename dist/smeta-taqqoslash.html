@@ -280,6 +280,7 @@ form.grid .foot{grid-column:1 / -1;display:flex;gap:8px;align-items:center}
 .denied{text-align:center;color:var(--mute);margin-top:60px}
 .ws{font-size:11px;border-radius:3px;padding:1px 5px;background:#fde7c7;color:#8a5300}
 .ws.done{background:var(--green);color:var(--greentx)}
+.wsreg{font-size:12px;max-width:170px;padding:1px 2px}
 
 /* ---------------------------------------------------------- application list */
 .screen.list{align-items:stretch;padding:0;z-index:60;border-top:1px solid var(--rule)}
@@ -548,6 +549,28 @@ body.compact main:not(.narrow){grid-template-columns:232px 1fr}
 .srvdown{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;z-index:60;max-width:880px;padding:10px 14px;
   background:#fff4e5;border:1px solid #f0b46a;border-radius:8px;box-shadow:0 4px 18px rgba(0,0,0,.14);font-size:13px;line-height:1.4}
 .srvdown code{background:#fff;border:1px solid #f0d2a8;border-radius:4px;padding:0 4px}
+
+/* «Наш ответ» from the exports kept on the server (F3) */
+.replypop{position:fixed;z-index:55;min-width:300px;max-width:380px;background:#fff;border:1px solid var(--rule2);border-radius:8px;
+  box-shadow:0 6px 24px rgba(0,0,0,.14);padding:6px;display:flex;flex-direction:column;align-items:stretch}
+.replypop .rp-h{font-weight:600;font-size:12px;padding:4px 6px 6px}
+.replypop .rp-h small{display:block;font-weight:400;color:var(--mute)}
+.replypop .link{text-align:left;padding:6px 8px;color:var(--ink)}
+.replypop .link:hover{background:var(--accent-w)}
+.cpbox{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center}
+.cpbox[hidden]{display:none}
+.cpbox .cp-in{background:#fff;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.2);width:min(1000px,94vw);max-height:86vh;display:flex;flex-direction:column}
+.cpbox .cp-h{padding:10px 14px;border-bottom:1px solid var(--rule2);display:flex;gap:8px;align-items:baseline}
+.cpbox .cp-h small{color:var(--mute)}
+.cpbox .cp-h .link{margin-left:auto;font-size:18px}
+.cpbox .cp-list{overflow:auto;flex:1}
+.cpbox table{border-collapse:collapse;width:100%;font-size:12px}
+.cpbox th,.cpbox td{padding:4px 8px;border-bottom:1px solid var(--rule2);text-align:left;vertical-align:top}
+.cpbox th{position:sticky;top:0;background:#f6f8fa}
+.cpbox .num{text-align:right;white-space:nowrap}
+.cpbox td small{display:block;color:var(--mute)}
+.cpbox .cp-f{padding:10px 14px;border-top:1px solid var(--rule2);display:flex;gap:8px;align-items:center}
+.cpbox .cp-f .count{flex:1;color:var(--mute);font-size:12px}
 </style>
 </head>
 <body>
@@ -5528,6 +5551,18 @@ if (typeof self !== 'undefined') self.S = S;
   function chose(slot, file) { document.dispatchEvent(new CustomEvent('cmp:file', { detail: { slot: slot, file: file || null } })); }
   function option(sel, v) { return !!v && Array.prototype.some.call(sel.options, function (o) { return o.value === v; }); }
 
+  /** «Наш ответ (Excel)»: the file chooser — the page without a server has nothing else to offer. */
+  Compare.prototype.pickReply = function () { $('cmpReplyFile').click(); };
+
+  /** The returned estimate, from a file (F4: also handed over by «Сравнить версию» of the list of applications). */
+  Compare.prototype.takeNew = function (f) {
+    var self = this, gen = this.gen;
+    this.read(f, function (objs) {
+      if (gen !== undefined && gen !== self.gen) return;
+      self.newFile = { name: f.name, objects: objs }; chose('new', f); self.run();
+    });
+  };
+
   Compare.prototype.bind = function () {
     var self = this;
     if (!$('cmpOld')) return;
@@ -5551,7 +5586,8 @@ if (typeof self !== 'undefined') self.S = S;
       }, function () { self.fillOld(); });
     });
     $('cmpNewBtn').addEventListener('click', function () { $('cmpNewFile').click(); });
-    $('cmpReplyBtn').addEventListener('click', function () { $('cmpReplyFile').click(); });
+    // looked up at the click: the server page offers the exports it keeps before the disk (F3, sync.js)
+    $('cmpReplyBtn').addEventListener('click', function (e) { self.pickReply(e.currentTarget); });
     $('cmpReplyFile').addEventListener('change', function (e) {
       var f = e.target.files[0]; e.target.value = '';
       if (f) self.loadReply(f);
@@ -5559,7 +5595,7 @@ if (typeof self !== 'undefined') self.S = S;
     $('cmpNewFile').addEventListener('change', function (e) {
       var f = e.target.files[0]; e.target.value = '';
       if (!f) return;
-      self.read(f, function (objs) { self.newFile = { name: f.name, objects: objs }; chose('new', f); self.run(); });
+      self.takeNew(f);
     });
     // back on the view and the filter the page was reloaded with
     if (option($('cmpView'), S.hashGet('cv'))) $('cmpView').value = S.hashGet('cv');

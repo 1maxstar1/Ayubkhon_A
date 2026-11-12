@@ -55,6 +55,17 @@
     saveRetry: SAVE_RETRY_MS,
 
     init: function () {
+      // «Наш ответ (Excel)» (F3): the exports this application keeps on the server are offered first, the disk after
+      if (S.Compare && S.Compare.prototype.pickReply) {
+        var pickDisk = S.Compare.prototype.pickReply;
+        S.Compare.prototype.pickReply = function (btn) {
+          var cmp = this, list = Sync.exportsList || [];
+          if (!Sync.ws || !list.length) return pickDisk.apply(this, arguments);
+          Sync.replyMenu(btn, list, function () { pickDisk.call(cmp); }, function (x) { Sync.takeExport(cmp, x); });
+        };
+      }
+      document.addEventListener('ws:open', function () { Sync.loadExports(); });
+      document.addEventListener('ws:close', function () { Sync.exportsList = []; });
       document.addEventListener('notes:change', function () { Sync.touch(); });
       document.addEventListener('checked:change', function () { if (!Sync.loading) Sync.touch(); });
       // the document of an application is named after it: its number and its contractor (E19)
@@ -129,7 +140,7 @@
      * earlier one is thrown away rather than dropped on top of the workspace
      * now on screen.
      */
-    open: function (w, a) {
+    open: function (w, a, opts) {
       var self = this;
       var mine = ++this.seq;
       var current = function () { return self.seq === mine; };
@@ -177,6 +188,8 @@
       var st = w.state || {};
       var wanted = (st.projects || []).map(function (p) { return { name: p.file, id: p.fileId }; })
         .filter(function (f) { return f.id && (w.files || []).indexOf(f.id) >= 0; });
+      // «Сравнить версию» of the list (F4): the returned estimate is taken once the application is on screen
+      this.after = opts && opts.compareNew ? { seq: this.seq, file: opts.compareNew } : null;
       if (!wanted.length) { this.restore(); return; }
       app.busy(true, 'Получение файлов с сервера…');
       Promise.all(wanted.map(function (f) {
@@ -315,6 +328,12 @@
       this.replay();
       this.mergeCorr();
       this.restoreCompare();
+      var af = this.after; this.after = null;
+      if (af && af.seq === this.seq && app.compare_ui) {
+        var t = document.querySelector('.tab[data-pane="compare"]');
+        if (t) t.click();
+        app.compare_ui.takeNew(af.file);
+      }
     },
 
     /* ----------------------------------------------- kept in the browser */
@@ -971,6 +990,47 @@
     },
 
     /* ---------------------------------------------------------- exports */
+    /** The exports of the open application, newest first (F3). */
+    loadExports: function () {
+      var self = this, ws = this.ws;
+      this.exportsList = [];
+      if (!ws || !this.app) return;
+      S.pb.collection('exports').getFullList({ filter: S.pb.filter('application = {:a}', { a: this.app.id }), sort: '-created', expand: 'by' })
+        .then(function (l) { if (self.ws === ws) self.exportsList = l; }).catch(function () { /* the disk is still there */ });
+    },
+    replyMenu: function (btn, list, disk, take) {
+      var pop = $('replyPop');
+      if (!pop) { pop = document.createElement('div'); pop.id = 'replyPop'; pop.className = 'replypop'; document.body.appendChild(pop); }
+      var when = function (d) { var t = new Date(String(d).replace(' ', 'T')); return isNaN(t) ? '' : t.toLocaleDateString('ru-RU') + ' ' + t.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); };
+      pop.innerHTML = '<div class="rp-h">Наш ответ — из сохранённых экспортов этой заявки<small>цены проекта будут заменены ценами экспорта</small></div>' +
+        list.slice(0, 12).map(function (x, i) {
+          var by = x.expand && x.expand.by;
+          return '<button class="link" data-i="' + i + '">' + S.esc(when(x.created)) + (by ? ' · ' + S.esc(by.name || by.email) : '') +
+            (x.mode ? ' · ' + S.esc(S.ru ? S.ru('mode', x.mode) : x.mode) : '') + '</button>';
+        }).join('') + '<button class="link" data-disk>Файл с диска…</button>';
+      var r = btn.getBoundingClientRect();
+      pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 380)) + 'px';
+      pop.style.top = (r.bottom + 4) + 'px';
+      pop.hidden = false;
+      var close = function () { pop.hidden = true; document.removeEventListener('mousedown', out, true); };
+      var out = function (e) { if (!pop.contains(e.target) && e.target !== btn) close(); };
+      document.addEventListener('mousedown', out, true);
+      pop.querySelectorAll('button').forEach(function (b) {
+        b.addEventListener('click', function () {
+          close();
+          if (b.hasAttribute('data-disk')) disk(); else take(list[+b.dataset.i]);
+        });
+      });
+    },
+    takeExport: function (cmp, x) {
+      S.fileURL(x, x.file).then(function (u) { return fetch(u); }).then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.blob();
+      }).then(function (b) {
+        cmp.loadReply(new File([b], x.file, { type: b.type }));
+      }).catch(function (e) { A().toast('Экспорт не получен с сервера: ' + (e && e.message || e), true); });
+    },
+
     saveExport: function (bytes, opts) {
       var self = this, app = A();
       if (!this.ws || this.frozen) return;
@@ -986,6 +1046,7 @@
       this.enqueue(function () {
         return S.pb.collection('exports').create(fd).then(function () {
           app.toast('Экспорт сохранён на сервере: ' + name);
+          self.loadExports();
         }).catch(function (e) { app.toast('Экспорт не записан на сервер: ' + S.pbErr(e), true); });
       });
     },
@@ -1060,13 +1121,27 @@
         '<span class="rg">' + S.esc(S.regionLabel(w.region)) + '</span>' +
         '<span class="sv" id="wsSave" title="Сохранено">✓</span>' +
         (w.status === 'done'
-          ? '<span class="done">завершена</span>'
+          ? '<span class="done">завершена</span><button class="btn sm" id="wsReopen" title="Снять отметку «завершена»">Вернуть в работу</button>'
           : '<button class="btn sm ok" id="wsDone" title="Отметить работу как завершённую">✓ Завершить</button>');
       $('wsList').addEventListener('click', function () {
         self.close().catch(function () { /* the toast already said why */ });
       });
       var d = $('wsDone');
       if (d) d.addEventListener('click', function () { self.finish(); });
+      var ro = $('wsReopen');
+      if (ro) ro.addEventListener('click', function () { self.reopen(); });
+    },
+
+    /** «Вернуть в работу»: a finished application is in work again (B8). Nothing in it changes but its status. */
+    reopen: function () {
+      var self = this, ws = this.ws;
+      if (!ws || this.frozen) return;
+      S.pb.collection('workspaces').update(ws.id, { status: 'in_progress', updated_by: S.me().id }).then(function (w) {
+        if (self.ws !== ws) return;
+        ws.status = w.status;
+        self.renderBox();
+        A().toast('Заявка снова в работе');
+      }).catch(function (e) { A().toast(S.pbErr(e), true); });
     },
 
     finish: function () {

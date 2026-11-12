@@ -179,6 +179,7 @@ browser_run close-tab    node test/close-tab.mjs
 browser_run state-size   node test/state-size.mjs
 browser_run e2e-workspace node test/e2e-workspace.mjs "$S1" "$S2"
 browser_run e2e-hints    node test/e2e-hints.mjs "$S1"
+browser_run contragent-prices node test/contragent-prices.mjs
 if [ -n "$REG" ]; then browser_run e2e-fullregistry node test/e2e-fullregistry.mjs "$REG"; else skip e2e-fullregistry "reyestr fayli berilmagan"; fi
 echo "-----------------------------------"
 # Counted by column rather than by grepping for the word: «\t» is a tab to GNU

@@ -280,6 +280,7 @@ form.grid .foot{grid-column:1 / -1;display:flex;gap:8px;align-items:center}
 .denied{text-align:center;color:var(--mute);margin-top:60px}
 .ws{font-size:11px;border-radius:3px;padding:1px 5px;background:#fde7c7;color:#8a5300}
 .ws.done{background:var(--green);color:var(--greentx)}
+.wsreg{font-size:12px;max-width:170px;padding:1px 2px}
 
 /* ---------------------------------------------------------- application list */
 .screen.list{align-items:stretch;padding:0;z-index:60;border-top:1px solid var(--rule)}
@@ -548,6 +549,28 @@ body.compact main:not(.narrow){grid-template-columns:232px 1fr}
 .srvdown{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;z-index:60;max-width:880px;padding:10px 14px;
   background:#fff4e5;border:1px solid #f0b46a;border-radius:8px;box-shadow:0 4px 18px rgba(0,0,0,.14);font-size:13px;line-height:1.4}
 .srvdown code{background:#fff;border:1px solid #f0d2a8;border-radius:4px;padding:0 4px}
+
+/* «Наш ответ» from the exports kept on the server (F3) */
+.replypop{position:fixed;z-index:55;min-width:300px;max-width:380px;background:#fff;border:1px solid var(--rule2);border-radius:8px;
+  box-shadow:0 6px 24px rgba(0,0,0,.14);padding:6px;display:flex;flex-direction:column;align-items:stretch}
+.replypop .rp-h{font-weight:600;font-size:12px;padding:4px 6px 6px}
+.replypop .rp-h small{display:block;font-weight:400;color:var(--mute)}
+.replypop .link{text-align:left;padding:6px 8px;color:var(--ink)}
+.replypop .link:hover{background:var(--accent-w)}
+.cpbox{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center}
+.cpbox[hidden]{display:none}
+.cpbox .cp-in{background:#fff;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.2);width:min(1000px,94vw);max-height:86vh;display:flex;flex-direction:column}
+.cpbox .cp-h{padding:10px 14px;border-bottom:1px solid var(--rule2);display:flex;gap:8px;align-items:baseline}
+.cpbox .cp-h small{color:var(--mute)}
+.cpbox .cp-h .link{margin-left:auto;font-size:18px}
+.cpbox .cp-list{overflow:auto;flex:1}
+.cpbox table{border-collapse:collapse;width:100%;font-size:12px}
+.cpbox th,.cpbox td{padding:4px 8px;border-bottom:1px solid var(--rule2);text-align:left;vertical-align:top}
+.cpbox th{position:sticky;top:0;background:#f6f8fa}
+.cpbox .num{text-align:right;white-space:nowrap}
+.cpbox td small{display:block;color:var(--mute)}
+.cpbox .cp-f{padding:10px 14px;border-top:1px solid var(--rule2);display:flex;gap:8px;align-items:center}
+.cpbox .cp-f .count{flex:1;color:var(--mute);font-size:12px}
 </style>
 </head>
 <body>
@@ -6094,6 +6117,18 @@ if (typeof self !== 'undefined') self.S = S;
   function chose(slot, file) { document.dispatchEvent(new CustomEvent('cmp:file', { detail: { slot: slot, file: file || null } })); }
   function option(sel, v) { return !!v && Array.prototype.some.call(sel.options, function (o) { return o.value === v; }); }
 
+  /** «Наш ответ (Excel)»: the file chooser — the page without a server has nothing else to offer. */
+  Compare.prototype.pickReply = function () { $('cmpReplyFile').click(); };
+
+  /** The returned estimate, from a file (F4: also handed over by «Сравнить версию» of the list of applications). */
+  Compare.prototype.takeNew = function (f) {
+    var self = this, gen = this.gen;
+    this.read(f, function (objs) {
+      if (gen !== undefined && gen !== self.gen) return;
+      self.newFile = { name: f.name, objects: objs }; chose('new', f); self.run();
+    });
+  };
+
   Compare.prototype.bind = function () {
     var self = this;
     if (!$('cmpOld')) return;
@@ -6117,7 +6152,8 @@ if (typeof self !== 'undefined') self.S = S;
       }, function () { self.fillOld(); });
     });
     $('cmpNewBtn').addEventListener('click', function () { $('cmpNewFile').click(); });
-    $('cmpReplyBtn').addEventListener('click', function () { $('cmpReplyFile').click(); });
+    // looked up at the click: the server page offers the exports it keeps before the disk (F3, sync.js)
+    $('cmpReplyBtn').addEventListener('click', function (e) { self.pickReply(e.currentTarget); });
     $('cmpReplyFile').addEventListener('change', function (e) {
       var f = e.target.files[0]; e.target.value = '';
       if (f) self.loadReply(f);
@@ -6125,7 +6161,7 @@ if (typeof self !== 'undefined') self.S = S;
     $('cmpNewFile').addEventListener('change', function (e) {
       var f = e.target.files[0]; e.target.value = '';
       if (!f) return;
-      self.read(f, function (objs) { self.newFile = { name: f.name, objects: objs }; chose('new', f); self.run(); });
+      self.takeNew(f);
     });
     // back on the view and the filter the page was reloaded with
     if (option($('cmpView'), S.hashGet('cv'))) $('cmpView').value = S.hashGet('cv');
@@ -8656,6 +8692,7 @@ if (typeof self !== 'undefined') self.S = S;
           '<td>' + S.esc(a.status) + '</td>' +
           '<td>' + work + '</td>' +
           '<td class="act"><button class="btn sm ' + (w ? 'ok' : 'cyan') + '" data-act="open">' + (w ? 'Продолжить' : 'Открыть') + '</button>' +
+          (w && w.status === 'done' ? '<button class="btn sm" data-act="cmpv" title="Загрузить смету, которую прислали после нашей таблицы, и сравнить">Сравнить версию</button>' : '') +
           (admin ? '<div class="adm">' +
             (w ? '<button class="btn xs" data-act="clear" title="Удалить файлы, правки и экспорты, начать заново">Очистить</button>' +
               '<button class="btn xs danger" data-act="delws" title="Удалить рабочую область (заявка остаётся)">Удалить работу</button>' : '') +
@@ -8665,6 +8702,23 @@ if (typeof self !== 'undefined') self.S = S;
       $('appCount').textContent = shown + ' / ' + (this.total || 0) + ' заявок';
       tb.querySelectorAll('button[data-act=open]').forEach(function (b) {
         b.addEventListener('click', function () { self.open(self.items[+b.closest('tr').dataset.i]); });
+      });
+      // «Сравнить версию» (F4): the file is asked for at once — the click is what lets the page open the chooser — and
+      // the application opens on «Сравнение версий» with it
+      tb.querySelectorAll('button[data-act=cmpv]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          self.cmpFor = self.items[+b.closest('tr').dataset.i];
+          var inp = $('appCmpFile');
+          if (!inp) {
+            inp = document.createElement('input'); inp.type = 'file'; inp.id = 'appCmpFile'; inp.accept = '.xlsx,.xlsm'; inp.hidden = true;
+            document.body.appendChild(inp);
+            inp.addEventListener('change', function () {
+              var f = inp.files && inp.files[0]; inp.value = '';
+              if (f && self.cmpFor) self.open(self.cmpFor, { compareNew: f });
+            });
+          }
+          inp.click();
+        });
       });
       tb.querySelectorAll('button[data-act=card]').forEach(function (b) {
         b.addEventListener('click', function () { self.card(self.items[+b.closest('tr').dataset.i]); });
@@ -8724,13 +8778,13 @@ if (typeof self !== 'undefined') self.S = S;
     },
 
     /* ------------------------------------------------------------- open */
-    open: function (a) {
+    open: function (a, opts) {
       var self = this;
       var w = this.ws[a.id];
       if (w) {
         S.pb.collection('workspaces').getOne(w.id, { expand: 'updated_by' }).then(function (full) {
           self.hide();
-          S.Sync.open(full, a);
+          S.Sync.open(full, a, opts);
         }).catch(function (e) { window.app.toast(S.pbErr(e), true); });
         return;
       }
@@ -8753,6 +8807,42 @@ if (typeof self !== 'undefined') self.S = S;
       $('regionErr').hidden = true;
       this.hide();
       $('screen-region').hidden = false;
+      // the contractor's earlier applications (F2): their region is offered when the text says nothing sure
+      this.touched = false;
+      if (!this._regionWatch) { this._regionWatch = true; $('regionSel').addEventListener('change', function () { self.touched = true; }); }
+      if (a.contragent) {
+        S.pb.collection('workspaces').getList(1, 30, {
+          filter: S.pb.filter('application.contragent = {:c} && application != {:a}', { c: a.contragent, a: a.id }), sort: '-updated',
+          expand: 'application', fields: 'region,expand.application.number'
+        }).then(function (res) {
+          if (self.pendingApp !== a || $('screen-region').hidden || self.touched) return;
+          var hist = (res.items || []).map(function (x) { return { region: x.region, number: x.expand && x.expand.application && x.expand.application.number }; });
+          var p = Registry.pickRegion(g, hist);
+          if (p.region !== $('regionSel').value) $('regionSel').value = p.region;
+          if (p.hint) $('regionHint').textContent = p.hint;
+        }).catch(function () { /* the text's guess stands */ });
+      }
+    },
+
+    /**
+     * The region to offer, from the text's guess `g` and the regions of the contractor's earlier applications `hist`
+     * (newest first): a sure guess stands — the history is said beside it when it differs; else a region that most of
+     * the earlier applications had is offered, said as such; else the guess, as before. Nothing is chosen for the
+     * expert: the screen still asks.
+     */
+    pickRegion: function (g, hist) {
+      var n = {}, all = 0, best = '', top = 0;
+      (hist || []).forEach(function (h) { if (!h.region) return; n[h.region] = (n[h.region] || 0) + 1; all++; });
+      Object.keys(n).forEach(function (r) { if (n[r] > top) { top = n[r]; best = r; } });
+      var nums = function (r) { return (hist || []).filter(function (h) { return h.region === r && h.number; }).slice(0, 3).map(function (h) { return '№ ' + h.number; }).join(', '); };
+      if (g.region && g.confidence >= 0.6) {
+        return { region: g.region, hint: best && best !== g.region ? 'В прежних заявках этого контрагента — ' + S.regionLabel(best) + ' (' + nums(best) + '). Проверьте.' : '' };
+      }
+      if (best && top * 2 > all) {
+        return { region: best, hint: 'Предложение: ' + S.regionLabel(best) + ' — так в прежних заявках этого контрагента (' + top + ' из ' + all + ': ' + nums(best) + ')' +
+          (g.region && g.region !== best ? '; по тексту заявки — ' + S.regionLabel(g.region) : '') + '. Проверьте.' };
+      }
+      return { region: g.region || '', hint: '' };
     },
 
     createWorkspace: function () {
@@ -8839,6 +8929,17 @@ if (typeof self !== 'undefined') self.S = S;
     saveRetry: SAVE_RETRY_MS,
 
     init: function () {
+      // «Наш ответ (Excel)» (F3): the exports this application keeps on the server are offered first, the disk after
+      if (S.Compare && S.Compare.prototype.pickReply) {
+        var pickDisk = S.Compare.prototype.pickReply;
+        S.Compare.prototype.pickReply = function (btn) {
+          var cmp = this, list = Sync.exportsList || [];
+          if (!Sync.ws || !list.length) return pickDisk.apply(this, arguments);
+          Sync.replyMenu(btn, list, function () { pickDisk.call(cmp); }, function (x) { Sync.takeExport(cmp, x); });
+        };
+      }
+      document.addEventListener('ws:open', function () { Sync.loadExports(); });
+      document.addEventListener('ws:close', function () { Sync.exportsList = []; });
       document.addEventListener('notes:change', function () { Sync.touch(); });
       document.addEventListener('checked:change', function () { if (!Sync.loading) Sync.touch(); });
       // the document of an application is named after it: its number and its contractor (E19)
@@ -8913,7 +9014,7 @@ if (typeof self !== 'undefined') self.S = S;
      * earlier one is thrown away rather than dropped on top of the workspace
      * now on screen.
      */
-    open: function (w, a) {
+    open: function (w, a, opts) {
       var self = this;
       var mine = ++this.seq;
       var current = function () { return self.seq === mine; };
@@ -8961,6 +9062,8 @@ if (typeof self !== 'undefined') self.S = S;
       var st = w.state || {};
       var wanted = (st.projects || []).map(function (p) { return { name: p.file, id: p.fileId }; })
         .filter(function (f) { return f.id && (w.files || []).indexOf(f.id) >= 0; });
+      // «Сравнить версию» of the list (F4): the returned estimate is taken once the application is on screen
+      this.after = opts && opts.compareNew ? { seq: this.seq, file: opts.compareNew } : null;
       if (!wanted.length) { this.restore(); return; }
       app.busy(true, 'Получение файлов с сервера…');
       Promise.all(wanted.map(function (f) {
@@ -9099,6 +9202,12 @@ if (typeof self !== 'undefined') self.S = S;
       this.replay();
       this.mergeCorr();
       this.restoreCompare();
+      var af = this.after; this.after = null;
+      if (af && af.seq === this.seq && app.compare_ui) {
+        var t = document.querySelector('.tab[data-pane="compare"]');
+        if (t) t.click();
+        app.compare_ui.takeNew(af.file);
+      }
     },
 
     /* ----------------------------------------------- kept in the browser */
@@ -9755,6 +9864,47 @@ if (typeof self !== 'undefined') self.S = S;
     },
 
     /* ---------------------------------------------------------- exports */
+    /** The exports of the open application, newest first (F3). */
+    loadExports: function () {
+      var self = this, ws = this.ws;
+      this.exportsList = [];
+      if (!ws || !this.app) return;
+      S.pb.collection('exports').getFullList({ filter: S.pb.filter('application = {:a}', { a: this.app.id }), sort: '-created', expand: 'by' })
+        .then(function (l) { if (self.ws === ws) self.exportsList = l; }).catch(function () { /* the disk is still there */ });
+    },
+    replyMenu: function (btn, list, disk, take) {
+      var pop = $('replyPop');
+      if (!pop) { pop = document.createElement('div'); pop.id = 'replyPop'; pop.className = 'replypop'; document.body.appendChild(pop); }
+      var when = function (d) { var t = new Date(String(d).replace(' ', 'T')); return isNaN(t) ? '' : t.toLocaleDateString('ru-RU') + ' ' + t.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); };
+      pop.innerHTML = '<div class="rp-h">Наш ответ — из сохранённых экспортов этой заявки<small>цены проекта будут заменены ценами экспорта</small></div>' +
+        list.slice(0, 12).map(function (x, i) {
+          var by = x.expand && x.expand.by;
+          return '<button class="link" data-i="' + i + '">' + S.esc(when(x.created)) + (by ? ' · ' + S.esc(by.name || by.email) : '') +
+            (x.mode ? ' · ' + S.esc(S.ru ? S.ru('mode', x.mode) : x.mode) : '') + '</button>';
+        }).join('') + '<button class="link" data-disk>Файл с диска…</button>';
+      var r = btn.getBoundingClientRect();
+      pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 380)) + 'px';
+      pop.style.top = (r.bottom + 4) + 'px';
+      pop.hidden = false;
+      var close = function () { pop.hidden = true; document.removeEventListener('mousedown', out, true); };
+      var out = function (e) { if (!pop.contains(e.target) && e.target !== btn) close(); };
+      document.addEventListener('mousedown', out, true);
+      pop.querySelectorAll('button').forEach(function (b) {
+        b.addEventListener('click', function () {
+          close();
+          if (b.hasAttribute('data-disk')) disk(); else take(list[+b.dataset.i]);
+        });
+      });
+    },
+    takeExport: function (cmp, x) {
+      S.fileURL(x, x.file).then(function (u) { return fetch(u); }).then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.blob();
+      }).then(function (b) {
+        cmp.loadReply(new File([b], x.file, { type: b.type }));
+      }).catch(function (e) { A().toast('Экспорт не получен с сервера: ' + (e && e.message || e), true); });
+    },
+
     saveExport: function (bytes, opts) {
       var self = this, app = A();
       if (!this.ws || this.frozen) return;
@@ -9770,6 +9920,7 @@ if (typeof self !== 'undefined') self.S = S;
       this.enqueue(function () {
         return S.pb.collection('exports').create(fd).then(function () {
           app.toast('Экспорт сохранён на сервере: ' + name);
+          self.loadExports();
         }).catch(function (e) { app.toast('Экспорт не записан на сервер: ' + S.pbErr(e), true); });
       });
     },
@@ -9844,13 +9995,27 @@ if (typeof self !== 'undefined') self.S = S;
         '<span class="rg">' + S.esc(S.regionLabel(w.region)) + '</span>' +
         '<span class="sv" id="wsSave" title="Сохранено">✓</span>' +
         (w.status === 'done'
-          ? '<span class="done">завершена</span>'
+          ? '<span class="done">завершена</span><button class="btn sm" id="wsReopen" title="Снять отметку «завершена»">Вернуть в работу</button>'
           : '<button class="btn sm ok" id="wsDone" title="Отметить работу как завершённую">✓ Завершить</button>');
       $('wsList').addEventListener('click', function () {
         self.close().catch(function () { /* the toast already said why */ });
       });
       var d = $('wsDone');
       if (d) d.addEventListener('click', function () { self.finish(); });
+      var ro = $('wsReopen');
+      if (ro) ro.addEventListener('click', function () { self.reopen(); });
+    },
+
+    /** «Вернуть в работу»: a finished application is in work again (B8). Nothing in it changes but its status. */
+    reopen: function () {
+      var self = this, ws = this.ws;
+      if (!ws || this.frozen) return;
+      S.pb.collection('workspaces').update(ws.id, { status: 'in_progress', updated_by: S.me().id }).then(function (w) {
+        if (self.ws !== ws) return;
+        ws.status = w.status;
+        self.renderBox();
+        A().toast('Заявка снова в работе');
+      }).catch(function (e) { A().toast(S.pbErr(e), true); });
     },
 
     finish: function () {
@@ -10458,6 +10623,145 @@ if (typeof self !== 'undefined') self.S = S;
   S.Hints = Hints;
   document.addEventListener('DOMContentLoaded', function () { Hints.init(); });
   if (document.readyState !== 'loading') Hints.init();
+})(S);
+
+;
+/*
+ * «Цены этого контрагента…» (F1): the earlier prices of the same contractor for the same resources, in one list, set by
+ * one confirmation.
+ *
+ * The popover of earlier projects offers them one resource at a time. An application of a contractor priced before
+ * often repeats most of its resources, and each took two clicks. Here they are listed together — each resource with
+ * the price of the newest earlier application of this contractor in this region that priced it — and nothing is set
+ * until «Применить выбранные» is pressed (the rule: a suggestion is set only by «Применить»). Never over a price the
+ * expert set (a price «Применить %» set is not one): a name and unit any of whose variants already has its own price is left out, so one name and unit never
+ * ends with two market prices. The press can be taken back («Отменить», as every bulk change).
+ *
+ * Server only. Calls what match.js exports (S.matchPair) and changes none of the measured code.
+ */
+(function (S) {
+  'use strict';
+  if (!S.pb) return;
+  function $(id) { return document.getElementById(id); }
+  function A() { return window.app; }
+
+  /**
+   * The list: `resources` of the model, `corrections` of the contractor's earlier applications (newest first).
+   * Returns { picks: [{ nk, name, unit, variants, price, corrId, number, at, smetaThere, ref, uzex, diff }], own, ambiguous, same }.
+   */
+  function pick(resources, corrections, own) {
+    own = own || function (v) { return !S.near(v.market, v.price); };
+    var byMk = {};
+    (corrections || []).forEach(function (c) {
+      if (!(c.market_price > 0)) return;
+      var mk = S.matchPair(c.name, c.unit || '');
+      var g = byMk[mk];
+      if (!g) { byMk[mk] = { app: c.application, rows: [c] }; return; }
+      if (c.application === g.app) g.rows.push(c);          // only the newest application that priced it counts
+    });
+    var groups = {}, order = [];
+    (resources || []).forEach(function (r) {
+      var k = r.nk || S.nameUnitKey(r.name, r.unit || '');
+      if (!groups[k]) { groups[k] = []; order.push(k); }
+      groups[k].push(r);
+    });
+    var out = { picks: [], own: 0, ambiguous: 0, same: 0 };
+    order.forEach(function (k) {
+      var vs = groups[k], r0 = vs[0];
+      var g = byMk[r0.mk || S.matchPair(r0.name, r0.unit || '')];
+      if (!g) return;
+      var prices = [];
+      g.rows.forEach(function (c) { if (!prices.some(function (p) { return S.near(p, c.market_price); })) prices.push(c.market_price); });
+      if (prices.length > 1) { out.ambiguous++; return; }
+      if (vs.some(own)) { out.own++; return; }
+      var price = prices[0];
+      if (vs.every(function (v) { return S.near(v.market, price); })) { out.same++; return; }
+      var c = g.rows[0], a = c.expand && c.expand.application;
+      // the saving row by row: a resource can stand at several estimate prices
+      var diff = vs.reduce(function (s, v) { return s + (v.smetaSum - (v.qty || 0) * price); }, 0);
+      out.picks.push({ nk: k, name: r0.name, unit: r0.unit || '', variants: vs, price: price, corrId: c.id, number: a ? a.number : '',
+        at: c.updated, smetaThere: c.smeta_price, ref: /^ref:/.test(c.source || '') && S.near(c.market_price, c.source_price),
+        uzex: /^uzex:/.test(c.source || '') && S.near(c.market_price, c.source_price), diff: diff });
+    });
+    return out;
+  }
+
+  function day(d) { var t = new Date(String(d || '').replace(' ', 'T')); return isNaN(t) ? '' : t.toLocaleDateString('ru-RU'); }
+
+  function open() {
+    var app = A(), Sy = S.Sync;
+    if (!app || !app.model || !Sy || !Sy.ws || Sy.loading || Sy.frozen || !Sy.app || !Sy.app.contragent) return;
+    S.pb.collection('corrections').getFullList({
+      batch: 500, sort: '-updated', expand: 'application',
+      filter: S.pb.filter('contragent = {:c} && region = {:r} && workspace != {:w} && market_price > 0', { c: Sy.app.contragent, r: Sy.ws.region, w: Sy.ws.id })
+    }).then(function (rows) {
+      // a price «Применить %» set is the program's, not the expert's (as for «Применить %» itself, A7)
+      show(pick(app.model.resources, rows, function (v) { return app.ownPrice(v); }));
+    }).catch(function (e) { app.toast('Прежние цены контрагента не получены: ' + S.pbErr(e), true); });
+  }
+
+  function show(res) {
+    var app = A();
+    var box = $('cpBox');
+    if (!box) { box = document.createElement('div'); box.id = 'cpBox'; box.className = 'cpbox'; document.body.appendChild(box); }
+    var skipped = (res.own ? 'с вашей ценой — ' + res.own : '') + (res.ambiguous ? (res.own ? ', ' : '') + 'разные цены в одной заявке — ' + res.ambiguous : '');
+    if (!res.picks.length) {
+      app.toast('Нечего предложить: у этого контрагента в этом регионе нет прежних цен на эти ресурсы' + (skipped ? ' (пропущено: ' + skipped + ')' : ''));
+      return;
+    }
+    box.innerHTML = '<div class="cp-in"><div class="cp-h"><b>Цены этого контрагента из прежних заявок</b> · ' + S.esc(S.regionLabel(S.Sync.ws.region)) +
+      ' <small>цены без НДС</small><button class="link" data-x title="Закрыть">×</button></div>' +
+      '<div class="cp-list"><table><thead><tr><th></th><th>Ресурс</th><th>Ед.</th><th class="num">Цена по смете</th><th class="num">Прежняя цена</th>' +
+      '<th class="num">Разница, сум</th><th>Заявка</th></tr></thead><tbody>' +
+      res.picks.map(function (p, i) {
+        var smeta = p.variants.map(function (v) { return S.price(v.price); }).join(' · ');
+        return '<tr><td><input type="checkbox" data-i="' + i + '"' + (p.uzex ? '' : ' checked') + '></td><td>' + S.esc(p.name) +
+          (p.ref ? ' <em class="hp-ref">из справочника</em>' : '') + (p.uzex ? ' <em class="hp-uzex">с биржи UZEX — проверьте НДС</em>' : '') +
+          '</td><td>' + S.esc(p.unit) + '</td><td class="num">' + smeta + '</td><td class="num"><b>' + S.price(p.price) + '</b>' +
+          (p.smetaThere != null && !p.variants.some(function (v) { return S.near(v.price, p.smetaThere); }) ? '<small>сметная цена там: ' + S.price(p.smetaThere) + '</small>' : '') +
+          '</td><td class="num">' + S.money(p.diff) + '</td><td>№ ' + S.esc(p.number) + ' · ' + day(p.at) + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<div class="cp-f"><span class="count">Ваши цены не трогаются' + (skipped ? ': пропущено ' + skipped : '') +
+      '. Сразу после применения действие можно отменить кнопкой «Отменить».</span>' +
+      '<button class="btn sm" data-x>Отмена</button><button class="btn sm ok" data-apply>Применить выбранные</button></div></div>';
+    box.hidden = false;
+    var count = function () { var n = box.querySelectorAll('input[data-i]:checked').length; box.querySelector('[data-apply]').textContent = 'Применить выбранные (' + n + ')'; };
+    count();
+    box.querySelectorAll('input[data-i]').forEach(function (c) { c.addEventListener('change', count); });
+    box.querySelectorAll('[data-x]').forEach(function (b) { b.addEventListener('click', function () { box.hidden = true; }); });
+    box.querySelector('[data-apply]').addEventListener('click', function () {
+      var chosen = [].map.call(box.querySelectorAll('input[data-i]:checked'), function (c) { return res.picks[+c.dataset.i]; });
+      var map = {}, used = [], now = {};
+      ((app.model && app.model.resources) || []).forEach(function (r) { now[r.key] = r; });
+      chosen.forEach(function (p) {
+        // again at the press, on the resources as they are now: a price typed while the list was open is not replaced
+        if (p.variants.some(function (v) { return !now[v.key] || app.ownPrice(now[v.key]); })) return;
+        p.variants.forEach(function (v) { map[v.key] = p.price; });
+        used.push(p);
+      });
+      box.hidden = true;
+      if (!used.length) { app.toast('Ничего не применено'); return; }
+      app.bulkPrices(map, 'Цены контрагента: применено ' + used.length, function () {
+        if (S.markSource) used.forEach(function (p) { p.variants.forEach(function (v) { S.markSource(v.key, p.price, 'hint:' + p.corrId); }); });
+      });
+    });
+  }
+
+  function init() {
+    var reset = $('resetBtn');
+    if (!reset || $('cpBtn')) return;
+    var b = document.createElement('button');
+    b.className = 'btn sm'; b.id = 'cpBtn'; b.hidden = true;
+    b.title = 'Прежние цены этого контрагента на те же ресурсы — одним списком, применяются после подтверждения';
+    b.textContent = 'Цены этого контрагента…';
+    reset.parentNode.insertBefore(b, reset);
+    b.addEventListener('click', open);
+    document.addEventListener('ws:open', function () { b.hidden = !(S.Sync && S.Sync.app && S.Sync.app.contragent); });
+    document.addEventListener('ws:close', function () { b.hidden = true; var x = $('cpBox'); if (x) x.hidden = true; });
+  }
+
+  S.ContragentPrices = { pick: pick, open: open };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })(S);
 
 ;

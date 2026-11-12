@@ -26,3 +26,12 @@ onRecordCreateRequest((e) => {
 onRecordUpdateRequest((e) => {
   require(`${__hooks}/lib/ownership.js`).stamp(e, "update");
 }, "workspaces", "corrections", "exports");
+
+// The region of a workspace is the region its price corrections are hints for: changed alone through the records
+// API, the two would part. It is changed only by the admin route, which moves both (admin.pb.js).
+onRecordUpdateRequest((e) => {
+  if (e.record.getString("region") !== e.record.original().getString("region") && !(e.auth && e.auth.isSuperuser())) {
+    throw new BadRequestError("Регион заявки меняет администратор (страница администратора, «Регион»)");
+  }
+  e.next();
+}, "workspaces");

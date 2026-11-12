@@ -104,22 +104,52 @@
         return '<tr data-id="' + w.id + '">' +
           '<td class="mono"><b>' + S.esc(a.number || '?') + '</b></td>' +
           '<td>' + S.esc(org) + (a.inn ? '<br><span class="mute">ИНН ' + S.esc(a.inn) + '</span>' : '') + '</td>' +
-          '<td>' + S.esc(S.regionLabel(w.region)) + '</td>' +
+          '<td><select class="wsreg" data-region title="Регион заявки: цены этой заявки — подсказки для этого региона. Сменить можно, правки переедут вместе с ней">' +
+            S.REGIONS.map(function (r) { return '<option value="' + r[0] + '"' + (r[0] === w.region ? ' selected' : '') + '>' + S.esc(r[1]) + '</option>'; }).join('') + '</select></td>' +
           '<td><span class="ws ' + S.esc(w.status) + '">' + (w.status === 'done' ? 'завершена' : 'в работе') + '</span></td>' +
           '<td>' + ((w.files || []).length) + '</td>' +
           '<td>' + (w.changed || 0) + '</td>' +
           '<td>' + when(w.updated) + (by ? '<br><span class="mute">' + S.esc(by.name || by.email) + '</span>' : '') + '</td>' +
-          '<td class="act"><button class="btn sm" data-act="clear" title="Удалить файлы, правки и экспорты, начать заново">Очистить</button>' +
+          '<td class="act">' + (w.status === 'done' ? '<button class="btn sm" data-act="reopen" title="Снять отметку «завершена»: заявка снова в работе, ничего не удаляется">Вернуть в работу</button>' : '') +
+          '<button class="btn sm" data-act="clear" title="Удалить файлы, правки и экспорты, начать заново">Очистить</button>' +
           '<button class="btn sm danger" data-act="delete" title="Удалить рабочую область полностью">✕ Удалить</button></td></tr>';
       }).join('') || '<tr><td colspan="8" class="mute">Никто ещё не открывал заявки</td></tr>';
       $('wsCount').textContent = shown + ' / ' + this.wsItems.length;
+      tb.querySelectorAll('select[data-region]').forEach(function (sel) {
+        sel.addEventListener('change', function () {
+          var w = self.wsItems.find(function (x) { return x.id === sel.closest('tr').dataset.id; });
+          self.moveRegion(w, sel.value, function () { sel.value = w.region; });
+        });
+      });
       tb.querySelectorAll('button[data-act]').forEach(function (b) {
         b.addEventListener('click', function () {
           var tr = b.closest('tr');
           var w = self.wsItems.find(function (x) { return x.id === tr.dataset.id; });
-          if (b.dataset.act === 'clear') self.clearWs(w); else self.deleteWs(w);
+          if (b.dataset.act === 'clear') self.clearWs(w);
+          else if (b.dataset.act === 'reopen') {
+            S.pb.collection('workspaces').update(w.id, { status: 'in_progress' }).then(function () {
+              var ap = self.appOf(w); toast('Заявка ' + (ap && ap.number ? '№ ' + ap.number + ' ' : '') + 'снова в работе');
+              self.loadWs();
+            }).catch(function (e) { toast(S.pbErr(e), true); });
+          } else self.deleteWs(w);
         });
       });
+    },
+
+    /**
+     * Another region for an application (B8): a region picked by mistake was for good. Its price corrections move with
+     * it — they are hints for the region they stand in — and the server says how many did.
+     */
+    moveRegion: function (w, region, back) {
+      var self = this, ap = this.appOf(w);
+      if (!w || region === w.region) return;
+      if (!confirm('Перенести заявку ' + (ap.number ? '№ ' + ap.number + ' ' : '') + 'из региона «' + S.regionLabel(w.region) + '» в «' + S.regionLabel(region) + '»?\n\n' +
+        'Её цены станут подсказками для нового региона и перестанут подсказываться в прежнем. Файлы и цены заявки не меняются.')) { back(); return; }
+      S.pb.send('/api/admin/workspaces/' + w.id + '/region', { method: 'POST', body: { region: region } }).then(function (r) {
+        toast('Заявка ' + (ap.number ? '№ ' + ap.number + ' ' : '') + 'перенесена в регион «' + S.regionLabel(region) + '»' +
+          (r.corrections ? '; перенесено цен: ' + r.corrections : ''));
+        self.loadWs();
+      }).catch(function (e) { back(); toast(S.pbErr(e), true); });
     },
 
     appOf: function (w) { return (w.expand && w.expand.application) || {}; },

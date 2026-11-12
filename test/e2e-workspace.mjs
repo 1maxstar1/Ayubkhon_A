@@ -383,6 +383,15 @@ await page.click('.tab[data-pane="prices"]');
 // finish and go back to the list
 await page.click('#wsDone');
 await page.waitForFunction(() => document.querySelector('#wsBox .done'));
+// «Вернуть в работу»: the application is in work again, nothing of it changed (B8) — then finished again for what follows
+const beforeReopen = (await api('/api/collections/workspaces/records?perPage=1', {}, su)).items[0];
+await page.click('#wsReopen');
+await page.waitForSelector('#wsDone', { timeout: 10 * 1000 }).catch(() => null);
+const afterReopen = (await api('/api/collections/workspaces/records?perPage=1', {}, su)).items[0];
+check(afterReopen.status === 'in_progress' && JSON.stringify(afterReopen.state.prices2) === JSON.stringify(beforeReopen.state.prices2),
+  '«Вернуть в работу» puts a finished application back in work, and changes nothing else');
+await page.click('#wsDone');
+await page.waitForFunction(() => document.querySelector('#wsBox .done'));
 await page.click('#wsList');
 await page.waitForSelector('#screen-list:not([hidden])');
 await page.fill('#appQ', '67159');

@@ -317,6 +317,7 @@ src/
     app.js            ulanish, xabarlar, narxlar kitobi
     sync.js           ish maydoni: saqlash, tuzatishlar, ikki vkladka, yopilgan vkladka
     hints.js, refs.js, uzex.js   takliflar: oldingi loyihalar, справочник, birja
+    contragent-prices.js  shu kontragentning oldingi narxlari bitta ro'yxatda (F1)
     compare.js, registry.js, auth.js, admin.js, *-admin.js
 server/
   pb_schema.json, pb_hooks/  PocketBase sxemasi va server qoidalari
@@ -615,12 +616,20 @@ hisobotning sariq ustunlari bo'yicha filtrlanadi: raqam / tashkilot / STIR /
 loyiha nomi / obyekt ID (qidiruv), ekspertiza turi, buyurtmachi turi, holat,
 summa oralig'i (`/api/registry/facets` — ustunlarning takrorlanmas qiymatlari).
 Xodim arizani ochadi,
-birinchi marta viloyatni tanlaydi (ariza matnidan taklif qilinadi), smeta
+birinchi marta viloyatni tanlaydi (ariza matnidan, matn aniq aytmasa — kontragentning
+oldingi arizalaridan taklif qilinadi), smeta
 fayllarini yuklaydi — fayllar, sozlamalar va har tuzatish avtomatik
 saqlanadi; qayta ochganda hammasi tiklanadi. Bozor narxi katagida shu
 viloyatdagi oldingi loyihalar narxlari ko'rinadi: avval shu kontragent
-(STIR bo'yicha), keyin boshqalar; boshqa viloyat ko'rsatilmaydi. Har
-eksport `exports` da saqlanadi, ariza kartochkasidan yuklab olinadi.
+(STIR bo'yicha), keyin boshqalar; boshqa viloyat ko'rsatilmaydi.
+«Цены этого контрагента…» shu kontragentning oldingi narxlarini bitta ro'yxatda
+beradi — belgilanganlari bitta «Применить выбранные» bilan qo'yiladi (qo'lda
+yozilgan narxga tegmaydi, «Отменить» bilan qaytadi). Har
+eksport `exports` da saqlanadi, ariza kartochkasidan yuklab olinadi va
+«Наш ответ (Excel)» da birinchi bo'lib taklif qilinadi. Tugallangan arizani
+«Вернуть в работу» qaytaradi; ro'yxatdagi «Сравнить версию» qaytgan smetani
+to'g'ri solishtirishga olib boradi. Arizaning viloyatini admin sahifasida
+o'zgartirish mumkin — narx tuzatishlari ham birga ko'chadi.
 Admin ish maydonini **tozalashi** (fayllar, tuzatishlar, eksportlar o'chadi,
 viloyat qoladi) yoki **o'chirishi**, arizani **qo'lda qo'shishi** (import
 hook orqali — raqam mavjud bo'lsa yangilanadi) yoki **o'chirishi** mumkin —

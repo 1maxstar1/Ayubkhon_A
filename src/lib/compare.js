@@ -89,10 +89,15 @@
     var p1 = a.price || 0, p2 = b.price || 0, q = Math.max(a.qty || 0, b.qty || 0);
     var qtyUp = !sameQty(a.qty, b.qty) && (b.qty || 0) > (a.qty || 0);
     var qtyDown = !sameQty(a.qty, b.qty) && !qtyUp;
-    // (whether we asked mirrors the report, price against price; what was done is judged by the line)
-    if (req && req.market != null && !samePrice(req.market, p1)) {
+    // (whether we asked mirrors the report exactly — it puts a line in the table on any difference: less than a sum
+    // per unit is a large sum on a large quantity; what was done is judged by the line)
+    if (req && req.market != null && !S.near(req.market, p1)) {
       var m = req.market;
       if (m < p1) {                                    // we asked for a lower price
+        if (p2 <= m) return qtyUp ? 'qtyup' : 'fixed';
+        // a line left as it was is not fixed, however close the price we asked for (the tolerance of `reached`
+        // would otherwise take an unchanged line for one that reached a request smaller than itself)
+        if (sameLine(p2, p1, q)) return 'notfixed';
         if (reached(p2, m, q)) return qtyUp ? 'qtyup' : 'fixed';
         if (p2 < p1 && !sameLine(p2, p1, q)) return 'partial';
         if (p2 > p1 && !sameLine(p2, p1, q)) return 'worse';
@@ -579,7 +584,7 @@
     model.spans.forEach(function (span) {
       S.report.build(model, span, opts || {}).rows.forEach(function (r) {
         if (r.kind !== 'item' || !r.key) return;
-        if (r.market != null && !samePrice(r.market, r.price)) out[r.key] = { market: r.market };
+        if (r.market != null && !S.near(r.market, r.price)) out[r.key] = { market: r.market };
         else if (r.cells && r.cells[NOTE] && r.cells[NOTE].v && !out[r.key]) out[r.key] = { note: String(r.cells[NOTE].v) };
       });
     });

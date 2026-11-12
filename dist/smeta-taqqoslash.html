@@ -4203,10 +4203,15 @@ if (typeof self !== 'undefined') self.S = S;
     var p1 = a.price || 0, p2 = b.price || 0, q = Math.max(a.qty || 0, b.qty || 0);
     var qtyUp = !sameQty(a.qty, b.qty) && (b.qty || 0) > (a.qty || 0);
     var qtyDown = !sameQty(a.qty, b.qty) && !qtyUp;
-    // (whether we asked mirrors the report, price against price; what was done is judged by the line)
-    if (req && req.market != null && !samePrice(req.market, p1)) {
+    // (whether we asked mirrors the report exactly — it puts a line in the table on any difference: less than a sum
+    // per unit is a large sum on a large quantity; what was done is judged by the line)
+    if (req && req.market != null && !S.near(req.market, p1)) {
       var m = req.market;
       if (m < p1) {                                    // we asked for a lower price
+        if (p2 <= m) return qtyUp ? 'qtyup' : 'fixed';
+        // a line left as it was is not fixed, however close the price we asked for (the tolerance of `reached`
+        // would otherwise take an unchanged line for one that reached a request smaller than itself)
+        if (sameLine(p2, p1, q)) return 'notfixed';
         if (reached(p2, m, q)) return qtyUp ? 'qtyup' : 'fixed';
         if (p2 < p1 && !sameLine(p2, p1, q)) return 'partial';
         if (p2 > p1 && !sameLine(p2, p1, q)) return 'worse';
@@ -4693,7 +4698,7 @@ if (typeof self !== 'undefined') self.S = S;
     model.spans.forEach(function (span) {
       S.report.build(model, span, opts || {}).rows.forEach(function (r) {
         if (r.kind !== 'item' || !r.key) return;
-        if (r.market != null && !samePrice(r.market, r.price)) out[r.key] = { market: r.market };
+        if (r.market != null && !S.near(r.market, r.price)) out[r.key] = { market: r.market };
         else if (r.cells && r.cells[NOTE] && r.cells[NOTE].v && !out[r.key]) out[r.key] = { note: String(r.cells[NOTE].v) };
       });
     });
@@ -4808,7 +4813,9 @@ if (typeof self !== 'undefined') self.S = S;
   /** Prices printed in a table are rounded to the sum: «12 346» stands for the smeta's 12 345,6789. */
   function samePrice(a, b) { return Math.abs(a - b) <= Math.max(1, Math.abs(a) * 1e-3); }
   /** Our market price equals the smeta price up to its rounding: 0.1 %, at most one sum (as in S.compare). */
-  function unchanged(p, m) { return Math.abs(p - m) < Math.min(1, Math.max(1e-6, Math.abs(p) * 1e-3)); }
+  // our own figure against the estimate's, exactly as the report puts a line in the table: less than a sum per unit
+  // on a large quantity is a price we asked for
+  function unchanged(p, m) { return S.near(p, m); }
   function bare(s) { return S.nameKey(s).replace(/[\s.,;:()"'«»-]+/g, ''); }
 
   /**
@@ -5345,8 +5352,8 @@ if (typeof self !== 'undefined') self.S = S;
   S.acceptFirst = function (key) {
     var H = S.Hints, R = S.Refs, U = S.Uzex, b = null;
     if (H && H.pop && !H.pop.hidden && H.key === key) b = H.pop.querySelector('.hp-row:not(.near) button[data-i]');
-    else if (R && R.pop && !R.pop.hidden && R.open && R.open.key === key) b = R.pop.querySelector('button[data-i]');
-    else if (U && U.pop && !U.pop.hidden && U.open && U.open.key === key) b = U.pop.querySelector('button[data-i]');
+    else if (R && R.pop && !R.pop.hidden && R.open && R.open.key === key) b = R.pop.querySelector('.rp-line:not(.near) button[data-i]');
+    else if (U && U.pop && !U.pop.hidden && U.open && U.open.key === key) b = U.pop.querySelector('.up-line:not(.near) button[data-i]');
     if (b && !b.disabled) b.click();
     return !!b;
   };
@@ -6397,6 +6404,9 @@ if (typeof self !== 'undefined') self.S = S;
     var now = this.prices[key] != null ? this.prices[key] : smeta;
     if (S.near(now, smeta)) return;
     var o = {}; o[key] = smeta;
+    // nothing typed: leaving the box after Esc does not mark the resource «проверено» (the box compares with `was`)
+    var a = document.activeElement;
+    if (a && a.dataset && a.dataset.key === key) a.dataset.was = String(smeta);
     this.bulkPrices(o, 'Цена возвращена к сметной: ' + S.price(smeta));
   };
 
@@ -6887,6 +6897,8 @@ if (typeof self !== 'undefined') self.S = S;
     });
     if (prepare) prepare();
     this.setPrices(map);
+    // what the press set, so that «Отменить» takes back only that: a price typed after it stays
+    keys.forEach(function (k) { before[k].set = map[k]; });
     // only the last press can be taken back: the offer to undo an earlier one goes when a new one is made
     if (this._undoOffer) this._undoOffer();
     this._undoOffer = this.toast(text, false, { action: { label: 'Отменить', fn: function () { self.undoPrices(before); } } });
@@ -6897,6 +6909,14 @@ if (typeof self !== 'undefined') self.S = S;
     var self = this, back = {}, smeta = {};
     ((this.model && this.model.resources) || []).forEach(function (r) { smeta[r.key] = r.price; });
     var keys = Object.keys(before).filter(function (k) { return before[k].had || smeta[k] != null; });
+    // a price changed since the press (typed, or set by another action) is the newer word: it is left as it is
+    var kept = 0;
+    keys = keys.filter(function (k) {
+      var b = before[k], now = self.prices[k] != null ? self.prices[k] : smeta[k];
+      if (b.set === undefined || S.near(now, b.set)) return true;
+      kept++;
+      return false;
+    });
     keys.forEach(function (k) {
       var b = before[k];
       back[k] = b.had ? b.v : smeta[k];
@@ -6906,7 +6926,7 @@ if (typeof self !== 'undefined') self.S = S;
     // a resource that had no price of its own has none again, not its smeta price written out; a price «Применить %»
     // had set is that again — free for the next percentage, not the expert's
     keys.forEach(function (k) { if (!before[k].had) delete self.prices[k]; else if (before[k].pct) self.pct[k] = 1; });
-    this.toast('Возвращено как было: ' + keys.length + ' цен');
+    this.toast('Возвращено как было: ' + keys.length + ' цен' + (kept ? ' (изменённые после этого — ' + kept + ' — оставлены как есть)' : ''));
   };
 
   /** One key changed: touch only the rows that use it. */

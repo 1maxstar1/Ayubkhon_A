@@ -91,7 +91,7 @@ module.exports = {
     try { ws = $app.findRecordById("workspaces", String(body.workspace || "")); } catch (_) { ws = null; }
     if (!ws) throw new NotFoundError("Рабочая область не найдена");
 
-    const region = ws.getString("region");
+    let region = ws.getString("region");
     const application = ws.getString("application");
     let contragent = "";
     if (application) {
@@ -117,6 +117,9 @@ module.exports = {
     const checkSource = sourceChecker($app);
 
     $app.runInTransaction((tx) => {
+      // the region as it is inside the write: an admin moving the application (admin.pb.js) while this request was
+      // on its way must not be undone by rows written with the region read before
+      region = tx.findRecordById("workspaces", ws.id).getString("region");
       for (const row of rows) {
         const key = text(row.res_key);
         if (!key) continue;

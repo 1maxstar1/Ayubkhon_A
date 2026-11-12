@@ -80,6 +80,16 @@ check(toasts <= 1, `twenty seconds of failed saves: at most one message (${toast
 check(await page.evaluate((id) => { try { return Object.keys(JSON.parse(localStorage.getItem('smeta.wal.' + id) || '{}')).length; } catch (e) { return 0; } }, wsId) > 0,
   'the prices typed meanwhile are kept in this browser');
 check(/проверьте сеть|не отвечает/.test(await page.textContent('#srvDown')), 'the bar says what to do');
+// leaving the application while nothing reaches the server keeps it open: its state (checked marks, notes, the order
+// of the projects) is not in this browser, only its prices are
+await page.evaluate(() => { app.setChecked([app.model.resources[0].key], true); });
+await page.click('#wsList');
+await page.waitForFunction(() => /не закрыта/.test(document.getElementById('toast').textContent), null, { timeout: 15 * 1000 }).catch(() => null);
+check(await page.isVisible('#wsBox') && await page.evaluate(() => !!S.Sync.ws) && /не закрыта/.test(await page.textContent('#toast')),
+  '«‹ Заявки» while the server does not answer stays in the application, and says why');
+// a redraw of the header says what is so, not a bare «✓»
+await page.evaluate(() => S.Sync.renderBox());
+check(await page.evaluate(() => document.getElementById('wsSave').textContent) === '⚠', 'a redrawn header still says «⚠»');
 
 /* it answers again */
 await page.unroute(API);

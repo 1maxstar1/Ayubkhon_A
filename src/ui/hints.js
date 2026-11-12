@@ -81,6 +81,9 @@
         // was a click inside it
         if (!document.documentElement.contains(e.target)) return;
         if (self.pop.contains(e.target) || (e.target.classList && e.target.classList.contains('tagh'))) return;
+        // «Применить» of the reference or exchange popover: the caret has just moved to the next row and opened its
+        // suggestions (afterApply) — the same click, bubbling on, must not close them
+        if (e.target.closest && e.target.closest('#refPop,#uzexPop')) return;
         // the click that put the caret in a price box opened its popover a moment ago (focusin): it must not close it.
         // Compared by key — the list may have drawn the box anew in between (E3)
         var p = e.target.closest && e.target.closest('.pin');

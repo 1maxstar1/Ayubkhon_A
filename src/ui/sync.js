@@ -593,7 +593,7 @@
       this.mark('●');
       clearTimeout(this.t);
       var self = this;
-      this.t = setTimeout(function () { self.saveNow(); }, SAVE_MS);
+      this.t = setTimeout(function () { self.saveNow().catch(function () { /* said by saveNow, and retried */ }); }, SAVE_MS);
     },
 
     /**
@@ -707,8 +707,10 @@
           self.dirty = true;
           self.mark('!');
           clearTimeout(self.t);
-          // no server at all: said once, in a bar that stays; the probe saves when it is back (E20)
-          if (self.isNet(e)) { self.down(); return; }
+          // no server at all: said once, in a bar that stays; the probe saves when it is back (E20). Still a failure for
+          // whoever waits on it: leaving the application on it would drop what only the state holds (checked marks,
+          // notes, the week, the order of the projects) — the prices alone are kept in this browser
+          if (self.isNet(e)) { self.down(); throw e; }
           if (e && (e.status === 400 || e.status === 413)) {
             // The server has read the state and will not take it; the same state would be refused the same way.
             // It used to be sent again every fifteen seconds for as long as the page stayed open. Nothing is
@@ -958,6 +960,9 @@
           });
         });
       }).catch(function (e) {
+        // the application was left meanwhile: these keys are its keys, never to be sent with another one's (the prices
+        // themselves are kept in this browser, and go out when it is opened again)
+        if (self.ws !== ws) return;
         // Nothing is dropped: what did not go out waits for the next attempt,
         // and it is said once, with a count, rather than once per resource.
         part.set.forEach(function (row) { if (self.pend[row.res_key] === undefined) self.pend[row.res_key] = waiting[row.res_key]; });
@@ -1026,12 +1031,15 @@
       });
     },
     takeExport: function (cmp, x) {
+      // an export arriving after its application was left (or another one opened) is not read into the one on screen
+      var self = this, seq = this.seq, ws = this.ws;
+      var here = function () { return self.seq === seq && self.ws === ws && ws && x.workspace === ws.id; };
       S.fileURL(x, x.file).then(function (u) { return fetch(u); }).then(function (r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.blob();
       }).then(function (b) {
-        cmp.loadReply(new File([b], x.file, { type: b.type }));
-      }).catch(function (e) { A().toast('Экспорт не получен с сервера: ' + (e && e.message || e), true); });
+        if (here()) cmp.loadReply(new File([b], x.file, { type: b.type }));
+      }).catch(function (e) { if (here()) A().toast('Экспорт не получен с сервера: ' + (e && e.message || e), true); });
     },
 
     saveExport: function (bytes, opts) {
@@ -1133,6 +1141,9 @@
       if (d) d.addEventListener('click', function () { self.finish(); });
       var ro = $('wsReopen');
       if (ro) ro.addEventListener('click', function () { self.reopen(); });
+      // the save mark as things are, not a bare «✓»: a redraw (reopen, finish) must not say «saved» over a held file,
+      // a refused state or a server that does not answer
+      this.mark(this.offline ? '⚠' : this.refused ? '!' : this.dirty ? '●' : '✓');
     },
 
     /** «Вернуть в работу»: a finished application is in work again (B8). Nothing in it changes but its status. */

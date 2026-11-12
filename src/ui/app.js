@@ -296,6 +296,9 @@
     var now = this.prices[key] != null ? this.prices[key] : smeta;
     if (S.near(now, smeta)) return;
     var o = {}; o[key] = smeta;
+    // nothing typed: leaving the box after Esc does not mark the resource «проверено» (the box compares with `was`)
+    var a = document.activeElement;
+    if (a && a.dataset && a.dataset.key === key) a.dataset.was = String(smeta);
     this.bulkPrices(o, 'Цена возвращена к сметной: ' + S.price(smeta));
   };
 
@@ -786,6 +789,8 @@
     });
     if (prepare) prepare();
     this.setPrices(map);
+    // what the press set, so that «Отменить» takes back only that: a price typed after it stays
+    keys.forEach(function (k) { before[k].set = map[k]; });
     // only the last press can be taken back: the offer to undo an earlier one goes when a new one is made
     if (this._undoOffer) this._undoOffer();
     this._undoOffer = this.toast(text, false, { action: { label: 'Отменить', fn: function () { self.undoPrices(before); } } });
@@ -796,6 +801,14 @@
     var self = this, back = {}, smeta = {};
     ((this.model && this.model.resources) || []).forEach(function (r) { smeta[r.key] = r.price; });
     var keys = Object.keys(before).filter(function (k) { return before[k].had || smeta[k] != null; });
+    // a price changed since the press (typed, or set by another action) is the newer word: it is left as it is
+    var kept = 0;
+    keys = keys.filter(function (k) {
+      var b = before[k], now = self.prices[k] != null ? self.prices[k] : smeta[k];
+      if (b.set === undefined || S.near(now, b.set)) return true;
+      kept++;
+      return false;
+    });
     keys.forEach(function (k) {
       var b = before[k];
       back[k] = b.had ? b.v : smeta[k];
@@ -805,7 +818,7 @@
     // a resource that had no price of its own has none again, not its smeta price written out; a price «Применить %»
     // had set is that again — free for the next percentage, not the expert's
     keys.forEach(function (k) { if (!before[k].had) delete self.prices[k]; else if (before[k].pct) self.pct[k] = 1; });
-    this.toast('Возвращено как было: ' + keys.length + ' цен');
+    this.toast('Возвращено как было: ' + keys.length + ' цен' + (kept ? ' (изменённые после этого — ' + kept + ' — оставлены как есть)' : ''));
   };
 
   /** One key changed: touch only the rows that use it. */

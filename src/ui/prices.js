@@ -263,8 +263,8 @@
   S.acceptFirst = function (key) {
     var H = S.Hints, R = S.Refs, U = S.Uzex, b = null;
     if (H && H.pop && !H.pop.hidden && H.key === key) b = H.pop.querySelector('.hp-row:not(.near) button[data-i]');
-    else if (R && R.pop && !R.pop.hidden && R.open && R.open.key === key) b = R.pop.querySelector('button[data-i]');
-    else if (U && U.pop && !U.pop.hidden && U.open && U.open.key === key) b = U.pop.querySelector('button[data-i]');
+    else if (R && R.pop && !R.pop.hidden && R.open && R.open.key === key) b = R.pop.querySelector('.rp-line:not(.near) button[data-i]');
+    else if (U && U.pop && !U.pop.hidden && U.open && U.open.key === key) b = U.pop.querySelector('.up-line:not(.near) button[data-i]');
     if (b && !b.disabled) b.click();
     return !!b;
   };

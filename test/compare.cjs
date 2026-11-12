@@ -317,5 +317,21 @@ check(twoModel.spans.length === 2 && (twoBack.sheets || []).length === 2 && Obje
 check((twoBack.unread || []).length === 0 && twoM.missing.length === 0 && (twoM.conflicts || []).length === 0,
   'and its header rows are not taken for prices that cannot be read');
 
+// «did we ask» exactly as the table: a price less than a sum below the estimate's, on a large quantity, is a line of
+// the table, so it is a request — kept by requested(), judged as one, and read back from our reply
+const bigQ = 50 * 1000, bigP = 2345.67, bigM = 2345;
+const bigV1 = one([MAT, line(1, 'ТЕСТОВЫЙ ПРОКАТ', 'Т', bigQ, bigP)]);
+const bigKey = k('ТЕСТОВЫЙ ПРОКАТ', 'Т', bigP), bigPrices = {}; bigPrices[bigKey] = bigM;
+const bigModel = S.assemble([{ id: 'p1', name: 'T', title: 'T', objects: bigV1, enabled: true }], bigPrices);
+const bigReq = S.compare.requested(bigModel, { mode: 'changed', minDiff: 1 });
+check(bigReq[bigKey] && bigReq[bigKey].market === bigM, 'a small price change on a large quantity is a request, as the table has it');
+const cl = (p2) => S.compare.classify({ price: bigP, qty: bigQ }, { price: p2, qty: bigQ }, { market: bigM });
+check(cl(bigP) === 'notfixed' && cl(bigM) === 'fixed' && cl(bigM - 5) === 'fixed',
+  'left as it was it is «не исправлено», at our price it is «исправлено» (' + [cl(bigP), cl(bigM)].join(', ') + ')');
+const bigBack = S.reply.parse(S.readXlsx(S.buildWorkbook(bigModel, { mode: 'changed', minDiff: 1 })));
+const bigRm = S.reply.match(bigBack.entries, bigV1);
+check(bigRm.prices[bigKey] === bigM && bigRm.requested[bigKey] && bigRm.requested[bigKey].market === bigM,
+  'and our own export read back as the reply gives that price back');
+
 console.log(fail ? '\nFAILED: ' + fail : '\nall compare checks passed');
 process.exit(fail ? 1 : 0);

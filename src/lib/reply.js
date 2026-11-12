@@ -101,7 +101,9 @@
   /** Prices printed in a table are rounded to the sum: «12 346» stands for the smeta's 12 345,6789. */
   function samePrice(a, b) { return Math.abs(a - b) <= Math.max(1, Math.abs(a) * 1e-3); }
   /** Our market price equals the smeta price up to its rounding: 0.1 %, at most one sum (as in S.compare). */
-  function unchanged(p, m) { return Math.abs(p - m) < Math.min(1, Math.max(1e-6, Math.abs(p) * 1e-3)); }
+  // our own figure against the estimate's, exactly as the report puts a line in the table: less than a sum per unit
+  // on a large quantity is a price we asked for
+  function unchanged(p, m) { return S.near(p, m); }
   function bare(s) { return S.nameKey(s).replace(/[\s.,;:()"'«»-]+/g, ''); }
 
   /**

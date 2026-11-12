@@ -126,6 +126,29 @@ await page.evaluate(() => [...document.querySelectorAll('#toast .toast-act')].fi
 await page.waitForTimeout(200);
 check(await page.evaluate((a) => Math.abs(app.prices[a.k] - a.t) < 1e-9, { k: res.key, t: typed }), '«Отменить» brings the typed price back');
 await page.keyboard.press('Tab');
+// «Отменить» takes back only what its press set: a price typed after Esc stays (review of stage 5)
+await box.click();
+await box.press('Escape');
+await page.waitForTimeout(200);
+await box.fill('777');
+await box.dispatchEvent('input');
+await page.evaluate(() => [...document.querySelectorAll('#toast .toast-act')].filter((b) => b.textContent === 'Отменить').pop().click());
+await page.waitForTimeout(200);
+check(await page.evaluate((k) => app.prices[k], res.key) === 777, '«Отменить» after Esc leaves a price typed after it');
+await page.evaluate((a) => app.setPrice(a.k, a.t), { k: res.key, t: typed });
+await page.keyboard.press('Tab');
+// Esc and away: nothing was typed, so the resource is not marked «проверено»
+const other = await page.evaluate((k) => { const r = app.model.resources.find((x) => x.key !== k && x.price > 0 && x.name.trim().length >= 4);
+  app.setPrice(r.key, r.price * 0.8); app.setChecked([r.key], false, true); return { key: r.key, name: r.name, price: r.price }; }, res.key);
+await page.fill('#q', other.name.trim());
+const otherBox = page.locator('#priceScroll .pin[data-key="' + other.key.replace(/(["\\])/g, '\\$1') + '"]');
+await otherBox.waitFor({ timeout: 10 * 1000 });
+await otherBox.click();
+await otherBox.press('Escape');
+await page.keyboard.press('Tab');
+await page.waitForTimeout(200);
+check(await page.evaluate((k) => !app.checked[k], other.key), 'Esc and leaving the box does not mark the resource «проверено»');
+await page.evaluate((o) => { app.setPrice(o.key, o.price); delete app.prices[o.key]; app.rebuild(); }, other);
 
 await page.fill('#q', '');
 await page.selectOption('#filter', 'changed');

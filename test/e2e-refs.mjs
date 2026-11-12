@@ -280,6 +280,10 @@ const sim = await popover('Кабель ВВГнг(А)-LS 3х2,5');
 check(sim.lines[0].badge === 'Похожий' && sim.lines[0].near && sim.lines[0].name === 'Кабель ВВГ 3х2,5' &&
   /Похожие ресурсы/.test(sim.text) && /близкие характеристики/.test(sim.lines[0].text) && !internal(sim.text),
   '«Похожий»: under «Похожие ресурсы», naming the other resource and what differs');
+// Ctrl+Enter takes the first «Применить» — never the price of another resource (E18; review of stage 5)
+const simTook = await ep.evaluate(() => { const k = S.Refs.open.key, r = app.model.resources.find((x) => x.key === k), was = r.market;
+  const took = S.acceptFirst(k); return { took, same: S.near(app.model.resources.find((x) => x.key === k).market, was) }; });
+check(!simTook.took && simTook.same, 'Ctrl+Enter over a popover of «Похожие» only sets nothing');
 await closePop();
 const lab = await popover('Затраты труда рабочих-строителей');
 check(lab.lines[0].badge === 'Ставка по таблице' && /таблица ставок · Хорезмская область/.test(lab.lines[0].text) && !internal(lab.text),

@@ -346,6 +346,7 @@ node build.mjs --watch               # ishlab chiqish paytida
 
 ```sh
 npm i && npx playwright install chromium     # bir marta
+node build.mjs                               # src o'zgargan bo'lsa — avval qurish (to'plam birinchi bo'lib dist/ ni tekshiradi)
 sh test/all.sh                               # hamma test, o'ylab topilgan smetalarda (≈ 12 daqiqa)
 sh test/all.sh reyestr.xls smeta1.xlsx smeta2.xlsx    # ... va haqiqiy fayllaringizda
 ```
@@ -375,7 +376,19 @@ commit'ini qiladi va push qiladi, keyin **alohida commit** bilan
 `server/releases.txt` ga o'sha commit'ning to'liq hash'ini va
 `docs/versiyalar.md` ga qatorni qo'shadi. Rad etadi (hech narsani
 o'zgartirmasdan): versiya yangi bo'lmasa, ishchi papkada o'zgarish bo'lsa,
-to'plam yashil bo'lmasa, справочник o'lchovi commit qilinmagan bo'lsa.
+to'plam yashil bo'lmasa, to'plam Windows ishga tushirgichi yoki brauzer
+testlaridan birortasini o'tkazib yuborgan yoki ishlatmagan bo'lsa (playwright va
+PowerShell kerak; Windows ishga tushirgichi testi faqat Linux'da ishlaydi — relizlar
+shu yerda qilinadi; boshqa tizimda, PowerShell yoki playwright yo'q bo'lsa skript
+to'plamdan oldin, darhol rad etadi), shox `claude/excel-price-validation-5ehbvb`
+bo'lmasa (Windows noutbuk `releases.txt` ni faqat shu shoxdan o'qiydi), kod o'z
+o'lchovidan farq qilsa (справочник, o'xshashlik). Reliz paytida origin oldinga
+ketsa, reliz commit'i rebase qilinmaydi — skript uni tashlab, shoxni yangilab,
+relizni qaytadan qilishni aytadi (`releases.txt` aynan origin'dagi commit'ni
+nomlashi kerak). Yarim yo'lda to'xtatilsa (Ctrl-C, commit rad
+etilsa) `package.json` va `dist/` qaytariladi; commit'dan keyin to'xtasa — nima
+qolganini aytadi. To'plam qilgan yangi o'lchov (`test/refs-parity.stamp`,
+`test/hints.stamp`) reliz commit'iga kiradi.
 `RELEASE_SMETA1`, `RELEASE_SMETA2`, `RELEASE_REGISTRY`, `REFS_KIT` — haqiqiy
 fayllar va maxfiy to'plam bilan to'liqroq tekshiruv uchun.
 

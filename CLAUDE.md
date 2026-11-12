@@ -47,7 +47,8 @@ node test/close-tab.mjs; node test/state-size.mjs    # yopilgan vkladkada oxirgi
 sh test/pb-smoke.sh; node test/e2e-workspace.mjs      # server rejimi testlari
 node test/num.cjs; node test/xlsx-guard.cjs           # son qat'iy o'qiladi («1,234.50» — ha, yonida so'z bo'lsa — yo'q); begona .xlsx o'quvchini osib qo'ymaydi
 node test/normalize.cjs; node test/sections.cjs; node test/regions.cjs   # NLP o'lchovlari
-node test/hints.cjs a.xlsx [b.xlsx]                    # o'xshash resurs takliflari o'lchovi — har bir smeta alohida (faqat haqiqiy smetada)
+node test/hints.cjs a.xlsx [b.xlsx]                    # o'xshash resurs takliflari: smeta ichida (85/5) va qayd etilgan bazaga nisbatan (aniqlik, to'liqlik, xavfsizlik) — baza bo'lsa (`REFS_KIT`/`HINTS_GOLDEN`), kompyuterdagi barcha qayd etilgan to'plamlarda
+REFS_KIT=<kit> node test/hints.cjs a.xlsx b.xlsx --record [--accept "sabab"]   # bazani yozish (maxfiy, kit ichida) — faqat muhr nomlagan kod uchun; o'zgargan kod yoki yiqilgan o'lchov faqat --accept bilan, sababi muhrga yoziladi
 node test/refs.cjs                                    # справочные цены: yadro, sintetik ma'lumotda
 node test/uzex.cjs; node test/uzex-api.mjs; node test/e2e-uzex.mjs   # UZEX haftalik kotirovkalari: sahifani o'qish, sinxronlash, «Проверка цен» (soxta sayt: test/uzex-site.mjs)
 REFS_KIT=<kit> node test/refs-parity.cjs               # dastur o'lchangan natijani aynan qaytaradimi (kit — maxfiy, repoda emas)
@@ -91,6 +92,17 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   `match.js` `UNIT_SAME`) va o'xshashlik bahosi (`match.js` `similarity`)
   **o'lchovsiz o'zgartirilmaydi**: har bir o'zgarish `test/sections.cjs` /
   `test/regions.cjs` / `test/hints.cjs` raqamlari bilan asoslanadi.
+  `match.js`, `normalize.js` va sahifaning `SIM_MIN`/`SIM_SHOW` i hamda `rankSimilar` i `test/hints.stamp`
+  muhriga ega (refs-parity kabi): haqiqiy smetalar va maxfiy bazasiz (`REFS_KIT`)
+  o'lchanmagan o'zgarish `test/all.sh` da «NOT MEASURED» — yiqiladi. Bazaga nisbatan
+  aniqlik, to'liqlik yoki xavfsizlik bitta taklifdan ko'p yomonlashsa — yiqiladi;
+  bilib qilingan murosa (masalan ko'proq taklif, lekin kamroq aniq) egasining
+  qarori bilan `--record --accept "sabab"` qilinadi — sabab muhrda qoladi. Bazani
+  boshqa kodga ko'chirish ham faqat `--accept` bilan (aks holda har biri «bittadan
+  ko'p emas» yomonlashgan qadamlar yig'ilib ketardi); qayd etilgan resurslarning
+  98 % i qayta topilishi shart (nom kaliti o'zgarsa — bu ham qaror). `rankSimilar`
+  o'zgarsa, test uni takrorlay olmaydi: `test/hints.cjs` dagi `suggest()` va
+  `RANK_SHA` u bilan birga o'zgartiriladi, keyin o'lchanadi.
   Bir necha viloyatda uchraydigan joy nomi hech kimga berilmaydi.
 * **Справочные цены** (`src/lib/refs/`, v2.5.0): narx hujjatlaridan olingan
   ma'lumot (paket `.json.gz`, hujjat nomlari, narxlar) **hech qachon repoga
@@ -111,8 +123,12 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   (`.github/workflows/tests.yml`, faqat sintetik ma'lumotda). Test yiqilsa —
   yo dastur, yo test tuzatiladi; «doim qizil» test qoldirilmaydi. Testga
   kerakli smeta `test/synth.cjs` da o'ylab topiladi — haqiqiy smeta, narx
-  yoki hujjat nomi repoga test sifatida ham tushmaydi. `test/refs-parity.stamp`
-  o'lchovdan keyin yangilansa — **commit qilinadi** (qaytarib qo'yilmaydi).
+  yoki hujjat nomi repoga test sifatida ham tushmaydi. `test/refs-parity.stamp` va
+  `test/hints.stamp` o'lchovdan keyin yangilansa — **commit qilinadi** (qaytarib
+  qo'yilmaydi). Ularni faqat o'tgan o'lchov yozadi (o'xshashlik uchun yana egasi
+  qabul qilgan yozuv, `--accept`), va faqat o'lchangan kod yangi bo'lsa — sanasi
+  uchun emas. `server/release.sh` ularni reliz commit'iga o'zi qo'shadi. `src` o'zgarsa, to'plamdan oldin `node build.mjs`:
+  to'plam birinchi bo'lib `dist/` src dan qurilganini tekshiradi (CI da shu muhim).
 * Raqamlar hech qachon yo'qolmaydi: `АНКЕР М5` ≠ `АНКЕР М8`, `4.1.1` ≠ `4.11`;
   ikki raqam orasidagi ajratgich o'chirilmaydi.
 * **Xavfsizlik bo'limi hozircha o'chirilgan (egasining qarori, 2026-10-24).**
@@ -135,7 +151,11 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   relizga (o'rnatuvchi `install-windows.ps1` ham shu ro'yxatdan oladi). Reliz
   chiqarish — `sh server/release.sh X.Y.Z "izoh" --row matn.md`: u
   `package.json` versiyasini ko'taradi → `node build.mjs` → to'plam
-  (`test/all.sh`, yashil bo'lishi shart) → commit + push; keyin **alohida
+  (`test/all.sh`, yashil bo'lishi shart; `laptop-windows` (PowerShell, `PWSH`) va
+  brauzer testlari (playwright) **o'tkazib yuborilsa yoki umuman ishlamasa ham reliz
+  rad etiladi**, chetlab o'tish yo'li yo'q — faqat egasining fayllari/to'plamiga
+  bog'liqlari SKIP bo'lishi mumkin; `laptop-windows` faqat Linux'da ishlaydi, shuning
+  uchun relizlar Linux'da, pwsh bilan qilinadi) → commit + push; keyin **alohida
   commit** bilan `releases.txt` ga `vX.Y.Z <o'sha commit hash>` qatori va
   `docs/versiyalar.md` ga qator. Qo'lda qilinsa ham tartib shu. Versiya raqami hech qachon qayta
   ishlatilmaydi — buzilgan relizni keyingi patch-versiya tuzatadi. Har bir

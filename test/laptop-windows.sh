@@ -328,7 +328,7 @@ wait_for 90 'alive trial.pid && [ "$(served)" = v9.2.0 ]' && ok 'the new version
 kill -9 $SUP $(pgrep -P $SUP) "$(pidof_ autostart.pid)" "$(pidof_ trial.pid)" "$(pidof_ server.pid)" 2>/dev/null; SUP=''
 sleep 1
 is "$(tr -d '\r\n' < "$TAQ_HOME/current.txt")" "$BEFORE" 'cut off before approval: current.txt still names the old version'
-TAQ_IDLE_SECONDS=0 TAQ_AUTOSTART=1 app start >/dev/null 2>&1
+( export TAQ_IDLE_SECONDS=0 TAQ_AUTOSTART=1; app start ) >/dev/null 2>&1   # a subshell: set in front of a function, they would outlive the call in macOS /bin/sh
 is "$(served)" "$BEFOREV" 'and the old version is what starts'
 alive autostart.pid && ok 'start, set to start at sign-in, leaves a supervisor running' || no 'start left no supervisor'
 
@@ -353,7 +353,7 @@ app status | grep -q "Avtomatik yangilanish: o'chirilgan" && ok 'autoupdate off 
 # program folder watches the version's supervisor: one that dies is started
 # again.
 app stop >/dev/null
-TAQ_AUTOSTART=1 TAQ_IDLE_SECONDS=0 app start >/dev/null 2>&1
+( export TAQ_AUTOSTART=1 TAQ_IDLE_SECONDS=0; app start ) >/dev/null 2>&1
 is "$(served)" v9.0.0 'started through the program folder: the version current.txt names'
 alive watchdog.pid && ok 'with the program folder watching' || no 'no watchdog'
 DEAD=$(pidof_ autostart.pid)

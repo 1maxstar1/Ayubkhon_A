@@ -17,26 +17,29 @@
  * not run at the same time — test/all.sh runs them one after another.
  *
  * A server does not outlive its test, and a test does not start on top of another's server:
+ *   - every server started here is written down in test/.servers.pid;
  *   - test/pb-smoke.sh, which every start goes through, first ends any server still serving pb_data_test and
- *     waits for it to be gone — a test that was killed leaves one behind, and it used to go on writing into
- *     the directory the next test was removing («Directory not empty», a test failing for no reason of its own);
+ *     waits for it to be gone — found by that file, by pgrep, or by /proc — and waits for the servers it starts
+ *     itself: a test that was killed leaves one behind, and it used to go on writing into the directory the
+ *     next test was removing («Directory not empty», a test failing for no reason of its own);
  *   - a port that still answers after that belongs to something else, and is refused in words;
  *   - a server that exits while it is being waited for is reported at once, with its exit code;
  *   - stop() ends the server and resolves when it is gone; Ctrl-C and a plain kill of the test end it too.
  */
 import { spawn, execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, appendFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 export const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 export const DATA = join(ROOT, 'server/pb_data_test');
+const PIDS = join(ROOT, 'test/.servers.pid');
 
 /**
  * @param {object} opts
  * @param {number} opts.port      each test needs its own
  * @param {boolean} [opts.registry]  also parse the sample registry into rows.json
- * @param {boolean} [opts.build]     rebuild dist and pb_public first
+ * @param {boolean} [opts.build]     rebuild dist and pb_public first — unless test/all.sh has just done so (TEST_BUILT=1)
  * @param {string}  [opts.dev]       PB_DEV; '1' writes sign-in codes to a file
  * @param {string}  [opts.laptop]    PB_LAPTOP; '1' also hands the code back to this machine
  * @param {string}  [opts.autologin] PB_AUTOLOGIN; with laptop, '1' signs the page in by itself
@@ -49,15 +52,21 @@ export async function startServer(opts) {
   const base = `http://127.0.0.1:${port}`;
   const answers = async () => { try { await fetch(base + '/api/health', { signal: AbortSignal.timeout(1500) }); return true; } catch (e) { return false; } };
 
-  if (build) execSync('node build.mjs --serve', { cwd: ROOT, stdio: 'ignore' });
+  // test/all.sh builds once before its tests; each test building again only made the suite slower
+  if (build && process.env.TEST_BUILT !== '1') execSync('node build.mjs --serve', { cwd: ROOT, stdio: 'ignore' });
   execSync('sh test/pb-smoke.sh', { cwd: ROOT, stdio: 'ignore' });
   // pb-smoke.sh has ended every test server there was: whatever answers on the port now is not one of ours
-  if (await answers()) throw new Error(`port ${port} is taken by something that is not a test server — the test cannot start on ${base}`);
+  if (await answers()) {
+    throw new Error(`port ${port} still answers after the test servers were ended — something else holds it, or a server ` +
+      `test/pb-smoke.sh could not find (see its «left behind» part); the test cannot start on ${base}`);
+  }
   if (registry) {
     execSync('node test/registry.cjs --json server/pb_data_test/rows.json', { cwd: ROOT, stdio: 'ignore' });
   }
 
   let proc = null;
+  // run.sh ends in `exec pocketbase …`, so the pid of this process is the server's own
+  const note = (p) => { try { appendFileSync(PIDS, p.pid + '\n'); } catch (e) { /* the other two ways still find it */ } };
   const spawnOne = () => spawn('sh', ['server/run.sh'], {
     cwd: ROOT,
     env: { ...process.env, UZEX_AUTO: '0', PB_DATA_DIR: 'pb_data_test', PB_HTTP: `127.0.0.1:${port}`, PB_DEV: dev, PB_LAPTOP: laptop, PB_AUTOLOGIN: autologin, PB_AUTOLOGIN_EMAIL: as, ...(opts.env || {}) },
@@ -83,6 +92,7 @@ export async function startServer(opts) {
   });
 
   proc = spawnOne();
+  note(proc);
   process.on('exit', () => { try { proc.kill(); } catch (e) { /* already gone */ } });
   // Ctrl-C, or the suite's own timeout: without these the test went and its server stayed
   ['SIGINT', 'SIGTERM', 'SIGHUP'].forEach((sig) => process.once(sig, () => { try { proc.kill(); } catch (e) { /* gone */ } process.exit(130); }));
@@ -135,6 +145,7 @@ export async function startServer(opts) {
     restart: async () => {
       await end(proc);
       proc = spawnOne();
+      note(proc);
       if (!await up()) throw new Error('server did not come back');
       pb.su = await auth();
     },

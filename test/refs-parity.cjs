@@ -166,6 +166,14 @@ console.log('timing ' + JSON.stringify(T));
 if (failed) { console.log('FAILED ' + failed); process.exit(1); }
 const stamp = { code: codeHash(), date: new Date().toISOString().slice(0, 10), policies, queries: queries.length, result: 'identical' };
 if (policies.join(',') === 'p1,p2,p3') {
-  fs.writeFileSync(STAMP, JSON.stringify(stamp, null, 1) + '\n');
-  console.log('stamp written: test/refs-parity.stamp (code ' + stamp.code + ')');
+  // rewritten only when the code it vouches for is new: a stamp that changed nothing but its date left every tree
+  // that ran the suite with the kit dirty, and every release carrying a «measurement» that measured nothing new
+  let old = null;
+  try { old = JSON.parse(fs.readFileSync(STAMP, 'utf8')); } catch (e) { /* none yet */ }
+  if (old && old.code === stamp.code && old.result === stamp.result && old.queries === stamp.queries) {
+    console.log('stamp unchanged: test/refs-parity.stamp already vouches for this code (' + old.date + ')');
+  } else {
+    fs.writeFileSync(STAMP, JSON.stringify(stamp, null, 1) + '\n');
+    console.log('stamp written: test/refs-parity.stamp (code ' + stamp.code + ')');
+  }
 }

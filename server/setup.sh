@@ -14,7 +14,12 @@ PID=$!
 # the temporary server already gone used to make a successful setup report
 # failure — and install.sh, under `set -e`, stopped right after printing
 # «collections imported», with nothing saying what went wrong.
-trap 'kill $PID 2>/dev/null; true' EXIT
+# It is also waited for: whatever starts next on the same data directory — the program itself, a test server —
+# must not find this one still closing its database. Not for ever: a server that does not end in five seconds is
+# made to (the watchdog, silenced so that a caller reading this script's output is not kept waiting for it). Each
+# step carries its own «|| true»: under set -e a kill that finds the server gone, or a wait that returns its exit
+# status, would otherwise end the trap with that status — and a «; true» at the end is never reached.
+trap 'kill $PID 2>/dev/null || true; ( sleep 5; kill -9 $PID 2>/dev/null ) >/dev/null 2>&1 & W=$!; wait $PID 2>/dev/null || true; kill $W 2>/dev/null || true' EXIT
 for i in 1 2 3 4 5 6 7 8 9 10; do
   curl -sS -m 2 -o /dev/null "http://127.0.0.1:$PORT/api/health" && break || sleep 1
 done

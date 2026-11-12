@@ -18,6 +18,7 @@ server/pb_data_walk/
 server/.env
 test/.book.json
 test/.synth-*.xlsx
+test/.servers.pid
 server/deploy/.target
 
 # reference-price packages are private data: never in the repository

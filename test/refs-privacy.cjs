@@ -25,7 +25,7 @@
  * one (exact, rounded or truncated) — the fixture is never allow-listed: pick another invented number.
  * A hit that is generic code (a rounding constant, a common word) is allow-listed in test/refs-privacy.allow by the
  * hash of its line text, never by its value: «<sha256-16 of the trimmed line>  <kind>  <reason>».
- * Output: kinds and file:line (or commit:<hash>) only, never a value. Exit 1 on any hit.
+ * Output: kinds and file:line (or commit:<hash>) only, never a value. Exit 1 on any hit; exit 2 when the check cannot run (no package in the kit, a history cut short).
  */
 'use strict';
 const crypto = require('node:crypto');
@@ -51,7 +51,7 @@ if (!STAGED) {
   try { git('cat-file', '-e', BASE + '^{commit}'); } catch (e) {
     console.error('refs-privacy: the base commit ' + BASE + ' is not in this checkout — its history is cut short.\n' +
       '  Get the whole history (git fetch --unshallow; in CI: fetch-depth: 0) and run again.');
-    process.exit(1);
+    process.exit(2);          // 2: the check could not run — not the owner's data found (that is 1)
   }
 }
 
@@ -172,8 +172,9 @@ fs.readFileSync(FIXTURE, 'utf8').split('\n').forEach((t, i) => {
 let dataChecked = false;
 if (KIT) {
   const dir = path.join(KIT, 'pkg');
-  const files = fs.readdirSync(dir).filter((f) => /\.json\.gz$/.test(f));
-  if (!files.length) { console.error('REFS_KIT/pkg has no package'); process.exit(2); }
+  let files = [];
+  try { files = fs.readdirSync(dir).filter((f) => /\.json\.gz$/.test(f)); } catch (e) { /* no pkg/ at all: said below */ }
+  if (!files.length) { console.error('REFS_KIT/pkg has no package (' + dir + ')'); process.exit(2); }
   const ids = new Set(), strings = new Set(), prices = new Set(), realPrices = [];
   const allNames = new Set();
   const STOP = new Set(['UNKNOWN', 'NOT NAMED', 'UNNAMED', 'NONE', 'NULL']);
@@ -240,5 +241,7 @@ console.log('scope: ' + scope + '; A ' + A.size + ' lines, B ' + B.size + ' mess
   ' dist lines added in history; data rules ' + (dataChecked ? 'ON (REFS_KIT)' : 'off (no REFS_KIT)') +
   '; allow-listed ' + allowUsed);
 for (const h of hits) console.log('HIT  ' + h);
+// not a leak, and how to clear it — said, so that it is not read as one
+if (hits.some((h) => /^dist-not-a-fresh-build /.test(h))) console.log('  dist/ is not a build of this src: run «node build.mjs» (and commit dist/)');
 console.log(hits.length ? 'FAILED: ' + hits.length + ' hits' : 'ok: 0 hits');
 process.exit(hits.length ? 1 : 0);

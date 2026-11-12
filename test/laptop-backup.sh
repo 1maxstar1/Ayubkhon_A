@@ -56,6 +56,8 @@ serve
 check 'curl -sS -m 2 -o /dev/null "$BASE/api/health"' "the launcher starts the program in the copy"
 i=0; while [ $i -lt 30 ] && [ "$(zips "$LOCAL")" = 0 ]; do sleep 1; i=$((i + 1)); done
 check '[ "$(zips "$LOCAL")" = 1 ]' "starting it takes a backup into ~/Backups/smeta"
+# the second copy is made right after the first: waited for, not looked at the instant the first appears
+i=0; while [ $i -lt 30 ] && [ "$(zips "$COPY")" = 0 ]; do sleep 1; i=$((i + 1)); done
 check '[ "$(zips "$COPY")" = 1 ]' "and a second copy into the cloud drive it found («$(basename "$DRIVE")/Smeta zaxira (Mac)»)"
 check '[ "$(ls "$LOCAL")" = "$(ls "$COPY")" ]' "the same file in both places"
 OUT=$(sh "$L" status)

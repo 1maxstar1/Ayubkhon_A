@@ -728,7 +728,7 @@ keyin bu muhim: mijoz narxlar **QQSsiz** bo'lishini talab qilgan.
 | F4 | Tugallangan ariza qatorida «Сравнить версию» | Qaytgan smetani bir bosishda solishtirish | S |
 | F5 | UZEX haftasini arizaning ro'yxatga olingan sanasi bo'yicha tanlash | Hozir qo'lda → egasining qarori 7 | S |
 | F6 | Ochiq sahifa server versiyasi o'zgarganini bilib, «обновите страницу» deyishi | Hozir yangilanishdan keyin eski sahifa yangi server bilan ishlayveradi | S |
-| F7 ✓ | Reliz skripti: versiya, qurish, testlar, `releases.txt`, `versiyalar.md` — bitta buyruq va tekshiruvlar. **Bajarildi — commit `ffccdc2`:** `sh server/release.sh X.Y.Z "izoh" --row matn.md [--dry]`; test — `test/release-script.sh` | Hozir 6 qadam qo'lda; `releases.txt` 14/14 to'g'ri, lekin faqat ehtiyotkorlik hisobiga | M |
+| F7 ✓ | Reliz skripti: versiya, qurish, testlar, `releases.txt`, `versiyalar.md` — bitta buyruq va tekshiruvlar. **Bajarildi — commit `ffccdc2`:** `sh server/release.sh X.Y.Z "izoh" --row matn.md [--dry]`; test — `test/release-script.sh`. Kod ko'rigidan keyin: PowerShell, playwright va shox (`claude/excel-price-validation-5ehbvb` — Windows `releases.txt` ni shundan o'qiydi) to'plamdan oldin tekshiriladi; natijalarda skript bilmagan test bo'lsa — rad; origin oldinga ketsa reliz commit'i rebase qilinmaydi (tashlab, qaytadan); `--row` yo'li skript ishga tushirilgan papkadan o'qiladi | Hozir 6 qadam qo'lda; `releases.txt` 14/14 to'g'ri, lekin faqat ehtiyotkorlik hisobiga | M |
 
 ### [ ] F8 `docs/2-bosqich-reja.md` dagi bajarilmagan talablar
 
@@ -818,10 +818,48 @@ Reja: `hints` — har fayl uchun alohida chegara va «taklif yo'q = yiqilish»;
 `e2e-hints` — harf almashtiradigan xato, to'g'ri hisob. **NLP jadvallari va
 o'xshashlik bahosiga tegilmaydi** — o'zgaradigani faqat testlar.
 
-**Bajarildi — commit `7ca64e4`.** `hints` har bir smetani alohida o'lchaydi
-(o'sha chegaralar bilan: haqiqiy ikki smetada 92 % va 90 %); ikkalasi birga
-bergan raqam ma'lumot sifatida chop etiladi; taklif umuman bo'lmasa —
-yiqiladi. `browser` berilgan smetaning birinchi narxli resursini oladi va
+**Bajarildi — commit `7ca64e4`; kod ko'rigi va mustaqil tekshiruvdan keyin qayta
+qurildi.** `hints` endi uch narsani tekshiradi. (1) *Smeta ichida* — o'sha
+chegaralar (85 % / 5 %), smetada 100 dan ortiq narxli resurs va kamida 20 taklif
+bo'lsa (haqiqiy smetalarda 92 %, 90 %, 96 %). (2) *Qayd etilgan bazaga nisbatan* —
+har bir resursga hozir berilgan taklif bazadagi kod bergan taklif bilan
+solishtiriladi, smeta ichida ham, smetalararo ham (dasturdagi haqiqiy ishlatilish:
+bir loyihaning resursi boshqa loyihalarning tuzatishlariga qarshi): aniqlik
+(25 % ichidagi takliflar ulushi), to'liqlik (25 % ichidagi takliflar soni) va
+xavfsizlik (uch baravar uzoq birinchi takliflar, va ko'rsatilgan 4 tasi orasida
+shundayi bor resurslar soni) — har biri bitta taklifdan ko'p yomonlashmasligi
+kerak. Teng ball olgan nomzodlar orasidagi tartib (alifbo omadi) o'zgarish deb
+sanalmaydi. Baza bo'lsa, kompyuterda topilgan **barcha** qayd etilgan to'plamlar
+o'lchanadi (bitta smeta ikki marta berilsa — bir marta). Baza maxfiy (egasining
+smetalaridan: nomlarning xeshlari va shu kompyuterdagi fayl yo'llari; smetadagi
+nom yoki narx yo'q) va kit ichida turadi. Bazani yozish (`--record`) faqat muhr
+nomlagan kod uchun — o'zgargan kod o'zi yozgan bazaga qarshi «o'tib» ketmasin;
+o'zgargan kodni yoki yiqilgan o'lchovni yozish faqat `--accept "sabab"` bilan
+(sabab muhrda qoladi). Yozish muhrni o'zi yozmaydi (faqat `--accept` bilan). (3) O'xshashlik kodi
+(`match.js`, `normalize.js`, `SIM_MIN`/`SIM_SHOW` va `bestMatches` chaqiruvi)
+`test/hints.stamp` muhriga ega: muhrni faqat ikki yoki undan ko'p **har xil**,
+har biri o'zicha baholangan haqiqiy smetada smeta ichida va smetalararo bazaga
+nisbatan o'tgan o'lchov yozadi, va faqat kod yangi bo'lsa; bazasiz o'lchanmagan
+o'zgarish — «NOT MEASURED», yiqiladi. Sahifa takliflarni test takrorlaydigan
+shakldan boshqacha tartiblasa (`src/ui/hints.js` dagi uch qator), test ishlamaydi
+— nima o'zgarganini aytadi.
+
+Nega shunday: avvalgi «hammasi bitta qozonda» o'lchovi ikki smetada doim 83 % da
+yiqilardi; mutlaq chegara smetalararo ishlamaydi — ikki smeta ikki mintaqa va
+chorak, **aynan bir xil** resurs ham o'zi bilan alohida smetalar orasida 63–72 %
+hollarda, bitta smetaning ikki versiyasi orasida esa ~90 % hollarda 25 % ichida
+mos keladi. Bunday chegara birinchisida yaxshi takliflarni yiqitadi, ikkinchisida
+o'rtacha regressiyani o'tkazib yuboradi (birinchi tuzatish varianti shunday edi —
+mustaqil tekshiruv ko'rsatdi). Bazaga nisbatan solishtirish uchta haqiqiy smeta
+to'plamida (ikki alohida smeta; uchtasi birga; bitta smetaning ikki versiyasi)
+quyidagilarning **hammasini** ushlaydi: o'lcham-almashinuv qo'riqchisini olib
+tashlash, raqam-ziddiyat qoidasini olib tashlash, «qo'shimcha o'lcham» chegirmasini
+olib tashlash, chegarani 0,45 / 0,55 / 0,58 ga tushirish va 0,66 / 0,75 / 0,9 ga
+ko'tarish; o'zgarishsiz kod va teng ballar tartibining teskari bo'lishi o'tadi.
+Ushlamaydigani — narx ajrata olmaydigan narsa (masalan rim raqamli nav qo'riqchisi:
+bu smetalarda u olib tashlansa «yaxshilanish» ko'rinadi); ochiq yozilgan. Hech narsani
+o'lchab bo'lmasa (kichik smeta yolg'iz) — SKIP sababi bilan (chiqish kodi 77), «NaN %»
+avval jim o'tardi. `browser` berilgan smetaning birinchi narxli resursini oladi va
 har bir qadami tekshiruv: narx hamma qatoriga tushgani, filtr, uch vkladka,
 yuklab olingan hujjat qayta o'qilib, taqqoslash varag'ida o'sha qator va
 yozilgan narx borligi. `e2e-hints` — eng uzun so'zdan **harf** tushiradi
@@ -843,9 +881,15 @@ server hali yozib turadi — vaqti-vaqti bilan yiqiladigan testlarning (masalan
 Reja: band portni rad etish, bola jarayon tirikligini tekshirish, chiqishini
 kutish, har port uchun o'z ma'lumot papkasi.
 
-**Bajarildi — commit `477ba58`.** Har bir test boshlanishida
-(`test/pb-smoke.sh`) oldingi testdan qolgan server to'xtatiladi va chiqishi
-kutiladi; shundan keyin ham band port — so'z bilan rad etiladi; ishga
+**Bajarildi — commit `477ba58`, kod ko'rigidan keyin mustahkamlandi.** Har bir
+test boshlanishida (`test/pb-smoke.sh`) oldingi testdan qolgan server topiladi —
+uch yo'l bilan: `test/server.mjs` yozgan pid-fayl, `pgrep`, `pgrep` bo'lmasa
+`/proc` — va faqat `pb_data_test` ga xizmat qilayotgan pocketbase to'xtatiladi
+(egasining noutbukdagi serveri, pid qayta ishlatilgan bo'lsa ham, hech qachon;
+boshqa nusxaning `pb_data_test` i ham emas — papka nisbiy berilgan bo'lsa
+(`--dir pb_data_test`, `server/run.sh` dagidek), jarayonning ishchi papkasi shu
+nusxa ekani tekshiriladi, o'qib bo'lmasa — tegilmaydi); `pb-smoke.sh` va `setup.sh` o'z
+serverlarini ham kutadi — 5 soniyagacha, keyin majburan; shundan keyin ham band port — so'z bilan rad etiladi; ishga
 tushayotib o'lgan server darhol, chiqish kodi bilan aytiladi; `stop()` server
 ketgach tugaydi; Ctrl-C va `kill` ham serverni to'xtatadi. Test:
 `test/server-helper.mjs`. **Qilinmadi:** har port uchun alohida ma'lumot

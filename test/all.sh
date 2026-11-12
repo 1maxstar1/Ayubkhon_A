@@ -24,7 +24,10 @@ for F in "$REG" "$S1" "$S2"; do
   echo "  sudrab tashlang — yo'li o'zi yoziladi. Uchtagacha fayl beriladi:"
   echo "  reyestr (.xls), keyin ikkita smeta (.xlsx)."
   echo
-  echo "  Fayllarsiz ham ishlaydi — u holda smetaga bog'liq testlar SKIP bo'ladi:"
+  echo "  Fayllarsiz ham ishlaydi — u holda butun dastur testlari o'ylab topilgan"
+  echo "  ikki smetada (test/synth.cjs) ishlaydi. Ishlay olmaydiganlari (egasining"
+  echo "  fayllari yoki maxfiy to'plami kerak bo'lganlar, pwsh yoki playwright yo'q)"
+  echo "  jadvalda SKIP deb, sababi bilan ko'rinadi:"
   echo
   echo "      sh test/all.sh"
   exit 1
@@ -52,13 +55,21 @@ if node -e "require.resolve('playwright')" 2>/dev/null; then PW=1; else PW=0; fi
 # The Windows launcher is checked under PowerShell when there is one.
 PWSH="${PWSH:-$(command -v pwsh 2>/dev/null)}"; export PWSH
 
+# A test that exits 77 (the automake convention) had nothing it could measure and says why on its last line:
+# shown as SKIP with that reason, not as a pass and not as a failure.
 run() {
   NAME="$1"; shift
   printf '%-22s ' "$NAME"
   T0=$(date +%s)
-  if "$@" >"test/.log-$NAME.txt" 2>&1; then R=OK; else R=FAIL; fi
+  "$@" >"test/.log-$NAME.txt" 2>&1
+  RC=$?
+  if [ "$RC" = 0 ]; then R=OK; elif [ "$RC" = 77 ]; then R=SKIP; else R=FAIL; fi
   T=$(( $(date +%s) - T0 ))
-  printf '%-4s %3ss\n' "$R" "$T"
+  if [ "$R" = SKIP ]; then
+    printf '%-4s %3ss   %s\n' "$R" "$T" "$(grep -v '^[[:space:]]*$' "test/.log-$NAME.txt" | tail -1 | cut -c1-110)"
+  else
+    printf '%-4s %3ss\n' "$R" "$T"
+  fi
   printf '%s\t%s\t%s\n' "$NAME" "$R" "$T" >> "$OUT"
   [ "$R" = FAIL ] && tail -15 "test/.log-$NAME.txt"
   return 0
@@ -67,18 +78,27 @@ skip() {
   printf '%-22s %-4s %3s   %s\n' "$1" "SKIP" "-" "$2"
   printf '%s\tSKIP\t0\n' "$1" >> "$OUT"
 }
-# A browser test with no browser, or a smeta test with no smeta, is skipped by
-# name rather than left out of the summary: a run that says «20 ok» and lists
-# twenty tests is telling the truth about a suite of twenty-five only if it
-# says which five it did not run.
+# A browser test with no browser is skipped by name rather than left out of the summary: a run that says «20 ok»
+# and lists twenty tests is telling the truth about a suite of twenty-five only if it says which five it did not
+# run. (There are always estimates now — the given ones or the invented — so nothing is skipped for want of one.)
 browser_run() { if [ "$PW" = 1 ]; then run "$@"; else skip "$1" "playwright o'rnatilmagan: npm i -D playwright && npx playwright install chromium"; fi; }
-smeta_run() { if [ -n "$S1" ]; then run "$@"; else skip "$1" "smeta fayli berilmagan"; fi; }
-both_run() { if [ -n "$S1" ]; then browser_run "$@"; else skip "$1" "smeta fayli berilmagan"; fi; }
-pwsh_run() { if [ -n "$PWSH" ] && [ -x "$PWSH" ]; then run "$@"; else skip "$1" "pwsh (PowerShell) o'rnatilmagan"; fi; }
+# The Windows launcher's test runs on Linux only (GNU tools, /proc, the Linux PocketBase): elsewhere it is skipped
+# with the reason, not run into a failure that points at nothing (releases are made on Linux, server/release.sh).
+pwsh_run() {
+  if [ "$(uname -s)" != Linux ]; then skip "$1" "faqat Linux'da ishlaydi (relizlar Linux'da qilinadi)"
+  elif [ -n "$PWSH" ] && [ -x "$PWSH" ]; then run "$@"
+  else skip "$1" "pwsh (PowerShell) o'rnatilmagan"; fi
+}
 
-node build.mjs --serve >/dev/null
 echo "test                   sonuc  vaqt"
 echo "-----------------------------------"
+# First, before anything is built: the privacy check compares dist/ with a fresh build of src. Run after the
+# suite had rebuilt dist/ it compared a build with itself and could never fail — in CI, a commit whose dist/ was
+# not built from its src went through green. (Changed src locally? «node build.mjs» before the suite.)
+run refs-privacy     node test/refs-privacy.cjs
+# built once for every test: test/server.mjs skips its own build when this is set — and only when the build
+# worked, so that a failed one leaves each test to build (and fail) by itself rather than run on the last build
+if node build.mjs --serve >/dev/null; then TEST_BUILT=1; export TEST_BUILT; fi
 run build            node build.mjs
 run normalize        node test/normalize.cjs
 run num              node test/num.cjs
@@ -92,7 +112,6 @@ run uzex             node test/uzex.cjs
 run sections         node test/sections.cjs
 run regions          node test/regions.cjs
 run refs             node test/refs.cjs
-run refs-privacy     node test/refs-privacy.cjs
 # The reference-price tables change only with measurement (CLAUDE.md). The measurement needs the private kit
 # (REFS_KIT: the owner's package and the goldens, never in the repository); without it the stamp of the last
 # measurement must still match the code — a change that was never measured is a failure, not a skip.
@@ -105,9 +124,21 @@ else
   printf 'refs-parity\tFAIL\t0\n' >> "$OUT"
 fi
 if [ -n "$REFS_KIT" ] && [ "$SYN" = 0 ]; then run refs-measure node test/refs-measure.cjs "$S1"; else skip refs-measure "REFS_KIT yoki smeta berilmagan"; fi
-smeta_run pipeline       node test/pipeline.cjs "$S1" "$S2" --out test/out.xlsx
-if [ "$SYN" = 0 ] && [ -n "$HINT2" ]; then run hints node test/hints.cjs "$S1" "$HINT2"
-elif [ "$SYN" = 0 ]; then run hints node test/hints.cjs "$S1"; else skip hints "o'lchov faqat haqiqiy smetada (sintetik nomlar narx haqida hech narsa demaydi)"; fi
+run pipeline         node test/pipeline.cjs "$S1" "$S2" --out test/out.xlsx
+# «Похожие ресурсы» is measured on real estimates only, against the private baseline (REFS_KIT) when there is one;
+# with invented estimates the stamp of the last measurement must still match the similarity code — a change that
+# was never measured is a failure, not a skip (CLAUDE.md), the same as the reference prices.
+# With the kit and no estimates given, every recorded set found on this machine is measured all the same.
+if [ "$SYN" = 0 ]; then
+  if [ -n "$HINT2" ]; then run hints node test/hints.cjs "$S1" "$HINT2"; else run hints node test/hints.cjs "$S1"; fi
+elif [ -n "$REFS_KIT" ]; then
+  run hints node test/hints.cjs --recorded
+elif HINTSAYS=$(node test/hints.cjs --check-stamp 2>&1); then
+  skip hints "$HINTSAYS (o'lchov faqat haqiqiy smetada)"
+else
+  printf '%-22s %-12s %s\n' hints "NOT MEASURED" "$HINTSAYS"
+  printf 'hints\tFAIL\t0\n' >> "$OUT"
+fi
 run registry-parse   node test/registry.cjs
 run backup-prune     node test/backup-prune.cjs
 run deploy-target    sh test/deploy-target.sh
@@ -126,7 +157,7 @@ run refs-api         node test/refs-api.mjs
 run uzex-api         node test/uzex-api.mjs
 run ownership        node test/ownership.mjs
 run disable-user     node test/disable-user.mjs
-both_run  browser        node test/browser.mjs "$S1" "$S2"
+browser_run browser      node test/browser.mjs "$S1" "$S2"
 browser_run price-book   node test/price-book.mjs
 browser_run e2e-auth     node test/e2e-auth.mjs
 browser_run laptop       node test/laptop.mjs
@@ -141,8 +172,8 @@ browser_run upload-fail  node test/upload-fail.mjs
 browser_run two-tabs     node test/two-tabs.mjs
 browser_run close-tab    node test/close-tab.mjs
 browser_run state-size   node test/state-size.mjs
-both_run  e2e-workspace  node test/e2e-workspace.mjs "$S1" "$S2"
-both_run  e2e-hints      node test/e2e-hints.mjs "$S1"
+browser_run e2e-workspace node test/e2e-workspace.mjs "$S1" "$S2"
+browser_run e2e-hints    node test/e2e-hints.mjs "$S1"
 if [ -n "$REG" ]; then browser_run e2e-fullregistry node test/e2e-fullregistry.mjs "$REG"; else skip e2e-fullregistry "reyestr fayli berilmagan"; fi
 echo "-----------------------------------"
 # Counted by column rather than by grepping for the word: «\t» is a tab to GNU

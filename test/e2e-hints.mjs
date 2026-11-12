@@ -239,14 +239,7 @@ check(near.sizes === 0, 'and two sizes of one part never do');
  */
 // The neighbourhood is fetched in the background after the exact matches, so
 // wait until there is something to score before counting the scoring.
-await page.waitForFunction(() => S.Hints.pool.length > 0, null, { timeout: 20 * 1000 }).catch(async (e) => {
-  console.log('DEBUG no neighbourhood:', JSON.stringify(await page.evaluate(() => ({
-    prefixed: Object.keys(S.Hints.prefixed), fetched: Object.keys(S.Hints.fetched).length, map: Object.keys(S.Hints.map),
-    open: app.model.resources.filter((r) => !S.Hints.hasRow(r)).length
-  }))).slice(0, 900));
-  console.log('corrections:', JSON.stringify((await api('/api/collections/corrections/records?perPage=20&fields=name,match_key,workspace,region', {}, su)).items).slice(0, 900));
-  throw e;
-});
+await page.waitForFunction(() => S.Hints.pool.length > 0, null, { timeout: 20 * 1000 });
 const scoring = await page.evaluate(() => {
   const open = app.model.resources.filter((r) => !S.Hints.hasRow(r));
   const real = S.bestMatches;

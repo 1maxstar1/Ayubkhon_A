@@ -1,0 +1,28 @@
+{
+ "code": "0437b87b980012eb",
+ "date": "2026-11-12",
+ "result": "not worse than the recorded baseline",
+ "measured": [
+  {
+   "files": 2,
+   "resources": 982,
+   "absolute": 2,
+   "within": true,
+   "across": true
+  },
+  {
+   "files": 3,
+   "resources": 1496,
+   "absolute": 3,
+   "within": true,
+   "across": true
+  },
+  {
+   "files": 2,
+   "resources": 1027,
+   "absolute": 2,
+   "within": true,
+   "across": true
+  }
+ ]
+}

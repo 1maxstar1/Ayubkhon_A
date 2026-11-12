@@ -16,7 +16,8 @@
  */
 'use strict';
 const fs = require('node:fs');
-const { xlsx } = require('./compare-books.cjs');
+// the layout of a local estimate is drawn from the one place the tiny estimates of the compare tests come from
+const { xlsx, sheet, estimate, line } = require('./compare-books.cjs');
 
 const MATERIALS = [
   ['ТРУБА ПОЛИЭТИЛЕНОВАЯ ТЕСТОВАЯ НАПОРНАЯ ДИАМЕТРОМ', 'ММ', 'М'],
@@ -53,16 +54,6 @@ function catalogue() {
   return out;
 }
 
-function sheet(name, lines) {
-  const rows = [];
-  lines.forEach((line, i) => {
-    const cells = [];
-    line.forEach((v, c) => { if (v != null) cells[c + 1] = { v }; });
-    rows[i + 1] = cells;
-  });
-  return { name, rows };
-}
-
 /**
  * One workbook. `which` 1: six local estimates; 2: five, sharing most resources with the first — every seventh
  * of them at another price, as a second estimate of the same builder has them.
@@ -73,7 +64,6 @@ function book(which) {
   const all = [[null, null, null, null, null, 'Форма 4А АВС-4'], ['Наименование стройки -', null, 'ТЕСТОВАЯ СТРОЙКА № ' + which], []];
   for (let e = 0; e < n; e++) {
     const body = [];
-    const line = (no, nm, unit, qty, price) => [String(no), null, nm, unit, qty, price, qty * price];
     let direct = 0;
     const band = (title, lines) => {
       if (!lines.length) return;
@@ -100,19 +90,7 @@ function book(which) {
     }
     band('СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ', mats);
     if (e % 3 === 2) band('ТЕХНОЛОГИЧЕСКОЕ ОБОРУДОВАНИЕ', [{ name: EQUIPMENT[(e + which) % EQUIPMENT.length], unit: 'ШТ', qty: 1 + (e % 2), price: 2900 + e * 100 }]);
-    const est = [
-      [null, null, ' ЛОКАЛЬНЫЙ   РЕСУРСНЫЙ   СМЕТНЫЙ   РАСЧЕТ', '№ ' + (e + 1)],
-      [null, 'на', WORKS[e % WORKS.length]],
-      ['Наименование объекта -', null, 'ТЕСТОВЫЙ ОБЪЕКТ ' + (e + 1)],
-      [],
-      ['№ п/п', 'Шифр ресурсов', 'Наименование ресурсов, оборудования, конструкций, изделий и  деталей',
-        'Единица измерения', 'Количество единиц', 'Сметная стоимость'],
-      [null, null, null, null, null, 'на единицу', 'общая'],
-      [1, 2, 3, 4, 5, 6, 7],
-      ...body,
-      [null, null, 'ИТОГО ПРЯМЫЕ ЗАТРАТЫ', 'СУМ', null, null, direct],
-      [], []
-    ];
+    const est = estimate(WORKS[e % WORKS.length], body, { no: e + 1, object: 'ТЕСТОВЫЙ ОБЪЕКТ ' + (e + 1), direct });
     if (e > 0) est[0] = [];
     all.push(...est);
   }

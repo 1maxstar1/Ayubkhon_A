@@ -7,7 +7,8 @@ PORT=8094; BASE="http://127.0.0.1:$PORT"
 node test/registry.cjs --json server/pb_data_test/rows.json >/dev/null
 PB_DATA_DIR=pb_data_test PB_HTTP="127.0.0.1:$PORT" PB_DEV=1 sh server/run.sh >server/pb_data_test/import.log 2>&1 &
 PID=$!
-trap 'kill $PID 2>/dev/null' EXIT
+# waited for, and «|| true» on each step: see test/pb-smoke.sh
+trap 'kill $PID 2>/dev/null || true; ( sleep 5; kill -9 $PID 2>/dev/null ) >/dev/null 2>&1 & W=$!; wait $PID 2>/dev/null || true; kill $W 2>/dev/null || true' EXIT
 for i in 1 2 3 4 5 6 7 8 9 10; do curl -sS -m 2 -o /dev/null "$BASE/api/health" 2>/dev/null && break || sleep 1; done
 json() { node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d)$1))"; }
 SU=$(curl -sS -X POST "$BASE/api/collections/_superusers/auth-with-password" -H 'content-type: application/json' \

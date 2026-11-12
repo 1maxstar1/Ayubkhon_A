@@ -1,6 +1,9 @@
 /*
  * The two invented versions of one tiny smeta used by test/compare.cjs and test/e2e-compare.mjs,
  * and the market prices «our table» put on the first. Names, numbers and prices are made up.
+ *
+ * The layout of a local estimate (sheet, estimate, line) is the one place every invented estimate is drawn
+ * from: test/synth.cjs builds its larger ones with the same three.
  */
 'use strict';
 
@@ -14,18 +17,23 @@ function sheet(name, lines) {
   return { name, rows };
 }
 
-function estimate(works, rows) {
+/**
+ * One local estimate as rows of cells: its title, the header of form 4А, `rows`, the direct-cost total.
+ * `o.no` the estimate's number (1), `o.object` the object's name, `o.direct` the typed direct-cost total (1).
+ */
+function estimate(works, rows, o) {
+  o = o || {};
   return [
-    [null, null, ' ЛОКАЛЬНЫЙ   РЕСУРСНЫЙ   СМЕТНЫЙ   РАСЧЕТ', '№ 1'],
+    [null, null, ' ЛОКАЛЬНЫЙ   РЕСУРСНЫЙ   СМЕТНЫЙ   РАСЧЕТ', '№ ' + (o.no || 1)],
     [null, 'на', works],
-    ['Наименование объекта -', null, 'ТЕСТОВЫЙ ОБЪЕКТ'],
+    ['Наименование объекта -', null, o.object || 'ТЕСТОВЫЙ ОБЪЕКТ'],
     [],
     ['№ п/п', 'Шифр ресурсов', 'Наименование ресурсов, оборудования, конструкций, изделий и  деталей',
       'Единица измерения', 'Количество единиц', 'Сметная стоимость'],
     [null, null, null, null, null, 'на единицу', 'общая'],
     [1, 2, 3, 4, 5, 6, 7],
     ...rows,
-    [null, null, 'ИТОГО ПРЯМЫЕ ЗАТРАТЫ', 'СУМ', null, null, 1],
+    [null, null, 'ИТОГО ПРЯМЫЕ ЗАТРАТЫ', 'СУМ', null, null, o.direct == null ? 1 : o.direct],
     [], []
   ];
 }
@@ -107,4 +115,4 @@ function replyBook() {
   ])] };
 }
 
-module.exports = { book, prices, xlsx, replyBook };
+module.exports = { book, prices, xlsx, replyBook, sheet, estimate, line };

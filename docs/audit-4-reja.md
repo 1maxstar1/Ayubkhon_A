@@ -1277,6 +1277,20 @@ tuzatiladi (2-tekshiruvdagi tartib).
 | 6 · v2.11.0 | Xavfsiz yangilanish, Mac o'zi yangilanadi | C1, G1, G2, G3 — shundan keyin repo yopiq bo'lishi mumkin | 5 kun |
 | 7 | Ikkinchi odam qo'shilishidan oldin | C6–C9, B3 (server), B9, F8, G4, I1 | 5 kun |
 
+**5-bosqichdan keyin (v2.10.1, v2.10.2).** CI da bir marta yiqilgan `e2e-uzex` ning sababi topildi:
+qidiruv maydoniga o'sha matn qayta yozilsa ro'yxat 90 ms dan keyin to'liq qayta chizilardi va bu
+sichqoncha bosilishi bilan qo'yib yuborilishi orasiga tushsa, qator belgisiga bosish yo'qolardi —
+endi faqat o'zgargan so'rov qayta chizadi. Shu yo'lda: tuzatishlar serverdan kech kelsa manba belgisi
+(U / С / П) ko'rinmasdi (v2.10.1). Keyin 5-bosqich kodini mustaqil ko'rib chiqish (har topilmani
+ikkinchi o'quvchi tekshirdi; 12 dan 11 tasi tasdiqlandi) — v2.10.2: server javob bermaganda arizadan
+chiqish uni yopib, faqat serverdagi holatni (belgilar, izohlar, hafta) yo'qotardi — endi yopilmaydi;
+«Отменить» bosishdan keyin yozilgan narxni ham qaytarardi — endi faqat o'sha bosish qo'ygan narx
+qaytadi; Ctrl+Enter справочник / UZEX oynasida «Похожие» qatorini (boshqa resurs narxini) olardi —
+endi olmaydi; Esc dan keyin resurs «проверено» bo'lib qolardi; «Наш ответ» uchun kech kelgan eksport
+boshqa arizaga o'qilardi; taqqoslashda «so'radikmi» jadvaldagidek aniq emas edi (katta miqdorda
+so'mdan kichik farq — so'rov); viloyat ko'chirilishi va narx saqlanishi bir paytga tushsa narx eski
+viloyatda qolishi mumkin edi. Har biriga (poyga holatlaridan tashqari) tuzatishsiz yiqiladigan test bor.
+
 Nega shu tartib: 1 — hujjat mijozga ketadi, undagi noto'g'ri jami eng qimmat
 xato; 2 — ma'lumot yo'qolishi qaytarilmaydi; 3 — begona fayl har kuni
 ochiladi; 4 — qolgan hamma ish yashil to'plamga tayanadi; 5–7 — qiymati

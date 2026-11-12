@@ -570,6 +570,18 @@ request va status-check talabi ataylab yoqilmagan: relizlar shu shoxga
 to'g'ridan-to'g'ri yoziladi. Qolgani (40 belgili xesh, PocketBase sha256,
 zaxira manzil) — kod, 6-bosqich bilan.
 
+Qisqa choralarning kod qismi yozildi (2026-11-12, 6-bosqich boshi, hali relizga chiqmagan):
+`laptop.ps1` va `install-windows.ps1` ro'yxatdan faqat to'liq 40 belgili xeshni oladi (qisqasi —
+reliz emas); ro'yxat shoxdan o'qilmasa `HEAD` dan o'qiladi (faqat shox o'qilmaganda, test rejimida
+emas); PocketBase arxivi ochishdan oldin sha256 bilan tekshiriladi — `laptop.ps1` (Windows ikki
+arxivi) va `get-pocketbase.sh` (Mac, Linux, Windows), xeshlar PocketBase e'lon qilgan
+`checksums.txt` dan, uchtasi arxivning o'zi bilan solishtirildi; xeshi noma'lum versiya rad etiladi
+(`PB_SHA256` bilan beriladi). Test: `test/update-channel.cjs` — pwsh siz, CI da ham (eski kodda 15
+tekshiruv yiqiladi). **Ochiq:** `laptop.ps1` o'zgarishlari bu muhitda pwsh ostida ishga
+tushirilmadi (o'rnatishga ruxsat yo'q edi) — reliz oldidan `test/laptop-windows.sh` ularni
+ishlatadi (`release.sh` usiz relizni rad etadi). To'liq reja (imzolangan ro'yxat, ZIP xeshi) —
+egasining kaliti kerak, hali qilinmadi.
+
 ### [x] C2–C5 Begona fayl va begona sahifa — [bugun]
 
 | № | Nima | Jiddiylik | Tuzatish | Hajm |
@@ -939,7 +951,7 @@ yuklash, tekshirish, har versiya o'z papkasida, ko'rsatkich sinovdan keyin
 o'zgaradi, `rollback`. C1 dagi yangi kanal bilan **birga** qilinadi (bir xil
 tekshiruv, ikki ishga tushirgich).
 
-### [ ] G2 Mac: nosozlik holatlari
+### [x] G2 Mac: nosozlik holatlari
 
 `server/laptop.sh` — **past–o'rta** · S (har biri)
 
@@ -947,6 +959,13 @@ tekshiruv, ikki ishga tushirgich).
 * `serve.log` har ishga tushishda boshidan yoziladi — oldingi qulash sababi
   yo'qoladi.
 * `serve` ostida port band bo'lsa, xabar «parol mos kelmayapti» deydi.
+
+**Bajarildi (2026-11-12, hali relizga chiqmagan):** `start` ostida server qulasa, ishga tushirgich uni
+qayta ko'taradi va aytadi (10 daqiqada 3 martadan ko'p qulasa — to'xtab, jurnal oxirini ko'rsatadi);
+oldingi ishga tushishning jurnali `serve.log.1` bo'lib qoladi; port boshqa dastur qo'lida bo'lsa —
+«port band» deydi, parol haqida emas (`serve` avval o'zi boshlamagan PocketBase'ni ham bo'shatadi);
+`stop_server` endi bir soniya emas, server haqiqatan to'xtaguncha kutadi. Test:
+`test/laptop-faults.sh` (eski kodda 4 ta tekshiruv yiqiladi).
 
 ### [ ] G3 Windows yangilanish mexanizmi — o'qib topilgan xavflar
 
@@ -1274,7 +1293,7 @@ tuzatiladi (2-tekshiruvdagi tartib).
 | 3 · v2.9.4 ✓ | Begona fayl va chetdagi holatlar | C2, C3, C4, C5, A5, A6, B2, B7 | 3–4 kun |
 | 4 ✓ | Testlar yashil va avtomatik | H1, H2, H3, H4 (qolganlari), F7 | 3 kun |
 | 5 · v2.10.0 ✓ | Qulaylik va QQS | E10–E12 (E12b — egasining qaroriga), E3–E9, E14–E20, F1–F6, A7, D1–D3, B8 qoldig'i | 5–6 kun, bo'lib-bo'lib |
-| 6 · v2.11.0 | Xavfsiz yangilanish, Mac o'zi yangilanadi | C1, G1, G2, G3 — shundan keyin repo yopiq bo'lishi mumkin | 5 kun |
+| 6 · v2.11.0 (boshlandi) | Xavfsiz yangilanish, Mac o'zi yangilanadi | C1 (qisqa choralar kodi ✓, to'liq reja — kalit kerak), G1, G2 ✓, G3 — shundan keyin repo yopiq bo'lishi mumkin | 5 kun |
 | 7 | Ikkinchi odam qo'shilishidan oldin | C6–C9, B3 (server), B9, F8, G4, I1 | 5 kun |
 
 **5-bosqichdan keyin (v2.10.1, v2.10.2).** CI da bir marta yiqilgan `e2e-uzex` ning sababi topildi:

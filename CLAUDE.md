@@ -42,6 +42,8 @@ server\laptop.cmd [autostart|status|backup|update|rollback|autoupdate|drive|stop
 irm https://raw.githubusercontent.com/1maxstar1/Ayubkhon_A/HEAD/server/install-windows.ps1 | iex   # Windows: bitta qator bilan o'rnatish/yangilash
 sh test/laptop-windows.sh                             # Windows ishga tushirgichi, pwsh ostida
 sh test/laptop-backup.sh; node test/backup-prune.cjs  # Mac ishga tushirgichi: zaxira, ikkinchi joy, tiklash; qaysi nusxalar saqlanadi
+sh test/laptop-faults.sh                              # Mac ishga tushirgichi nosozlikda: port band, oldingi jurnal, qulagan server qayta turadi
+node test/update-channel.cjs                          # yangilanish kanali (pwsh siz): faqat 40 belgili xesh, ro'yxat uchun zaxira manzil, PocketBase sha256
 node test/upload-fail.mjs; node test/two-tabs.mjs     # serverga yuklanmagan smeta «saqlangan» emas; bitta ariza ikki vkladkada
 node test/close-tab.mjs; node test/state-size.mjs    # yopilgan vkladkada oxirgi narx yo'qolmaydi; holat server cheklovidan oshmaydi
 sh test/pb-smoke.sh; node test/e2e-workspace.mjs      # server rejimi testlari

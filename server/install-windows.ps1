@@ -47,14 +47,19 @@
   # list has no release yet; a list that cannot be read stops everything.
   $url = 'https://github.com/1maxstar1/Ayubkhon_A/archive/refs/heads/claude/excel-price-validation-5ehbvb.zip'
   if (-not $env:TAQ_ZIP) {
+    # The branch's list first, then the list on whatever branch the repository opens on (the launcher's
+    # own fallback, fourth audit C1).
     $list = $null
-    for ($try = 0; $try -lt 3 -and $null -eq $list; $try++) {
-      try { $list = [string](Invoke-WebRequest -UseBasicParsing -TimeoutSec 30 -Uri 'https://raw.githubusercontent.com/1maxstar1/Ayubkhon_A/claude/excel-price-validation-5ehbvb/server/releases.txt').Content } catch { Start-Sleep -Seconds 3 }
+    $lists = @('https://raw.githubusercontent.com/1maxstar1/Ayubkhon_A/claude/excel-price-validation-5ehbvb/server/releases.txt',
+               'https://raw.githubusercontent.com/1maxstar1/Ayubkhon_A/HEAD/server/releases.txt')
+    for ($try = 0; $try -lt 4 -and $null -eq $list; $try++) {
+      try { $list = [string](Invoke-WebRequest -UseBasicParsing -TimeoutSec 30 -Uri $lists[$try % 2]).Content } catch { Start-Sleep -Seconds 3 }
     }
     if ($null -eq $list -or $list -notmatch 'releases') { throw "Relizlar ro'yxatini olib bo'lmadi - birozdan keyin qayta urinib ko'ring. Hech narsa o'zgartirilmadi." }
     $best = $null
     foreach ($line in ($list -split "`n")) {
-      $m = [regex]::Match($line, '^\s*v(\d+\.\d+\.\d+)\s+([0-9a-fA-F]{7,40})\b')
+      # a full 40-character commit only, as the launcher reads it
+      $m = [regex]::Match($line, '^\s*v(\d+\.\d+\.\d+)\s+([0-9a-fA-F]{40})\b')
       if ($m.Success -and (-not $best -or [version]$m.Groups[1].Value -gt $best.Num)) {
         $best = @{ Num = [version]$m.Groups[1].Value; Sha = $m.Groups[2].Value }
       }

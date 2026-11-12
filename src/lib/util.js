@@ -41,6 +41,17 @@ var S = (typeof S !== 'undefined' && S) || {};
   }
 
   /**
+   * Does `v` look like `base` with VAT on top (× 1,12)? Market prices are typed without VAT, and a price copied from
+   * an invoice carries it. To the tiyin under a gross price of 20; beyond that within 0,05 % of it, so a price
+   * rounded to whole sums is caught from 1 000 up. Only a hint for the expert: nothing is changed by it.
+   */
+  function looksGross(v, base) {
+    if (!(base > 0) || !(v > base)) return false;
+    var g = base * 1.12;
+    return Math.abs(v - g) <= Math.max(0.01, Math.min(0.5, g * 5e-4));
+  }
+
+  /**
    * A number as it is written in an estimate or typed into a price box; null when the text is not one.
    *
    * One comma or one point is the decimal mark, as it always was: «12,5» and «12.5», and «12,500» is twelve and
@@ -123,6 +134,7 @@ var S = (typeof S !== 'undefined' && S) || {};
 
   S.col = col; S.colIndex = colIndex; S.esc = esc;
   S.near = near; S.num = num;
+  S.vat = { RATE: 0.12, looksGross: looksGross };
   S.money = money; S.price = price; S.qty = qty; S.debounce = debounce;
 })(S);
 if (typeof self !== 'undefined') self.S = S;

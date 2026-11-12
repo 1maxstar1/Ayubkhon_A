@@ -14,8 +14,8 @@
     { k: 'unit', w: 70, cls: 'mid', h: 'Ед. изм.' },
     { k: 'count', w: 54, cls: 'num', h: 'Повторов' },
     { k: 'qty', w: 100, cls: 'num', h: 'Общее кол-во' },
-    { k: 'price', w: 126, cls: 'num', h: 'Цена по смете' },
-    { k: 'market', w: 126, cls: 'num', h: 'Рыночная цена' },
+    { k: 'price', w: 126, cls: 'num', h: 'Цена по смете', sub: 'без НДС' },
+    { k: 'market', w: 126, cls: 'num', h: 'Рыночная цена', sub: 'без НДС' },
     { k: 'delta', w: 88, cls: 'num', h: 'Разница, %' },
     { k: 'econ', w: 138, cls: 'num', h: 'Разница, сум' }
   ];
@@ -64,7 +64,8 @@
       render: this.renderRange.bind(this)
     });
     this.head.innerHTML = COLS.map(function (c) {
-      return '<div class="c' + (c.cls ? ' ' + c.cls : '') + '" style="' + width(c) + '">' + S.esc(c.h) + '</div>';
+      return '<div class="c' + (c.cls ? ' ' + c.cls : '') + '" style="' + width(c) + '"' + (c.sub ? ' title="Цена без НДС, сум"' : '') + '>' +
+        S.headText(c) + '</div>';
     }).join('');
     this.bind();
   }
@@ -91,7 +92,7 @@
       var inp = e.target;
       if (!inp.classList || !inp.classList.contains('pin')) return;
       var rec = self.byKey(inp.dataset.key);
-      if (rec) inp.value = fmtIn(rec.market);
+      if (rec) { inp.value = fmtIn(rec.market); inp.dataset.was = String(rec.market); }
       inp.select();
     });
     scroll.addEventListener('focusout', function (e) {
@@ -130,15 +131,29 @@
     document.getElementById('filter').addEventListener('change', function () { self.apply(); });
     document.getElementById('sort').addEventListener('change', function () { self.apply(); });
 
+    // A percentage of the estimate's price, on every resource shown — but never over a price the expert has set
+    // (typed, pasted, applied from a suggestion, a book, «Наш ответ»): the expert's price stands (App.ownPrice).
+    // Rounded to the tiyin, and a price that would become 0 is left as it is.
     document.getElementById('pctBtn').addEventListener('click', function () {
-      var raw = prompt('Применить процент к ' + self.view.length +
-        ' видимым ресурсам?\nНапример: -10  (на 10% ниже сметной цены)', '-10');
+      var own = self.view.filter(function (r) { return self.app.ownPrice(r); }).length;
+      var raw = prompt('Применить процент к ' + self.view.length + ' видимым ресурсам?\nНапример: -10  (на 10% ниже сметной цены)' +
+        (own ? '\n\nЦены, изменённые вручную или применённые из подсказок, не изменятся: ' + own + '.' : ''), '-10');
       if (raw == null) return;
-      var pct = S.num(raw);
+      var pct = S.num(String(raw).replace(/%\s*$/, ''));
       if (pct == null) { self.app.toast('Процент введён неверно', true); return; }
-      var map = {};
-      self.view.forEach(function (r) { map[r.key] = Math.round(r.price * (1 + pct / 100)); });
-      self.app.bulkPrices(map, 'Цены ' + self.view.length + ' ресурсов изменены на ' + pct + '%');
+      var map = {}, n = 0, zero = 0;
+      self.view.forEach(function (r) {
+        if (!(r.price > 0) || self.app.ownPrice(r)) return;
+        // the product in hundredths first: 31 × 90 / 100 is 27,9 exactly, without a binary tail
+        var v = Math.round(r.price * (100 + pct)) / 100;
+        if (!(v > 0)) { zero++; return; }
+        n++;
+        if (!S.near(v, r.market)) map[r.key] = v;
+      });
+      var why = (own ? ' · пропущено изменённых вручную: ' + own : '') + (zero ? ' · цена стала бы 0 — не изменено: ' + zero : '');
+      if (!Object.keys(map).length) { self.app.toast('Нечего менять' + why); return; }
+      self.app.bulkPrices(map, 'Цены ' + n + ' ресурсов изменены на ' + pct + '%' + why);
+      Object.keys(map).forEach(function (k) { self.app.pct[k] = 1; });
     });
 
     // The button says «показанные» and means it: every resource on the list as it is filtered now. With the

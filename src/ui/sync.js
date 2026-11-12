@@ -139,7 +139,7 @@
       this.savedOnOpen = w.updated || '';      // the server's own clock: corrections are compared with it
       this.corrReady = false; this.merged = false;
       var app = A();
-      app.projects = []; app.prices = {}; app.looseBook = null; app.spareBook = null; app.queue = [];
+      app.projects = []; app.prices = {}; app.pct = {}; app.looseBook = null; app.spareBook = null; app.queue = [];
       this.refused = ''; this.cutSaid = 0;
       app.rebuild(); app.renderSide();
       this.renderBox();
@@ -288,6 +288,8 @@
       if (saved && Object.keys(saved).length) {
         var r = (st.keys === KEYS && st.prices2) ? { map: saved, moved: 0 } : this.reindex(saved);
         app.setPrices(r.map);
+        // the prices «Применить %» set stay free for the next percentage; any other price is the expert's
+        if (st.keys === KEYS && st.prices2 && Array.isArray(st.pct)) st.pct.forEach(function (k) { if (r.map[k] != null) app.pct[k] = 1; });
         if (r.moved) { this.dirty = true; app.toast('Цены перенесены на обновлённые названия ресурсов: ' + r.moved); }
       }
       this.indexCorr();
@@ -625,6 +627,7 @@
         files: this.files,
         prices: this.downgrade(prices),       // readable by the previous version
         prices2: prices,
+        pct: Object.keys(prices).filter(function (k) { return app.pct && app.pct[k]; }),
         looseBook: app.looseBook || null,
         book: app.spareBook || null,
         compare: { old: this.cmp.old || null, new: this.cmp.new || null, reply: this.cmp.reply || null, base: this.cmp.base || '' },
@@ -1046,7 +1049,7 @@
         self.thaw();
         S.hashSet('ws', '');
         self.loading = true;
-        app.projects = []; app.prices = {}; app.looseBook = null; app.spareBook = null; app.queue = [];
+        app.projects = []; app.prices = {}; app.pct = {}; app.looseBook = null; app.spareBook = null; app.queue = [];
         app.resetOpts();
         $('reportMode').value = 'changed';
         app.rebuild(); app.renderSide();

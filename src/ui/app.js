@@ -23,6 +23,7 @@
     this.projects = [];
     this.model = null;
     this.prices = {};        // resource key -> market unit price
+    this.pct = {};           // resource key -> 1 when its price was set by «Применить %» (and may be set by it again)
     this.spareBook = null;   // price-book lines for a resource key no estimate has yet; see loadPriceBook()
     this.opts = Object.assign({}, DEFAULTS, loadOpts());
     this.seq = 0;
@@ -188,7 +189,29 @@
       // a lone comma before three digits is a decimal mark; next to an estimate price a hundred times larger, thousands were probably meant
       this.toast('«' + raw + '» прочитано как ' + S.price(t.v) + ' (запятая — десятичный знак). Если это ' +
         raw.replace(',', ' ') + ', введите без запятой.', true);
+    } else if (t.kind === 'ok' && !S.near(t.v, +inp.dataset.was) && S.near(this.prices[inp.dataset.key], t.v) && S.vat.looksGross(t.v, smeta)) {
+      // the price just typed is the estimate's × 1,12: most likely copied with VAT. Said, with the way back —
+      // which puts the estimate's own price, exactly, and only if nothing has been typed over it since.
+      var key = inp.dataset.key, self = this, gross = t.v;
+      this.toast('Похоже на цену с НДС: ' + S.price(gross) + ' = цена по смете × 1,12. Рыночная цена вводится без НДС.', false, {
+        action: { label: '÷ 1,12', fn: function () {
+          if (!S.near(self.prices[key], gross)) { self.toast('Цена уже изменена — ничего не сделано'); return; }
+          self.setPrice(key, smeta);
+          self.prices_ui.list.refresh();
+          self.sheetList.refresh();
+        } }
+      });
     }
+  };
+
+  /**
+   * Has the expert set this resource's price — typed it, pasted it, applied it from a suggestion, a book or a reply?
+   * Then «Применить %» leaves it alone. What it does not count: the estimate's own price, and a price an earlier
+   * «Применить %» set (app.pct). Every other way of setting a price clears that mark, so a way of setting one that is
+   * added later is the expert's too: the safe side.
+   */
+  App.prototype.ownPrice = function (r) {
+    return !S.near(r.market, r.price) && !this.pct[r.key];
   };
 
   /**
@@ -218,7 +241,7 @@
       var inp = e.target;
       if (!inp.classList || !inp.classList.contains('pin')) return;
       var row = self.rowByKeyFirst(inp.dataset.key);
-      if (row) inp.value = inVal(row.market);
+      if (row) { inp.value = inVal(row.market); inp.dataset.was = String(row.market); }
       inp.select();
     });
     scroll.addEventListener('focusout', function (e) {
@@ -694,12 +717,13 @@
 
   App.prototype.setPrice = function (key, value) {
     this.prices[key] = value;
+    delete this.pct[key];
     this.applyOne(key, value);
   };
 
   App.prototype.setPrices = function (map) {
     var self = this;
-    Object.keys(map).forEach(function (k) { self.prices[k] = map[k]; });
+    Object.keys(map).forEach(function (k) { self.prices[k] = map[k]; delete self.pct[k]; });
     if (this.model) S.applyPrices(this.model, this.prices);
     this.prices_ui.apply();
     this.ledger();
@@ -721,7 +745,7 @@
     var self = this, keys = Object.keys(map), before = {};
     keys.forEach(function (k) {
       var had = self.prices[k] != null;
-      before[k] = { had: had, v: self.prices[k], src: had && S.sourceOfPrice ? S.sourceOfPrice(k, self.prices[k]) : '' };
+      before[k] = { had: had, v: self.prices[k], pct: !!self.pct[k], src: had && S.sourceOfPrice ? S.sourceOfPrice(k, self.prices[k]) : '' };
     });
     if (prepare) prepare();
     this.setPrices(map);
@@ -741,8 +765,9 @@
       if (b.had && b.src && S.markSource) S.markSource(k, b.v, b.src);
     });
     this.setPrices(back);
-    // a resource that had no price of its own has none again, not its smeta price written out
-    keys.forEach(function (k) { if (!before[k].had) delete self.prices[k]; });
+    // a resource that had no price of its own has none again, not its smeta price written out; a price «Применить %»
+    // had set is that again — free for the next percentage, not the expert's
+    keys.forEach(function (k) { if (!before[k].had) delete self.prices[k]; else if (before[k].pct) self.pct[k] = 1; });
     this.toast('Возвращено как было: ' + keys.length + ' цен');
   };
 
@@ -820,9 +845,9 @@
     { w: 0, h: 'НАИМЕНОВАНИЕ' },
     { w: 74, cls: 'mid', h: 'ЕД.ИЗМ.' },
     { w: 96, cls: 'num', h: 'КОЛ-ВО' },
-    { w: 106, cls: 'num', h: 'Цена по смете' },
+    { w: 106, cls: 'num', h: 'Цена по смете', sub: 'без НДС' },
     { w: 128, cls: 'num', h: 'Сумма по смете' },
-    { w: 106, cls: 'num', h: 'Рыночная цена' },
+    { w: 106, cls: 'num', h: 'Рыночная цена', sub: 'без НДС' },
     { w: 128, cls: 'num', h: 'Рыночная сумма' },
     { w: 118, cls: 'num', h: 'Разница' }
   ];
@@ -862,8 +887,8 @@
     if (!this._sheetHead) {
       document.getElementById('sheetHead').innerHTML = [IDX_COL].concat(SHEET_COLS).map(function (c) {
         return '<div class="c' + (c.cls ? ' ' + c.cls : '') + '" style="' + w(c) +
-          '"' + (c === IDX_COL ? ' title="Столбец A «Лист1» — сквозной номер строки"' : '') + '>' +
-          S.esc(c.h) + '</div>';
+          '"' + (c === IDX_COL ? ' title="Столбец A «Лист1» — сквозной номер строки"' : c.sub ? ' title="Цена без НДС, сум"' : '') + '>' +
+          S.headText(c) + '</div>';
       }).join('');
       this._sheetHead = true;
     }
@@ -1012,7 +1037,7 @@
   App.prototype.renderReport = function (from, to) {
     if (!this._repHead) {
       document.getElementById('reportHead').innerHTML = SHEET_COLS.map(function (c) {
-        return '<div class="c' + (c.cls ? ' ' + c.cls : '') + '" style="' + w(c) + '">' + S.esc(c.h) + '</div>';
+        return '<div class="c' + (c.cls ? ' ' + c.cls : '') + '" style="' + w(c) + '"' + (c.sub ? ' title="Цена без НДС, сум"' : '') + '>' + S.headText(c) + '</div>';
       }).join('');
       this._repHead = true;
     }

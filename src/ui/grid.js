@@ -91,4 +91,11 @@
   function cssEscape(s) { return String(s).replace(/["\\]/g, '\\$&'); }
 
   S.VList = VList;
+  /**
+   * A column heading, with a second, smaller line when the column has one («без НДС» under the price headings: the
+   * prices on screen are without VAT, and the screen says so). Both lines in one span, so the cell lays out as before.
+   */
+  S.headText = function (c) {
+    return c.sub ? '<span class="th2">' + S.esc(c.h) + '<small>' + S.esc(c.sub) + '</small></span>' : S.esc(c.h);
+  };
 })(S);

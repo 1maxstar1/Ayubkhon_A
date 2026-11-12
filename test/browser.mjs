@@ -57,6 +57,9 @@ check(stats.resources > 0 && stats.items >= stats.resources, `${stats.items} lin
 check(await page.evaluate(() => !document.getElementById('export').disabled), '«Скачать Excel» is offered');
 check(await page.evaluate(() => app.model.resources.every((r) => r.market === r.price)), 'before anything is typed every resource stands at its estimate price');
 await page.screenshot({ path: join(root, 'test/shot-prices.png') });
+// prices on screen are without VAT, and the screen says so — in the price headings only (E10)
+check(await page.evaluate(() => (document.getElementById('priceHead').textContent.match(/без НДС/g) || []).length) === 2,
+  'the price list says «без НДС» under its two price headings');
 
 /* a price, typed into the box of the first priced resource — whatever the estimate calls it */
 const res = await page.evaluate(() => {
@@ -71,6 +74,25 @@ await page.waitForFunction((a) => app.prices_ui.view.length < a.all && !!documen
 const box = page.locator('#priceScroll .pin[data-key="' + res.key.replace(/(["\\])/g, '\\$1') + '"]');
 const shownOf = await page.evaluate(() => app.prices_ui.view.length);
 check(shownOf >= 1 && shownOf < stats.resources, `the search narrows the list to the resource (${shownOf} of ${stats.resources})`);
+// a price typed as the estimate's × 1,12 is most likely one with VAT: said, with «÷ 1,12» to put the estimate's back (E11)
+const vatToast = () => page.evaluate(() => [...document.querySelectorAll('#toast .toast-item')].filter((t) => /с НДС/.test(t.textContent))
+  .map((t) => ({ text: t.textContent, act: (t.querySelector('.toast-act') || {}).textContent || '' })));
+await box.click();
+await box.fill(String(Math.round(res.price * 1.12 * 100) / 100).replace('.', ','));
+await box.press('Tab');
+await page.waitForTimeout(300);
+const said = await vatToast();
+check(said.length === 1 && said[0].act === '÷ 1,12', `a price of the estimate's × 1,12 is said to look like one with VAT, with «÷ 1,12» (${(said[0] || {}).text || 'nothing said'})`);
+await page.click('#toast .toast-item .toast-act');
+await page.waitForTimeout(200);
+check(await page.evaluate((k) => { const r = app.model.resources.find((x) => x.key === k);
+  return r.market === r.price && app.model.rows.filter((x) => x.kind === 'item' && x.key === k).every((x) => x.market === r.price) &&
+    app.model.resources.every((x) => x.market === x.price); }, res.key), '«÷ 1,12» puts the estimate\'s own price back on every line, and nothing else changes');
+await page.evaluate(() => document.querySelectorAll('#toast .toast-item .toast-x, #toast .toast-item .x').forEach((b) => b.click()));
+await box.click();
+await box.press('Tab');
+await page.waitForTimeout(200);
+check((await vatToast()).length === 0, 'entering and leaving the box without typing says nothing');
 await box.click();
 await box.fill(String(typed).replace('.', ','));
 await box.press('Tab');
@@ -148,6 +170,34 @@ const onTable = table.rows.some((row) => {
 check(wb.sheets.length < 2 || onTable, `the comparison table («${table.name}», ${table.rows.length} rows) has that line`);
 check(cells.some((c) => c.f && /^\+?[A-Z]+\d+[*-]/.test(String(c.f).replace(/^=/, ''))) && cells.some((c) => c.f && /SUM\(/i.test(c.f)),
   'and its sums are formulas, not numbers');
+
+/* «Применить %» (A7): every price shown moves to the estimate's ± the percentage, to the tiyin — but never one the expert set */
+await page.click('.tab[data-pane="prices"]');
+await page.fill('#q', '');
+await page.selectOption('#filter', 'all');
+await page.waitForFunction((n) => app.prices_ui.view.length === n, stats.resources, { timeout: 10 * 1000 }).catch(() => { /* said by the check */ });
+const pctPress = async (val) => { page.once('dialog', (d) => d.accept(val)); await page.click('#pctBtn'); await page.waitForTimeout(300); };
+const lastToast = async () => page.evaluate(() => { const t = [...document.querySelectorAll('#toast .toast-item')].pop(); return t ? t.textContent : ''; });
+await pctPress('-10');
+const pctState = (p) => page.evaluate(([k, p]) => {
+  const off = app.model.resources.filter((r) => r.key !== k && r.price > 0 && Math.abs(r.market - Math.round(r.price * (100 + p)) / 100) > 1e-9);
+  const typedR = app.model.resources.find((r) => r.key === k);
+  return { typed: typedR.market, off: off.length, first: off.slice(0, 2).map((r) => r.name + ' ' + r.price + ' → ' + r.market) };
+}, [res.key, p]);
+let ps = await pctState(-10);
+check(Math.abs(ps.typed - typed) < 1e-9, `«Применить %» leaves the typed price alone (${ps.typed})`);
+check(ps.off === 0, 'every other price is the estimate\'s less 10 %, to the tiyin' + (ps.off ? ' — not ' + ps.first.join('; ') : ''));
+check(/пропущено изменённых вручную: 1/.test(await lastToast()), 'and the message says one typed price was skipped');
+await pctPress('-100');
+check(/цена стала бы 0/.test(await lastToast()) && (await pctState(-10)).off === 0, 'a percentage that would make prices 0 changes none of them, and says so');
+page.once('dialog', (d) => d.accept());
+await page.click('#resetBtn');
+await page.waitForTimeout(300);
+await page.evaluate(() => { const b = [...document.querySelectorAll('#toast .toast-act')].pop(); if (b) b.click(); });
+await page.waitForTimeout(300);
+await pctPress('-20');
+ps = await pctState(-20);
+check(Math.abs(ps.typed - typed) < 1e-9 && ps.off === 0, 'after «Сбросить» and «Отменить» the percentage prices are free for the next percentage, the typed one still is not');
 
 writeFileSync(join(root, 'test/browser-errors.txt'), errors.join('\n'));
 check(errors.length === 0, errors.length ? 'page errors:\n' + errors.slice(0, 12).join('\n') : 'no page errors');

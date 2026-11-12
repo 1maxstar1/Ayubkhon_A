@@ -217,7 +217,7 @@ marta aytiladi: nechta qator, birinchisining raqami, nomi, smetadagi summa va
 miqdor × narx. Hisoblash qoidasi o'zgarmadi. Alohida «Проверка» ro'yxati
 qilinmadi — 5-bosqichda (UX) ko'riladi.
 
-### [?] A7 «Применить %»: yaxlitlash va yozilgan narxlar
+### [x] A7 «Применить %»: yaxlitlash va yozilgan narxlar
 
 `src/ui/prices.js:136-142` — **o'rta** · S
 
@@ -229,6 +229,16 @@ yozgan narx doim ustun» qoidasining ruhiga zid.
 Reja: (1) ikki xonagacha yaxlitlash, natija 0 bo'lsa tegmaslik; (2) → egasining
 qarori 2: qo'lda yozilganlarni o'tkazib yuborish va nechta o'tkazilganini
 aytish.
+
+**Bajarildi — 5-bosqich (v2.10.0).** Foiz tiyingacha yaxlitlanadi (`31 × 90 / 100 =
+27,9`), 0 bo'lib qoladigan narxga tegilmaydi. Dastur «qo'lda yozilgan»ni taxmin
+qilmaydi — aksincha, faqat **foizning o'zi qo'ygan** narxni biladi (`app.pct`):
+boshqa har qanday yo'l bilan qo'yilgan narx (yozilgan, joylashtirilgan, taklifdan,
+kitobdan, «Наш ответ» dan, eski holatdan) ekspertniki hisoblanadi va foiz unga
+tegmaydi — keyin qo'shiladigan yangi yo'l ham xavfsiz tomonda bo'ladi. So'rov oynasi
+va xabar nechta narx o'tkazilganini aytadi; «Отменить» foiz belgilarini ham
+qaytaradi; server rejimida belgilar ish maydoni bilan saqlanadi (`state.pct`).
+Testlar: `test/browser.mjs`, `test/price-book.mjs`, `test/e2e-workspace.mjs`.
 
 ### [x] A8 Hamma o'zgarish chegaradan past bo'lsa, hisobot varag'i jimgina bo'sh
 
@@ -697,10 +707,10 @@ keyin bu muhim: mijoz narxlar **QQSsiz** bo'lishini talab qilgan.
 
 | № | Taklif | Hajm |
 |---|---|---|
-| E10 | Ustun sarlavhalari: «Цена по смете, без НДС», «Рыночная цена, без НДС» (faqat ekran) | S |
-| E11 | Qo'lda yozilgan narx smeta narxidan roppa-rosa ×1,12 bo'lsa — yumshoq ogohlantirish «похоже на цену с НДС» va «÷ 1,12» tugmasi | S |
+| E10 ✓ | Ustun sarlavhalari: «Цена по смете, без НДС», «Рыночная цена, без НДС» (faqat ekran). **Bajarildi (v2.10.0):** «Цены», «Сводная таблица» va hisobot ko'rinishida narx sarlavhalari ostida kichik «без НДС»; eksport o'zgarmadi (E13) | S |
+| E11 ✓ | Qo'lda yozilgan narx smeta narxidan roppa-rosa ×1,12 bo'lsa — yumshoq ogohlantirish «похоже на цену с НДС» va «÷ 1,12» tugmasi. **Bajarildi (v2.10.0):** `S.vat.looksGross`; tugma smeta narxini aynan qo'yadi va faqat narx o'shandan beri o'zgarmagan bo'lsa; test — `test/num.cjs`, `test/browser.mjs` | S |
 | E12 | «Прежние проекты» va справочник oynasida QQS holati (справочник uchun `src/lib/refs` ko'rinishiga tegadi — parity o'lchovi bilan) | M |
-| E13 | Eksport hujjatida QQS haqida satr — `321.xlsx` ko'rinishiga bog'liq → egasining qarori 1 | S |
+| E13 ✓ | Eksport hujjatida QQS haqida satr — `321.xlsx` ko'rinishiga bog'liq → egasining qarori 1. **Hal bo'ldi: qo'shilmaydi** — hujjat o'zgarmaydi | S |
 
 ### Yaxshilashlar
 

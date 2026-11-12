@@ -273,7 +273,7 @@ check((await count('corrections')) === 0, 'resetting the price removes the corre
 // A resource priced at zero in the estimate stays at zero — ten per cent off
 // nothing is nothing — so it is not a change and gets no correction.
 const all = await page.evaluate(() =>
-  app.model.resources.filter((r) => !S.near(r.price, Math.round(r.price * 0.9))).length);
+  app.model.resources.filter((r) => r.price > 0 && !S.near(r.price, Math.round(r.price * 90) / 100)).length);
 corrWrites = 0;
 page.once('dialog', (d) => d.accept('-10'));
 await page.click('#pctBtn');
@@ -282,7 +282,12 @@ await page.evaluate(() => S.Sync.q);
 check((await count('corrections')) === all, `every resource the percentage moved is recorded (${await count('corrections')} of ${all})`);
 check(corrWrites === Math.ceil(all / 1000), `in ${corrWrites} request(s), not ${all}`);
 const pct = (await api(`/api/collections/corrections/records?perPage=1&filter=${encodeURIComponent(`res_key='${first.key}'`)}`, {}, su)).items[0];
-check(pct && Math.abs(pct.market_price - Math.round(first.price * 0.9)) <= 1, 'and the price stored is the one applied');
+check(pct && Math.abs(pct.market_price - Math.round(first.price * 90) / 100) <= 1, 'and the price stored is the one applied');
+// the prices the percentage set are saved as its own: after a reload the next percentage may set them again (A7)
+await page.waitForFunction(() => document.getElementById('wsSave').textContent === '✓' && !S.Sync.dirty, null, { timeout: 20 * 1000 });
+const wPct = (await api('/api/collections/workspaces/records?perPage=1', {}, su)).items[0];
+check(Array.isArray(wPct.state.pct) && wPct.state.pct.includes(first.key) && wPct.state.pct.length === all,
+  `the saved state names the prices the percentage set (${(wPct.state.pct || []).length} of ${all})`);
 
 // «Сбросить» puts every resource back on its own estimate price, which means
 // removing every correction — in as few requests as the writes took, and cut
@@ -308,7 +313,7 @@ await page.click('.toast-act');
 await page.evaluate(() => S.Sync.flush());
 await page.evaluate(() => S.Sync.q);
 check((await count('corrections')) === all, `«Отменить» brings every price back, corrections with them (${await count('corrections')} of ${all})`);
-check(await page.evaluate((k) => { const r = app.model.resources.find((x) => x.key === k); return Math.abs(r.market - Math.round(r.price * 0.9)) <= 1; }, first.key),
+check(await page.evaluate((k) => { const r = app.model.resources.find((x) => x.key === k); return Math.abs(r.market - Math.round(r.price * 90) / 100) <= 1; }, first.key),
   'at the prices they had');
 page.once('dialog', (d) => d.accept());
 await page.click('#resetBtn');

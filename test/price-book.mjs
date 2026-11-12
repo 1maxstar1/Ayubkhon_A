@@ -103,6 +103,19 @@ check(now.some((r) => r.name === pick.twin[0].name && r.price === pick.twin[0].p
   !now.some((r) => r.name === pick.twin[1].name && r.price === pick.twin[1].price),
   'the line of the resource at two prices lands on its own estimate price, and not on the other');
 
+// «Применить %» leaves the book's prices alone: they are the expert's, not the estimate's (A7)
+p2.once('dialog', (d) => d.accept('-10'));
+await p2.click('#pctBtn');
+await p2.waitForTimeout(300);
+const afterPct = await p2.evaluate((names) => {
+  const rs = app.model.resources;
+  const book = rs.filter((r) => names.includes(r.name) && !S.near(r.price, r.market) && !S.near(r.market, Math.round(r.price * 90) / 100));
+  const off = rs.filter((r) => r.price > 0 && !book.includes(r) && !S.near(r.market, Math.round(r.price * 90) / 100));
+  return { book: book.length, off: off.length };
+}, [pick.single[0].name, pick.single[1].name, pick.twin[0].name]);
+check(afterPct.book === 3 && afterPct.off === 0 && /пропущено изменённых вручную: 3/.test(await toast(p2)),
+  `«Применить %» moves every other price and leaves the three from the book (${afterPct.book} kept, ${afterPct.off} off)`);
+
 /* a line without an estimate price prices every variant of the name */
 const OLD = join(dir, 'old-book.json');
 writeFileSync(OLD, JSON.stringify([{ name: pick.twin[0].name, unit: pick.twin[0].unit, price: 999 }]));

@@ -50,5 +50,12 @@ const calm = S.assemble([{ id: 'p', name: 'Тест', title: 'ТЕСТ', objects
   ['ТЕСТОВАЯ СТРОЙКА'], ['ТЕСТОВАЯ УЛИЦА'], [], ['СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'], [1, 'ЩЕБЕНЬ ТЕСТОВЫЙ', 'М3', 4, 17, 68], [2, 'ПЕСОК ТЕСТОВЫЙ', 'М3', 2, 7, 14]])] }, 'b.xlsx') }], {});
 check(calm.oddSums.count === 0, 'an estimate whose arithmetic holds has none');
 
+/* a price that looks like the estimate's price with VAT on top (E11): only a hint, never a change */
+const gross = [[13827.15, 12345.67], [13827, 12345.67], [1120, 1000], [5.6, 5], [0.41, 0.37]];
+const net = [[1121, 1000], [1000, 1000], [6, 5], [0, 0], [1120, null], [900, 1000], [510, 455]];
+const vatBad = gross.filter(([v, b]) => !(S.vat && S.vat.looksGross(v, b))).concat(net.filter(([v, b]) => !S.vat || S.vat.looksGross(v, b)));
+check(!vatBad.length, '× 1,12 of the estimate price is taken for a price with VAT, and nothing else is' +
+  (vatBad.length ? ' — wrong for ' + vatBad.map((p) => p.join(' / ')).join('; ') : ''));
+
 console.log(fail ? '\nFAILED: ' + fail : '\nall passed');
 process.exit(fail ? 1 : 0);

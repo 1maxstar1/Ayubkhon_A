@@ -135,6 +135,15 @@
     for: function (mk) { return this.map[mk] || []; },
     /** Close-but-not-equal names, best first. */
     similar: function (mk) { return this.sim[mk] || []; },
+    /** The suggestion of this id, wherever it is held — for the «П» badge of an applied price (E16). */
+    byId: function (id) {
+      var all = [this.map, this.sim];
+      for (var a = 0; a < all.length; a++) for (var k in all[a]) {
+        var l = all[a][k] || [];
+        for (var i = 0; i < l.length; i++) if (l[i] && l[i].id === id) return l[i];
+      }
+      return null;
+    },
     has: function (mk) { return !!(this.map[mk] && this.map[mk].length); },
     any: function (mk) { return this.for(mk).length + this.similar(mk).length > 0; },
     /* The same two questions asked with a resource row in hand. */

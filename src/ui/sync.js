@@ -685,6 +685,8 @@
           self.dirty = true;
           self.mark('!');
           clearTimeout(self.t);
+          // no server at all: said once, in a bar that stays; the probe saves when it is back (E20)
+          if (self.isNet(e)) { self.down(); return; }
           if (e && (e.status === 400 || e.status === 413)) {
             // The server has read the state and will not take it; the same state would be refused the same way.
             // It used to be sent again every fifteen seconds for as long as the page stayed open. Nothing is
@@ -940,6 +942,7 @@
         part.del.forEach(function (k) { if (self.pend[k] === undefined) self.pend[k] = waiting[k]; });
         clearTimeout(self.ct);
         self.ct = setTimeout(function () { self.flush(); }, RETRY_MS);
+        if (self.isNet(e)) { self.down(); return; }
         app.toast('Правки не сохранены (' + (part.set.length + part.del.length) + '): ' +
           S.pbErr(e) + ' — повтор через ' + (RETRY_MS / 1000) + ' секунд', true);
       });
@@ -988,14 +991,60 @@
     },
 
     /* ----------------------------------------------------------- header */
+    /* -------------------------------------------------------- no server (E20) */
+    /** A request that did not reach the server at all (not one it answered, not one the page called off). */
+    isNet: function (e) { return !!e && e.status === 0 && !e.isAbort && !this.leaving; },
+    /**
+     * The server does not answer: said once, in a bar that stays (not a toast for every failed save), with what to
+     * do — on the laptop, how to start it again. Asked every five seconds; when it answers, everything waiting goes.
+     */
+    down: function () {
+      var self = this;
+      if (!this.offline) {
+        this.offline = true;
+        var local = (S.Auth && S.Auth.laptop) || /^(localhost|127\.\d+\.\d+\.\d+|\[::1\])$/.test(location.hostname);
+        var bar = $('srvDown');
+        if (!bar) { bar = document.createElement('div'); bar.id = 'srvDown'; bar.className = 'srvdown'; document.body.appendChild(bar); }
+        bar.innerHTML = local
+          ? '<b>Сервер программы на этом компьютере не отвечает.</b> Запустите его снова: Windows — <code>C:\\Smeta\\server\\laptop.cmd</code> ' +
+            '(если включён автозапуск — перезагрузите компьютер), Mac — <code>sh server/laptop.sh</code>. Введённые цены сохраняются в этом ' +
+            'браузере и уйдут на сервер, как только он заработает. Не закрывайте и не обновляйте страницу: без сервера она не откроется.'
+          : '<b>Нет связи с сервером</b> — проверьте сеть. Введённые цены сохраняются в этом браузере и уйдут на сервер, как только связь вернётся.';
+        bar.hidden = false;
+        this.mark('⚠');
+      }
+      if (this.probe) return;
+      this.probe = setInterval(function () {
+        S.pb.health.check({ requestKey: null }).then(function () { self.up(); }, function () { /* still down */ });
+      }, 5000);
+    },
+    up: function () {
+      if (!this.offline) return;
+      clearInterval(this.probe); this.probe = null;
+      this.offline = false;
+      var bar = $('srvDown');
+      if (bar) bar.hidden = true;
+      if (!this.ws) return;
+      var self = this;
+      this.flush();
+      if (this.dirty) this.saveNow().catch(function () { /* said by saveNow */ });
+      else this.mark('✓');
+      if (this.retryUploads) this.retryUploads();
+      A().toast('Связь с сервером восстановлена — изменения сохраняются');
+      if (S.Hints && S.Hints.loadSoon) S.Hints.loadSoon();
+      void self;
+    },
+
     mark: function (s) {
       var el = $('wsSave');
+      if (this.offline && s === '✓') s = '⚠';
       // «saved» is not said while an estimate on screen has no file on the server
       var held = s === '✓' && this.hasUnsaved();
       if (held) s = '!';
       if (el) {
         el.textContent = s;
-        el.title = held ? 'Есть сметы, не сохранённые на сервере' : s === '●' ? 'Сохранение…' : s === '✓' ? 'Сохранено' : 'Ошибка сохранения';
+        el.title = held ? 'Есть сметы, не сохранённые на сервере' : s === '●' ? 'Сохранение…' : s === '✓' ? 'Сохранено' :
+          s === '⚠' ? 'Нет связи с сервером' : 'Ошибка сохранения';
       }
     },
     renderBox: function () {
@@ -1091,6 +1140,18 @@
     return c && c.source && c.source !== 'typed' && S.near(c.market, value) ? c.source : '';
   };
   S.priceSource = function (key, value) { return Sync.priceSource(key, value); };
+  /**
+   * Where the price on screen of resource `r` was applied from — 'ref:…', 'hint:…', 'uzex:…' — or '' when it was
+   * typed, or is the estimate's own. The mark of this session first; while a newer change is on its way to the server,
+   * nothing; else the correction stored. (E16: the badge of the «Рыночная цена» cell.)
+   */
+  S.appliedSource = function (r) {
+    if (!Sync.ws || !r || S.near(r.market, r.price)) return '';
+    var m = Sync.priceSource(r.key, r.market);
+    if (m) return m.source === 'typed' ? '' : (m.source || '');
+    if (Sync.pend && Sync.pend[r.key] !== undefined) return '';
+    return S.sourceOfPrice(r.key, r.market);
+  };
   document.addEventListener('DOMContentLoaded', function () { Sync.init(); });
   if (document.readyState !== 'loading') Sync.init();
 })(S);

@@ -190,6 +190,13 @@ function finish() {
     S.uzex.parseSource('ref:fake-1:3') === null && S.uzex.parseSource('uzex:x:1') === null, 'and reads back; anything else is not a UZEX source');
   check(S.uzex.period('2031-03-10', '2031-03-14') === '10.03–14.03.2031' && S.uzex.period('2030-12-29', '2031-01-02') === '29.12.2030–02.01.2031', 'periods in words');
 
+  // the week of an application's date (F5): the newest begun on that day or before
+  const weeks = [{ import_id: 304, period_from: '2031-03-10' }, { import_id: 300, period_from: '2031-03-03' }, { import_id: 290, period_from: '2031-02-17' }];
+  const wf = (d) => { const w = S.uzex.weekFor(weeks, d); return w ? w.import_id : null; };
+  check(wf('2031-03-05') === 300 && wf('2031-03-08') === 300 && wf('2031-03-10') === 304 && wf('2031-03-01') === 290 &&
+    wf('2031-02-01') === null && wf('') === null && wf(null) === null && wf('abc') === null && wf('2031-03-05 00:00:00.000Z') === 300,
+    'the week of an application\'s date: inside a week, the weekend after, a gap between weeks, before them all, no date, the server\'s date form');
+
   console.log(fail ? `FAILED (${fail})` : 'uzex OK');
   process.exit(fail ? 1 : 0);
 }

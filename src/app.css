@@ -532,3 +532,13 @@ body.compact main:not(.narrow){grid-template-columns:232px 1fr}
 /* VAT said where prices are offered (E12): the offers are without VAT; an earlier price that looks like one with it */
 .hp-vat{font-style:normal;color:#8a5a00;background:#fff3d6;border-radius:4px;padding:0 4px;font-weight:600}
 .hp-vat0,.rp-vat{color:var(--mute);font-size:11px;font-weight:400;text-transform:none;letter-spacing:0}
+
+/* where an applied price came from (E16): «С» the reference prices, «П» an earlier project — in their tags' colours */
+.upill.r{background:#e9f5ee;color:#1d5c39;border-color:#bfe0cb}
+.upill.h{background:#e3f0ff;color:#174a8c;border-color:#bcd6f5}
+.pin.src{background:#f6f7f9}
+
+/* the server does not answer (E20): a bar that stays until it answers again */
+.srvdown{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;z-index:60;max-width:880px;padding:10px 14px;
+  background:#fff4e5;border:1px solid #f0b46a;border-radius:8px;box-shadow:0 4px 18px rgba(0,0,0,.14);font-size:13px;line-height:1.4}
+.srvdown code{background:#fff;border:1px solid #f0d2a8;border-radius:4px;padding:0 4px}

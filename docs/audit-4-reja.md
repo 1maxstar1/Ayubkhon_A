@@ -769,6 +769,19 @@ keyingi resursga o'tadi va uning oynasi ochiq qoladi; Ctrl+Enter — ochiq oynad
 «Применить» («Похожие» hech qachon emas); yozilgan narx ustidan oldingi loyiha narxi ham
 so'raladi. E19: server rejimida hujjat nomi `Zayavka_<raqam>_<kontragent>_…`.
 
+**E16, E20 — bajarildi (v2.10.0).** E16: qo'llangan narx katagida manbasi — «U» birja,
+«С» справочник, «П» oldingi loyiha (qaysi ariza ekani `title` da); qo'lda yozilsa belgi
+yo'qoladi (`S.appliedSource`). E20: server javob bermasa — har bir saqlashga xabar emas,
+bitta turg'un panel: noutbukda serverni qanday qayta ishga tushirish (`laptop.cmd` /
+`laptop.sh`), aks holda «проверьте сеть»; belgi «⚠», hech qachon «✓»; narxlar shu
+brauzerda saqlanadi; har 5 soniyada tekshiriladi, server qaytgach hammasi saqlanadi va panel
+yo'qoladi. Faqat fayl yuklash uzilsa — fayl qatori o'z xabarini aytadi (panel emas). Test —
+`test/server-down.mjs`.
+
+**F5 — bajarildi (v2.10.0).** UZEX haftasi arizaning ro'yxatga olingan sanasi tushgan hafta
+(`S.uzex.weekFor`); sana barcha haftalardan oldin bo'lsa — eng yangisi, sababi bilan; qo'lda
+tanlangan hafta ariza bilan saqlanadi, «по дате заявки» bilan qaytariladi.
+
 **F6 — bajarildi (v2.10.0).** Ochiq sahifa vaqti-vaqti bilan (vkladka ko'ringanda, tarmoq
 qaytganda, har 5 daqiqada) server bergan versiyani ishga tushirgichlar o'qiydigan yorliqdan
 o'qiydi; boshqa bo'lsa — doimiy panel va «Обновить страницу» (avval ish maydonini saqlaydi);
@@ -844,11 +857,11 @@ keyin bu muhim: mijoz narxlar **QQSsiz** bo'lishini talab qilgan.
 |---|---|---|---|
 | E14 ✓ v2.10.0 | «Проверено» belgisi va jarayon ko'rsatkichi («проверено 212 из 541») | Ekspert qayerda to'xtaganini eslab yurmaydi | M |
 | E15 ✓ v2.10.0 | Bo'lim bo'yicha filtr (materiallar, mashinalar, uskunalar…) | Bo'limlar allaqachon aniqlanadi, lekin filtrda yo'q | S |
-| E16 | Narx manbasi belgisi справочник va «Прежние проекты» uchun ham — UZEX dagi «U» kabi | Narx qayerdan kelgani bir qarashda ko'rinadi | S |
+| E16 ✓ v2.10.0 | Narx manbasi belgisi справочник va «Прежние проекты» uchun ham — UZEX dagi «U» kabi | Narx qayerdan kelgani bir qarashda ko'rinadi | S |
 | E17 ✓ v2.10.0 | Resursga izoh → «Eslatma» ustuniga (sozlama, standart holatda o'chiq) | Nega shu narx qo'yilgani hujjatda qoladi | M |
 | E18 ✓ v2.10.0 | Klaviatura oqimi: qo'llagandan keyin fokus keyingi qatorga; taklifni bitta tugma bilan qabul qilish | Hozir har bir taklifga 2 bosish va fokus yo'qoladi | S–M |
 | E19 ✓ v2.10.0 | Yuklab olinadigan fayl nomida ariza raqami va kontragent | Talabda bor (F8) | S |
-| E20 | Server o'chganda tushunarli holat (hozir faqat «!») | Noutbuk rejimida «server ishlamayapti — ishga tushiring» | S |
+| E20 ✓ v2.10.0 | Server o'chganda tushunarli holat (hozir faqat «!») | Noutbuk rejimida «server ishlamayapti — ishga tushiring» | S |
 
 ---
 
@@ -862,7 +875,7 @@ keyin bu muhim: mijoz narxlar **QQSsiz** bo'lishini talab qilgan.
 | F2 | Viloyatni kontragent bo'yicha oldindan tanlash | Oldingi arizalardan | S |
 | F3 | «Наш ответ» uchun saqlangan eksportni taklif qilish | Hozir fayl diskdan so'raladi, holbuki eksportlar serverda turadi | S |
 | F4 | Tugallangan ariza qatorida «Сравнить версию» | Qaytgan smetani bir bosishda solishtirish | S |
-| F5 | UZEX haftasini arizaning ro'yxatga olingan sanasi bo'yicha tanlash | Hozir qo'lda → egasining qarori 7 | S |
+| F5 ✓ v2.10.0 | UZEX haftasini arizaning ro'yxatga olingan sanasi bo'yicha tanlash | Hozir qo'lda → egasining qarori 7 | S |
 | F6 ✓ v2.10.0 | Ochiq sahifa server versiyasi o'zgarganini bilib, «обновите страницу» deyishi | Hozir yangilanishdan keyin eski sahifa yangi server bilan ishlayveradi | S |
 | F7 ✓ | Reliz skripti: versiya, qurish, testlar, `releases.txt`, `versiyalar.md` — bitta buyruq va tekshiruvlar. **Bajarildi — commit `ffccdc2`:** `sh server/release.sh X.Y.Z "izoh" --row matn.md [--dry]`; test — `test/release-script.sh`. Kod ko'rigidan keyin: PowerShell, playwright va shox (`claude/excel-price-validation-5ehbvb` — Windows `releases.txt` ni shundan o'qiydi) to'plamdan oldin tekshiriladi; natijalarda skript bilmagan test bo'lsa — rad; origin oldinga ketsa reliz commit'i rebase qilinmaydi (tashlab, qaytadan); `--row` yo'li skript ishga tushirilgan papkadan o'qiladi | Hozir 6 qadam qo'lda; `releases.txt` 14/14 to'g'ri, lekin faqat ehtiyotkorlik hisobiga | M |
 

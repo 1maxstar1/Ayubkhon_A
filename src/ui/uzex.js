@@ -69,7 +69,7 @@
   var U = {
     src: loadPrefs(),
     imports: [], known: false,   // the stored weeks, newest first; known: the server has the collections
-    weekId: null,                // a week picked by hand, for this visit; null — the newest of the market
+    weekId: null,                // a week picked by hand, kept with the application; null — the week of its date (F5)
     quotes: {},                  // week record + fetch time → its rows
     imp: null, byRow: {},        // the week in use and its rows by number
     info: null,                  // { used, total, left } of the package built from it
@@ -110,16 +110,23 @@
         var b = e.target.closest && e.target.closest('.tagu');
         if (b) { e.preventDefault(); self.show(b, b.dataset.res); }
       });
-      sc.addEventListener('scroll', function () { self.hide(); }, { passive: true });
-      // a price typed over an applied one is the expert's own again
-      sc.addEventListener('input', function (e) {
-        var inp = e.target;
-        if (!inp.classList || !inp.classList.contains('uz')) return;
-        inp.classList.remove('uz');
-        var p = inp.parentNode && inp.parentNode.querySelector('.upill');
-        if (p) p.remove();
-      });
-      document.addEventListener('ws:open', function () { self.start(); });
+      // a scroll keeps the popover with its row while the row is on screen, and closes it once it is not
+      sc.addEventListener('scroll', function () {
+        if (self.pop.hidden || !self.open) return;
+        var tag = sc.querySelector('.tagu[data-res="' + String(self.open.key).replace(/["\\]/g, '\\$&') + '"]'), box = sc.getBoundingClientRect();
+        if (tag && self.place) { var r = tag.getBoundingClientRect(); if (r.top >= box.top && r.bottom <= box.bottom) { self.place(tag); return; } }
+        self.hide();
+      }, { passive: true });
+      document.addEventListener('ws:open', function (e) { self.start(e && e.detail); });
+      // the week picked by hand is the application's: kept with it
+      if (S.Sync && S.Sync.state) {
+        var state = S.Sync.state;
+        S.Sync.state = function () {
+          var st = state.apply(this, arguments);
+          if (self.weekId != null) st.uzex = { week: self.weekId };
+          return st;
+        };
+      }
       document.addEventListener('ws:close', function () { self.stop(); });
       document.addEventListener('auth:signedout', function () { self.kill(); self.quotes = {}; });
       this.applySources(true);
@@ -173,8 +180,12 @@
       bar.querySelectorAll('.srccard').forEach(function (b) {
         b.addEventListener('click', function () { self.toggle(b.dataset.src); });
       });
-      $('uzWeek').addEventListener('change', function () { self.weekId = +this.value || null; self.prepare(); });
-      $('uzMarket').addEventListener('change', function () { self.src.market = MARKET[this.value] ? this.value : 'internal'; self.weekId = null; self.save(); self.prepare(); });
+      $('uzWeek').addEventListener('change', function () { self.weekId = +this.value || null; if (S.Sync) S.Sync.touch(); self.prepare(); });
+      $('uzMarket').addEventListener('change', function () { self.src.market = MARKET[this.value] ? this.value : 'internal'; self.weekId = null; if (S.Sync) S.Sync.touch(); self.save(); self.prepare(); });
+      bar.addEventListener('click', function (e) {
+        if (!e.target.closest || !e.target.closest('[data-uz-reset]')) return;
+        e.preventDefault(); self.weekId = null; if (S.Sync) S.Sync.touch(); self.prepare();
+      });
       $('uzOnlyWeek').addEventListener('change', function () { self.src.onlyWeek = this.checked; self.save(); self.prepare(); });
       $('uzForward').addEventListener('change', function () { self.src.forward = this.checked; self.save(); self.prepare(); });
     },
@@ -214,8 +225,10 @@
     },
 
     /* ------------------------------------------------------------------ workspace */
-    start: function () {
+    start: function (w) {
       var self = this, gen = ++this.gen;
+      var st = w && w.state && w.state.uzex;
+      this.weekId = st && +st.week ? +st.week : null;
       this.map = {}; this.asked = {}; this.batches = {}; this.hide();
       this.paint();
       S.pb.collection('uzex_imports').getFullList({
@@ -235,6 +248,7 @@
 
     stop: function () {
       this.gen++;
+      this.weekId = null;
       this.map = {}; this.asked = {}; this.batches = {};
       this.hide();
       this.paint();
@@ -251,7 +265,13 @@
     chosen: function () {
       var m = this.src.market, id = this.weekId;
       var list = this.imports.filter(function (x) { return x.market === m; });
-      return list.filter(function (x) { return x.import_id === id; })[0] || list[0] || null;
+      var picked = id != null && list.filter(function (x) { return x.import_id === id; })[0];
+      if (picked) { this.how = 'hand'; return picked; }
+      // the week the application was registered in (F5); without one, the newest
+      var reg = String((S.Sync && S.Sync.app && S.Sync.app.registered_at) || '').slice(0, 10);
+      var w = S.uzex.weekFor(list, reg);
+      this.how = w ? 'date' : (list.length ? 'newest' : '');
+      return w || list[0] || null;
     },
 
     rowsOfWeek: function (imp) {
@@ -395,6 +415,13 @@
       }).join('') || '<option value="">нет недель</option>';
       if (sel.dataset.html !== html) { sel.innerHTML = html; sel.dataset.html = html; }
       sel.value = imp ? String(imp.import_id) : '';
+      // how the week was chosen (F5): by the application's date, by hand, or the newest when its date has none
+      var how = $('uzHow');
+      if (!how) { how = document.createElement('span'); how.id = 'uzHow'; how.className = 'count'; sel.parentNode.insertBefore(how, sel.nextSibling); }
+      var reg = String((S.Sync && S.Sync.app && S.Sync.app.registered_at) || '').slice(0, 10);
+      how.innerHTML = this.how === 'hand' ? 'выбрана вручную · <a href="#" data-uz-reset>по дате заявки</a>'
+        : this.how === 'date' ? 'по дате заявки ' + S.esc(reg.split('-').reverse().join('.'))
+        : this.how === 'newest' ? (reg ? 'на дату заявки недели нет — показана самая новая' : 'самая новая') : '';
       $('uzMarket').value = src.market;
       $('uzOnlyWeek').checked = !!src.onlyWeek;
       $('uzForward').checked = !!src.forward;
@@ -440,13 +467,8 @@
     /* ------------------------------------------------------------------ a price that came from the exchange */
     /** The source of the resource's market price when it was applied from a quote and is still that price; else ''. */
     applied: function (r) {
-      if (!r || !S.Sync || !S.Sync.ws || S.near(r.market, r.price)) return '';
-      var m = S.priceSource ? S.priceSource(r.key, r.market) : null;
-      if (m) return /^uzex:/.test(m.source || '') ? m.source : '';
-      var c = S.Sync.corr && S.Sync.corr[r.key];
-      // not while a newer change of this price is still on its way to the server: that one decides
-      if (S.Sync.pend && S.Sync.pend[r.key] !== undefined) return '';
-      return c && /^uzex:/.test(c.source || '') && S.near(c.market, r.market) ? c.source : '';
+      var s = S.appliedSource ? S.appliedSource(r) : '';
+      return /^uzex:/.test(s) ? s : '';
     },
 
     /** The «U» pill of the «Рыночная цена» cell, '' when the price is not from the exchange. */

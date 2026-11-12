@@ -538,6 +538,16 @@ body.compact main:not(.narrow){grid-template-columns:232px 1fr}
 /* VAT said where prices are offered (E12): the offers are without VAT; an earlier price that looks like one with it */
 .hp-vat{font-style:normal;color:#8a5a00;background:#fff3d6;border-radius:4px;padding:0 4px;font-weight:600}
 .hp-vat0,.rp-vat{color:var(--mute);font-size:11px;font-weight:400;text-transform:none;letter-spacing:0}
+
+/* where an applied price came from (E16): «С» the reference prices, «П» an earlier project — in their tags' colours */
+.upill.r{background:#e9f5ee;color:#1d5c39;border-color:#bfe0cb}
+.upill.h{background:#e3f0ff;color:#174a8c;border-color:#bcd6f5}
+.pin.src{background:#f6f7f9}
+
+/* the server does not answer (E20): a bar that stays until it answers again */
+.srvdown{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;z-index:60;max-width:880px;padding:10px 14px;
+  background:#fff4e5;border:1px solid #f0b46a;border-radius:8px;box-shadow:0 4px 18px rgba(0,0,0,.14);font-size:13px;line-height:1.4}
+.srvdown code{background:#fff;border:1px solid #f0d2a8;border-radius:4px;padding:0 4px}
 </style>
 </head>
 <body>
@@ -5701,6 +5711,23 @@ if (typeof self !== 'undefined') self.S = S;
       '" title="' + (on ? 'Проверено — нажмите, чтобы снять' : 'Отметить как проверенный (Shift+Enter в поле цены)') + '">' + (on ? '✓' : '○') + '</button>';
   }
 
+  /**
+   * Where an applied price came from, in its cell (E16): «U» the exchange, «С» the reference prices, «П» an earlier
+   * project. Typing over it takes the badge away (the price is the expert's own again).
+   */
+  function srcMark(r) {
+    var s = S.appliedSource ? S.appliedSource(r) : '';
+    if (!s) return '';
+    if (/^uzex:/.test(s)) return S.Uzex ? S.Uzex.cellMark(r) : '';
+    if (/^ref:/.test(s)) return '<span class="upill r" title="Справочная цена (применена из справочника). Введите цену вручную, чтобы снять отметку">С</span>';
+    if (/^hint:/.test(s)) {
+      var h = S.Hints && S.Hints.byId ? S.Hints.byId(s.slice(5)) : null;
+      var t = h ? 'Цена из прежнего проекта № ' + h.number + ' · ' + h.contragent : 'Цена из прежнего проекта';
+      return '<span class="upill h" title="' + S.esc(t + '. Введите цену вручную, чтобы снять отметку') + '">П</span>';
+    }
+    return '';
+  }
+
   /** «✎»: the expert's own note on the resource, for the document's «Eslatma» column — only with the setting on (E17). */
   function noteBtn(app, r) {
     if (!app.opts.resNotes) return '';
@@ -5722,6 +5749,12 @@ if (typeof self !== 'undefined') self.S = S;
     scroll.addEventListener('input', function (e) {
       var inp = e.target;
       if (!inp.classList || !inp.classList.contains('pin')) return;
+      // a price typed over an applied one is the expert's own again: its badge goes
+      if (inp.classList.contains('uz') || inp.classList.contains('src')) {
+        inp.classList.remove('uz', 'src');
+        var pill = inp.parentNode && inp.parentNode.querySelector('.upill');
+        if (pill) pill.remove();
+      }
       var rec = self.byKey(inp.dataset.key);
       if (!rec) return;
       var t = self.app.typedPrice(inp);
@@ -5991,7 +6024,7 @@ if (typeof self !== 'undefined') self.S = S;
         S.esc(multiHint(r)) + '">' + r.variants + ' цены</button>' : '';
       var hint = (S.Hints ? S.Hints.tag(r) : '') + (S.Refs ? S.Refs.tag(r) : '') + (S.Uzex ? S.Uzex.tag(r) : '');
       // a price applied from an exchange quote keeps its mark in the cell until it is typed over (src/ui/uzex.js)
-      var uz = S.Uzex ? S.Uzex.cellMark(r) : '';
+      var uz = srcMark(r), uzOnly = uz && /upill u\b/.test(uz);
       var sec = secTag(r);
       out.push(
         '<div class="vrow' + (changed ? ' chg' : '') + (many ? ' many' : '') + '">' +
@@ -6003,7 +6036,7 @@ if (typeof self !== 'undefined') self.S = S;
         cell(COLS[4], S.qty(r.qty)) +
         '<div class="c num" style="' + width(COLS[5]) + '">' + S.price(r.price) + '</div>' +
         '<div class="c num' + (uz ? ' uzc' : '') + '" style="' + width(COLS[6]) + '">' + uz +
-        '<input class="pin' + (changed ? ' edited' : '') + (uz ? ' uz' : '') + '" data-key="' + S.esc(r.key) + '" data-i="' + i +
+        '<input class="pin' + (changed ? ' edited' : '') + (uzOnly ? ' uz' : uz ? ' src' : '') + '" data-key="' + S.esc(r.key) + '" data-i="' + i +
         '" inputmode="decimal" value="' + S.price(r.market) + '"></div>' +
         '<div class="c num' + S.diffCls(changed, e) + '" style="' + width(COLS[7]) + '">' +
         (r.smetaSum ? pct.toFixed(1) + '%' : '') + '</div>' +
@@ -9436,6 +9469,8 @@ if (typeof self !== 'undefined') self.S = S;
           self.dirty = true;
           self.mark('!');
           clearTimeout(self.t);
+          // no server at all: said once, in a bar that stays; the probe saves when it is back (E20)
+          if (self.isNet(e)) { self.down(); return; }
           if (e && (e.status === 400 || e.status === 413)) {
             // The server has read the state and will not take it; the same state would be refused the same way.
             // It used to be sent again every fifteen seconds for as long as the page stayed open. Nothing is
@@ -9691,6 +9726,7 @@ if (typeof self !== 'undefined') self.S = S;
         part.del.forEach(function (k) { if (self.pend[k] === undefined) self.pend[k] = waiting[k]; });
         clearTimeout(self.ct);
         self.ct = setTimeout(function () { self.flush(); }, RETRY_MS);
+        if (self.isNet(e)) { self.down(); return; }
         app.toast('Правки не сохранены (' + (part.set.length + part.del.length) + '): ' +
           S.pbErr(e) + ' — повтор через ' + (RETRY_MS / 1000) + ' секунд', true);
       });
@@ -9739,14 +9775,60 @@ if (typeof self !== 'undefined') self.S = S;
     },
 
     /* ----------------------------------------------------------- header */
+    /* -------------------------------------------------------- no server (E20) */
+    /** A request that did not reach the server at all (not one it answered, not one the page called off). */
+    isNet: function (e) { return !!e && e.status === 0 && !e.isAbort && !this.leaving; },
+    /**
+     * The server does not answer: said once, in a bar that stays (not a toast for every failed save), with what to
+     * do — on the laptop, how to start it again. Asked every five seconds; when it answers, everything waiting goes.
+     */
+    down: function () {
+      var self = this;
+      if (!this.offline) {
+        this.offline = true;
+        var local = (S.Auth && S.Auth.laptop) || /^(localhost|127\.\d+\.\d+\.\d+|\[::1\])$/.test(location.hostname);
+        var bar = $('srvDown');
+        if (!bar) { bar = document.createElement('div'); bar.id = 'srvDown'; bar.className = 'srvdown'; document.body.appendChild(bar); }
+        bar.innerHTML = local
+          ? '<b>Сервер программы на этом компьютере не отвечает.</b> Запустите его снова: Windows — <code>C:\\Smeta\\server\\laptop.cmd</code> ' +
+            '(если включён автозапуск — перезагрузите компьютер), Mac — <code>sh server/laptop.sh</code>. Введённые цены сохраняются в этом ' +
+            'браузере и уйдут на сервер, как только он заработает. Не закрывайте и не обновляйте страницу: без сервера она не откроется.'
+          : '<b>Нет связи с сервером</b> — проверьте сеть. Введённые цены сохраняются в этом браузере и уйдут на сервер, как только связь вернётся.';
+        bar.hidden = false;
+        this.mark('⚠');
+      }
+      if (this.probe) return;
+      this.probe = setInterval(function () {
+        S.pb.health.check({ requestKey: null }).then(function () { self.up(); }, function () { /* still down */ });
+      }, 5000);
+    },
+    up: function () {
+      if (!this.offline) return;
+      clearInterval(this.probe); this.probe = null;
+      this.offline = false;
+      var bar = $('srvDown');
+      if (bar) bar.hidden = true;
+      if (!this.ws) return;
+      var self = this;
+      this.flush();
+      if (this.dirty) this.saveNow().catch(function () { /* said by saveNow */ });
+      else this.mark('✓');
+      if (this.retryUploads) this.retryUploads();
+      A().toast('Связь с сервером восстановлена — изменения сохраняются');
+      if (S.Hints && S.Hints.loadSoon) S.Hints.loadSoon();
+      void self;
+    },
+
     mark: function (s) {
       var el = $('wsSave');
+      if (this.offline && s === '✓') s = '⚠';
       // «saved» is not said while an estimate on screen has no file on the server
       var held = s === '✓' && this.hasUnsaved();
       if (held) s = '!';
       if (el) {
         el.textContent = s;
-        el.title = held ? 'Есть сметы, не сохранённые на сервере' : s === '●' ? 'Сохранение…' : s === '✓' ? 'Сохранено' : 'Ошибка сохранения';
+        el.title = held ? 'Есть сметы, не сохранённые на сервере' : s === '●' ? 'Сохранение…' : s === '✓' ? 'Сохранено' :
+          s === '⚠' ? 'Нет связи с сервером' : 'Ошибка сохранения';
       }
     },
     renderBox: function () {
@@ -9842,6 +9924,18 @@ if (typeof self !== 'undefined') self.S = S;
     return c && c.source && c.source !== 'typed' && S.near(c.market, value) ? c.source : '';
   };
   S.priceSource = function (key, value) { return Sync.priceSource(key, value); };
+  /**
+   * Where the price on screen of resource `r` was applied from — 'ref:…', 'hint:…', 'uzex:…' — or '' when it was
+   * typed, or is the estimate's own. The mark of this session first; while a newer change is on its way to the server,
+   * nothing; else the correction stored. (E16: the badge of the «Рыночная цена» cell.)
+   */
+  S.appliedSource = function (r) {
+    if (!Sync.ws || !r || S.near(r.market, r.price)) return '';
+    var m = Sync.priceSource(r.key, r.market);
+    if (m) return m.source === 'typed' ? '' : (m.source || '');
+    if (Sync.pend && Sync.pend[r.key] !== undefined) return '';
+    return S.sourceOfPrice(r.key, r.market);
+  };
   document.addEventListener('DOMContentLoaded', function () { Sync.init(); });
   if (document.readyState !== 'loading') Sync.init();
 })(S);
@@ -10064,6 +10158,15 @@ if (typeof self !== 'undefined') self.S = S;
     for: function (mk) { return this.map[mk] || []; },
     /** Close-but-not-equal names, best first. */
     similar: function (mk) { return this.sim[mk] || []; },
+    /** The suggestion of this id, wherever it is held — for the «П» badge of an applied price (E16). */
+    byId: function (id) {
+      var all = [this.map, this.sim];
+      for (var a = 0; a < all.length; a++) for (var k in all[a]) {
+        var l = all[a][k] || [];
+        for (var i = 0; i < l.length; i++) if (l[i] && l[i].id === id) return l[i];
+      }
+      return null;
+    },
     has: function (mk) { return !!(this.map[mk] && this.map[mk].length); },
     any: function (mk) { return this.for(mk).length + this.similar(mk).length > 0; },
     /* The same two questions asked with a resource row in hand. */
@@ -11525,7 +11628,17 @@ var S = (typeof S !== 'undefined' && S) || {};
     return d(from, from.slice(0, 4) !== to.slice(0, 4)) + '–' + d(to, true);
   }
 
-  S.uzex = { vatRate: vatRate, net: net, packageOf: packageOf, rowsOf: rowsOf, sourceOf: sourceOf, parseSource: parseSource, period: period, srcId: srcId };
+  /**
+   * The week of `weeks` (one market's, newest first) an application registered on `date` belongs to: the newest that
+   * began on that day or before. null when the date cannot be read or comes before every week (F5).
+   */
+  function weekFor(weeks, date) {
+    var d = String(date || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
+    for (var i = 0; i < (weeks || []).length; i++) if (String(weeks[i].period_from || '').slice(0, 10) <= d) return weeks[i];
+    return null;
+  }
+  S.uzex = { weekFor: weekFor, vatRate: vatRate, net: net, packageOf: packageOf, rowsOf: rowsOf, sourceOf: sourceOf, parseSource: parseSource, period: period, srcId: srcId };
 })(S);
 
 ;
@@ -11600,7 +11713,7 @@ var S = (typeof S !== 'undefined' && S) || {};
   var U = {
     src: loadPrefs(),
     imports: [], known: false,   // the stored weeks, newest first; known: the server has the collections
-    weekId: null,                // a week picked by hand, for this visit; null — the newest of the market
+    weekId: null,                // a week picked by hand, kept with the application; null — the week of its date (F5)
     quotes: {},                  // week record + fetch time → its rows
     imp: null, byRow: {},        // the week in use and its rows by number
     info: null,                  // { used, total, left } of the package built from it
@@ -11641,16 +11754,23 @@ var S = (typeof S !== 'undefined' && S) || {};
         var b = e.target.closest && e.target.closest('.tagu');
         if (b) { e.preventDefault(); self.show(b, b.dataset.res); }
       });
-      sc.addEventListener('scroll', function () { self.hide(); }, { passive: true });
-      // a price typed over an applied one is the expert's own again
-      sc.addEventListener('input', function (e) {
-        var inp = e.target;
-        if (!inp.classList || !inp.classList.contains('uz')) return;
-        inp.classList.remove('uz');
-        var p = inp.parentNode && inp.parentNode.querySelector('.upill');
-        if (p) p.remove();
-      });
-      document.addEventListener('ws:open', function () { self.start(); });
+      // a scroll keeps the popover with its row while the row is on screen, and closes it once it is not
+      sc.addEventListener('scroll', function () {
+        if (self.pop.hidden || !self.open) return;
+        var tag = sc.querySelector('.tagu[data-res="' + String(self.open.key).replace(/["\\]/g, '\\$&') + '"]'), box = sc.getBoundingClientRect();
+        if (tag && self.place) { var r = tag.getBoundingClientRect(); if (r.top >= box.top && r.bottom <= box.bottom) { self.place(tag); return; } }
+        self.hide();
+      }, { passive: true });
+      document.addEventListener('ws:open', function (e) { self.start(e && e.detail); });
+      // the week picked by hand is the application's: kept with it
+      if (S.Sync && S.Sync.state) {
+        var state = S.Sync.state;
+        S.Sync.state = function () {
+          var st = state.apply(this, arguments);
+          if (self.weekId != null) st.uzex = { week: self.weekId };
+          return st;
+        };
+      }
       document.addEventListener('ws:close', function () { self.stop(); });
       document.addEventListener('auth:signedout', function () { self.kill(); self.quotes = {}; });
       this.applySources(true);
@@ -11704,8 +11824,12 @@ var S = (typeof S !== 'undefined' && S) || {};
       bar.querySelectorAll('.srccard').forEach(function (b) {
         b.addEventListener('click', function () { self.toggle(b.dataset.src); });
       });
-      $('uzWeek').addEventListener('change', function () { self.weekId = +this.value || null; self.prepare(); });
-      $('uzMarket').addEventListener('change', function () { self.src.market = MARKET[this.value] ? this.value : 'internal'; self.weekId = null; self.save(); self.prepare(); });
+      $('uzWeek').addEventListener('change', function () { self.weekId = +this.value || null; if (S.Sync) S.Sync.touch(); self.prepare(); });
+      $('uzMarket').addEventListener('change', function () { self.src.market = MARKET[this.value] ? this.value : 'internal'; self.weekId = null; if (S.Sync) S.Sync.touch(); self.save(); self.prepare(); });
+      bar.addEventListener('click', function (e) {
+        if (!e.target.closest || !e.target.closest('[data-uz-reset]')) return;
+        e.preventDefault(); self.weekId = null; if (S.Sync) S.Sync.touch(); self.prepare();
+      });
       $('uzOnlyWeek').addEventListener('change', function () { self.src.onlyWeek = this.checked; self.save(); self.prepare(); });
       $('uzForward').addEventListener('change', function () { self.src.forward = this.checked; self.save(); self.prepare(); });
     },
@@ -11745,8 +11869,10 @@ var S = (typeof S !== 'undefined' && S) || {};
     },
 
     /* ------------------------------------------------------------------ workspace */
-    start: function () {
+    start: function (w) {
       var self = this, gen = ++this.gen;
+      var st = w && w.state && w.state.uzex;
+      this.weekId = st && +st.week ? +st.week : null;
       this.map = {}; this.asked = {}; this.batches = {}; this.hide();
       this.paint();
       S.pb.collection('uzex_imports').getFullList({
@@ -11766,6 +11892,7 @@ var S = (typeof S !== 'undefined' && S) || {};
 
     stop: function () {
       this.gen++;
+      this.weekId = null;
       this.map = {}; this.asked = {}; this.batches = {};
       this.hide();
       this.paint();
@@ -11782,7 +11909,13 @@ var S = (typeof S !== 'undefined' && S) || {};
     chosen: function () {
       var m = this.src.market, id = this.weekId;
       var list = this.imports.filter(function (x) { return x.market === m; });
-      return list.filter(function (x) { return x.import_id === id; })[0] || list[0] || null;
+      var picked = id != null && list.filter(function (x) { return x.import_id === id; })[0];
+      if (picked) { this.how = 'hand'; return picked; }
+      // the week the application was registered in (F5); without one, the newest
+      var reg = String((S.Sync && S.Sync.app && S.Sync.app.registered_at) || '').slice(0, 10);
+      var w = S.uzex.weekFor(list, reg);
+      this.how = w ? 'date' : (list.length ? 'newest' : '');
+      return w || list[0] || null;
     },
 
     rowsOfWeek: function (imp) {
@@ -11926,6 +12059,13 @@ var S = (typeof S !== 'undefined' && S) || {};
       }).join('') || '<option value="">нет недель</option>';
       if (sel.dataset.html !== html) { sel.innerHTML = html; sel.dataset.html = html; }
       sel.value = imp ? String(imp.import_id) : '';
+      // how the week was chosen (F5): by the application's date, by hand, or the newest when its date has none
+      var how = $('uzHow');
+      if (!how) { how = document.createElement('span'); how.id = 'uzHow'; how.className = 'count'; sel.parentNode.insertBefore(how, sel.nextSibling); }
+      var reg = String((S.Sync && S.Sync.app && S.Sync.app.registered_at) || '').slice(0, 10);
+      how.innerHTML = this.how === 'hand' ? 'выбрана вручную · <a href="#" data-uz-reset>по дате заявки</a>'
+        : this.how === 'date' ? 'по дате заявки ' + S.esc(reg.split('-').reverse().join('.'))
+        : this.how === 'newest' ? (reg ? 'на дату заявки недели нет — показана самая новая' : 'самая новая') : '';
       $('uzMarket').value = src.market;
       $('uzOnlyWeek').checked = !!src.onlyWeek;
       $('uzForward').checked = !!src.forward;
@@ -11971,13 +12111,8 @@ var S = (typeof S !== 'undefined' && S) || {};
     /* ------------------------------------------------------------------ a price that came from the exchange */
     /** The source of the resource's market price when it was applied from a quote and is still that price; else ''. */
     applied: function (r) {
-      if (!r || !S.Sync || !S.Sync.ws || S.near(r.market, r.price)) return '';
-      var m = S.priceSource ? S.priceSource(r.key, r.market) : null;
-      if (m) return /^uzex:/.test(m.source || '') ? m.source : '';
-      var c = S.Sync.corr && S.Sync.corr[r.key];
-      // not while a newer change of this price is still on its way to the server: that one decides
-      if (S.Sync.pend && S.Sync.pend[r.key] !== undefined) return '';
-      return c && /^uzex:/.test(c.source || '') && S.near(c.market, r.market) ? c.source : '';
+      var s = S.appliedSource ? S.appliedSource(r) : '';
+      return /^uzex:/.test(s) ? s : '';
     },
 
     /** The «U» pill of the «Рыночная цена» cell, '' when the price is not from the exchange. */

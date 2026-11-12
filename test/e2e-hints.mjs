@@ -158,6 +158,11 @@ await page.waitForFunction((p) => p.some((x) => app.prices[x.key] === x.market),
 await page.evaluate(() => S.Hints.hide());
 const applied = await page.evaluate((p) => p.map((x) => app.prices[x.key]), picked);
 check(applied.includes(picked[0].market) || applied.includes(picked[1].market), 'Qo\'llash applied the hinted price');
+// its cell says where the price came from, and from which application (E16)
+const hintBadge = await page.evaluate((p) => { const x = p.find((y) => app.prices[y.key] === y.market);
+  const inp = document.querySelector('#priceScroll .pin[data-key="' + CSS.escape(x.key) + '"]'); const b = inp && inp.parentNode.querySelector('.upill');
+  return b ? { cls: b.className, t: b.textContent, title: b.title } : null; }, picked);
+check(hintBadge && /upill h/.test(hintBadge.cls) && hintBadge.t === 'П' && /№ /.test(hintBadge.title), `the cell of a price from an earlier project carries «П», naming the application (${hintBadge && hintBadge.title})`);
 await page.evaluate(() => S.Sync.q);
 await page.waitForFunction(() => !S.Sync.dirty, null, { timeout: 15000 });
 

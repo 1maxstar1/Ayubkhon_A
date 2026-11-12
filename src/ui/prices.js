@@ -86,6 +86,23 @@
       '" title="' + (on ? 'Проверено — нажмите, чтобы снять' : 'Отметить как проверенный (Shift+Enter в поле цены)') + '">' + (on ? '✓' : '○') + '</button>';
   }
 
+  /**
+   * Where an applied price came from, in its cell (E16): «U» the exchange, «С» the reference prices, «П» an earlier
+   * project. Typing over it takes the badge away (the price is the expert's own again).
+   */
+  function srcMark(r) {
+    var s = S.appliedSource ? S.appliedSource(r) : '';
+    if (!s) return '';
+    if (/^uzex:/.test(s)) return S.Uzex ? S.Uzex.cellMark(r) : '';
+    if (/^ref:/.test(s)) return '<span class="upill r" title="Справочная цена (применена из справочника). Введите цену вручную, чтобы снять отметку">С</span>';
+    if (/^hint:/.test(s)) {
+      var h = S.Hints && S.Hints.byId ? S.Hints.byId(s.slice(5)) : null;
+      var t = h ? 'Цена из прежнего проекта № ' + h.number + ' · ' + h.contragent : 'Цена из прежнего проекта';
+      return '<span class="upill h" title="' + S.esc(t + '. Введите цену вручную, чтобы снять отметку') + '">П</span>';
+    }
+    return '';
+  }
+
   /** «✎»: the expert's own note on the resource, for the document's «Eslatma» column — only with the setting on (E17). */
   function noteBtn(app, r) {
     if (!app.opts.resNotes) return '';
@@ -107,6 +124,12 @@
     scroll.addEventListener('input', function (e) {
       var inp = e.target;
       if (!inp.classList || !inp.classList.contains('pin')) return;
+      // a price typed over an applied one is the expert's own again: its badge goes
+      if (inp.classList.contains('uz') || inp.classList.contains('src')) {
+        inp.classList.remove('uz', 'src');
+        var pill = inp.parentNode && inp.parentNode.querySelector('.upill');
+        if (pill) pill.remove();
+      }
       var rec = self.byKey(inp.dataset.key);
       if (!rec) return;
       var t = self.app.typedPrice(inp);
@@ -376,7 +399,7 @@
         S.esc(multiHint(r)) + '">' + r.variants + ' цены</button>' : '';
       var hint = (S.Hints ? S.Hints.tag(r) : '') + (S.Refs ? S.Refs.tag(r) : '') + (S.Uzex ? S.Uzex.tag(r) : '');
       // a price applied from an exchange quote keeps its mark in the cell until it is typed over (src/ui/uzex.js)
-      var uz = S.Uzex ? S.Uzex.cellMark(r) : '';
+      var uz = srcMark(r), uzOnly = uz && /upill u\b/.test(uz);
       var sec = secTag(r);
       out.push(
         '<div class="vrow' + (changed ? ' chg' : '') + (many ? ' many' : '') + '">' +
@@ -388,7 +411,7 @@
         cell(COLS[4], S.qty(r.qty)) +
         '<div class="c num" style="' + width(COLS[5]) + '">' + S.price(r.price) + '</div>' +
         '<div class="c num' + (uz ? ' uzc' : '') + '" style="' + width(COLS[6]) + '">' + uz +
-        '<input class="pin' + (changed ? ' edited' : '') + (uz ? ' uz' : '') + '" data-key="' + S.esc(r.key) + '" data-i="' + i +
+        '<input class="pin' + (changed ? ' edited' : '') + (uzOnly ? ' uz' : uz ? ' src' : '') + '" data-key="' + S.esc(r.key) + '" data-i="' + i +
         '" inputmode="decimal" value="' + S.price(r.market) + '"></div>' +
         '<div class="c num' + S.diffCls(changed, e) + '" style="' + width(COLS[7]) + '">' +
         (r.smetaSum ? pct.toFixed(1) + '%' : '') + '</div>' +

@@ -352,6 +352,24 @@ try {
   await uzReady();
   check(await ep.inputValue('#uzWeek') === '304', 'back on the internal market, the newest week again');
 
+  /* ------------------------------------------------------------- the week of the application's date (F5) */
+  const reg0 = await ep.evaluate(() => S.Sync.app.registered_at || '');
+  await ep.evaluate(() => { S.Sync.app.registered_at = '2031-03-05 00:00:00.000Z'; S.Uzex.weekId = null; S.Uzex.prepare(); });
+  await uzReady();
+  check(await ep.inputValue('#uzWeek') === '300' && /по дате заявки 05\.03\.2031/.test(await ep.textContent('#uzHow')),
+    'an application registered on 05.03.2031 is given the week of that date, and the page says so');
+  await ep.selectOption('#uzWeek', '304');
+  await uzReady();
+  check(await ep.evaluate(() => S.Uzex.weekId === 304 && S.Sync.state().uzex && S.Sync.state().uzex.week === 304) && /выбрана вручную/.test(await ep.textContent('#uzHow')),
+    'a week picked by hand is said so, and kept with the application');
+  await ep.click('#uzHow [data-uz-reset]');
+  await uzReady();
+  check(await ep.inputValue('#uzWeek') === '300' && await ep.evaluate(() => S.Uzex.weekId === null), '«по дате заявки» goes back to the week of the date');
+  await ep.evaluate((r) => { S.Sync.app.registered_at = r; S.Uzex.prepare(); }, reg0);
+  await uzReady();
+  check(await ep.inputValue('#uzWeek') === '304' && /недели нет|самая новая/.test(await ep.textContent('#uzHow')),
+    'a date before every week: the newest, and the page says why');
+
   check(!errors.length, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
 
   /* ------------------------------------------------------------- the single-file page has none of it */

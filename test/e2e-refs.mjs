@@ -306,6 +306,12 @@ const waitCorr = async (name, ok) => {
 const cAnc = await waitCorr('Анкер М8', (c) => c.source);
 check(cAnc && cAnc.market_price === r2(P.d) && cAnc.source === `ref:${ACTIVE}:10` && cAnc.source_price === r2(P.d),
   '«Применить»: the price is set and its correction says ref:<package>:<record>, with the price it gave');
+// its cell says where the price came from (E16)
+const badge = await ep.evaluate(() => { const k = app.model.resources.find((r) => /АНКЕР/i.test(r.name) && /М8/.test(r.name)).key;
+  document.getElementById('q').value = ''; app.prices_ui.apply(); const i = app.prices_ui.view.findIndex((r) => r.key === k); app.prices_ui.list.scrollToRow(i);
+  return new Promise((res) => requestAnimationFrame(() => { const inp = document.querySelector('#priceScroll .pin[data-key="' + CSS.escape(k) + '"]');
+    const p = inp && inp.parentNode.querySelector('.upill'); res(p ? p.className + ':' + p.textContent : ''); })); });
+check(/upill r/.test(badge) && /С$/.test(badge), `the cell of a reference price carries «С» (${badge})`);
 const cCab = await waitCorr('Кабель ВВГ 3х2,5', (c) => c.source);
 check(cCab && /^ref:fake-20260101-2:median:(2,3|3,2)$/.test(cCab.source) && cCab.source_price === cCab.market_price &&
   cCab.market_price === r2((P.a + P.g) / 2), 'a median: ref:<package>:median:<records>');

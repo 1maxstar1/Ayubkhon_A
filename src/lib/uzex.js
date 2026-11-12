@@ -107,5 +107,15 @@
     return d(from, from.slice(0, 4) !== to.slice(0, 4)) + '–' + d(to, true);
   }
 
-  S.uzex = { vatRate: vatRate, net: net, packageOf: packageOf, rowsOf: rowsOf, sourceOf: sourceOf, parseSource: parseSource, period: period, srcId: srcId };
+  /**
+   * The week of `weeks` (one market's, newest first) an application registered on `date` belongs to: the newest that
+   * began on that day or before. null when the date cannot be read or comes before every week (F5).
+   */
+  function weekFor(weeks, date) {
+    var d = String(date || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
+    for (var i = 0; i < (weeks || []).length; i++) if (String(weeks[i].period_from || '').slice(0, 10) <= d) return weeks[i];
+    return null;
+  }
+  S.uzex = { weekFor: weekFor, vatRate: vatRate, net: net, packageOf: packageOf, rowsOf: rowsOf, sourceOf: sourceOf, parseSource: parseSource, period: period, srcId: srcId };
 })(S);

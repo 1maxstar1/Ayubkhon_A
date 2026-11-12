@@ -750,9 +750,9 @@ ko'rish.
 | E4 ✓ v2.10.0 | Taklifni qo'llash ro'yxatni boshiga aylantiradi — `src/ui/hints.js:299` | past | Joyni saqlash (`apply(true)`) | S |
 | E5 ✓ v2.10.0 | 1366 kenglikda «Сводная таблица» kesiladi, sarlavha gorizontal aylantirishga ergashmaydi; «Цены» da 15 qator ko'rinadi (UZEX bilan 13), nom ustuni 320 px — nomlarning 42 % i kesilgan | o'rta | Ixcham rejim: kichikroq qator, kengayadigan nom ustuni, yopishqoq sarlavha | M |
 | E6 ✓ v2.10.0 | Tejam qatorlarda qizil, jamida yashil | past | Bitta qoida hamma joyda | S |
-| E7 | Tushunarsiz xatolar: buzuq `.xlsx` baribir yuklanadi; UZEX ulanish xatosi xom holda; «email: Value must be unique» | past | Ruscha, nima qilish kerakligi bilan | S |
+| E7 ✓ v2.10.0 | Tushunarsiz xatolar: buzuq `.xlsx` baribir yuklanadi; UZEX ulanish xatosi xom holda; «email: Value must be unique» | past | Ruscha, nima qilish kerakligi bilan | S |
 | E8 ✓ v2.10.0 | Bitta-fayl sahifasi o'zida yo'q manbalar filtrini ko'rsatadi | past | Server yo'q bo'lsa yashirish | S |
-| E9 | Til aralash: «Ichki/Eksport», xom rol nomlari, `changed` | past | Interfeys ruscha — bitta lug'at | S |
+| E9 ✓ v2.10.0 | Til aralash: «Ichki/Eksport», xom rol nomlari, `changed` | past | Interfeys ruscha — bitta lug'at | S |
 
 **E12a, E14, E15, E17, E18, E19 — bajarildi (v2.10.0).** E12a: «Прежние проекты» va
 справочник oynalari «цены без НДС» deydi; oldingi loyihada smeta narxi × 1,12 qilib yozilgan
@@ -795,6 +795,35 @@ deb olinmaydi (`VList.restoring`) — yopilgan oyna o'zi qayta ochilmaydi, E11 n
 yangilanish ro'yxat joyini saqlaydi. E6: tejam hamma joyda yashil, ortiqcha
 xarajat qizil (`S.diffCls`), o'zgargan qator foni neytral. E8: taklif filtrlari
 faqat server rejimida qo'shiladi. Testlar: `test/browser.mjs`, `test/e2e-hints.mjs`.
+
+**E7, E9 — bajarildi (v2.10.0).** E7: buzuq fayl endi yarim o'qilmaydi — rad
+etiladi va nima qilish kerakligi ruscha aytiladi (`src/lib/xlsx-read.js`): arxiv
+ochilmasa; eski `.xls` yoki parolli kitob (`D0 CF 11 E0`); varaq, satrlar jadvali
+yoki kitob tavsifi o'rtada uzilgan bo'lsa; kitob sanagan varaq arxivda yo'q bo'lsa;
+varaqlar tavsifi (`workbook.xml.rels`) yo'q bo'lsa; katak yo'q satrga ishora qilsa
+(nom bo'sh katakka aylanardi). Diagramma varag'i avvalgidek o'tkazib yuboriladi,
+prefiksli ildiz (`</x:worksheet>`) va qism nomining harf registri o'qiladi; bu
+kompyuterdagi ~600 Excel faylida tekshirildi — avval o'qilgan birortasi rad etilmadi. Bunday fayl
+serverga ham tushmaydi (`fileRead` faqat muvaffaqiyatda). UZEX ulanish xatosi Go
+matni o'rniga ruscha sabab bilan («нет интернета…», «соединение оборвалось»,
+«HTTP 503»), xom matn server jurnaliga (`server/pb_hooks/lib/uzex.js` `reason`).
+`S.pbErr` maydon va kodni ruscha aytadi («Пользователь с такой почтой уже есть…»),
+hook'ning ruscha matnini (403/404 ham) o'tkazadi, inglizcha qolganini «Сервер
+отклонил запрос (код n)» qiladi; `uzex-admin.js`/`refs-admin.js` endi xom
+`response.message` ni emas, `S.pbErr` ni ko'rsatadi. E9: bitta lug'at `S.RU`/`S.ru`
+(`src/lib/util.js`) — bozor, rol, eksport rejimi; UZEX admin bo'limi to'liq ruscha;
+yon paneldagi «Лист1 A ustuni» → «Номера в столбце A листа «Лист1»»; hook
+xabarlari («Kirish kerak», «Faqat administrator», «too many rows…», «confirm must
+be СТЕРЕТЬ», «Ish maydoni topilmadi») ruscha. O'zgarmadi (ataylab): eksport hujjati
+matnlari (shtamp, ikki tilli sarlavha, `introFrom`, `compare.js` dagi sarlavha
+nomi) va `narx_kitobi.json`. Testlar: `test/xlsx-guard.cjs`, `test/uzex.cjs`,
+yangi `test/pb-err.cjs` va `test/ui-language.cjs` (interfeys satrlarida o'zbekcha
+qolmagan — eksport matnlari ruxsat ro'yxatida); server testlari `test/uzex-api.mjs`
+(uzilgan ulanish), `test/e2e-uzex.mjs`, `test/e2e-admin.mjs` (rol, takroriy
+pochta), `test/e2e-workspace.mjs` (eksport rejimi). Qolgani: PocketBase'ning o'z
+inglizcha xabarlari (masalan OTP) endi umumiy ruscha jumla bo'ladi — aniq tarjima
+faqat ma'lum kodlar uchun; `.xls` fayl tanlashda oldindan rad etilmaydi (o'quvchi
+uni o'z xabari bilan rad etadi).
 
 ### QQS (НДС) hech qayerda aytilmaydi
 

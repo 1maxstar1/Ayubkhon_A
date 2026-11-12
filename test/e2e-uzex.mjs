@@ -2,7 +2,7 @@
  * The UZEX source in a real browser, against the stand-in site (test/uzex-site.mjs), with the synthetic reference
  * package and smeta of test/refs-fixture.cjs beside it. Every quote and price here is invented.
  *
- * Admin page: «UZEX haftalik narxlar» — the button stores the listed weeks, a second press adds nothing, a site that
+ * Admin page: «Недельные котировки UZEX» (in Russian, like the rest) — the button stores the listed weeks, a second press adds nothing, a site that
  * is down leaves an error and the stored weeks, the switch reaches the server, a week can be deleted; the reference
  * packages are the same before and after.
  * Expert: out of the box only «Наш справочник» is on and the page is what it was; UZEX on — violet tags beside
@@ -87,27 +87,29 @@ try {
   await page.fill('#loginCode', pb.lastCode('boss@example.com'));
   await page.click('#loginBtn');
   await page.waitForSelector('#adminMain:not([hidden])');
-  check(await page.isVisible('#uzexPanel') && /UZEX haftalik narxlar/.test(await page.textContent('#uzexPanel h2')), 'the admin page has «UZEX haftalik narxlar», a section of its own');
+  check(await page.isVisible('#uzexPanel') && /Недельные котировки UZEX/.test(await page.textContent('#uzexPanel h2')), 'the admin page has «Недельные котировки UZEX», a section of its own');
+  check(!/[A-Za-z][oOgG]['ʻ’][a-z]|\b(?:va|Ichki|Eksport)\b|yangila|hafta|saqla/.test(await page.textContent('#uzexPanel')), 'and it speaks Russian: no Uzbek left in it (E9)');
   check(await page.evaluate(() => document.getElementById('refsPanel').compareDocumentPosition(document.getElementById('uzexPanel')) & 4) > 0 &&
     !(await page.$('#refsPanel #uzexSync')), 'placed apart from «Справочник цен (документы)»');
-  await page.waitForFunction(() => /Hali hech narsa olinmagan/.test(document.querySelector('#uzexTable tbody').textContent));
-  check(await page.isChecked('#uzexAuto') && /Hali yangilanmagan/.test(await page.textContent('#uzexStat')), 'nothing fetched yet; «Avtomatik yangilash» is on by default');
+  await page.waitForFunction(() => /Пока ничего не получено/.test(document.querySelector('#uzexTable tbody').textContent));
+  check(await page.isChecked('#uzexAuto') && /Ещё не обновлялось/.test(await page.textContent('#uzexStat')), 'nothing fetched yet; «Обновлять автоматически» is on by default');
 
   await page.click('#uzexSync');
   await page.waitForFunction(() => document.querySelectorAll('#uzexTable tbody tr').length === 3, null, T);
   const table = await page.textContent('#uzexTable tbody');
-  check(/10\.03\.2031 – 14\.03\.2031/.test(table) && /Ichki/.test(table) && /Eksport/.test(table), 'the three listed weeks are stored and shown: period and market');
-  await page.waitForFunction(() => /Oxirgi yangilanish: .+, yangi haftalar: 3/.test(document.getElementById('uzexStat').textContent));
+  check(/10\.03\.2031 – 14\.03\.2031/.test(table) && /Внутренний рынок/.test(table) && /Экспортный рынок/.test(table), 'the three listed weeks are stored and shown: period and market');
+  await page.waitForFunction(() => /Последнее обновление: .+, новых недель: 3/.test(document.getElementById('uzexStat').textContent));
   check(true, 'the status says when and how many weeks were new (' + await page.textContent('#uzexStat') + ')');
   await page.click('#uzexSync');
-  await page.waitForFunction(() => /yangi haftalar: 0/.test(document.getElementById('uzexStat').textContent), null, T);
+  await page.waitForFunction(() => /новых недель: 0/.test(document.getElementById('uzexStat').textContent), null, T);
   check(await pb.count('uzex_imports') === 3 && await pb.count('uzex_quotes') === 9, 'a second press adds nothing');
 
   site.mode = 'down';
   await page.click('#uzexSync');
   await page.waitForFunction(() => !document.getElementById('uzexErr').hidden, null, T);
-  check(/не ответил/.test(await page.textContent('#uzexErr')) && await pb.count('uzex_quotes') === 9 && (await page.$$('#uzexTable tbody tr')).length === 3,
-    'the site is down: the error is shown and the stored weeks stay');
+  const down = await page.textContent('#uzexErr');
+  check(/не ответил/.test(down) && /HTTP 503/.test(down) && /сохранённые недели на месте/.test(down) && await pb.count('uzex_quotes') === 9 &&
+    (await page.$$('#uzexTable tbody tr')).length === 3, 'the site is down: the error is shown, in Russian, and the stored weeks stay (' + down + ')');
   site.mode = 'ok';
 
   await page.uncheck('#uzexAuto');
@@ -116,7 +118,7 @@ try {
   await page.waitForFunction(async () => (await S.pb.send('/api/uzex/status', {})).auto === true);
   check(true, 'the switch reaches the server, off and on again');
 
-  await page.click('#uzexTable tbody tr:has-text("Eksport") button[data-del]');
+  await page.click('#uzexTable tbody tr:has-text("Экспортный рынок") button[data-del]');
   await page.waitForFunction(() => document.querySelectorAll('#uzexTable tbody tr').length === 2, null, T);
   check(await pb.count('uzex_imports') === 2 && await pb.count('uzex_quotes') === 8, 'a week is deleted with its quotes');
   await page.click('#uzexSync');
@@ -210,7 +212,7 @@ try {
     `violet, semi-bold, with its left border — not green, red or our own colours (${tag.color} on ${tag.bg}, ${tag.border})`);
   check(await prices() === p0, 'checking a source sets no price');
   check(await ep.isVisible('.srcopts') && await ep.inputValue('#uzWeek') === '304' && await ep.inputValue('#uzMarket') === 'internal' &&
-    /Ichki/.test(await ep.textContent('#uzMarket')) && /Eksport/.test(await ep.textContent('#uzMarket')), 'the week and the market are shown: the newest internal week');
+    /Внутренний рынок/.test(await ep.textContent('#uzMarket')) && /Экспортный рынок/.test(await ep.textContent('#uzMarket')), 'the week and the market are shown: the newest internal week');
   check(/котировок: 4 из 6/.test(await ep.textContent('#uzInfo')) && /в валюте 1/.test(await ep.textContent('#uzInfo')) && /цены биржи с НДС — показаны без НДС/.test(await ep.textContent('#uzInfo')),
     'how many quotes are in use, and that the prices are shown without VAT (' + await ep.textContent('#uzInfo') + ')');
   check(/ · UZEX \d+/.test(await ep.textContent('#priceCount')), 'the status line counts the resources with a quote');

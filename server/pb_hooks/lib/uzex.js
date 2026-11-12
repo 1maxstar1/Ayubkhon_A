@@ -244,22 +244,47 @@ function parseWeek(html, id, market) {
 
 function base() { return String($os.getenv("UZEX_BASE") || "https://uzex.uz").replace(/\/+$/, ""); }
 
+/*
+ * Why a page did not come, in words the admin page can show. The transport's own text is Go's —
+ * «Get "…": dial tcp: lookup uzex.uz: no such host», «context deadline exceeded», «EOF» — and it used to be stored
+ * and shown as it was. It goes to the server log; the stored message says what happened. A text of our own
+ * (Cyrillic: «страница слишком велика», «пустой ответ») is kept as it is.
+ */
+const FETCH_TIMEOUT = 90;
+function reason(raw, code) {
+  if (code >= 500) return "сайт временно не работает (HTTP " + code + ")";
+  if (code >= 400) return "сайт отклонил запрос (HTTP " + code + ") — возможно, изменился адрес страницы";
+  if (code) return "неожиданный ответ сайта (HTTP " + code + ")";
+  const s = String(raw || "");
+  if (/[А-Яа-яЁё]/.test(s)) return s;
+  if (/no such host|lookup|network is unreachable|no route to host/i.test(s)) return "нет интернета или адрес uzex.uz не находится";
+  if (/refused/i.test(s)) return "uzex.uz отказал в соединении";
+  if (/timeout|deadline|timed out/i.test(s)) return "нет ответа за " + FETCH_TIMEOUT + " секунд";
+  if (/x509|certificate|tls/i.test(s)) return "не удалось установить защищённое соединение (сертификат)";
+  if (/EOF|reset|broken pipe|closed/i.test(s)) return "соединение оборвалось";
+  return "ошибка соединения";
+}
+
 /** One page, as text. A second try after a failure; then the error is the caller's. */
 function fetchPage(query) {
   const url = base() + PAGE + "?" + query;
   let last = "";
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const res = $http.send({ url: url, method: "GET", timeout: 90, headers: { "User-Agent": UA, "Accept": "text/html", "Accept-Language": "ru" } });
+      const res = $http.send({ url: url, method: "GET", timeout: FETCH_TIMEOUT, headers: { "User-Agent": UA, "Accept": "text/html", "Accept-Language": "ru" } });
       if (res.statusCode === 200) {
         const body = res.raw || (res.body ? toString(res.body) : "");
         if (body && body.length > MAX_PAGE) throw new Error("страница слишком велика (" + Math.round(body.length / 1024 / 1024) + " МБ)");
         if (body) return body;
         last = "пустой ответ";
-      } else last = "HTTP " + res.statusCode;
-    } catch (err) { last = String((err && err.message) || err).slice(0, 200); }
+      } else last = reason("", res.statusCode);
+    } catch (err) {
+      const raw = String((err && err.message) || err).slice(0, 300);
+      try { $app.logger().warn("uzex fetch", "url", url, "error", raw); } catch (_) { /* no logger here */ }
+      last = reason(raw);
+    }
   }
-  throw new Error("uzex.uz не ответил: " + last);
+  throw new Error("uzex.uz не ответил — " + last);
 }
 
 function settings(app) {
@@ -409,6 +434,6 @@ function catchUp(app) {
 
 module.exports = {
   HEADER: HEADER, LIMITS: { page: MAX_PAGE, listed: MAX_LISTED, rows: MAX_ROWS, cell: MAX_CELL, newWeeks: MAX_NEW_WEEKS },
-  text: text, num: num, isoDate: isoDate, parseName: parseName, parseWeeks: parseWeeks, parseWeek: parseWeek,
+  text: text, num: num, isoDate: isoDate, reason: reason, parseName: parseName, parseWeeks: parseWeeks, parseWeek: parseWeek,
   status: status, setAuto: setAuto, sync: sync, auto: auto, catchUp: catchUp
 };

@@ -77,19 +77,19 @@ module.exports = {
    */
   bulk(e) {
     const auth = e.auth;
-    if (!auth) throw new ForbiddenError("Kirish kerak");
+    if (!auth) throw new ForbiddenError("Нужно войти");
 
     const body = e.requestInfo().body || {};
     const rows = Array.isArray(body.set) ? body.set : [];
     const gone = Array.isArray(body.del) ? body.del : [];
     if (rows.length + gone.length > MAX_ROWS) {
-      throw new BadRequestError("too many corrections in one request: " +
-        (rows.length + gone.length) + " (max " + MAX_ROWS + ")");
+      throw new BadRequestError("Слишком много правок за один запрос: " +
+        (rows.length + gone.length) + " (не больше " + MAX_ROWS + ")");
     }
 
     let ws = null;
     try { ws = $app.findRecordById("workspaces", String(body.workspace || "")); } catch (_) { ws = null; }
-    if (!ws) throw new NotFoundError("Ish maydoni topilmadi");
+    if (!ws) throw new NotFoundError("Рабочая область не найдена");
 
     const region = ws.getString("region");
     const application = ws.getString("application");

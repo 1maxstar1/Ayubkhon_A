@@ -5,7 +5,7 @@
 routerAdd("POST", "/api/registry/import", (e) => {
   const auth = e.auth;
   if (!auth || !(auth.isSuperuser() || auth.get("role") === "admin")) {
-    throw new ForbiddenError("Faqat administrator");
+    throw new ForbiddenError("Только администратор");
   }
   const body = e.requestInfo().body || {};
   const raw = Array.isArray(body.rows) ? body.rows : [];
@@ -14,7 +14,7 @@ routerAdd("POST", "/api/registry/import", (e) => {
   // mistake or something to be refused rather than held open for minutes.
   const MAX_ROWS = 2000;
   if (raw.length > MAX_ROWS) {
-    throw new BadRequestError("too many rows in one request: " + raw.length + " (max " + MAX_ROWS + ")");
+    throw new BadRequestError("Слишком много строк за один запрос: " + raw.length + " (не больше " + MAX_ROWS + ")");
   }
   // One application number = one record. A registry export can repeat a number;
   // the later row wins, because it carries the newer state of the application.

@@ -71,17 +71,50 @@
   };
   document.addEventListener('auth:signedout', function () { tok = null; tokAt = 0; });
 
-  /** Human-readable (Uzbek) message for a failed request. */
+  /*
+   * Human-readable (Russian) message for a failed request.
+   *
+   * PocketBase answers in English — «email: Value must be unique.», «Failed to create record.» — and the interface
+   * is Russian. A field error is told with the field's Russian name and what is wrong with it; a hook's own text,
+   * which is Russian, is passed on; anything else in English becomes a plain sentence with the code, and the
+   * English goes to the console for whoever looks into it. test/pb-err.cjs.
+   */
+  var FIELD = {
+    email: 'Эл. почта', name: 'Имя', number: 'Номер заявки', inn: 'ИНН', region: 'Регион', role: 'Роль',
+    org_name: 'Организация', project_title: 'Название объекта', status: 'Статус', file: 'Файл', note: 'Примечание'
+  };
+  var CODE = [
+    [/not_unique/, 'такое значение уже есть'],
+    [/required|nil_or_not_empty|empty/, 'не заполнено'],
+    [/email/, 'неверный адрес почты'],
+    [/too_short|min_text|min_length/, 'слишком короткое'],
+    [/length|too_long|max_text/, 'слишком длинное'],
+    [/file_size|size_limit/, 'файл слишком велик'],
+    [/mime/, 'файл не того типа']
+  ];
+  var CYR = /[А-Яа-яЁё]/;
+  function fieldText(name, item) {
+    var code = String(item && (item.code || item.message) || ''), what = 'неверное значение';
+    for (var i = 0; i < CODE.length; i++) if (CODE[i][0].test(code)) { what = CODE[i][1]; break; }
+    if (item && item.message && CYR.test(item.message)) what = item.message;   // a hook named it already
+    if (name === 'email' && /not_unique/.test(code)) {
+      return 'Пользователь с такой почтой уже есть — найдите его в списке (если отключён, нажмите «Включить»)';
+    }
+    return FIELD[name] ? FIELD[name] + ': ' + what : what;
+  }
   S.pbErr = function (e) {
     if (!e) return 'Неизвестная ошибка';
     if (e.status === 0) return 'Нет связи с сервером';
+    var d = e.response && e.response.data;
+    var keys = d && typeof d === 'object' ? Object.keys(d) : [];
+    if (keys.length && e.status === 400) return fieldText(keys[0], d[keys[0]]);
+    var msg = String(e.message || (e.response && e.response.message) || '');
+    if (typeof e.status !== 'number') return msg || String(e);   // not a server answer: an error of our own
+    if (CYR.test(msg)) return msg;                                // the hooks speak Russian
+    if (msg && typeof console !== 'undefined') console.warn('server said', e.status, msg);
     if (e.status === 401 || e.status === 403) return 'Нет доступа';
     if (e.status === 404) return 'Не найдено';
-    var d = e.response && e.response.data;
-    if (d) {
-      var keys = Object.keys(d);
-      if (keys.length) return keys[0] + ': ' + (d[keys[0]].message || d[keys[0]].code || 'неверное значение');
-    }
-    return e.message || String(e);
+    if (e.status === 429) return 'Слишком много запросов подряд — подождите несколько секунд';
+    return 'Сервер отклонил запрос (код ' + e.status + ')';
   };
 })(S);

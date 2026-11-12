@@ -182,5 +182,76 @@ check(!!junk.err, 'five random bytes are refused, not silently accepted');
 const empty = read(book(''), 'empty');
 check(!empty.err && empty.wb.sheets[0].rows.length <= 1, 'a workbook with no rows is simply empty');
 
+/* ------------------------------------------------ a damaged file is refused in words */
+/*
+ * The part reader looks for tags, not for a well-formed document. A sheet cut off in the middle used to give the
+ * rows before the cut and say nothing — half an estimate, and in server mode it was stored like that; a missing
+ * shared-strings table turned every name into an empty cell; a broken archive said «invalid zip data». Each of
+ * these is now refused, in Russian, with what to do about it.
+ */
+console.log('-- a damaged file is refused in words, never half read --');
+{
+  const enc = new TextEncoder();
+  const rowsOf = (n) => Array.from({ length: n }, (_, i) =>
+    `<row r="${i + 1}"><c r="A${i + 1}" t="s"><v>${i}</v></c><c r="B${i + 1}"><v>${i + 1}</v></c></row>`).join('');
+  const sstOf = (n) => '<?xml version="1.0"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
+    `count="${n}" uniqueCount="${n}">` + Array.from({ length: n }, (_, i) => `<si><t>РЕСУРС ${i}</t></si>`).join('') + '</sst>';
+  /** book() with shared strings: six rows whose names live in xl/sharedStrings.xml */
+  const withSst = () => {
+    const f = fflate.unzipSync(book(rowsOf(6)));
+    f['xl/sharedStrings.xml'] = enc.encode(sstOf(6));
+    return f;
+  };
+  const text = (u8) => new TextDecoder().decode(u8);
+  const cut = (u8) => u8.slice(0, Math.floor(u8.length / 2));
+
+  const good = read(fflate.zipSync(withSst()), 'sst');
+  check(!good.err && good.wb.sheets[0].rows[6][1].v === 'РЕСУРС 5', 'a workbook with shared strings reads, names in place');
+
+  const refused = (what, bytes, more) => {
+    const r = read(bytes, what);
+    const m = r.err ? String(r.err.message) : '';
+    check(!!r.err && /[А-Яа-я]/.test(m) && !/invalid|undefined|zip data/i.test(m) && (!more || more.test(m)),
+      `${what}: refused — ${m || 'NOT REFUSED (' + (r.wb ? r.wb.sheets.map((s) => s.rows.length).join('/') : '?') + ' rows read)'}`);
+  };
+
+  refused('random bytes', new Uint8Array(Array.from({ length: 300 }, (_, i) => (i * 37 + 11) & 255)), /не открывается/);
+  { const cfb = new Uint8Array(1024); cfb.set([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]);
+    refused('an old .xls (or password-protected) file', cfb, /\.xls.*парол|парол.*\.xls/); }
+  refused('the archive cut in half', cut(fflate.zipSync(withSst())), /не открывается/);
+  { const f = withSst(); f['xl/worksheets/sheet1.xml'] = cut(f['xl/worksheets/sheet1.xml']);
+    refused('the sheet cut in half', fflate.zipSync(f), /Лист1.*обрывается/); }
+  { const f = withSst(); delete f['xl/worksheets/sheet1.xml'];
+    refused('the sheet missing from the archive', fflate.zipSync(f), /Лист1.*отсутствует/); }
+  { const f = withSst(); delete f['xl/_rels/workbook.xml.rels'];
+    refused('no description of the sheets (workbook.xml.rels)', fflate.zipSync(f), /описания листов/); }
+  { const f = withSst(); delete f['xl/sharedStrings.xml'];
+    refused('cells pointing at shared strings, with no shared strings', fflate.zipSync(f), /отсутствующую строку/); }
+  { const f = withSst(); f['xl/sharedStrings.xml'] = enc.encode(sstOf(3));
+    refused('a cell pointing past the end of the shared strings', fflate.zipSync(f), /отсутствующую строку/); }
+  { const f = withSst(); f['xl/sharedStrings.xml'] = cut(f['xl/sharedStrings.xml']);
+    refused('the shared strings cut in half', fflate.zipSync(f), /таблица строк/); }
+  { const f = withSst(); f['xl/workbook.xml'] = cut(f['xl/workbook.xml']);
+    refused('the workbook description cut in half', fflate.zipSync(f), /описание книги/); }
+
+  // what other tools write is still read
+  { const f = withSst();
+    f['xl/_rels/workbook.xml.rels'] = enc.encode(text(f['xl/_rels/workbook.xml.rels']).replace('</Relationships>',
+      '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet" Target="chartsheets/sheet2.xml"/></Relationships>'));
+    f['xl/workbook.xml'] = enc.encode(text(f['xl/workbook.xml']).replace('</sheets>', '<sheet name="Диаграмма" sheetId="2" r:id="rId2"/></sheets>'));
+    const r = read(fflate.zipSync(f), 'chartsheet');
+    check(!r.err && r.wb.sheets.length === 1 && r.wb.sheets[0].rows[6][1].v === 'РЕСУРС 5', 'a chart sheet the reader does not read is still skipped, not refused'); }
+  { const f = withSst();
+    f['xl/worksheets/sheet1.xml'] = enc.encode('<?xml version="1.0"?><x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      '<x:sheetData></x:sheetData></x:worksheet>\r\n\n  ');
+    f['xl/sharedStrings.xml'] = enc.encode('<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="0" uniqueCount="0"/>\n');
+    const r = read(fflate.zipSync(f), 'prefixed');
+    check(!r.err, 'a prefixed root with trailing whitespace, and an empty self-closed string table, are read' + (r.err ? ' — ' + r.err.message : '')); }
+  { const f = withSst();
+    f['xl/worksheets/Sheet1.xml'] = f['xl/worksheets/sheet1.xml']; delete f['xl/worksheets/sheet1.xml'];
+    const r = read(fflate.zipSync(f), 'case');
+    check(!r.err && !!r.wb.sheets[0] && r.wb.sheets[0].rows[6][1].v === 'РЕСУРС 5', 'a part name in another letter case is found (package names are not case-sensitive)'); }
+}
+
 console.log(fail ? `FAILED (${fail})` : 'xlsx-guard OK');
 process.exit(fail ? 1 : 0);

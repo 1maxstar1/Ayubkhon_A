@@ -136,5 +136,17 @@ var S = (typeof S !== 'undefined' && S) || {};
   S.near = near; S.num = num;
   S.vat = { RATE: 0.12, looksGross: looksGross };
   S.money = money; S.price = price; S.qty = qty; S.debounce = debounce;
+
+  /*
+   * The interface is Russian (CLAUDE.md). Values the server stores as codes — a market, a role, an export mode —
+   * are shown through this one vocabulary, so the same thing has the same Russian name on every page.
+   *   S.ru('role', 'ekspert') → 'Эксперт';  a code it does not know comes back as it is.
+   */
+  S.RU = {
+    market: { internal: 'Внутренний рынок', 'export': 'Экспортный рынок' },
+    role: { admin: 'Администратор', ekspert: 'Эксперт' },
+    mode: { changed: 'Только изменённые', dedup: 'Все ресурсы', full: 'Полная копия' }
+  };
+  S.ru = function (group, code) { return (S.RU[group] || {})[code] || code; };
 })(S);
 if (typeof self !== 'undefined') self.S = S;

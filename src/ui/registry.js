@@ -319,7 +319,7 @@
           $('cardExports').innerHTML = list.length ? list.map(function (x) {
             var by = x.expand && x.expand.by;
             return '<li><a data-name="' + S.esc(x.file) + '" data-rec="' + S.esc(x.id) + '">' + S.esc(shortName(x.file)) + '</a>' +
-              '<small>' + day(x.created) + (by ? ' · ' + S.esc(by.name || by.email) : '') + (x.mode ? ' · ' + S.esc(x.mode) : '') + '</small></li>';
+              '<small>' + day(x.created) + (by ? ' · ' + S.esc(by.name || by.email) : '') + (x.mode ? ' · ' + S.esc(S.ru('mode', x.mode)) : '') + '</small></li>';
           }).join('') : '<li class="mute">экспортов ещё нет</li>';
           list.forEach(function (x) { sign($('cardExports'), x, x.id); });
         }).catch(function (e) { $('cardExports').innerHTML = '<li class="mute">' + S.esc(S.pbErr(e)) + '</li>'; });

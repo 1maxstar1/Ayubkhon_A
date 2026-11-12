@@ -124,7 +124,7 @@
   Compare.prototype.read = function (file, done, failed) {
     var app = this.app;
     failed = failed || function () {};
-    if (!/\.xls[xm]?$/i.test(file.name)) { app.toast('Принимаются только файлы .xlsx', true); failed(); return; }
+    if (!/\.xls[xm]?$/i.test(file.name)) { app.toast('Принимаются только файлы .xlsx / .xlsm', true); failed(); return; }
     app.busy(true, 'Чтение файла: ' + file.name + '…');
     var reader = new FileReader();
     reader.onerror = function () { app.busy(false); app.toast('Не удалось прочитать файл', true); failed(); };

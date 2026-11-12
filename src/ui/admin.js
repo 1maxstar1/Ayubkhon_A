@@ -339,7 +339,7 @@
       S.pb.collection('users').getFullList({ sort: 'name' }).then(function (items) {
         tb.innerHTML = items.map(function (u) {
           return '<tr data-id="' + u.id + '"><td>' + S.esc(u.email) + '</td><td>' + S.esc(u.name || '') +
-            '</td><td>' + S.esc(u.role || '') + '</td><td>' + (u.active ? 'активен' : '<span class="mute">отключён</span>') +
+            '</td><td>' + S.esc(S.ru('role', u.role || '')) + '</td><td>' + (u.active ? 'активен' : '<span class="mute">отключён</span>') +
             '</td><td class="act"><button class="btn sm ' + (u.active ? 'danger' : 'ok') + '" data-act="toggle">' + (u.active ? 'Отключить' : 'Включить') + '</button></td></tr>';
         }).join('');
         tb.querySelectorAll('button[data-act=toggle]').forEach(function (b) {

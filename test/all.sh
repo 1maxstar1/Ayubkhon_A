@@ -103,6 +103,8 @@ run build            node build.mjs
 run normalize        node test/normalize.cjs
 run num              node test/num.cjs
 run xlsx-guard       node test/xlsx-guard.cjs
+run pb-err           node test/pb-err.cjs
+run ui-language      node test/ui-language.cjs
 run smeta-form4a     node test/smeta-form4a.cjs
 run smeta-header     node test/smeta-header.cjs
 run compare          node test/compare.cjs

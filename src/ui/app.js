@@ -445,7 +445,7 @@
   App.prototype.addFiles = function (files) {
     var self = this;
     files = files.filter(function (f) { return /\.xlsx?$|\.xlsm$/i.test(f.name); });
-    if (!files.length) { this.toast('Принимаются только файлы .xlsx', true); return; }
+    if (!files.length) { this.toast('Принимаются только файлы .xlsx / .xlsm', true); return; }
     this.busy(true, 'Чтение файлов: ' + files.length + '…');
     // Files finish parsing in whatever order the worker gets to them, so each
     // one keeps the slot it was picked in; the projects are appended in that
@@ -592,7 +592,7 @@
         '<header>' +
         '<input type="checkbox" ' + (p.enabled ? 'checked' : '') + ' data-act="proj-on" title="Включить проект">' +
         '<input class="tab-name" data-act="tab" value="' + S.esc(p.name) + '" title="Имя листа Excel">' +
-        range(p, 'Лист1 A ustuni') +
+        range(p, 'Номера в столбце A листа «Лист1»') +
         '<button class="link" data-act="pup" title="Выше — номера в столбце A изменятся">▲</button>' +
         '<button class="link" data-act="pdown" title="Ниже">▼</button>' +
         '<button class="link" data-act="del" title="Убрать">×</button>' +
@@ -605,7 +605,7 @@
             '<input type="checkbox" ' + (o.enabled === false ? '' : 'checked') + ' data-act="obj-on">' +
             '<span class="nm" title="' + S.esc(o.subtitle) + '">' + S.esc(o.subtitle) + '</span>' +
             '<small>' + o.items + '</small>' +
-            range(o, 'Лист1 A ustuni') +
+            range(o, 'Номера в столбце A листа «Лист1»') +
             '<button class="mv" data-act="up" title="Выше">▲</button>' +
             '<button class="mv" data-act="down" title="Ниже">▼</button>' +
             '</li>';

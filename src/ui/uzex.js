@@ -35,7 +35,7 @@
   var BATCH = 50;
   var NEAR = { similar: true, estimate: true };
   var QF = 'row_no,name,item,unit,unit_assumed,packing,is_forward,is_import,currency,price,change,change_pct,date_from,date_to';
-  var MARKET = { internal: 'Ichki', 'export': 'Eksport' };
+  var MARKET = S.RU.market;
 
   function $(id) { return document.getElementById(id); }
   function A() { return window.app; }
@@ -162,7 +162,7 @@
         '<span class="srcopts" hidden>' +
         '<select id="uzWeek" title="Неделя котировок UZEX"></select>' +
         '<select id="uzMarket" title="Рынок: внутренние или экспортные котировки">' +
-        '<option value="internal">Ichki</option><option value="export">Eksport</option></select>' +
+        '<option value="internal">' + MARKET.internal + '</option><option value="export">' + MARKET['export'] + '</option></select>' +
         '<label title="Таблица недели содержит и последнюю цену товаров, по которым на этой неделе сделок не было. С галочкой — только сделки самой недели">' +
         '<input type="checkbox" id="uzOnlyWeek"> только котировки этой недели</label>' +
         '<label title="Форвардные и фьючерсные контракты — цена будущей поставки, не текущая. Без галочки не предлагаются">' +

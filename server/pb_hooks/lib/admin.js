@@ -4,7 +4,7 @@ module.exports = {
   requireAdmin(e) {
     const auth = e.auth;
     if (!auth || !(auth.isSuperuser() || auth.get("role") === "admin")) {
-      throw new ForbiddenError("Faqat administrator");
+      throw new ForbiddenError("Только администратор");
     }
   },
   /** Deletes every record of `collection` whose `field` equals `id`; returns the count. */

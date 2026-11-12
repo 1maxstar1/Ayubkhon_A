@@ -27,6 +27,25 @@ check(isNaN(U.num('')) && isNaN(U.num('12 345,6,7')) && isNaN(U.num('н/д')), '
 check(U.isoDate('06.11.2026') === '2026-11-06' && U.isoDate('31.02.2026') === '' && U.isoDate('2026-11-06') === '', 'dates: dd.mm.yyyy only, and only real ones');
 check(U.text(' <span>&#x410;&#x432; &amp; &#1057;&#xA0;&quot;x&quot;</span>\n ') === 'Ав & С "x"', 'cells: tags out, hex / decimal / named entities decoded, spaces folded');
 
+/* ------------------------------------------------------------------ why a page did not come */
+// the transport's Go text («dial tcp: lookup uzex.uz: no such host») was stored and shown as it was; it is now said in Russian
+{
+  const r = U.reason;
+  const plain = (s) => /[А-Яа-я]/.test(s) && !/dial|lookup|tcp|EOF|deadline|Get "/.test(s);
+  const cases = [
+    ['Get "https://uzex.uz/WeeklyQuotes?culture=ru": dial tcp: lookup uzex.uz: no such host', /нет интернета/],
+    ['Get "https://uzex.uz/x": dial tcp 1.2.3.4:443: connect: connection refused', /отказал/],
+    ['Get "https://uzex.uz/x": context deadline exceeded (Client.Timeout exceeded while awaiting headers)', /90 секунд/],
+    ['Get "https://uzex.uz/x": tls: failed to verify certificate: x509: certificate has expired', /сертификат/],
+    ['Get "https://uzex.uz/x": EOF', /оборвалось/],
+    ['read tcp 10.0.0.2:5555->1.2.3.4:443: read: connection reset by peer', /оборвалось/],
+    ['something nobody has seen', /^ошибка соединения$/]
+  ];
+  check(cases.every(([raw, re]) => re.test(r(raw)) && plain(r(raw))), 'a failed connection is told in Russian, the Go text left for the log');
+  check(r('страница слишком велика (9 МБ)') === 'страница слишком велика (9 МБ)', 'a reason of our own, in Russian, is kept');
+  check(/временно не работает \(HTTP 503\)/.test(r('', 503)) && /отклонил запрос \(HTTP 404\).*адрес/.test(r('', 404)), 'a 5xx and a 4xx from the site');
+}
+
 /* ------------------------------------------------------------------ names */
 const n = (s, m) => U.parseName(s, m || 'internal');
 const eq = (a, b) => Object.keys(b).every((k) => a[k] === b[k]);

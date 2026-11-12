@@ -62,19 +62,19 @@
   </section>
 
   <section class="panel" id="uzexPanel">
-    <h2>UZEX haftalik narxlar</h2>
-    <p class="lead">Manba: UzEx — Haftalik kotirovkalar (uzex.uz). Birlik nomda ko'rsatilmagan bo'lsa — 1 tonna deb olingan.
-      Birja narxlari QQS bilan; «Проверка цен» da ular QQSsiz ko'rsatiladi (÷ 1,12). Bu bo'lim «Справочник цен (документы)» dan alohida: u paketlarga tegmaydi, paket yuklash
-      esa bu yerdagi haftalarga tegmaydi. Sayt faqat oxirgi 4 haftani saqlaydi — olingan har bir hafta shu bazada qoladi.</p>
-    <button class="btn primary" type="button" id="uzexSync"><span class="ic">↻</span> UZEX dan yangilash</button>
-    <button class="btn" type="button" id="uzexForce" title="Saytda ko'rinib turgan haftalarni qaytadan o'qib, saqlanganining o'rniga yozadi">Qayta o'qish</button>
-    <label class="uz-auto" title="Server ishga tushgandan yarim daqiqa keyin va har kuni soat 09:00 da (Toshkent vaqti) yangi haftalarni o'zi oladi">
-      <input type="checkbox" id="uzexAuto"> Avtomatik yangilash</label>
-    <div class="progress" id="uzexProgress" hidden><div class="bar-fill" style="width:100%"></div><span>UZEX dan o'qilmoqda…</span></div>
+    <h2>Недельные котировки UZEX</h2>
+    <p class="lead">Источник: UzEx — Недельные котировки (uzex.uz). Если единица в названии не указана — принята 1 тонна.
+      Биржевые цены с НДС; в «Проверка цен» они показаны без НДС (÷ 1,12). Этот раздел отделён от «Справочник цен (документы)»: он не трогает пакеты,
+      а загрузка пакета не трогает недели отсюда. Сайт хранит только последние 4 недели — каждая полученная неделя остаётся в этой базе.</p>
+    <button class="btn primary" type="button" id="uzexSync"><span class="ic">↻</span> Обновить с UZEX</button>
+    <button class="btn" type="button" id="uzexForce" title="Заново читает недели, которые показывает сайт, и записывает их вместо сохранённых">Перечитать</button>
+    <label class="uz-auto" title="Сервер сам получает новые недели через полминуты после запуска и каждый день в 09:00 (время Ташкента)">
+      <input type="checkbox" id="uzexAuto"> Обновлять автоматически</label>
+    <div class="progress" id="uzexProgress" hidden><div class="bar-fill" style="width:100%"></div><span>Читаем UZEX…</span></div>
     <p class="err" id="uzexErr" hidden></p>
     <div class="stat" id="uzexStat"></div>
-    <h3>Saqlangan haftalar</h3>
-    <table class="tbl" id="uzexTable"><thead><tr><th>Hafta</th><th>Bozor</th><th>Qatorlar</th><th>Olingan</th><th></th></tr></thead><tbody></tbody></table>
+    <h3>Сохранённые недели</h3>
+    <table class="tbl" id="uzexTable"><thead><tr><th>Неделя</th><th>Рынок</th><th>Строк</th><th>Получено</th><th></th></tr></thead><tbody></tbody></table>
   </section>
 
   <section class="panel">

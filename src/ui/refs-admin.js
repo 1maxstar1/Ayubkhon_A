@@ -233,7 +233,7 @@
         var d = e && e.response && e.response.data;
         if (d && ((d.sha256 && d.sha256.code === 'validation_not_unique') || (d.package_id && d.package_id.code === 'validation_not_unique'))) {
           self.fail(d.sha256 ? 'Этот пакет уже загружен' : 'Пакет с таким номером уже есть, но содержимое другое — проверьте файл');
-        } else self.fail('Не удалось загрузить: ' + ((e && e.response && e.response.message) || S.pbErr(e)));
+        } else self.fail('Не удалось загрузить: ' + S.pbErr(e));
       }).then(function () { $('refsUpload').disabled = false; });
     },
 
@@ -288,7 +288,7 @@
       var x = this.items.filter(function (i) { return i.id === id; })[0];
       if (!x || !confirm('Удалить пакет ' + x.package_id + '?\n\nЦены, уже применённые экспертами, останутся.')) return;
       S.pb.collection('ref_packages').delete(id).then(function () { toast('Пакет удалён'); self.load(); })
-        .catch(function (e) { toast((e && e.response && e.response.message) || S.pbErr(e), true); });
+        .catch(function (e) { toast(S.pbErr(e), true); });
     },
 
     /** The documents of a package, from its manifest: type, issuer, number, date, region (issuer and number without the

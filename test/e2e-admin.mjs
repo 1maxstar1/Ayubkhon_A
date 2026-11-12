@@ -119,6 +119,16 @@ await page.click('#userForm button[type=submit]');
 await page.waitForFunction(() => document.body.textContent.includes('new@example.com'));
 const rows = await page.$$eval('#userTable tbody tr', (trs) => trs.map((t) => t.textContent.replace(/\s+/g, ' ').trim()));
 check(rows.some((r) => r.includes('new@example.com') && r.includes('активен')), 'new user listed as active');
+check(rows.some((r) => r.includes('new@example.com') && r.includes('Эксперт')) && !rows.some((r) => /\bekspert\b|\badmin\b/.test(r.replace(/\S+@\S+/g, ''))),
+  'the role is shown in Russian, as the form names it — «Эксперт», not the stored «ekspert» (E9)');
+// the same address again: PocketBase says «email: Value must be unique.»; the page says it in Russian, with what to do
+await page.fill('#uEmail', 'new@example.com');
+await page.fill('#uName', 'Ещё раз');
+await page.click('#userForm button[type=submit]');
+await page.waitForSelector('#userErr:not([hidden])');
+const dupErr = await page.textContent('#userErr');
+check(/уже есть/.test(dupErr) && !/Value must be unique|email:/.test(dupErr), 'a colleague already on the list is refused in Russian (E7): ' + dupErr);
+await page.fill('#uEmail', ''); await page.fill('#uName', '');
 // it ends that person's session at once, so it asks; «нет» changes nothing
 let offAsked = '';
 page.once('dialog', (d) => { offAsked = d.message(); d.dismiss(); });

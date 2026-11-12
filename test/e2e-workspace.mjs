@@ -391,6 +391,9 @@ check(true, 'list shows the application as finished');
 await page.click('#appTable tbody tr button[data-act=card]');
 await page.waitForSelector('#screen-card:not([hidden])');
 await page.waitForFunction(() => document.querySelectorAll('#cardExports li a').length === 1);
+const expLine = await page.textContent('#cardExports small');
+check(/Только изменённые/.test(expLine) && !/\b(changed|dedup|full)\b/.test(expLine),
+  'the export is listed with its mode in Russian, as the export menu names it — not the stored «changed» (E9): ' + expLine);
 check((await page.textContent('#cardFields')).includes('67159') === false && (await page.textContent('#cardTitle')).includes('67159'), 'card opens for the application');
 check((await page.$$eval('#cardFiles li a', (a) => a.length)) === 2, 'card lists the two uploaded smeta files');
 

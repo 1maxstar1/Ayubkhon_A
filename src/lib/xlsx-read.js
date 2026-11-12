@@ -136,7 +136,7 @@
   var MAX_ROW = 1048576;
   var MAX_COL = 16384;
 
-  function parseSheet(xml, sst) {
+  function parseSheet(xml, sst, name) {
     var rows = [], maxCol = 0;
 
     var dim = /<dimension ref="([^"]*)"/.exec(xml);
@@ -168,7 +168,12 @@
         } else {
           var raw = first(body, 'v');
           if (raw !== null) {
-            if (t === 's') v = sst[+raw];
+            if (t === 's') {
+              // a name that points at a string the file does not have would come out as an empty cell — refused
+              var si = +raw;
+              if (!(si >= 0 && si < sst.length)) throw new Error(BROKEN + 'лист «' + name + '» ссылается на отсутствующую строку.');
+              v = sst[si];
+            }
             else if (t === 'str' || t === 'e') v = unesc(raw);
             else if (t === 'b') v = raw === '1';
             else { v = +raw; if (!isFinite(v)) v = unesc(raw); }
@@ -211,31 +216,67 @@
    */
   var MAX_PART_MB = 120, MAX_ALL_MB = 360;
 
+  /*
+   * A file that is damaged is refused in words, never half read. The part reader looks for tags, not for a
+   * well-formed document, so a sheet cut off in the middle used to give the rows before the cut and say nothing:
+   * an estimate with half its resources, and in server mode it was stored like that. Each part therefore has to
+   * end where its root element ends, every sheet the workbook lists has to be in the archive, and every shared
+   * string a cell points at has to exist. Chart, dialog and macro sheets are not read and are not asked for.
+   */
+  var BROKEN = 'Файл повреждён: ';
+  var AGAIN = ' Откройте его в Excel и сохраните заново.';
+  var SHEET_PART = /^xl\/worksheets\/[^/]+\.xml$/i;
+  var END = {};
+  /** Does `xml` end where its root element <root> ends (prefixed or not, closed or self-closing)? Only the tail is looked at. */
+  function ends(xml, root) {
+    var re = END[root] || (END[root] = new RegExp('(</(\\w+:)?' + root + '>|<(\\w+:)?' + root + '\\b[^<>]*/>)$'));
+    var z = xml.length;
+    while (z > 0) {
+      var c = xml.charCodeAt(z - 1);
+      if (c === 32 || c === 9 || c === 10 || c === 13 || c === 0) z--; else break;
+    }
+    return re.test(xml.slice(Math.max(0, z - 2048), z));
+  }
+
   function read(bytes) {
-    var MB = 1024 * 1024, all = 0, tooBig = '';
-    var files = fflate.unzipSync(bytes, {
-      filter: function (f) {
-        var n = f.name;
-        var wanted = n === 'xl/workbook.xml' || n === 'xl/_rels/workbook.xml.rels' ||
-          n === 'xl/sharedStrings.xml' || /^xl\/worksheets\/[^/]+\.xml$/.test(n);
-        if (!wanted || tooBig) return false;
-        all += f.originalSize || 0;
-        if (f.originalSize > MAX_PART_MB * MB || all > MAX_ALL_MB * MB) { tooBig = n; return false; }
-        return true;
+    var MB = 1024 * 1024, all = 0, tooBig = '', zipped;
+    try {
+      zipped = fflate.unzipSync(bytes, {
+        filter: function (f) {
+          var n = f.name;
+          var wanted = /^xl\/(workbook\.xml|_rels\/workbook\.xml\.rels|sharedStrings\.xml)$/i.test(n) || SHEET_PART.test(n);
+          if (!wanted || tooBig) return false;
+          all += f.originalSize || 0;
+          if (f.originalSize > MAX_PART_MB * MB || all > MAX_ALL_MB * MB) { tooBig = n; return false; }
+          return true;
+        }
+      });
+    } catch (e) {
+      // «D0 CF 11 E0» opens an OLE compound file: an Excel 97–2003 book, or an .xlsx Excel has put a password on
+      if (bytes && bytes[0] === 0xD0 && bytes[1] === 0xCF && bytes[2] === 0x11 && bytes[3] === 0xE0) {
+        throw new Error('Это книга Excel старого формата (.xls) или защищённая паролем. Откройте её в Excel и ' +
+          'сохраните как «Книга Excel (.xlsx)» без пароля.');
       }
-    });
+      throw new Error('Файл повреждён или это не книга Excel: архив не открывается.' + AGAIN);
+    }
+    // part names inside a package are not case-sensitive
+    var files = {};
+    for (var zn in zipped) files[zn.toLowerCase()] = zipped[zn];
     if (tooBig) {
       throw new Error('Файл слишком велик в распакованном виде (' + tooBig.replace(/^.*\//, '') + ' — больше ' +
         MAX_PART_MB + ' МБ, или все листы вместе больше ' + MAX_ALL_MB + ' МБ). Такую книгу программа не читает.');
     }
 
     var wbXml = files['xl/workbook.xml'];
-    if (!wbXml) throw new Error('xl/workbook.xml не найден — это не файл .xlsx.');
+    if (!wbXml) throw new Error('Это не книга Excel: в архиве нет описания книги (xl/workbook.xml).');
     wbXml = decodeText(wbXml);
+    if (!ends(wbXml, 'workbook')) throw new Error(BROKEN + 'описание книги обрывается на середине.' + AGAIN);
 
     var rels = {};
-    if (files['xl/_rels/workbook.xml.rels']) {
-      var relXml = decodeText(files['xl/_rels/workbook.xml.rels']);
+    var relRaw = files['xl/_rels/workbook.xml.rels'];
+    if (!relRaw && /<(\w+:)?sheet\b/.test(wbXml)) throw new Error(BROKEN + 'нет описания листов.' + AGAIN);
+    if (relRaw) {
+      var relXml = decodeText(relRaw);
       var rre = /<Relationship([^>]*)\/>/g, rm2;
       while ((rm2 = rre.exec(relXml))) {
         var a = attrs(rm2[1]);
@@ -243,18 +284,27 @@
       }
     }
 
-    var sst = sharedStrings(files['xl/sharedStrings.xml'] ? decodeText(files['xl/sharedStrings.xml']) : null);
+    var sstXml = files['xl/sharedstrings.xml'] ? decodeText(files['xl/sharedstrings.xml']) : null;
+    if (sstXml !== null && !ends(sstXml, 'sst')) throw new Error(BROKEN + 'таблица строк обрывается на середине.' + AGAIN);
+    var sst = sharedStrings(sstXml);
 
     var sheets = [];
     var sre = /<sheet([^>]*)\/>/g, sm;
     while ((sm = sre.exec(wbXml))) {
       var sa = attrs(sm[1]);
+      var name = unesc(sa.name || '');
       var target = rels[sa['r:id']] || rels[sa['id']];
       var key = target ? 'xl/' + target : null;
-      var raw = key && files[key];
-      if (!raw) continue;
-      var parsed = parseSheet(decodeText(raw), sst);
-      parsed.name = unesc(sa.name || '');
+      var raw = key && files[key.toLowerCase()];
+      if (!raw) {
+        // a worksheet the workbook lists and the archive does not have; anything else (a chart sheet) is not read
+        if (key && SHEET_PART.test(key)) throw new Error(BROKEN + 'лист «' + name + '» отсутствует.' + AGAIN);
+        continue;
+      }
+      var sheetXml = decodeText(raw);
+      if (!ends(sheetXml, 'worksheet')) throw new Error(BROKEN + 'лист «' + name + '» обрывается на середине.' + AGAIN);
+      var parsed = parseSheet(sheetXml, sst, name);
+      parsed.name = name;
       parsed.hidden = sa.state === 'hidden' || sa.state === 'veryHidden';
       sheets.push(parsed);
     }

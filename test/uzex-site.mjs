@@ -5,7 +5,7 @@
  *
  *   const site = await startSite(8145);
  *   site.weeks       the weeks it lists (edit freely: push a week, change rows)
- *   site.mode        'ok' | 'down' (503) | 'uz' (another language) | 'stuck' (always shows the newest week)
+ *   site.mode        'ok' | 'down' (503) | 'reset' (drops the connection) | 'uz' (another language) | 'stuck' (always shows the newest week)
  *   site.hits        requests answered, by importId ('' for the list)
  *   site.stop()
  */
@@ -94,6 +94,7 @@ export async function startSite(port) {
     const id = u.searchParams.get('importId') || '';
     site.hits[id] = (site.hits[id] || 0) + 1;
     if (site.mode === 'down') { res.writeHead(503); res.end('Service Unavailable'); return; }
+    if (site.mode === 'reset') { req.socket.destroy(); return; }
     // the real site ignores the language cookie when the query names a culture, and answers an unknown week with the newest
     const lang = site.mode === 'uz' ? 'uz' : (u.searchParams.get('culture') === 'ru' && u.searchParams.get('ui-culture') === 'ru' ? 'ru' : 'uz');
     const want = site.mode === 'stuck' ? null : site.weeks.find((w) => String(w.id) === id);

@@ -5,7 +5,7 @@
  *   forward, import, currency); a second sync fetches nothing, a forced one rewrites without duplicates; a site that
  *   is down, answers in another language, shows another week than asked or sends a broken row changes nothing and
  *   says why; a new week is added while the old ones stay; an administrator deletes a week with its quotes; the
- *   reference packages are never touched; the daily job follows the «Avtomatik yangilash» switch; and a price can
+ *   reference packages are never touched; the daily job follows the «Обновлять автоматически» switch; and a price can
  *   be marked as taken from a stored week (corrections.source = uzex:<week>:<row>), not from one that is not there.
  *
  *   node test/uzex-api.mjs
@@ -85,9 +85,13 @@ try {
   /* ------------------------------------------------------------- failures keep the data */
   site.mode = 'down';
   const d = (await call('POST', '/api/uzex/sync?force=1', boss)).body;
-  check(d.ok === false && /не ответил/.test(d.message) && await pb.count('uzex_quotes') === 23, `a site that is down: an error, the data stays (${d.message})`);
+  check(d.ok === false && /не ответил/.test(d.message) && /HTTP 503/.test(d.message) && await pb.count('uzex_quotes') === 23, `a site that is down: an error, the data stays (${d.message})`);
   const st = (await call('GET', '/api/uzex/status', expert)).body;
   check(st.last_sync_status === 'error' && /не ответил/.test(st.last_sync_message) && st.auto === true, 'the status says so, and the switch is on by default');
+  site.mode = 'reset';
+  const dr = (await call('POST', '/api/uzex/sync?force=1', boss)).body;
+  check(dr.ok === false && /не ответил/.test(dr.message) && /оборвал/.test(dr.message) && !/EOF|read tcp|Get "|dial/.test(dr.message) &&
+    await pb.count('uzex_quotes') === 23, `a dropped connection is told in Russian, not in Go's words; the data stays (${dr.message})`);
   site.mode = 'uz';
   const e = (await call('POST', '/api/uzex/sync?force=1', boss)).body;
   check(e.ok === false && /русском/.test(e.message) && await pb.count('uzex_quotes') === 23, `another language is refused whole (${e.message})`);
@@ -155,7 +159,7 @@ try {
   check(st2.last_sync_status === 'ok' && st2.last_new_weeks === 1 && !!st2.last_sync_at, 'and records when, how it went and how many weeks were new');
   check((await call('POST', '/api/uzex/auto', expert, { on: false })).status === 403, 'an expert cannot turn the switch');
   const off = await call('POST', '/api/uzex/auto', boss, { on: false });
-  check(off.status === 200 && off.body.auto === false, 'an administrator turns «Avtomatik yangilash» off');
+  check(off.status === 200 && off.body.auto === false, 'an administrator turns «Обновлять автоматически» off');
   site.weeks.unshift(week(216, '2031-03-31', '2031-04-04', 'internal', sampleRows().slice(0, 3)));
   await call('POST', '/api/crons/uzex-daily', pb.su);
   await new Promise((r) => setTimeout(r, 1500));

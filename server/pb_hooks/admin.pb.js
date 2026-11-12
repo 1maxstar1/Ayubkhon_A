@@ -70,7 +70,7 @@ routerAdd("DELETE", "/api/admin/applications/{id}", (e) => {
 // Distinct values of the categorical registry columns, for the filter menus.
 // A plain SELECT DISTINCT is far cheaper than paging 28 000 records to the browser.
 routerAdd("GET", "/api/registry/facets", (e) => {
-  if (!e.auth) throw new ForbiddenError("Kirish kerak");
+  if (!e.auth) throw new ForbiddenError("Нужно войти");
   const out = {};
   for (const col of ["expertise_type", "buyer_type", "status", "currency"]) {
     const rows = arrayOf(new DynamicModel({ v: "", n: 0 }));
@@ -210,7 +210,7 @@ routerAdd("POST", "/api/admin/reset", (e) => {
   requireAdmin(e);
   const body = e.requestInfo().body || {};
   if (String(body.confirm || "") !== "СТЕРЕТЬ") {
-    throw new BadRequestError("confirm must be СТЕРЕТЬ");
+    throw new BadRequestError("Для подтверждения введите СТЕРЕТЬ");
   }
   const counts = {};
   // Collections with stored files go through the records API so the files go

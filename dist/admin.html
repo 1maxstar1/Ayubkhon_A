@@ -596,19 +596,19 @@ body.compact main:not(.narrow){grid-template-columns:232px 1fr}
   </section>
 
   <section class="panel" id="uzexPanel">
-    <h2>UZEX haftalik narxlar</h2>
-    <p class="lead">Manba: UzEx — Haftalik kotirovkalar (uzex.uz). Birlik nomda ko'rsatilmagan bo'lsa — 1 tonna deb olingan.
-      Birja narxlari QQS bilan; «Проверка цен» da ular QQSsiz ko'rsatiladi (÷ 1,12). Bu bo'lim «Справочник цен (документы)» dan alohida: u paketlarga tegmaydi, paket yuklash
-      esa bu yerdagi haftalarga tegmaydi. Sayt faqat oxirgi 4 haftani saqlaydi — olingan har bir hafta shu bazada qoladi.</p>
-    <button class="btn primary" type="button" id="uzexSync"><span class="ic">↻</span> UZEX dan yangilash</button>
-    <button class="btn" type="button" id="uzexForce" title="Saytda ko'rinib turgan haftalarni qaytadan o'qib, saqlanganining o'rniga yozadi">Qayta o'qish</button>
-    <label class="uz-auto" title="Server ishga tushgandan yarim daqiqa keyin va har kuni soat 09:00 da (Toshkent vaqti) yangi haftalarni o'zi oladi">
-      <input type="checkbox" id="uzexAuto"> Avtomatik yangilash</label>
-    <div class="progress" id="uzexProgress" hidden><div class="bar-fill" style="width:100%"></div><span>UZEX dan o'qilmoqda…</span></div>
+    <h2>Недельные котировки UZEX</h2>
+    <p class="lead">Источник: UzEx — Недельные котировки (uzex.uz). Если единица в названии не указана — принята 1 тонна.
+      Биржевые цены с НДС; в «Проверка цен» они показаны без НДС (÷ 1,12). Этот раздел отделён от «Справочник цен (документы)»: он не трогает пакеты,
+      а загрузка пакета не трогает недели отсюда. Сайт хранит только последние 4 недели — каждая полученная неделя остаётся в этой базе.</p>
+    <button class="btn primary" type="button" id="uzexSync"><span class="ic">↻</span> Обновить с UZEX</button>
+    <button class="btn" type="button" id="uzexForce" title="Заново читает недели, которые показывает сайт, и записывает их вместо сохранённых">Перечитать</button>
+    <label class="uz-auto" title="Сервер сам получает новые недели через полминуты после запуска и каждый день в 09:00 (время Ташкента)">
+      <input type="checkbox" id="uzexAuto"> Обновлять автоматически</label>
+    <div class="progress" id="uzexProgress" hidden><div class="bar-fill" style="width:100%"></div><span>Читаем UZEX…</span></div>
     <p class="err" id="uzexErr" hidden></p>
     <div class="stat" id="uzexStat"></div>
-    <h3>Saqlangan haftalar</h3>
-    <table class="tbl" id="uzexTable"><thead><tr><th>Hafta</th><th>Bozor</th><th>Qatorlar</th><th>Olingan</th><th></th></tr></thead><tbody></tbody></table>
+    <h3>Сохранённые недели</h3>
+    <table class="tbl" id="uzexTable"><thead><tr><th>Неделя</th><th>Рынок</th><th>Строк</th><th>Получено</th><th></th></tr></thead><tbody></tbody></table>
   </section>
 
   <section class="panel">
@@ -1561,6 +1561,18 @@ var S = (typeof S !== 'undefined' && S) || {};
   S.near = near; S.num = num;
   S.vat = { RATE: 0.12, looksGross: looksGross };
   S.money = money; S.price = price; S.qty = qty; S.debounce = debounce;
+
+  /*
+   * The interface is Russian (CLAUDE.md). Values the server stores as codes — a market, a role, an export mode —
+   * are shown through this one vocabulary, so the same thing has the same Russian name on every page.
+   *   S.ru('role', 'ekspert') → 'Эксперт';  a code it does not know comes back as it is.
+   */
+  S.RU = {
+    market: { internal: 'Внутренний рынок', 'export': 'Экспортный рынок' },
+    role: { admin: 'Администратор', ekspert: 'Эксперт' },
+    mode: { changed: 'Только изменённые', dedup: 'Все ресурсы', full: 'Полная копия' }
+  };
+  S.ru = function (group, code) { return (S.RU[group] || {})[code] || code; };
 })(S);
 if (typeof self !== 'undefined') self.S = S;
 
@@ -1638,18 +1650,51 @@ if (typeof self !== 'undefined') self.S = S;
   };
   document.addEventListener('auth:signedout', function () { tok = null; tokAt = 0; });
 
-  /** Human-readable (Uzbek) message for a failed request. */
+  /*
+   * Human-readable (Russian) message for a failed request.
+   *
+   * PocketBase answers in English — «email: Value must be unique.», «Failed to create record.» — and the interface
+   * is Russian. A field error is told with the field's Russian name and what is wrong with it; a hook's own text,
+   * which is Russian, is passed on; anything else in English becomes a plain sentence with the code, and the
+   * English goes to the console for whoever looks into it. test/pb-err.cjs.
+   */
+  var FIELD = {
+    email: 'Эл. почта', name: 'Имя', number: 'Номер заявки', inn: 'ИНН', region: 'Регион', role: 'Роль',
+    org_name: 'Организация', project_title: 'Название объекта', status: 'Статус', file: 'Файл', note: 'Примечание'
+  };
+  var CODE = [
+    [/not_unique/, 'такое значение уже есть'],
+    [/required|nil_or_not_empty|empty/, 'не заполнено'],
+    [/email/, 'неверный адрес почты'],
+    [/too_short|min_text|min_length/, 'слишком короткое'],
+    [/length|too_long|max_text/, 'слишком длинное'],
+    [/file_size|size_limit/, 'файл слишком велик'],
+    [/mime/, 'файл не того типа']
+  ];
+  var CYR = /[А-Яа-яЁё]/;
+  function fieldText(name, item) {
+    var code = String(item && (item.code || item.message) || ''), what = 'неверное значение';
+    for (var i = 0; i < CODE.length; i++) if (CODE[i][0].test(code)) { what = CODE[i][1]; break; }
+    if (item && item.message && CYR.test(item.message)) what = item.message;   // a hook named it already
+    if (name === 'email' && /not_unique/.test(code)) {
+      return 'Пользователь с такой почтой уже есть — найдите его в списке (если отключён, нажмите «Включить»)';
+    }
+    return FIELD[name] ? FIELD[name] + ': ' + what : what;
+  }
   S.pbErr = function (e) {
     if (!e) return 'Неизвестная ошибка';
     if (e.status === 0) return 'Нет связи с сервером';
+    var d = e.response && e.response.data;
+    var keys = d && typeof d === 'object' ? Object.keys(d) : [];
+    if (keys.length && e.status === 400) return fieldText(keys[0], d[keys[0]]);
+    var msg = String(e.message || (e.response && e.response.message) || '');
+    if (typeof e.status !== 'number') return msg || String(e);   // not a server answer: an error of our own
+    if (CYR.test(msg)) return msg;                                // the hooks speak Russian
+    if (msg && typeof console !== 'undefined') console.warn('server said', e.status, msg);
     if (e.status === 401 || e.status === 403) return 'Нет доступа';
     if (e.status === 404) return 'Не найдено';
-    var d = e.response && e.response.data;
-    if (d) {
-      var keys = Object.keys(d);
-      if (keys.length) return keys[0] + ': ' + (d[keys[0]].message || d[keys[0]].code || 'неверное значение');
-    }
-    return e.message || String(e);
+    if (e.status === 429) return 'Слишком много запросов подряд — подождите несколько секунд';
+    return 'Сервер отклонил запрос (код ' + e.status + ')';
   };
 })(S);
 
@@ -3549,7 +3594,7 @@ var S = (typeof S !== 'undefined' && S) || {};
       S.pb.collection('users').getFullList({ sort: 'name' }).then(function (items) {
         tb.innerHTML = items.map(function (u) {
           return '<tr data-id="' + u.id + '"><td>' + S.esc(u.email) + '</td><td>' + S.esc(u.name || '') +
-            '</td><td>' + S.esc(u.role || '') + '</td><td>' + (u.active ? 'активен' : '<span class="mute">отключён</span>') +
+            '</td><td>' + S.esc(S.ru('role', u.role || '')) + '</td><td>' + (u.active ? 'активен' : '<span class="mute">отключён</span>') +
             '</td><td class="act"><button class="btn sm ' + (u.active ? 'danger' : 'ok') + '" data-act="toggle">' + (u.active ? 'Отключить' : 'Включить') + '</button></td></tr>';
         }).join('');
         tb.querySelectorAll('button[data-act=toggle]').forEach(function (b) {
@@ -3832,7 +3877,7 @@ var S = (typeof S !== 'undefined' && S) || {};
         var d = e && e.response && e.response.data;
         if (d && ((d.sha256 && d.sha256.code === 'validation_not_unique') || (d.package_id && d.package_id.code === 'validation_not_unique'))) {
           self.fail(d.sha256 ? 'Этот пакет уже загружен' : 'Пакет с таким номером уже есть, но содержимое другое — проверьте файл');
-        } else self.fail('Не удалось загрузить: ' + ((e && e.response && e.response.message) || S.pbErr(e)));
+        } else self.fail('Не удалось загрузить: ' + S.pbErr(e));
       }).then(function () { $('refsUpload').disabled = false; });
     },
 
@@ -3887,7 +3932,7 @@ var S = (typeof S !== 'undefined' && S) || {};
       var x = this.items.filter(function (i) { return i.id === id; })[0];
       if (!x || !confirm('Удалить пакет ' + x.package_id + '?\n\nЦены, уже применённые экспертами, останутся.')) return;
       S.pb.collection('ref_packages').delete(id).then(function () { toast('Пакет удалён'); self.load(); })
-        .catch(function (e) { toast((e && e.response && e.response.message) || S.pbErr(e), true); });
+        .catch(function (e) { toast(S.pbErr(e), true); });
     },
 
     /** The documents of a package, from its manifest: type, issuer, number, date, region (issuer and number without the
@@ -3919,16 +3964,16 @@ var S = (typeof S !== 'undefined' && S) || {};
 
 ;
 /*
- * Admin page: «UZEX haftalik narxlar» — the exchange's weekly quotes, a section of its own beside «Справочник цен
+ * Admin page: «Недельные котировки UZEX» — the exchange's weekly quotes, a section of its own beside «Справочник цен
  * (документы)». Nothing here reads or writes the reference packages.
  *
- *   «UZEX dan yangilash»   POST /api/uzex/sync — the server fetches the weeks the site lists that are not stored yet
- *   «Qayta o'qish»         the same with force=1 — the listed weeks are read again and rewritten
- *   «Avtomatik yangilash»  POST /api/uzex/auto — the switch of the server's own sync (after a start, and daily)
- *   the table              the stored weeks; an administrator may delete one (its quotes go with it; prices already
- *                          applied from it stay)
- * The words of this section are Uzbek, as its owner asked; the server's messages about the site are quoted as they
- * come.
+ *   «Обновить с UZEX»          POST /api/uzex/sync — the server fetches the weeks the site lists that are not stored yet
+ *   «Перечитать»               the same with force=1 — the listed weeks are read again and rewritten
+ *   «Обновлять автоматически»  POST /api/uzex/auto — the switch of the server's own sync (after a start, and daily)
+ *   the table                  the stored weeks; an administrator may delete one (its quotes go with it; prices
+ *                              already applied from it stay)
+ * The interface is Russian (CLAUDE.md); this section was Uzbek until v2.10.0 (audit 4, E9). The server's messages
+ * about the site are Russian too (server/pb_hooks/lib/uzex.js) and are quoted as they come.
  */
 (function (S) {
   'use strict';
@@ -3947,7 +3992,7 @@ var S = (typeof S !== 'undefined' && S) || {};
     var x = new Date(String(d).replace(' ', 'T'));
     return isNaN(x) ? String(d) : x.toLocaleDateString('ru-RU') + ' ' + x.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
   }
-  var MARKET = { internal: 'Ichki', 'export': 'Eksport' };
+  var MARKET = S.RU.market;
 
   var Uz = {
     items: [], busy: false,
@@ -3958,7 +4003,7 @@ var S = (typeof S !== 'undefined' && S) || {};
       this.inited = true;
       $('uzexSync').addEventListener('click', function () { self.sync(false); });
       $('uzexForce').addEventListener('click', function () {
-        if (confirm("Saytda ko'rinib turgan haftalar qaytadan o'qiladi va saqlanganining o'rniga yoziladi. Davom etilsinmi?")) self.sync(true);
+        if (confirm('Недели, которые сейчас показывает сайт, будут прочитаны заново и записаны вместо сохранённых. Продолжить?')) self.sync(true);
       });
       $('uzexAuto').addEventListener('change', function () { self.setAuto(this.checked); });
       $('uzexTable').addEventListener('click', function (e) {
@@ -3977,18 +4022,18 @@ var S = (typeof S !== 'undefined' && S) || {};
         self.render();
       }).catch(function (e) {
         if (e && e.status === 0) return;
-        $('uzexStat').textContent = "Bu serverda UZEX bo'limi yo'q — dasturni yangilang.";
+        $('uzexStat').textContent = 'На этом сервере нет раздела UZEX — обновите программу.';
       });
     },
 
     status: function (st) {
       $('uzexAuto').checked = !!st.auto;
-      var t = st.last_sync_at ? 'Oxirgi yangilanish: ' + when(st.last_sync_at) + ', yangi haftalar: ' + (st.last_new_weeks || 0) : 'Hali yangilanmagan';
+      var t = st.last_sync_at ? 'Последнее обновление: ' + when(st.last_sync_at) + ', новых недель: ' + (st.last_new_weeks || 0) : 'Ещё не обновлялось';
       $('uzexStat').textContent = t;
       var err = $('uzexErr');
       err.hidden = st.last_sync_status !== 'error';
-      err.textContent = st.last_sync_status === 'error' ? 'Oxirgi yangilanish xato bilan tugadi: ' + (st.last_sync_message || '') +
-        ' — saqlangan haftalar joyida.' : '';
+      err.textContent = st.last_sync_status === 'error' ? 'Последнее обновление завершилось ошибкой: ' + (st.last_sync_message || '') +
+        ' — сохранённые недели на месте.' : '';
     },
 
     sync: function (force) {
@@ -3998,12 +4043,12 @@ var S = (typeof S !== 'undefined' && S) || {};
       $('uzexSync').disabled = true; $('uzexForce').disabled = true;
       $('uzexProgress').hidden = false;
       S.pb.send('/api/uzex/sync' + (force ? '?force=1' : ''), { method: 'POST' }).then(function (r) {
-        if (r.busy) { toast('Yangilanish allaqachon ketmoqda', true); return; }
+        if (r.busy) { toast('Обновление уже идёт', true); return; }
         var rows = (r.added || []).reduce(function (n, w) { return n + w.rows; }, 0);
-        toast(r.ok ? (r.added.length ? 'Yangi haftalar: ' + r.added.length + ' (qatorlar: ' + rows + ')' : "Yangi hafta yo'q — hammasi saqlangan")
-          : 'UZEX: ' + (r.message || 'xato'), !r.ok);
+        toast(r.ok ? (r.added.length ? 'Новых недель: ' + r.added.length + ' (строк: ' + rows + ')' : 'Новых недель нет — всё уже сохранено')
+          : 'UZEX: ' + (r.message || 'ошибка'), !r.ok);
       }).catch(function (e) {
-        toast((e && e.response && e.response.message) || S.pbErr(e), true);
+        toast(S.pbErr(e), true);
       }).then(function () {
         self.busy = false;
         $('uzexSync').disabled = false; $('uzexForce').disabled = false;
@@ -4016,30 +4061,30 @@ var S = (typeof S !== 'undefined' && S) || {};
       var self = this;
       S.pb.send('/api/uzex/auto', { method: 'POST', body: { on: !!on } }).then(function (st) {
         self.status(st);
-        toast(st.auto ? 'Avtomatik yangilash yoqildi' : "Avtomatik yangilash o'chirildi");
+        toast(st.auto ? 'Автоматическое обновление включено' : 'Автоматическое обновление выключено');
       }).catch(function (e) {
         $('uzexAuto').checked = !on;
-        toast((e && e.response && e.response.message) || S.pbErr(e), true);
+        toast(S.pbErr(e), true);
       });
     },
 
     render: function () {
       var tb = $('uzexTable').querySelector('tbody');
-      if (!this.items.length) { tb.innerHTML = '<tr><td colspan="5" class="mute">Hali hech narsa olinmagan — «UZEX dan yangilash» ni bosing.</td></tr>'; return; }
+      if (!this.items.length) { tb.innerHTML = '<tr><td colspan="5" class="mute">Пока ничего не получено — нажмите «Обновить с UZEX».</td></tr>'; return; }
       tb.innerHTML = this.items.map(function (x) {
         return '<tr><td title="' + S.esc(x.label || '') + '">' + S.esc(day(x.period_from) + ' – ' + day(x.period_to)) + '</td><td>' +
           S.esc(MARKET[x.market] || x.market) + '</td><td>' + (x.row_count || 0) + '</td><td>' + S.esc(when(x.fetched_at)) + '</td>' +
-          '<td><button class="link" data-del="' + S.esc(x.id) + '">O\'chirish</button></td></tr>';
+          '<td><button class="link" data-del="' + S.esc(x.id) + '">Удалить</button></td></tr>';
       }).join('');
     },
 
     remove: function (id) {
       var self = this;
       var x = this.items.filter(function (i) { return i.id === id; })[0];
-      if (!x || !confirm(day(x.period_from) + ' – ' + day(x.period_to) + ' (' + (MARKET[x.market] || x.market) + ') haftasi o\'chirilsinmi?\n\n' +
-        'Undan allaqachon qo\'llangan narxlar joyida qoladi. Sayt bu haftani hali ko\'rsatayotgan bo\'lsa, keyingi yangilanishda qayta olinadi.')) return;
-      S.pb.collection('uzex_imports').delete(id).then(function () { toast("Hafta o'chirildi"); self.load(); })
-        .catch(function (e) { toast((e && e.response && e.response.message) || S.pbErr(e), true); });
+      if (!x || !confirm('Удалить неделю ' + day(x.period_from) + ' – ' + day(x.period_to) + ' (' + (MARKET[x.market] || x.market) + ')?\n\n' +
+        'Цены, уже применённые из неё, останутся. Если сайт ещё показывает эту неделю, она будет получена снова при следующем обновлении.')) return;
+      S.pb.collection('uzex_imports').delete(id).then(function () { toast('Неделя удалена'); self.load(); })
+        .catch(function (e) { toast(S.pbErr(e), true); });
     }
   };
 

@@ -1273,7 +1273,7 @@ tuzatiladi (2-tekshiruvdagi tartib).
 | 2 · v2.9.3 ✓ | Hech narsa yo'qolmasin | B1, B5 (+«Отменить»), B3 (vkladkalar), B4, B6, B8, E1, E2 | 4 kun |
 | 3 · v2.9.4 ✓ | Begona fayl va chetdagi holatlar | C2, C3, C4, C5, A5, A6, B2, B7 | 3–4 kun |
 | 4 ✓ | Testlar yashil va avtomatik | H1, H2, H3, H4 (qolganlari), F7 | 3 kun |
-| 5 · v2.10.0 | Qulaylik va QQS | E10–E12, E3–E9, E14–E20, F1–F6, A7, D1–D3 | 5–6 kun, bo'lib-bo'lib |
+| 5 · v2.10.0 ✓ | Qulaylik va QQS | E10–E12 (E12b — egasining qaroriga), E3–E9, E14–E20, F1–F6, A7, D1–D3, B8 qoldig'i | 5–6 kun, bo'lib-bo'lib |
 | 6 · v2.11.0 | Xavfsiz yangilanish, Mac o'zi yangilanadi | C1, G1, G2, G3 — shundan keyin repo yopiq bo'lishi mumkin | 5 kun |
 | 7 | Ikkinchi odam qo'shilishidan oldin | C6–C9, B3 (server), B9, F8, G4, I1 | 5 kun |
 

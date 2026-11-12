@@ -9,8 +9,8 @@ Versiyalar, orqaga qaytish va NLP jadvallarini o'lchov bilan o'zgartirish —
 (birinchi), `docs/audit-2-reja.md` (ikkinchi) va `docs/audit-3-reja.md`
 (uchinchi, o'lchov bilan: rad etilgan takliflar ham yozilgan). To'rtinchisi —
 `docs/audit-4-reja.md` — butun dastur bo'yicha **bosqichma-bosqich bajarilayotgan
-reja**: topilmalar, ustuvorlik tartibi va egasi hal qiladigan savollar; 1–4-bosqichlar
-bajarilgan (v2.9.2 – v2.9.4, yashil to'plam va CI), 5–7 navbatda — har bir band yonida holati yozilgan.
+reja**: topilmalar, ustuvorlik tartibi va egasi hal qiladigan savollar; 1–5-bosqichlar
+bajarilgan (v2.9.2 – v2.10.0: yashil to'plam va CI, qulaylik va QQS), 6–7 navbatda — har bir band yonida holati yozilgan.
 
 ## Muloqot tili
 
@@ -45,6 +45,7 @@ sh test/laptop-backup.sh; node test/backup-prune.cjs  # Mac ishga tushirgichi: z
 node test/upload-fail.mjs; node test/two-tabs.mjs     # serverga yuklanmagan smeta «saqlangan» emas; bitta ariza ikki vkladkada
 node test/close-tab.mjs; node test/state-size.mjs    # yopilgan vkladkada oxirgi narx yo'qolmaydi; holat server cheklovidan oshmaydi
 sh test/pb-smoke.sh; node test/e2e-workspace.mjs      # server rejimi testlari
+node test/contragent-prices.mjs                       # «Цены этого контрагента…»: oldingi narxlar bitta ro'yxatda, bitta tasdiq
 node test/num.cjs; node test/xlsx-guard.cjs           # son qat'iy o'qiladi («1,234.50» — ha, yonida so'z bo'lsa — yo'q); begona .xlsx o'quvchini osib qo'ymaydi
 node test/normalize.cjs; node test/sections.cjs; node test/regions.cjs   # NLP o'lchovlari
 node test/hints.cjs a.xlsx [b.xlsx]                    # o'xshash resurs takliflari: smeta ichida (85/5) va qayd etilgan bazaga nisbatan (aniqlik, to'liqlik, xavfsizlik) — baza bo'lsa (`REFS_KIT`/`HINTS_GOLDEN`), kompyuterdagi barcha qayd etilgan to'plamlarda

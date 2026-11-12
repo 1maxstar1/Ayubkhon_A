@@ -70,9 +70,18 @@
       this.pop.id = 'hintPop';
       this.pop.hidden = true;
       document.body.appendChild(this.pop);
+      // the filters of the suggestions, where there are suggestions: the page without a server has none (E8)
+      var f = $('filter'), multi = f && f.querySelector('option[value="multi"]');
+      if (multi && !f.querySelector('option[value="hint"]')) {
+        multi.insertAdjacentHTML('afterend', '<option value="hint">С подсказками</option><option value="near">Только похожие ресурсы</option>');
+      }
       document.addEventListener('click', function (e) {
         if (self.pop.hidden) return;
         if (self.pop.contains(e.target) || (e.target.classList && e.target.classList.contains('tagh'))) return;
+        // the click that put the caret in a price box opened its popover a moment ago (focusin): it must not close it.
+        // Compared by key — the list may have drawn the box anew in between (E3)
+        var p = e.target.closest && e.target.closest('.pin');
+        if (p && p.dataset.key === self.key) return;
         self.hide();
       });
       document.addEventListener('keydown', function (e) { if (e.key === 'Escape') self.hide(); });
@@ -84,11 +93,20 @@
         });
         sc.addEventListener('focusin', function (e) {
           var inp = e.target;
-          if (!inp.classList || !inp.classList.contains('pin')) return;
+          if (!inp.classList || !inp.classList.contains('pin') || S.VList.restoring) return;
           var rec = self.recOf(inp.dataset.key);
           if (rec && self.any(mkOf(rec))) self.show(inp, mkOf(rec), rec.key);
         });
-        sc.addEventListener('scroll', function () { self.hide(); }, { passive: true });
+        // scrolling moves the popover with its box while the box is on screen, and closes it once it is not
+        sc.addEventListener('scroll', function () {
+          if (self.pop.hidden) return;
+          var a = document.activeElement, box = sc.getBoundingClientRect();
+          if (a && a.classList && a.classList.contains('pin') && a.dataset.key === self.key && sc.contains(a)) {
+            var r = a.getBoundingClientRect();
+            if (r.top >= box.top && r.bottom <= box.bottom) { self.place(a); return; }
+          }
+          self.hide();
+        }, { passive: true });
       });
     },
 
@@ -302,15 +320,20 @@
           self.hide();
         });
       });
-      var r = anchor.getBoundingClientRect();
+      this.key = key;
       this.pop.hidden = false;
+      this.place(anchor);
+    },
+    hide: function () { this.pop.hidden = true; this.key = null; },
+    /** Put the popover under its anchor — above it when there is no room below. */
+    place: function (anchor) {
+      var r = anchor.getBoundingClientRect();
       var w = this.pop.offsetWidth, hgt = this.pop.offsetHeight;
       var left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
       var top = r.bottom + 4 + hgt > window.innerHeight ? r.top - hgt - 4 : r.bottom + 4;
       this.pop.style.left = left + 'px';
       this.pop.style.top = Math.max(4, top) + 'px';
     },
-    hide: function () { this.pop.hidden = true; },
 
     /** Tag markup for a resource row, '' when there is nothing to show. */
     tag: function (r) {

@@ -179,9 +179,10 @@ body.drag::after{content:"";position:fixed;inset:8px;border:2px dashed var(--acc
 .vrow.k-section,.vrow.k-total,.vrow.k-grandtotal,.vrow.k-header,.vrow.k-numbering,.vrow.k-uzhead,.vrow.k-uznum{background:var(--cyan);font-weight:600}
 .vrow.k-title,.vrow.k-object,.vrow.k-intro,.vrow.k-bigtitle{background:#fbfbfd;font-weight:600}
 .vrow.k-blank{background:#fff}
-.vrow.chg{background:#fff6f7}
-.vrow.chg:hover{background:#ffeef0}
+.vrow.chg{background:#fffbe6}
+.vrow.chg:hover{background:#fff5d6}
 .vrow .c.diff{color:var(--pinktx);font-weight:600}
+.vrow .c.diff.save{color:var(--good)} .vrow .c.diff.over{color:var(--bad)}   /* a saving green, an overspend red: as in the total */
 .vrow .c.big{background:var(--pink);color:var(--pinktx)}
 .pin{width:100%;border:1px solid transparent;background:none;border-radius:4px;padding:2px 5px;text-align:right;
   font-variant-numeric:tabular-nums;min-width:0}
@@ -556,8 +557,6 @@ body.src-norefs #refAsof{display:none !important}
           <option value="same">Без изменений</option>
           <option value="zero">С ценой 0</option>
           <option value="multi">Несколько сметных цен</option>
-          <option value="hint">С подсказками</option>
-          <option value="near">Только похожие ресурсы</option>
           <option value="wrongsec">Не тот раздел</option>
         </select>
         <select id="sort">
@@ -5150,7 +5149,12 @@ if (typeof self !== 'undefined') self.S = S;
       var again = this.body.querySelector(tag + '[data-focus="' + esc + '"]') ||
                   this.body.querySelector(tag + '[data-key="' + esc + '"]');
       if (again && again.focus) {
-        again.focus();
+        // what the box knew when the caret entered it goes with the caret; and the focus given back here is not the
+        // expert entering the box — the handlers of focusin tell the two apart by VList.restoring (a popover closed
+        // with Esc stays closed through a repaint, E3)
+        if (act.dataset.was != null) again.dataset.was = act.dataset.was;
+        VList.restoring = true;
+        try { again.focus(); } finally { VList.restoring = false; }
         try { again.setSelectionRange(selStart, selEnd); } catch (e) { /* not a text input */ }
       }
     }
@@ -5163,6 +5167,17 @@ if (typeof self !== 'undefined') self.S = S;
    * A column heading, with a second, smaller line when the column has one («без НДС» under the price headings: the
    * prices on screen are without VAT, and the screen says so). Both lines in one span, so the cell lays out as before.
    */
+  /**
+   * One rule for the colour of a difference, everywhere on screen: a saving (estimate − market > 0) green, an overspend
+   * red, an unchanged line plain. It used to be red in the lines and green in the total (E6). The exported document
+   * keeps its own rule (321.xlsx). `chg` is the line's own «changed», so colour and «changed» never disagree.
+   */
+  S.diffCls = function (chg, d) { return !chg ? '' : d > 0 ? ' diff save' : d < 0 ? ' diff over' : ' diff'; };
+  S.diffMark = function (el, chg, d) {
+    el.classList.toggle('diff', chg);
+    el.classList.toggle('save', chg && d > 0);
+    el.classList.toggle('over', chg && d < 0);
+  };
   S.headText = function (c) {
     return c.sub ? '<span class="th2">' + S.esc(c.h) + '<small>' + S.esc(c.sub) + '</small></span>' : S.esc(c.h);
   };
@@ -5263,7 +5278,7 @@ if (typeof self !== 'undefined') self.S = S;
       var inp = e.target;
       if (!inp.classList || !inp.classList.contains('pin')) return;
       var rec = self.byKey(inp.dataset.key);
-      if (rec) { inp.value = fmtIn(rec.market); inp.dataset.was = String(rec.market); }
+      if (rec && !S.VList.restoring) { inp.value = fmtIn(rec.market); inp.dataset.was = String(rec.market); }
       inp.select();
     });
     scroll.addEventListener('focusout', function (e) {
@@ -5286,7 +5301,7 @@ if (typeof self !== 'undefined') self.S = S;
       else if (e.key === 'ArrowUp') { e.preventDefault(); self.focusRow(+inp.dataset.i - 1); }
       else if (e.key === 'Escape') {
         var rec = self.byKey(inp.dataset.key);
-        if (rec) { self.app.setPrice(rec.key, rec.price); self.list.refresh(); }
+        if (rec) self.app.escPrice(rec.key, rec.price);
       }
     });
 
@@ -5360,8 +5375,8 @@ if (typeof self !== 'undefined') self.S = S;
     var econ = econOf(rec), pct = pctOf(rec), chg = isChanged(rec);
     cells[7].textContent = rec.smetaSum ? pct.toFixed(1) + '%' : '';
     cells[8].textContent = S.money(econ);
-    cells[7].classList.toggle('diff', chg);
-    cells[8].classList.toggle('diff', chg);
+    S.diffMark(cells[7], chg, econ);
+    S.diffMark(cells[8], chg, econ);
     row.classList.toggle('chg', chg);
   };
 
@@ -5407,6 +5422,11 @@ if (typeof self !== 'undefined') self.S = S;
       return a.name < b.name ? -1 : a.name > b.name ? 1 : a.price - b.price;
     });
 
+    // the same search, filter and sort over the same estimates is a refresh — a price applied, an answer arrived — and
+    // keeps its place; a change of any of them, or new estimates, starts from the top (E4)
+    var sig = q + '\0' + f + '\0' + sort;
+    if (keepScroll === undefined && sig === this._sig && m === this._sigModel) keepScroll = true;
+    this._sig = sig; this._sigModel = m;
     this.view = list;
     this.list.setCount(list.length, keepScroll === true);
     this.status();
@@ -5455,9 +5475,9 @@ if (typeof self !== 'undefined') self.S = S;
         '<div class="c num' + (uz ? ' uzc' : '') + '" style="' + width(COLS[6]) + '">' + uz +
         '<input class="pin' + (changed ? ' edited' : '') + (uz ? ' uz' : '') + '" data-key="' + S.esc(r.key) + '" data-i="' + i +
         '" inputmode="decimal" value="' + S.price(r.market) + '"></div>' +
-        '<div class="c num' + (changed ? ' diff' : '') + '" style="' + width(COLS[7]) + '">' +
+        '<div class="c num' + S.diffCls(changed, e) + '" style="' + width(COLS[7]) + '">' +
         (r.smetaSum ? pct.toFixed(1) + '%' : '') + '</div>' +
-        '<div class="c num' + (changed ? ' diff' : '') + '" style="' + width(COLS[8]) + '">' +
+        '<div class="c num' + S.diffCls(changed, e) + '" style="' + width(COLS[8]) + '">' +
         S.money(e) + '</div>' +
         '</div>');
     }
@@ -6242,7 +6262,7 @@ if (typeof self !== 'undefined') self.S = S;
       var inp = e.target;
       if (!inp.classList || !inp.classList.contains('pin')) return;
       var row = self.rowByKeyFirst(inp.dataset.key);
-      if (row) { inp.value = inVal(row.market); inp.dataset.was = String(row.market); }
+      if (row && !S.VList.restoring) { inp.value = inVal(row.market); inp.dataset.was = String(row.market); }
       inp.select();
     });
     scroll.addEventListener('focusout', function (e) {
@@ -6259,9 +6279,22 @@ if (typeof self !== 'undefined') self.S = S;
       else if (e.key === 'ArrowUp') { e.preventDefault(); self.stepSheet(+inp.dataset.i, -1); }
       else if (e.key === 'Escape') {
         var row = self.rowByKeyFirst(inp.dataset.key);
-        if (row) { self.setPrice(inp.dataset.key, row.price); self.sheetList.refresh(); }
+        if (row) self.escPrice(inp.dataset.key, row.price);
       }
     });
+  };
+
+  /**
+   * Esc in a price box. With a popover open (suggestions, reference prices, the exchange) it only closes the popover —
+   * it used to take the price typed so far with it. Otherwise it puts the estimate's price back, as it always did,
+   * now with «Отменить»: one key too many no longer costs a price (E3).
+   */
+  App.prototype.escPrice = function (key, smeta) {
+    if (document.querySelector('#hintPop:not([hidden]),#refPop:not([hidden]),#uzexPop:not([hidden])')) return;
+    var now = this.prices[key] != null ? this.prices[key] : smeta;
+    if (S.near(now, smeta)) return;
+    var o = {}; o[key] = smeta;
+    this.bulkPrices(o, 'Цена возвращена к сметной: ' + S.price(smeta));
   };
 
   /** Move the caret to the next/previous priced row, skipping the banners. */
@@ -6301,7 +6334,7 @@ if (typeof self !== 'undefined') self.S = S;
       var cells = el.querySelectorAll('.c');
       cells[8].textContent = S.money(mk);
       cells[9].textContent = S.money(d);
-      cells[9].classList.toggle('diff', chg);
+      S.diffMark(cells[9], chg, r.price - r.market);
       el.classList.toggle('chg', chg);
       inp.classList.toggle('edited', chg);
       if (document.activeElement !== inp) inp.value = S.price(r.market);
@@ -6948,7 +6981,7 @@ if (typeof self !== 'undefined') self.S = S;
       '<div class="c num" style="' + w(SHEET_COLS[5]) + '">' + S.money(sm) + '</div>' +
       market +
       '<div class="c num" style="' + w(SHEET_COLS[7]) + '">' + S.money(mk) + '</div>' +
-      '<div class="c num' + (chg ? ' diff' : '') + '" style="' + w(SHEET_COLS[8]) + '">' + S.money(d) + '</div>' +
+      '<div class="c num' + S.diffCls(chg, r.price - r.market) + '" style="' + w(SHEET_COLS[8]) + '">' + S.money(d) + '</div>' +
       '</div>';
   }
 
@@ -9256,9 +9289,18 @@ if (typeof self !== 'undefined') self.S = S;
       this.pop.id = 'hintPop';
       this.pop.hidden = true;
       document.body.appendChild(this.pop);
+      // the filters of the suggestions, where there are suggestions: the page without a server has none (E8)
+      var f = $('filter'), multi = f && f.querySelector('option[value="multi"]');
+      if (multi && !f.querySelector('option[value="hint"]')) {
+        multi.insertAdjacentHTML('afterend', '<option value="hint">С подсказками</option><option value="near">Только похожие ресурсы</option>');
+      }
       document.addEventListener('click', function (e) {
         if (self.pop.hidden) return;
         if (self.pop.contains(e.target) || (e.target.classList && e.target.classList.contains('tagh'))) return;
+        // the click that put the caret in a price box opened its popover a moment ago (focusin): it must not close it.
+        // Compared by key — the list may have drawn the box anew in between (E3)
+        var p = e.target.closest && e.target.closest('.pin');
+        if (p && p.dataset.key === self.key) return;
         self.hide();
       });
       document.addEventListener('keydown', function (e) { if (e.key === 'Escape') self.hide(); });
@@ -9270,11 +9312,20 @@ if (typeof self !== 'undefined') self.S = S;
         });
         sc.addEventListener('focusin', function (e) {
           var inp = e.target;
-          if (!inp.classList || !inp.classList.contains('pin')) return;
+          if (!inp.classList || !inp.classList.contains('pin') || S.VList.restoring) return;
           var rec = self.recOf(inp.dataset.key);
           if (rec && self.any(mkOf(rec))) self.show(inp, mkOf(rec), rec.key);
         });
-        sc.addEventListener('scroll', function () { self.hide(); }, { passive: true });
+        // scrolling moves the popover with its box while the box is on screen, and closes it once it is not
+        sc.addEventListener('scroll', function () {
+          if (self.pop.hidden) return;
+          var a = document.activeElement, box = sc.getBoundingClientRect();
+          if (a && a.classList && a.classList.contains('pin') && a.dataset.key === self.key && sc.contains(a)) {
+            var r = a.getBoundingClientRect();
+            if (r.top >= box.top && r.bottom <= box.bottom) { self.place(a); return; }
+          }
+          self.hide();
+        }, { passive: true });
       });
     },
 
@@ -9488,15 +9539,20 @@ if (typeof self !== 'undefined') self.S = S;
           self.hide();
         });
       });
-      var r = anchor.getBoundingClientRect();
+      this.key = key;
       this.pop.hidden = false;
+      this.place(anchor);
+    },
+    hide: function () { this.pop.hidden = true; this.key = null; },
+    /** Put the popover under its anchor — above it when there is no room below. */
+    place: function (anchor) {
+      var r = anchor.getBoundingClientRect();
       var w = this.pop.offsetWidth, hgt = this.pop.offsetHeight;
       var left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
       var top = r.bottom + 4 + hgt > window.innerHeight ? r.top - hgt - 4 : r.bottom + 4;
       this.pop.style.left = left + 'px';
       this.pop.style.top = Math.max(4, top) + 'px';
     },
-    hide: function () { this.pop.hidden = true; },
 
     /** Tag markup for a resource row, '' when there is nothing to show. */
     tag: function (r) {

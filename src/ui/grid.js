@@ -82,7 +82,12 @@
       var again = this.body.querySelector(tag + '[data-focus="' + esc + '"]') ||
                   this.body.querySelector(tag + '[data-key="' + esc + '"]');
       if (again && again.focus) {
-        again.focus();
+        // what the box knew when the caret entered it goes with the caret; and the focus given back here is not the
+        // expert entering the box — the handlers of focusin tell the two apart by VList.restoring (a popover closed
+        // with Esc stays closed through a repaint, E3)
+        if (act.dataset.was != null) again.dataset.was = act.dataset.was;
+        VList.restoring = true;
+        try { again.focus(); } finally { VList.restoring = false; }
         try { again.setSelectionRange(selStart, selEnd); } catch (e) { /* not a text input */ }
       }
     }
@@ -95,6 +100,17 @@
    * A column heading, with a second, smaller line when the column has one («без НДС» under the price headings: the
    * prices on screen are without VAT, and the screen says so). Both lines in one span, so the cell lays out as before.
    */
+  /**
+   * One rule for the colour of a difference, everywhere on screen: a saving (estimate − market > 0) green, an overspend
+   * red, an unchanged line plain. It used to be red in the lines and green in the total (E6). The exported document
+   * keeps its own rule (321.xlsx). `chg` is the line's own «changed», so colour and «changed» never disagree.
+   */
+  S.diffCls = function (chg, d) { return !chg ? '' : d > 0 ? ' diff save' : d < 0 ? ' diff over' : ' diff'; };
+  S.diffMark = function (el, chg, d) {
+    el.classList.toggle('diff', chg);
+    el.classList.toggle('save', chg && d > 0);
+    el.classList.toggle('over', chg && d < 0);
+  };
   S.headText = function (c) {
     return c.sub ? '<span class="th2">' + S.esc(c.h) + '<small>' + S.esc(c.sub) + '</small></span>' : S.esc(c.h);
   };

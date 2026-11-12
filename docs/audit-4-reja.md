@@ -691,13 +691,24 @@ jamini «внимание» darajasiga ko'tarish.
 |---|---|---|---|---|
 | E1 ✓ v2.9.3 | Yon paneldagi «–» tugmasi sahifani 0 kenglikka yig'adi, qaytarish yo'li yo'q (faqat qayta yuklash) — `src/app.css:89-90`, `src/ui/app.js:101-102` | o'rta | Yig'ilganda ingichka tasma va «+» qoladi | S |
 | E2 ✓ v2.9.3 | Bitta `#toast`: xabarlar 10–400 ms ichida bir-birini almashtiradi, xato xabari ma'lumot xabari ostida yo'qoladi (B4 ning sababi) — `src/ui/app.js:272-279` | o'rta | Navbat; xato xabari yopilmaguncha turadi | S |
-| E3 | Taklif oynasi uni ochgan bosishning o'zida yopiladi; `Esc` yozilayotgan narxni o'chiradi — `src/ui/hints.js:73-90`, `src/ui/prices.js:114-117` | past | Bosishni bir kadrga kechiktirish; `Esc` avval oynani yopadi | S |
-| E4 | Taklifni qo'llash ro'yxatni boshiga aylantiradi — `src/ui/hints.js:299` | past | Joyni saqlash (`apply(true)`) | S |
+| E3 ✓ v2.10.0 | Taklif oynasi uni ochgan bosishning o'zida yopiladi; `Esc` yozilayotgan narxni o'chiradi — `src/ui/hints.js:73-90`, `src/ui/prices.js:114-117` | past | Bosishni bir kadrga kechiktirish; `Esc` avval oynani yopadi | S |
+| E4 ✓ v2.10.0 | Taklifni qo'llash ro'yxatni boshiga aylantiradi — `src/ui/hints.js:299` | past | Joyni saqlash (`apply(true)`) | S |
 | E5 | 1366 kenglikda «Сводная таблица» kesiladi, sarlavha gorizontal aylantirishga ergashmaydi; «Цены» da 15 qator ko'rinadi (UZEX bilan 13), nom ustuni 320 px — nomlarning 42 % i kesilgan | o'rta | Ixcham rejim: kichikroq qator, kengayadigan nom ustuni, yopishqoq sarlavha | M |
-| E6 | Tejam qatorlarda qizil, jamida yashil | past | Bitta qoida hamma joyda | S |
+| E6 ✓ v2.10.0 | Tejam qatorlarda qizil, jamida yashil | past | Bitta qoida hamma joyda | S |
 | E7 | Tushunarsiz xatolar: buzuq `.xlsx` baribir yuklanadi; UZEX ulanish xatosi xom holda; «email: Value must be unique» | past | Ruscha, nima qilish kerakligi bilan | S |
-| E8 | Bitta-fayl sahifasi o'zida yo'q manbalar filtrini ko'rsatadi | past | Server yo'q bo'lsa yashirish | S |
+| E8 ✓ v2.10.0 | Bitta-fayl sahifasi o'zida yo'q manbalar filtrini ko'rsatadi | past | Server yo'q bo'lsa yashirish | S |
 | E9 | Til aralash: «Ichki/Eksport», xom rol nomlari, `changed` | past | Interfeys ruscha — bitta lug'at | S |
+
+**E3, E4, E6, E8 — bajarildi (v2.10.0).** E3: oynani ochgan bosish uni yopmaydi
+(kalit bo'yicha solishtiriladi — ro'yxat qutini qayta chizgan bo'lishi mumkin);
+aylantirganda oyna qutisi bilan birga yuradi, quti ekrandan chiqsa yopiladi; ochiq
+oynada Esc faqat oynani yopadi, yozilgan narx qoladi; Esc smeta narxini qaytaradi —
+endi «Отменить» bilan. Qayta chizishda kursorni qaytarish «ekspert qutiga kirdi»
+deb olinmaydi (`VList.restoring`) — yopilgan oyna o'zi qayta ochilmaydi, E11 ning
+«kirgandagi narxi» ham saqlanadi. E4: qidiruv, filtr va saralash o'zgarmagan
+yangilanish ro'yxat joyini saqlaydi. E6: tejam hamma joyda yashil, ortiqcha
+xarajat qizil (`S.diffCls`), o'zgargan qator foni neytral. E8: taklif filtrlari
+faqat server rejimida qo'shiladi. Testlar: `test/browser.mjs`, `test/e2e-hints.mjs`.
 
 ### QQS (НДС) hech qayerda aytilmaydi
 

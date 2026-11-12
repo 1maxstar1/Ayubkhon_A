@@ -60,6 +60,8 @@ await page.screenshot({ path: join(root, 'test/shot-prices.png') });
 // prices on screen are without VAT, and the screen says so — in the price headings only (E10)
 check(await page.evaluate(() => (document.getElementById('priceHead').textContent.match(/без НДС/g) || []).length) === 2,
   'the price list says «без НДС» under its two price headings');
+check(await page.evaluate(() => !document.querySelector('#filter option[value="hint"],#filter option[value="near"]')),
+  'the page without a server offers no filter of suggestions it can never have (E8)');
 
 /* a price, typed into the box of the first priced resource — whatever the estimate calls it */
 const res = await page.evaluate(() => {
@@ -107,10 +109,30 @@ check(Math.abs(after.market - typed) < 1e-9, `the typed price is the resource's 
 check(after.rows === res.lines && after.applied === after.rows, `and it is on every one of its ${after.rows} lines`);
 check(after.others === 0, 'no other resource is touched');
 
+// Esc puts the estimate's price back, as it always did — now with «Отменить» (E3)
+await box.click();
+await box.press('Escape');
+await page.waitForTimeout(200);
+check(await page.evaluate((a) => app.prices[a.k] === a.p, { k: res.key, p: res.price }) &&
+  await page.evaluate(() => [...document.querySelectorAll('#toast .toast-act')].some((b) => b.textContent === 'Отменить')),
+  'Esc in a price box puts the estimate\'s price back, and the message offers «Отменить»');
+await page.evaluate(() => [...document.querySelectorAll('#toast .toast-act')].filter((b) => b.textContent === 'Отменить').pop().click());
+await page.waitForTimeout(200);
+check(await page.evaluate((a) => Math.abs(app.prices[a.k] - a.t) < 1e-9, { k: res.key, t: typed }), '«Отменить» brings the typed price back');
+await page.keyboard.press('Tab');
+
 await page.fill('#q', '');
 await page.selectOption('#filter', 'changed');
 await page.waitForTimeout(300);
 check(await page.evaluate(() => app.prices_ui.view.length) === 1, 'the filter «изменённые» shows exactly that one');
+// a saving is green on the line as in the total (E6)
+const tone = await page.evaluate(() => {
+  const c = document.querySelector('#priceScroll .vrow .c:last-child');
+  const g = document.createElement('div'); g.className = 'v good'; document.getElementById('ledger').appendChild(g);
+  const want = getComputedStyle(g).color; g.remove();
+  return { save: c.classList.contains('save'), over: c.classList.contains('over'), same: getComputedStyle(c).color === want };
+});
+check(tone.save && !tone.over && tone.same, 'the saving on the line is coloured as a saving, the colour of the total\'s saving');
 await page.screenshot({ path: join(root, 'test/shot-changed.png') });
 
 /* the document lists a change only above a threshold (five million by default): here every change counts */
@@ -170,6 +192,24 @@ const onTable = table.rows.some((row) => {
 check(wb.sheets.length < 2 || onTable, `the comparison table («${table.name}», ${table.rows.length} rows) has that line`);
 check(cells.some((c) => c.f && /^\+?[A-Z]+\d+[*-]/.test(String(c.f).replace(/^=/, ''))) && cells.some((c) => c.f && /SUM\(/i.test(c.f)),
   'and its sums are formulas, not numbers');
+
+/* a refresh keeps the list where it was; a new sort starts it from the top (E4) */
+await page.click('.tab[data-pane="prices"]');
+await page.fill('#q', '');
+await page.selectOption('#filter', 'all');
+await page.selectOption('#sort', 'name');
+await page.waitForTimeout(300);
+const kept = await page.evaluate(() => {
+  const sc = document.getElementById('priceScroll');
+  app.prices_ui.list.scrollToRow(Math.min(60, app.prices_ui.view.length - 1));
+  const at = sc.scrollTop;
+  app.prices_ui.apply();
+  return { at, after: sc.scrollTop };
+});
+if (kept.at > 0) check(kept.after === kept.at, `a refresh of the list keeps its place (${kept.after} of ${kept.at})`);
+await page.selectOption('#sort', 'sum');
+await page.waitForTimeout(200);
+check(await page.evaluate(() => document.getElementById('priceScroll').scrollTop) === 0, 'and another sort starts it from the top');
 
 /* «Применить %» (A7): every price shown moves to the estimate's ± the percentage, to the tiyin — but never one the expert set */
 await page.click('.tab[data-pane="prices"]');

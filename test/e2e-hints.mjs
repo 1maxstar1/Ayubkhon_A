@@ -144,6 +144,31 @@ check(applied.includes(picked[0].market) || applied.includes(picked[1].market), 
 await page.evaluate(() => S.Sync.q);
 await page.waitForFunction(() => !S.Sync.dirty, null, { timeout: 15000 });
 
+// E3: the click that puts the caret in a hinted price box opens its popover — and does not close it again; Esc with the
+// popover open closes it and keeps what was typed; a second Esc puts the estimate's price back, with «Отменить»
+const other = await page.evaluate((p) => { const x = p.find((y) => !S.near(app.prices[y.key], y.market)) || p[0];
+  return { key: x.key, smeta: app.model.resources.find((r) => r.key === x.key).price }; }, picked);
+const otherBox = page.locator('#priceScroll .pin[data-key="' + other.key.replace(/(["\\])/g, '\\$1') + '"]');
+await otherBox.click();
+await page.waitForTimeout(300);
+check(await page.isVisible('#hintPop'), 'clicking into a hinted price box opens its popover, and the same click does not close it');
+await otherBox.fill('12345');
+await otherBox.press('Escape');
+await page.waitForTimeout(200);
+check(await page.evaluate(() => document.getElementById('hintPop').hidden) && await page.evaluate((k) => app.prices[k] === 12345, other.key),
+  'Esc closes the popover and keeps the price typed so far');
+await otherBox.press('Escape');
+await page.waitForTimeout(200);
+check(await page.evaluate((o) => app.prices[o.key] === o.smeta, other) && await page.isVisible('.toast-act'),
+  'a second Esc puts the estimate\'s price back, and offers «Отменить»');
+await page.evaluate(() => [...document.querySelectorAll('#toast .toast-act')].filter((b) => b.textContent === 'Отменить').pop().click());
+await page.waitForTimeout(200);
+check(await page.evaluate((k) => app.prices[k] === 12345, other.key), '«Отменить» brings back what was typed');
+await page.evaluate((o) => app.setPrice(o.key, o.smeta), other);
+await otherBox.press('Tab');
+await page.evaluate(() => S.Sync.q);
+await page.waitForFunction(() => !S.Sync.dirty, null, { timeout: 15 * 1000 });
+
 /*
  * One request asks for as many keys as fit in a filter and takes the newest
  * thousand rows of the answer. A resource every project buys can fill that

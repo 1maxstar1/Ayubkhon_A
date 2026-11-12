@@ -92,7 +92,7 @@
       var inp = e.target;
       if (!inp.classList || !inp.classList.contains('pin')) return;
       var rec = self.byKey(inp.dataset.key);
-      if (rec) { inp.value = fmtIn(rec.market); inp.dataset.was = String(rec.market); }
+      if (rec && !S.VList.restoring) { inp.value = fmtIn(rec.market); inp.dataset.was = String(rec.market); }
       inp.select();
     });
     scroll.addEventListener('focusout', function (e) {
@@ -115,7 +115,7 @@
       else if (e.key === 'ArrowUp') { e.preventDefault(); self.focusRow(+inp.dataset.i - 1); }
       else if (e.key === 'Escape') {
         var rec = self.byKey(inp.dataset.key);
-        if (rec) { self.app.setPrice(rec.key, rec.price); self.list.refresh(); }
+        if (rec) self.app.escPrice(rec.key, rec.price);
       }
     });
 
@@ -189,8 +189,8 @@
     var econ = econOf(rec), pct = pctOf(rec), chg = isChanged(rec);
     cells[7].textContent = rec.smetaSum ? pct.toFixed(1) + '%' : '';
     cells[8].textContent = S.money(econ);
-    cells[7].classList.toggle('diff', chg);
-    cells[8].classList.toggle('diff', chg);
+    S.diffMark(cells[7], chg, econ);
+    S.diffMark(cells[8], chg, econ);
     row.classList.toggle('chg', chg);
   };
 
@@ -236,6 +236,11 @@
       return a.name < b.name ? -1 : a.name > b.name ? 1 : a.price - b.price;
     });
 
+    // the same search, filter and sort over the same estimates is a refresh — a price applied, an answer arrived — and
+    // keeps its place; a change of any of them, or new estimates, starts from the top (E4)
+    var sig = q + '\0' + f + '\0' + sort;
+    if (keepScroll === undefined && sig === this._sig && m === this._sigModel) keepScroll = true;
+    this._sig = sig; this._sigModel = m;
     this.view = list;
     this.list.setCount(list.length, keepScroll === true);
     this.status();
@@ -284,9 +289,9 @@
         '<div class="c num' + (uz ? ' uzc' : '') + '" style="' + width(COLS[6]) + '">' + uz +
         '<input class="pin' + (changed ? ' edited' : '') + (uz ? ' uz' : '') + '" data-key="' + S.esc(r.key) + '" data-i="' + i +
         '" inputmode="decimal" value="' + S.price(r.market) + '"></div>' +
-        '<div class="c num' + (changed ? ' diff' : '') + '" style="' + width(COLS[7]) + '">' +
+        '<div class="c num' + S.diffCls(changed, e) + '" style="' + width(COLS[7]) + '">' +
         (r.smetaSum ? pct.toFixed(1) + '%' : '') + '</div>' +
-        '<div class="c num' + (changed ? ' diff' : '') + '" style="' + width(COLS[8]) + '">' +
+        '<div class="c num' + S.diffCls(changed, e) + '" style="' + width(COLS[8]) + '">' +
         S.money(e) + '</div>' +
         '</div>');
     }

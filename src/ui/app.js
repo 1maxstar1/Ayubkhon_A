@@ -241,7 +241,7 @@
       var inp = e.target;
       if (!inp.classList || !inp.classList.contains('pin')) return;
       var row = self.rowByKeyFirst(inp.dataset.key);
-      if (row) { inp.value = inVal(row.market); inp.dataset.was = String(row.market); }
+      if (row && !S.VList.restoring) { inp.value = inVal(row.market); inp.dataset.was = String(row.market); }
       inp.select();
     });
     scroll.addEventListener('focusout', function (e) {
@@ -258,9 +258,22 @@
       else if (e.key === 'ArrowUp') { e.preventDefault(); self.stepSheet(+inp.dataset.i, -1); }
       else if (e.key === 'Escape') {
         var row = self.rowByKeyFirst(inp.dataset.key);
-        if (row) { self.setPrice(inp.dataset.key, row.price); self.sheetList.refresh(); }
+        if (row) self.escPrice(inp.dataset.key, row.price);
       }
     });
+  };
+
+  /**
+   * Esc in a price box. With a popover open (suggestions, reference prices, the exchange) it only closes the popover —
+   * it used to take the price typed so far with it. Otherwise it puts the estimate's price back, as it always did,
+   * now with «Отменить»: one key too many no longer costs a price (E3).
+   */
+  App.prototype.escPrice = function (key, smeta) {
+    if (document.querySelector('#hintPop:not([hidden]),#refPop:not([hidden]),#uzexPop:not([hidden])')) return;
+    var now = this.prices[key] != null ? this.prices[key] : smeta;
+    if (S.near(now, smeta)) return;
+    var o = {}; o[key] = smeta;
+    this.bulkPrices(o, 'Цена возвращена к сметной: ' + S.price(smeta));
   };
 
   /** Move the caret to the next/previous priced row, skipping the banners. */
@@ -300,7 +313,7 @@
       var cells = el.querySelectorAll('.c');
       cells[8].textContent = S.money(mk);
       cells[9].textContent = S.money(d);
-      cells[9].classList.toggle('diff', chg);
+      S.diffMark(cells[9], chg, r.price - r.market);
       el.classList.toggle('chg', chg);
       inp.classList.toggle('edited', chg);
       if (document.activeElement !== inp) inp.value = S.price(r.market);
@@ -947,7 +960,7 @@
       '<div class="c num" style="' + w(SHEET_COLS[5]) + '">' + S.money(sm) + '</div>' +
       market +
       '<div class="c num" style="' + w(SHEET_COLS[7]) + '">' + S.money(mk) + '</div>' +
-      '<div class="c num' + (chg ? ' diff' : '') + '" style="' + w(SHEET_COLS[8]) + '">' + S.money(d) + '</div>' +
+      '<div class="c num' + S.diffCls(chg, r.price - r.market) + '" style="' + w(SHEET_COLS[8]) + '">' + S.money(d) + '</div>' +
       '</div>';
   }
 

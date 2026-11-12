@@ -148,6 +148,8 @@ run release-script   sh test/release-script.sh
 run pb-smoke         sh test/pb-smoke.sh
 run server-helper    node test/server-helper.mjs
 run laptop-backup    sh test/laptop-backup.sh
+run laptop-faults    sh test/laptop-faults.sh
+run update-channel   node test/update-channel.cjs
 run install          node test/install.mjs
 run registry-import  sh test/registry-import.sh
 run admin-api        sh test/admin-api.sh

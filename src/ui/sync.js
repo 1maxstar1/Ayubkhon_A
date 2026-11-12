@@ -181,6 +181,9 @@
           self.indexCorr();
           self.corrReady = true;
           self.mergeCorr();
+          // the marks of where an applied price came from (U / С / П) are read from these corrections: arrived after the
+          // list was drawn (a slow server), the list is drawn again — they used to stay away until the next scroll
+          if (!self.loading && app.prices_ui && app.prices_ui.list) app.prices_ui.list.refresh();
         }).catch(function (e) {
           if (current()) app.toast('Правки не загружены: ' + S.pbErr(e), true);
         });

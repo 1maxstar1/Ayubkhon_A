@@ -318,6 +318,9 @@ try {
   check(c.uz && c.pill === 'U', 'the price applied from UZEX keeps its mark while the source is unchecked');
 
   /* ------------------------------------------------------------- after a reload */
+  // the corrections held back until the list is drawn (a slow server): the marks still come, once they arrive
+  const SLOW = (u) => /\/api\/collections\/corrections\/records/.test(u.toString()) && /workspace/.test(decodeURIComponent(u.toString()));
+  await ep.route(SLOW, async (r) => { await new Promise((ok) => setTimeout(ok, 3000)); await r.continue().catch(() => null); });
   await ep.reload();
   await ep.waitForSelector('#wsBox:not([hidden])', T);
   await ep.waitForFunction(() => window.app && app.model && app.model.resources.length > 60 && !S.Sync.loading, null, T);
@@ -326,9 +329,10 @@ try {
   // after a reload the mark comes with the corrections from the server, after the prices
   await markOn(row(PIPE, 'т'));
   c = await cell();
-  check(c && c.uz && c.color === 'rgb(83, 74, 183)' && c.pill === 'U', 'after a reload the cell is still violet with its «U»');
+  check(c && c.uz && c.color === 'rgb(83, 74, 183)' && c.pill === 'U', 'after a reload the cell is still violet with its «U» — also when its correction arrives after the list');
   await show(PAINT);
   await markOn(row(PAINT));
+  await ep.unroute(SLOW);
   check(await ep.$eval(row(PAINT), (r) => !!r.querySelector('.pin.uz') && !!r.querySelector('.upill.u')), 'so is the converted one');
 
   // typed over: the expert's own price again

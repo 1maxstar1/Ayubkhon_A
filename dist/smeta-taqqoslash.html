@@ -5286,7 +5286,13 @@ if (typeof self !== 'undefined') self.S = S;
       self.apply();
     });
 
-    document.getElementById('q').addEventListener('input', S.debounce(function () { self.apply(); }, 90));
+    // Only a query that changed redraws the list. An input event that leaves the text as it was (the same text typed over
+    // a selection) used to redraw every row 90 ms later — and a redraw that falls between the press and the release of
+    // the mouse on a row's tag takes the tag away under it: the click is lost and the popover never opens.
+    document.getElementById('q').addEventListener('input', S.debounce(function () {
+      if (self.qShown != null && document.getElementById('q').value === self.qShown) return;
+      self.apply();
+    }, 90));
     document.getElementById('filter').addEventListener('change', function () { self.apply(); });
     document.getElementById('secFilter').addEventListener('change', function () { self.apply(); });
     document.getElementById('sort').addEventListener('change', function () { self.apply(); });
@@ -5399,7 +5405,8 @@ if (typeof self !== 'undefined') self.S = S;
   Prices.prototype.apply = function (keepScroll) {
     var m = this.app.model;
     if (!m) { this.view = []; this.list.setCount(0); this.status(); return; }
-    var q = S.nameKey(document.getElementById('q').value);
+    this.qShown = document.getElementById('q').value;
+    var q = S.nameKey(this.qShown);
     var f = document.getElementById('filter').value;
     var sort = document.getElementById('sort').value;
     var sec = document.getElementById('secFilter').value;

@@ -76,6 +76,12 @@ await page.waitForFunction((a) => app.prices_ui.view.length < a.all && !!documen
 const box = page.locator('#priceScroll .pin[data-key="' + res.key.replace(/(["\\])/g, '\\$1') + '"]');
 const shownOf = await page.evaluate(() => app.prices_ui.view.length);
 check(shownOf >= 1 && shownOf < stats.resources, `the search narrows the list to the resource (${shownOf} of ${stats.resources})`);
+// the same text typed again redraws nothing: a redraw under a press on a row's tag used to lose the click (CI, e2e-uzex)
+await page.evaluate(() => document.querySelectorAll('#priceScroll .vrow').forEach((r) => { r.dataset.kept = '1'; }));
+await page.fill('#q', res.name.trim());
+await page.waitForTimeout(400);
+check(await page.evaluate(() => { const r = [...document.querySelectorAll('#priceScroll .vrow')]; return r.length > 0 && r.every((x) => x.dataset.kept === '1'); }),
+  'the same query typed again does not redraw the list');
 // a price typed as the estimate's × 1,12 is most likely one with VAT: said, with «÷ 1,12» to put the estimate's back (E11)
 const vatToast = () => page.evaluate(() => [...document.querySelectorAll('#toast .toast-item')].filter((t) => /с НДС/.test(t.textContent))
   .map((t) => ({ text: t.textContent, act: (t.querySelector('.toast-act') || {}).textContent || '' })));

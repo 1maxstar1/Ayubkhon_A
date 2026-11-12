@@ -1110,10 +1110,13 @@ oladi.
 ## Egasi hal qiladigan savollar
 
 1. **Eksportda QQS.** Hujjatga «narxlar QQSsiz» satri qo'shilsinmi? `321.xlsx`
-   ko'rinishini o'zgartiradi (E13).
-2. **«Применить %»** qo'lda yozilgan narxlarni o'tkazib yuborsinmi? (A7)
+   ko'rinishini o'zgartiradi (E13). — **Hal bo'ldi (2026-11-12): yo'q** — hujjat
+   `321.xlsx` bilan aynan bir xil qoladi, QQS faqat ekranda aytiladi.
+2. **«Применить %»** qo'lda yozilgan narxlarni o'tkazib yuborsinmi? (A7) — **Hal
+   bo'ldi (2026-11-12): ha**, o'tkazib yuboriladi va nechtasi aytiladi.
 3. **Ommaviy taklif**: aynan shu kontragentning oldingi narxlarini bitta
-   ro'yxat va bitta tasdiqlash bilan qo'yishga ruxsatmi? (F1)
+   ro'yxat va bitta tasdiqlash bilan qo'yishga ruxsatmi? (F1) — **Hal bo'ldi
+   (2026-11-12): ha** — avval ro'yxat, keyin bitta tasdiq, «Отменить» bilan.
 4. **Formulalar ro'yxati**: smetadan faqat xavfsiz funksiyali formulalar tirik
    ko'chsin, qolgani son bo'lib — rozimisiz? Haqiqiy fayllarda hech narsa
    o'zgarmaydi (C3). — **Hal bo'ldi (v2.9.4):** «3-bosqichni boshla» javobi
@@ -1122,7 +1125,8 @@ oladi.
    yopiladi — 6-bosqichdan keyin (C).
 6. **Mac'dagi ikkinchi zaxira joyi**: iCloud Drive, Google Drive yoki tashqi
    disk? (B1)
-7. **UZEX haftasi** arizaning sanasi bo'yicha o'zi tanlansinmi? (F5)
+7. **UZEX haftasi** arizaning sanasi bo'yicha o'zi tanlansinmi? (F5) — **Hal
+   bo'ldi (2026-11-12): ha**, qo'lda boshqasini tanlash qoladi.
 8. **4А ИТОГО**: qatorlar bo'yicha `SUM` yozilsinmi yoki bozor tomoni bo'sh
    qolsinmi? (A2)
 

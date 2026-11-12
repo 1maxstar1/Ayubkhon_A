@@ -235,10 +235,17 @@ await page.evaluate(() => S.Sync.q);
 const w3 = (await api('/api/collections/workspaces/records?perPage=1', {}, su)).items[0];
 check(w3.files.length === 2 && Object.keys(w3.state.files).length === 2, 're-adding the file uploads it again');
 
-// export -> stored on the server
+// export -> stored on the server, both named after the application: its number and its contractor (E19)
+const appNo = await page.evaluate(() => ({ no: S.Sync.app.number, who: (S.Sync.app.expand && S.Sync.app.expand.contragent && S.Sync.app.expand.contragent.name) || S.Sync.app.org_name || '' }));
+const dlExport = page.waitForEvent('download', { timeout: 60 * 1000 });
 await page.click('#export');
+const dlFile = await dlExport;
 await page.waitForFunction(() => document.getElementById('toast').textContent.includes('сохранён на сервере'), null, { timeout: 60000 });
 check((await count('exports')) === 1, 'export stored in exports');
+const wantName = await page.evaluate((a) => S.safeName('Zayavka_' + a.no + (a.who ? '_' + a.who : '')), appNo);
+check(dlFile.suggestedFilename().startsWith(wantName + '_taqqoslash_'), `the downloaded document is named after the application (${dlFile.suggestedFilename()})`);
+const storedExport = (await api('/api/collections/exports/records?perPage=1', {}, su)).items[0];
+check(new RegExp('zayavka_' + appNo.no, 'i').test(storedExport.file), `and so is the one kept on the server (${storedExport.file})`);
 
 // Typing a price fires on every keystroke, and each one used to be its own
 // write — «120000» meant five, four of them recording a number nobody meant.
@@ -288,6 +295,14 @@ await page.waitForFunction(() => document.getElementById('wsSave').textContent =
 const wPct = (await api('/api/collections/workspaces/records?perPage=1', {}, su)).items[0];
 check(Array.isArray(wPct.state.pct) && wPct.state.pct.includes(first.key) && wPct.state.pct.length === all,
   `the saved state names the prices the percentage set (${(wPct.state.pct || []).length} of ${all})`);
+// «Проверено» (E14) and the expert's own notes (E17) are saved with the application
+await page.evaluate((k) => { app.setChecked([k], true); app.notes[k] = 'КП №3'; document.dispatchEvent(new Event('notes:change')); }, first.key);
+await page.waitForFunction(() => document.getElementById('wsSave').textContent === '✓' && !S.Sync.dirty, null, { timeout: 20 * 1000 });
+const wMarks = (await api('/api/collections/workspaces/records?perPage=1', {}, su)).items[0];
+check(wMarks.state.checked && wMarks.state.checked[first.key] === 1 && wMarks.state.notes && wMarks.state.notes[first.key] === 'КП №3',
+  'the «проверено» marks and the own notes are saved with the application');
+await page.evaluate((k) => { app.setChecked([k], false); delete app.notes[k]; document.dispatchEvent(new Event('notes:change')); }, first.key);
+await page.waitForFunction(() => document.getElementById('wsSave').textContent === '✓' && !S.Sync.dirty, null, { timeout: 20 * 1000 });
 
 // «Сбросить» puts every resource back on its own estimate price, which means
 // removing every correction — in as few requests as the writes took, and cut

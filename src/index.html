@@ -69,6 +69,16 @@
           <option value="zero">С ценой 0</option>
           <option value="multi">Несколько сметных цен</option>
           <option value="wrongsec">Не тот раздел</option>
+          <option value="unchecked">Не проверенные</option>
+          <option value="checked">Проверенные</option>
+        </select>
+        <select id="secFilter" title="По разделу сметы; строки без раздела — в «Прочие»" hidden>
+          <option value="all">Все разделы</option>
+          <option value="labor">Затраты труда</option>
+          <option value="machines">Машины и механизмы</option>
+          <option value="materials">Материалы</option>
+          <option value="equipment">Оборудование</option>
+          <option value="other">Прочие / без раздела</option>
         </select>
         <select id="sort">
           <option value="name">По названию</option>
@@ -152,6 +162,8 @@
           <input id="optNote" type="text"></label>
         <label class="row"><input type="checkbox" id="optAutoNote" checked>
           Ставить примечание в каждую изменённую строку автоматически</label>
+        <label class="row"><input type="checkbox" id="optResNotes">
+          Примечание к отдельному ресурсу (кнопка ✎ в «Проверка цен») — в столбец «Eslatma» вместо стандартного текста</label>
         <label>Лист «Только изменённые цены»: ресурс попадает в отчёт, если разница по смете
           (кол-во × (цена по смете − рыночная)) больше, сум (0 — все изменённые)
           <input id="optMinDiff" type="number" step="any"></label>

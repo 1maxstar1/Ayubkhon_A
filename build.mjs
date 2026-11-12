@@ -65,6 +65,7 @@ const SERVER_SCRIPTS = [
   'src/ui/apps-admin.js',
   'src/ui/registry.js',
   'src/ui/sync.js',
+  'src/ui/version.js',
   'src/ui/hints.js',
   // reference prices: the main thread only shows the lines (Russian texts) and keeps the as-of date; the pool, the
   // parsers and the suggester run in their own worker (REFS_WORKER_LIBS below)
@@ -159,7 +160,7 @@ function build() {
       .replace('/*__JS__*/', () => ['src/vendor/pocketbase.umd.js', 'src/vendor/xlsx.full.min.js', 'src/vendor/fflate.umd.js',
         'src/lib/normalize.js', 'src/lib/match.js', 'src/lib/util.js', 'src/lib/pb.js', 'src/lib/regions.js', 'src/lib/registry-parse.js',
         'src/lib/refs/package.js', 'src/lib/refs/view.js',
-        'src/ui/auth.js', 'src/ui/apps-admin.js', 'src/ui/admin.js', 'src/ui/refs-admin.js', 'src/ui/uzex-admin.js']
+        'src/ui/auth.js', 'src/ui/apps-admin.js', 'src/ui/admin.js', 'src/ui/refs-admin.js', 'src/ui/uzex-admin.js', 'src/ui/version.js']
         .filter((p) => existsSync(join(root, p))).map(read).join('\n;\n'));
     emit('admin.html', admin);
   }

@@ -94,8 +94,10 @@ await page.click('#loginBtn');
 await openApp(A.number, 'fargona');
 const picked = await page.evaluate(() => {
   const rs = app.model.resources.filter((x) => x.price > 1000).slice(0, 2);
-  rs.forEach((r) => app.setPrice(r.key, Math.round(r.price * 1.2)));
-  return rs.map((r) => ({ key: r.key, nk: r.nk, mk: r.mk, name: r.name, price: r.price, market: Math.round(r.price * 1.2) }));
+  // the first at the estimate's price × 1,12 — a price typed with VAT, which the popover of the next project says (E12)
+  const at = (r, i) => Math.round(r.price * (i ? 1.2 : 1.12));
+  rs.forEach((r, i) => app.setPrice(r.key, at(r, i)));
+  return rs.map((r, i) => ({ key: r.key, nk: r.nk, mk: r.mk, name: r.name, price: r.price, market: at(r, i) }));
 });
 await page.evaluate(() => S.Sync.q);
 await page.waitForFunction(() => !S.Sync.dirty && document.getElementById('wsSave').textContent === '✓', null, { timeout: 15000 });
@@ -137,8 +139,23 @@ check(await page.evaluate(() => Object.keys(S.Hints.map).every((k) => k.indexOf(
 await page.click('#priceScroll .tagh');
 await page.waitForSelector('#hintPop:not([hidden])');
 check((await page.textContent('#hintPop')).includes(A.number), 'popover names the source application');
+// E12: the popover says its prices are without VAT, and flags an earlier price that is that estimate's × 1,12
+const vatSaid = [];
+for (const p of picked) {
+  await page.evaluate(() => S.Hints.hide());
+  await page.click('#priceScroll .tagh[data-key="' + p.key.replace(/(["\\])/g, '\\$1') + '"]');
+  await page.waitForSelector('#hintPop:not([hidden])');
+  vatSaid.push({ head: await page.textContent('#hintPop .hp-head'), flag: await page.locator('#hintPop .hp-vat').count() });
+}
+check(vatSaid.every((v) => /без НДС/.test(v.head)), 'the popover of earlier projects says its prices are without VAT');
+check(vatSaid[0].flag === 1 && vatSaid[1].flag === 0, 'an earlier price typed as that estimate\'s × 1,12 is flagged «похоже на цену с НДС», the other is not');
+await page.evaluate(() => S.Hints.hide());
+await page.click('#priceScroll .tagh');
+await page.waitForSelector('#hintPop:not([hidden])');
 await page.click('#hintPop button[data-i="0"]');
-await page.waitForFunction(() => document.getElementById('hintPop').hidden);
+// applied: the caret goes on to the next resource, and the popover there opens if it has suggestions (E18)
+await page.waitForFunction((p) => p.some((x) => app.prices[x.key] === x.market), picked);
+await page.evaluate(() => S.Hints.hide());
 const applied = await page.evaluate((p) => p.map((x) => app.prices[x.key]), picked);
 check(applied.includes(picked[0].market) || applied.includes(picked[1].market), 'Qo\'llash applied the hinted price');
 await page.evaluate(() => S.Sync.q);
@@ -164,6 +181,36 @@ check(await page.evaluate((o) => app.prices[o.key] === o.smeta, other) && await 
 await page.evaluate(() => [...document.querySelectorAll('#toast .toast-act')].filter((b) => b.textContent === 'Отменить').pop().click());
 await page.waitForTimeout(200);
 check(await page.evaluate((k) => app.prices[k] === 12345, other.key), '«Отменить» brings back what was typed');
+await page.evaluate((o) => app.setPrice(o.key, o.smeta), other);
+await otherBox.press('Tab');
+await page.evaluate(() => S.Sync.q);
+await page.waitForFunction(() => !S.Sync.dirty, null, { timeout: 15 * 1000 });
+
+// E18: Ctrl+Enter in a hinted price box takes the first suggestion, as «Применить» would, and the caret goes on to the
+// next resource; over a price the expert set it asks first
+const hintOf = picked.find((x) => x.key === other.key).market;
+const order = await page.evaluate(() => app.prices_ui.view.map((r) => r.key));
+const at = order.indexOf(other.key);
+await otherBox.click();
+await page.waitForTimeout(300);
+await otherBox.press('Control+Enter');
+await page.waitForTimeout(300);
+check(await page.evaluate((a) => app.prices[a.k] === a.p, { k: other.key, p: hintOf }), `Ctrl+Enter applies the first suggestion (${hintOf})`);
+if (at >= 0 && at + 1 < order.length) {
+  check(await page.evaluate((i) => document.activeElement && document.activeElement.classList.contains('pin') && +document.activeElement.dataset.i === i, at + 1),
+    'and the caret is in the next resource\'s price box');
+}
+await page.evaluate((o) => app.setPrice(o.key, o.smeta), other);
+await otherBox.click();
+await otherBox.fill('12345');
+let askedReplace = '';
+page.once('dialog', (d) => { askedReplace = d.message(); d.dismiss(); });
+await page.evaluate((k) => { const b = document.querySelector('#priceScroll .pin[data-key="' + CSS.escape(k) + '"]'); b.blur(); b.focus(); }, other.key);
+await page.waitForTimeout(300);
+await otherBox.press('Control+Enter');
+await page.waitForTimeout(300);
+check(/Заменить вашу цену/.test(askedReplace) && await page.evaluate((k) => app.prices[k] === 12345, other.key),
+  'over a typed price it asks first, and «нет» leaves the typed price');
 await page.evaluate((o) => app.setPrice(o.key, o.smeta), other);
 await otherBox.press('Tab');
 await page.evaluate(() => S.Sync.q);

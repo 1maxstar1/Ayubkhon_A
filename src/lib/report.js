@@ -193,7 +193,11 @@
       var moved = r.kind === 'item' && !S.near(r.price, r.market);
       // The note column doubles as the sheet's first helper column, exactly as
       // in the reference workbook — never overwrite a value carried across.
-      if (r.kind === 'item' && big[r.key] && !cells[R_NOTE]) cells[R_NOTE] = { v: opts.equipNote };
+      // The expert's own note on a resource (E17, a setting off by default) stands in place of the standard text;
+      // with notes off (null) every line is exactly what it always was.
+      var own = r.kind === 'item' && opts.notes && opts.notes[r.key];
+      if (r.kind === 'item' && big[r.key] && !cells[R_NOTE]) cells[R_NOTE] = { v: opts.equipNote + (own ? '\n' + own : '') };
+      else if (own && !cells[R_NOTE]) cells[R_NOTE] = { v: own };
       else if (moved && opts.autoNote && opts.noteText && !cells[R_NOTE]) cells[R_NOTE] = { v: opts.noteText };
       rows.push({
         kind: r.kind, section: r.section, nm: r.nm, unit: r.unit,
@@ -271,7 +275,9 @@
         cells[R_MPRICE] = { v: rec.market };
         cells[R_MSUM] = { f: '=F' + rr + '*I' + rr };
         cells[R_DIFF] = { f: '=+H' + rr + '-J' + rr };
-        if (rec.big) cells[R_NOTE] = { v: opts.equipNote };
+        var ownNote = opts.notes && opts.notes[rec.key];
+        if (rec.big) cells[R_NOTE] = { v: opts.equipNote + (ownNote ? '\n' + ownNote : '') };
+        else if (ownNote) cells[R_NOTE] = { v: ownNote };
         else if (opts.autoNote && rec.changed && opts.noteText) cells[R_NOTE] = { v: opts.noteText };
         rows.push({ kind: 'item', section: sec, nm: rec.nm, unit: rec.unit, key: rec.key,
                     price: rec.price, market: rec.market, qty: rec.qty,

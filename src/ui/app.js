@@ -16,7 +16,8 @@
     equipOn: true, equipLimit: 20000000,
     minDiff: 5 * 1000 * 1000,
     autoNote: true, hideSums: true, hideQty: true, contents: true,
-    cfLimit: 10000000, sheetName: 'Лист1'
+    cfLimit: 10 * 1000 * 1000, sheetName: 'Лист1',
+    resNotes: false            // the expert's own notes on resources (E17): off, and the document is what it always was
   };
 
   function App() {
@@ -24,6 +25,8 @@
     this.model = null;
     this.prices = {};        // resource key -> market unit price
     this.pct = {};           // resource key -> 1 when its price was set by «Применить %» (and may be set by it again)
+    this.checked = {};       // resource key -> 1: the expert marked it «проверено» (E14)
+    this.notes = {};         // resource key -> the expert's own note for the document (E17, behind opts.resNotes)
     this.spareBook = null;   // price-book lines for a resource key no estimate has yet; see loadPriceBook()
     this.opts = Object.assign({}, DEFAULTS, loadOpts());
     this.seq = 0;
@@ -148,6 +151,8 @@
     bindOpt(this, 'optSheetName', 'sheetName');
     bindOpt(this, 'optCf', 'cfLimit', true);
     bindChk(this, 'optAutoNote', 'autoNote');
+    bindChk(this, 'optResNotes', 'resNotes');
+    document.getElementById('optResNotes').addEventListener('change', function () { self.prices_ui.list.refresh(); });
     bindOpt(this, 'optEquipNote', 'equipNote');
     bindChk(this, 'optEquipOn', 'equipOn');
     bindOpt(this, 'optEquipLimit', 'equipLimit', true);
@@ -207,6 +212,19 @@
         } }
       });
     }
+  };
+
+  /** Mark resources «проверено» or not (E14). `quiet`: no redraw of the list (the caret is leaving a box). */
+  App.prototype.setChecked = function (keys, on, quiet) {
+    var self = this;
+    keys.forEach(function (k) { if (on) self.checked[k] = 1; else delete self.checked[k]; });
+    this.prices_ui.status();
+    if (!quiet) this.prices_ui.list.refresh();
+    else keys.forEach(function (k) {
+      var b = document.querySelector('#priceScroll .ck[data-ck="' + String(k).replace(/["\\]/g, '\\$&') + '"]');
+      if (b) { b.classList.toggle('on', !!on); b.textContent = on ? '✓' : '○'; b.setAttribute('aria-pressed', String(!!on)); }
+    });
+    try { document.dispatchEvent(new Event('checked:change')); } catch (e) { /* old browser */ }
   };
 
   /**
@@ -357,6 +375,7 @@
     document.getElementById('optSheetName').value = this.opts.sheetName;
     document.getElementById('optCf').value = this.opts.cfLimit;
     document.getElementById('optAutoNote').checked = !!this.opts.autoNote;
+    document.getElementById('optResNotes').checked = !!this.opts.resNotes;
     document.getElementById('optEquipNote').value = this.opts.equipNote;
     document.getElementById('optEquipOn').checked = this.opts.equipOn !== false;
     document.getElementById('optEquipLimit').value = this.opts.equipLimit;
@@ -1006,6 +1025,7 @@
       mode: document.getElementById('reportMode').value,
       stamp: this.opts.stamp, docTitle: this.opts.docTitle, noteText: this.opts.noteText,
       autoNote: this.opts.autoNote, hideSums: this.opts.hideSums, hideQty: this.opts.hideQty,
+      notes: this.opts.resNotes ? this.notes : null,
       equipNote: this.opts.equipOn !== false ? this.opts.equipNote : '',
       equipLimit: this.opts.equipLimit, minDiff: this.opts.minDiff,
       cfLimit: this.opts.cfLimit, sheetName: this.opts.sheetName,
@@ -1103,9 +1123,17 @@
   function fileName(app) {
     var d = new Date();
     var p = String(d.getFullYear()) + pad(d.getMonth() + 1) + pad(d.getDate());
-    var base = app.projects.length === 1 ? app.projects[0].name : 'Taqqoslash';
-    return base.replace(/[^\wЀ-ӿ\- ]+/g, '') + '_taqqoslash_' + p + '.xlsx';
+    return S.safeName(app.exportBase()) + '_taqqoslash_' + p + '.xlsx';
   }
+  /**
+   * What the downloaded document is named after: the project when there is one, else «Taqqoslash». Server mode puts
+   * the application's number and contractor in its place (sync.js, E19).
+   */
+  App.prototype.exportBase = function () { return this.projects.length === 1 ? this.projects[0].name : 'Taqqoslash'; };
+  /** A name a file system takes: letters, digits, dashes and single spaces, at most 80 characters. */
+  S.safeName = function (s) {
+    return String(s || '').replace(/\//g, '-').replace(/[^\wЀ-ӿ\- ]+/g, '').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Taqqoslash';
+  };
   function pad(n) { return (n < 10 ? '0' : '') + n; }
 
   function download(bytes, name) {
@@ -1122,20 +1150,27 @@
   App.prototype.savePriceBook = function () {
     if (!this.model) { this.toast('Сначала добавьте файлы смет', true); return; }
     var self = this;
+    var notes = this.notes || {}, checked = this.checked || {};
     var book = this.model.resources
-      .filter(function (r) { return !S.near(r.price, r.market); })
+      .filter(function (r) { return !S.near(r.price, r.market) || notes[r.key] || checked[r.key]; })
       .map(function (r) {
-        // `smeta` identifies which priced line this belongs to when reloaded.
-        return { name: r.name, unit: r.unit, price: r.market, smeta: r.price, note: self.opts.noteText };
+        // `smeta` identifies which priced line this belongs to when reloaded. A resource with only an own note (E17)
+        // has no price in the book: an older page skips such a line, and none is counted as a price.
+        var e = { name: r.name, unit: r.unit, smeta: r.price, note: self.opts.noteText };
+        if (!S.near(r.price, r.market)) e.price = r.market;
+        if (notes[r.key]) e.own_note = notes[r.key];
+        if (checked[r.key]) e.checked = true;       // «Проверено» (E14) travels with the book, priced or not
+        return e;
       });
     if (!book.length) { this.toast('Ни одна цена ещё не изменена', true); return; }
+    var priced = book.filter(function (e) { return e.price != null; }).length;
     var blob = new Blob([JSON.stringify(book, null, 1)], { type: 'application/json' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url; a.download = 'narx_kitobi.json';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
-    this.toast('Сохранено цен: ' + book.length);
+    this.toast('Сохранено цен: ' + priced + (book.length > priced ? ' · строк без цены (примечания, отметки «проверено»): ' + (book.length - priced) : ''));
   };
 
   App.prototype.loadPriceBook = function (file) {
@@ -1174,6 +1209,10 @@
       var exact = {}, loose = {}, n = 0;
       entries.forEach(function (e) {
         var p = S.num(e.price != null ? e.price : e.market);
+        // the expert's own note (E17) comes back with its line, priced or not
+        var sm0 = S.num(e.smeta);
+        if (e && e.name && sm0 != null && typeof e.own_note === 'string' && e.own_note.trim()) self.notes[S.resKey(e.name, e.unit || '', sm0)] = e.own_note.trim().slice(0, 500);
+        if (e && e.name && sm0 != null && e.checked === true) self.checked[S.resKey(e.name, e.unit || '', sm0)] = 1;
         if (!e.name || p == null) return;
         var sm = S.num(e.smeta);
         if (sm != null) exact[S.resKey(e.name, e.unit || '', sm)] = p;

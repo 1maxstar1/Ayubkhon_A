@@ -126,7 +126,13 @@
         var b = e.target.closest && e.target.closest('.tagr');
         if (b) { e.preventDefault(); self.show(b, b.dataset.res); }
       });
-      sc.addEventListener('scroll', function () { self.hide(); }, { passive: true });
+      // a scroll keeps the popover with its row while the row is on screen, and closes it once it is not
+      sc.addEventListener('scroll', function () {
+        if (self.pop.hidden || !self.open) return;
+        var tag = sc.querySelector('.tagr[data-res="' + String(self.open.key).replace(/["\\]/g, '\\$&') + '"]'), box = sc.getBoundingClientRect();
+        if (tag) { var r = tag.getBoundingClientRect(); if (r.top >= box.top && r.bottom <= box.bottom) { self.place(tag); return; } }
+        self.hide();
+      }, { passive: true });
     },
 
     /* ------------------------------------------------------------------ workspace */
@@ -408,7 +414,7 @@
       var ctx = { sources: this.sources, asof: this.asofNow(), smetaPrice: rec.price, unit: rec.unit, regionLabel: S.regionLabel, queryName: rec.name };
       var html = '<div class="rp-head"><span>Справочные цены · ' + S.esc(S.regionLabel(S.Sync.ws.region) || '') +
         ' · на <b class="rp-date" title="' + (this.asofSet ? 'Дата выбрана вручную' : 'Дата регистрации заявки') + '">' +
-        ruDate(ctx.asof) + '</b> <button class="link" data-asof>изменить</button></span>' +
+        ruDate(ctx.asof) + '</b> <button class="link" data-asof>изменить</button> · <span class="rp-vat">цены без НДС</span></span>' +
         '<button class="link" data-x title="Закрыть">×</button></div>';
       html += '<div class="rp-asof" hidden>' + this.dateEditorHtml(ctx.asof) + '</div>';
       if (!S.near(rec.market, rec.price)) html += '<div class="rp-mine">Ваша цена: <b>' + fmt(rec.market) + '</b></div>';
@@ -502,10 +508,10 @@
           !window.confirm('Заменить вашу цену ' + fmt(rec.market) + ' на ' + fmt(price) + '?')) return;
       if (S.markSource) S.markSource(key, price, this.sourceOf(line));
       app.setPrice(key, price);
-      app.prices_ui.apply(true);
+      this.hide();
+      app.prices_ui.afterApply(key);
       app.sheetList.refresh();
       app.toast('Применено: ' + fmt(price) + ' (справочник)');
-      this.hide();
     },
 
     /** ref:<package>:<record>, or ref:<package>:median:<record>,<record>… (≤ 200 characters). */

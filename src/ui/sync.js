@@ -55,6 +55,16 @@
     saveRetry: SAVE_RETRY_MS,
 
     init: function () {
+      document.addEventListener('notes:change', function () { Sync.touch(); });
+      document.addEventListener('checked:change', function () { if (!Sync.loading) Sync.touch(); });
+      // the document of an application is named after it: its number and its contractor (E19)
+      var baseOf = S.App.prototype.exportBase;
+      S.App.prototype.exportBase = function () {
+        var a = Sync.ws && Sync.app;
+        if (!a) return baseOf.apply(this, arguments);
+        var c = a.expand && a.expand.contragent;
+        return 'Zayavka_' + a.number + ((c && c.name) || a.org_name ? '_' + ((c && c.name) || a.org_name) : '');
+      };
       var self = this;
       var P = S.App.prototype;
       wrap(P, 'rebuild', function () { self.touch(); });
@@ -139,7 +149,7 @@
       this.savedOnOpen = w.updated || '';      // the server's own clock: corrections are compared with it
       this.corrReady = false; this.merged = false;
       var app = A();
-      app.projects = []; app.prices = {}; app.pct = {}; app.looseBook = null; app.spareBook = null; app.queue = [];
+      app.projects = []; app.prices = {}; app.pct = {}; app.notes = {}; app.checked = {}; app.looseBook = null; app.spareBook = null; app.queue = [];
       this.refused = ''; this.cutSaid = 0;
       app.rebuild(); app.renderSide();
       this.renderBox();
@@ -292,6 +302,9 @@
         if (st.keys === KEYS && st.prices2 && Array.isArray(st.pct)) st.pct.forEach(function (k) { if (r.map[k] != null) app.pct[k] = 1; });
         if (r.moved) { this.dirty = true; app.toast('Цены перенесены на обновлённые названия ресурсов: ' + r.moved); }
       }
+      // the expert's own notes on resources (E17), under this version's keys
+      if (st.notes && typeof st.notes === 'object') app.notes = st.keys === KEYS ? Object.assign({}, st.notes) : this.reindex(st.notes).map;
+      if (st.checked && typeof st.checked === 'object') { app.checked = st.keys === KEYS ? Object.assign({}, st.checked) : this.reindex(st.checked).map; app.prices_ui.status(); app.prices_ui.list.refresh(); }
       this.indexCorr();
       var remapped = this.dirty;
       this.loading = false; this.dirty = false;
@@ -628,6 +641,8 @@
         prices: this.downgrade(prices),       // readable by the previous version
         prices2: prices,
         pct: Object.keys(prices).filter(function (k) { return app.pct && app.pct[k]; }),
+        notes: app.notes && Object.keys(app.notes).length ? app.notes : undefined,
+        checked: app.checked && Object.keys(app.checked).length ? app.checked : undefined,
         looseBook: app.looseBook || null,
         book: app.spareBook || null,
         compare: { old: this.cmp.old || null, new: this.cmp.new || null, reply: this.cmp.reply || null, base: this.cmp.base || '' },
@@ -957,7 +972,7 @@
       var self = this, app = A();
       if (!this.ws || this.frozen) return;
       var d = new Date(), pad = function (n) { return (n < 10 ? '0' : '') + n; };
-      var name = 'Zayavka_' + this.app.number + '_sopostavlenie_' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) +
+      var name = S.safeName(app.exportBase()) + '_' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) +
         '_' + pad(d.getHours()) + pad(d.getMinutes()) + '.xlsx';
       var fd = new FormData();
       fd.append('workspace', this.ws.id);
@@ -1049,7 +1064,7 @@
         self.thaw();
         S.hashSet('ws', '');
         self.loading = true;
-        app.projects = []; app.prices = {}; app.pct = {}; app.looseBook = null; app.spareBook = null; app.queue = [];
+        app.projects = []; app.prices = {}; app.pct = {}; app.notes = {}; app.checked = {}; app.looseBook = null; app.spareBook = null; app.queue = [];
         app.resetOpts();
         $('reportMode').value = 'changed';
         app.rebuild(); app.renderSide();

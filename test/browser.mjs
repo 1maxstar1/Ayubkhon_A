@@ -167,6 +167,8 @@ check(scrollMs < 5000, `sixty frames of scrolling take ${scrollMs} ms`);
 const dl = page.waitForEvent('download', { timeout: 120 * 1000 });
 await page.click('#export');
 const download = await dl;
+check(inputs.length < 2 || /^Taqqoslash_taqqoslash_\d{8}\.xlsx$/.test(download.suggestedFilename()),
+  `without a server, several projects are downloaded as «Taqqoslash_taqqoslash_<date>.xlsx» (${download.suggestedFilename()})`);
 const out = join(dir, 'export.xlsx');
 await download.saveAs(out);
 const bytes = readFileSync(out);
@@ -210,6 +212,44 @@ if (kept.at > 0) check(kept.after === kept.at, `a refresh of the list keeps its 
 await page.selectOption('#sort', 'sum');
 await page.waitForTimeout(200);
 check(await page.evaluate(() => document.getElementById('priceScroll').scrollTop) === 0, 'and another sort starts it from the top');
+
+/* «Проверено» (E14): a typed price checks its resource; a click and Shift+Enter check one; the list counts them */
+check(await page.evaluate((k) => !!app.checked[k], res.key), 'the resource whose price was typed is checked by itself');
+await page.selectOption('#sort', 'name');
+await page.waitForTimeout(200);
+const ckOther = await page.evaluate((k) => app.prices_ui.view.find((r) => r.key !== k).key, res.key);
+await page.click('#priceScroll .ck[data-ck="' + ckOther.replace(/(["\\])/g, '\\$1') + '"]');
+await page.waitForTimeout(150);
+let ckN = await page.evaluate(() => Object.keys(app.checked).length);
+check(ckN === 2 && new RegExp('проверено 2 из ' + stats.resources).test(await page.textContent('#priceCount')),
+  `a click on «○» checks a resource, and the status line counts them (${(await page.textContent('#priceCount')).match(/проверено \d+ из \d+/)})`);
+const third = await page.evaluate((ks) => { const v = app.prices_ui.view; const i = v.findIndex((r) => !ks.includes(r.key)); return { i, key: v[i].key }; }, [res.key, ckOther]);
+await page.evaluate((i) => app.prices_ui.focusRow(i), third.i);
+await page.keyboard.press('Shift+Enter');
+await page.waitForTimeout(150);
+check(await page.evaluate((t) => !!app.checked[t.key] && +document.activeElement.dataset.i === t.i + 1, third),
+  'Shift+Enter in a price box checks it and goes on to the next');
+await page.selectOption('#filter', 'unchecked');
+await page.waitForTimeout(200);
+check(await page.evaluate((n) => app.prices_ui.view.length === n - 3, stats.resources), 'the filter «Не проверенные» leaves the three out');
+await page.selectOption('#filter', 'all');
+await page.waitForTimeout(200);
+
+/* the bands of the estimate, as a filter (E15) */
+const bands = await page.evaluate(() => { const per = {}; app.model.resources.forEach((r) => { const k = r.section || 'other'; per[k] = (per[k] || 0) + 1; }); return per; });
+const band = Object.keys(bands).filter((k) => k !== 'other').sort((a, b) => bands[a] - bands[b])[0];
+if (Object.keys(bands).length >= 2 && band) {
+  check(await page.isVisible('#secFilter'), 'with two bands or more the list offers a filter by band');
+  await page.selectOption('#secFilter', band);
+  await page.waitForTimeout(200);
+  const v = await page.evaluate((b) => ({ n: app.prices_ui.view.length, all: app.prices_ui.view.every((r) => r.section === b),
+    label: document.querySelector('#secFilter option[value="' + b + '"]').textContent }), band);
+  check(v.all && v.n === bands[band] && v.label.includes('(' + bands[band] + ')'),
+    `the filter «${v.label}» shows exactly the ${bands[band]} resources of that band, and says how many`);
+  await page.selectOption('#secFilter', 'all');
+  await page.waitForTimeout(200);
+  check(await page.evaluate((n) => app.prices_ui.view.length === n, stats.resources), 'and «Все разделы» shows them all again');
+}
 
 /* «Применить %» (A7): every price shown moves to the estimate's ± the percentage, to the tiyin — but never one the expert set */
 await page.click('.tab[data-pane="prices"]');

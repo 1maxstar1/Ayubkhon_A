@@ -522,6 +522,22 @@ body.compact .vrow{font-size:11.5px}
 body.compact .vrow .c{padding:0 5px}
 body.compact .pin{padding:1px 3px}
 body.compact main:not(.narrow){grid-template-columns:232px 1fr}
+
+/* the server was updated under an open page (F6): said in a bar that stays, never by a reload */
+.verbar{position:fixed;left:50%;transform:translateX(-50%);top:8px;z-index:60;display:flex;gap:10px;align-items:center;
+  padding:8px 12px;background:#fff7e0;border:1px solid #e6c46a;border-radius:8px;box-shadow:0 4px 18px rgba(0,0,0,.12);font-size:13px}
+
+/* the expert's own note on a resource (E17) */
+.nt{border:0;background:none;cursor:pointer;color:var(--mute);padding:0 4px;margin-left:4px;font-size:12px;flex:0 0 auto}
+.nt.on{color:var(--navy);font-weight:700}
+
+/* «Проверено» (E14): the expert's mark in the number cell */
+.ck{border:0;background:none;cursor:pointer;color:#b8bfca;padding:0 4px 0 0;font-size:12px;line-height:1}
+.ck.on{color:var(--good);font-weight:700}
+
+/* VAT said where prices are offered (E12): the offers are without VAT; an earlier price that looks like one with it */
+.hp-vat{font-style:normal;color:#8a5a00;background:#fff3d6;border-radius:4px;padding:0 4px;font-weight:600}
+.hp-vat0,.rp-vat{color:var(--mute);font-size:11px;font-weight:400;text-transform:none;letter-spacing:0}
 </style>
 </head>
 <body>
@@ -587,6 +603,16 @@ body.compact main:not(.narrow){grid-template-columns:232px 1fr}
           <option value="zero">С ценой 0</option>
           <option value="multi">Несколько сметных цен</option>
           <option value="wrongsec">Не тот раздел</option>
+          <option value="unchecked">Не проверенные</option>
+          <option value="checked">Проверенные</option>
+        </select>
+        <select id="secFilter" title="По разделу сметы; строки без раздела — в «Прочие»" hidden>
+          <option value="all">Все разделы</option>
+          <option value="labor">Затраты труда</option>
+          <option value="machines">Машины и механизмы</option>
+          <option value="materials">Материалы</option>
+          <option value="equipment">Оборудование</option>
+          <option value="other">Прочие / без раздела</option>
         </select>
         <select id="sort">
           <option value="name">По названию</option>
@@ -670,6 +696,8 @@ body.compact main:not(.narrow){grid-template-columns:232px 1fr}
           <input id="optNote" type="text"></label>
         <label class="row"><input type="checkbox" id="optAutoNote" checked>
           Ставить примечание в каждую изменённую строку автоматически</label>
+        <label class="row"><input type="checkbox" id="optResNotes">
+          Примечание к отдельному ресурсу (кнопка ✎ в «Проверка цен») — в столбец «Eslatma» вместо стандартного текста</label>
         <label>Лист «Только изменённые цены»: ресурс попадает в отчёт, если разница по смете
           (кол-во × (цена по смете − рыночная)) больше, сум (0 — все изменённые)
           <input id="optMinDiff" type="number" step="any"></label>
@@ -4026,7 +4054,11 @@ if (typeof self !== 'undefined') self.S = S;
       var moved = r.kind === 'item' && !S.near(r.price, r.market);
       // The note column doubles as the sheet's first helper column, exactly as
       // in the reference workbook — never overwrite a value carried across.
-      if (r.kind === 'item' && big[r.key] && !cells[R_NOTE]) cells[R_NOTE] = { v: opts.equipNote };
+      // The expert's own note on a resource (E17, a setting off by default) stands in place of the standard text;
+      // with notes off (null) every line is exactly what it always was.
+      var own = r.kind === 'item' && opts.notes && opts.notes[r.key];
+      if (r.kind === 'item' && big[r.key] && !cells[R_NOTE]) cells[R_NOTE] = { v: opts.equipNote + (own ? '\n' + own : '') };
+      else if (own && !cells[R_NOTE]) cells[R_NOTE] = { v: own };
       else if (moved && opts.autoNote && opts.noteText && !cells[R_NOTE]) cells[R_NOTE] = { v: opts.noteText };
       rows.push({
         kind: r.kind, section: r.section, nm: r.nm, unit: r.unit,
@@ -4104,7 +4136,9 @@ if (typeof self !== 'undefined') self.S = S;
         cells[R_MPRICE] = { v: rec.market };
         cells[R_MSUM] = { f: '=F' + rr + '*I' + rr };
         cells[R_DIFF] = { f: '=+H' + rr + '-J' + rr };
-        if (rec.big) cells[R_NOTE] = { v: opts.equipNote };
+        var ownNote = opts.notes && opts.notes[rec.key];
+        if (rec.big) cells[R_NOTE] = { v: opts.equipNote + (ownNote ? '\n' + ownNote : '') };
+        else if (ownNote) cells[R_NOTE] = { v: ownNote };
         else if (opts.autoNote && rec.changed && opts.noteText) cells[R_NOTE] = { v: opts.noteText };
         rows.push({ kind: 'item', section: sec, nm: rec.nm, unit: rec.unit, key: rec.key,
                     price: rec.price, market: rec.market, qty: rec.qty,
@@ -5495,7 +5529,7 @@ if (typeof self !== 'undefined') self.S = S;
   'use strict';
 
   var COLS = [
-    { k: 'n', w: 46, wc: 38, cls: 'mid', h: '№' },
+    { k: 'n', w: 62, wc: 52, cls: 'mid', h: '№' },
     { k: 'name', w: 0, h: 'Наименование ресурса' },
     { k: 'unit', w: 70, wc: 58, cls: 'mid', h: 'Ед. изм.' },
     { k: 'count', w: 54, wc: 48, cls: 'num', h: 'Повт.', t: 'Повторов' },
@@ -5515,6 +5549,9 @@ if (typeof self !== 'undefined') self.S = S;
   function econOf(r) { return r.smetaSum - r.marketSum; }
   function pctOf(r) { return r.smetaSum ? econOf(r) / r.smetaSum * 100 : 0; }
   function isChanged(r) { return !S.near(r.smetaSum, r.marketSum); }
+  /** The band of the estimate the resource stands under (E15): as the estimate has it, nothing guessed. */
+  function secOf(r) { return r.section && r.section !== 'other' && SEC_LABEL[r.section] ? r.section : 'other'; }
+  var SEC_LABEL = { labor: 'Затраты труда', machines: 'Машины и механизмы', materials: 'Материалы', equipment: 'Оборудование', other: 'Прочие / без раздела' };
 
   var SEC_RU = {
     labor: 'затраты труда',
@@ -5559,6 +5596,24 @@ if (typeof self !== 'undefined') self.S = S;
 
   function width(c) { var w = S.colW(c); return w ? 'flex:0 0 ' + w + 'px' : 'flex:1 1 auto;min-width:220px'; }
 
+  /**
+   * «Проверено» (E14): the expert's own mark that a resource has been looked at, priced or not. Its data-focus lets
+   * the list give the focus back to it after a repaint; it carries no data-key (the tags of the name cell do).
+   */
+  function ckBtn(app, r) {
+    var on = !!app.checked[r.key];
+    return '<button class="ck' + (on ? ' on' : '') + '" data-ck="' + S.esc(r.key) + '" data-focus="ck:' + S.esc(r.key) + '" aria-pressed="' + on +
+      '" title="' + (on ? 'Проверено — нажмите, чтобы снять' : 'Отметить как проверенный (Shift+Enter в поле цены)') + '">' + (on ? '✓' : '○') + '</button>';
+  }
+
+  /** «✎»: the expert's own note on the resource, for the document's «Eslatma» column — only with the setting on (E17). */
+  function noteBtn(app, r) {
+    if (!app.opts.resNotes) return '';
+    var n = app.notes[r.key];
+    return '<button class="nt' + (n ? ' on' : '') + '" data-nt="' + S.esc(r.key) + '" title="' +
+      S.esc(n ? 'Примечание: ' + n : 'Примечание к ресурсу — в столбец «Eslatma» документа') + '">✎</button>';
+  }
+
   Prices.prototype.paintHead = function () {
     this.head.innerHTML = COLS.map(function (c) {
       return '<div class="c' + (c.cls ? ' ' + c.cls : '') + '" style="' + width(c) + '">' + S.headText(c) + '</div>';
@@ -5592,13 +5647,26 @@ if (typeof self !== 'undefined') self.S = S;
       var inp = e.target;
       if (!inp.classList || !inp.classList.contains('pin')) return;
       var rec = self.byKey(inp.dataset.key);
-      if (rec) { self.app.leftPrice(inp, rec.price); inp.value = S.price(rec.market); }
+      if (rec) {
+        self.app.leftPrice(inp, rec.price);
+        // a price typed here is a resource looked at: it is checked (Esc put the old one back: nothing typed)
+        if (inp.dataset.was != null && !S.near(rec.market, +inp.dataset.was) && !self.app.checked[rec.key]) self.app.setChecked([rec.key], true, true);
+        inp.value = S.price(rec.market);
+      }
     });
 
     scroll.addEventListener('keydown', function (e) {
       var inp = e.target;
       if (!inp.classList || !inp.classList.contains('pin')) return;
-      if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) {
+      if (e.key === 'Enter' && e.shiftKey) {
+        // Shift+Enter: this one is checked, on to the next
+        e.preventDefault();
+        self.app.setChecked([inp.dataset.key], true);
+        self.focusRow(+inp.dataset.i + 1);
+      } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        // Ctrl+Enter: the first suggestion of the popover open for this resource, as if its «Применить» were pressed
+        e.preventDefault(); S.acceptFirst(inp.dataset.key);
+      } else if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) {
         var i = +inp.dataset.i;
         if (i + 1 < self.view.length) {
           e.preventDefault();
@@ -5613,6 +5681,19 @@ if (typeof self !== 'undefined') self.S = S;
     });
 
     scroll.addEventListener('click', function (e) {
+      var ck = e.target.closest ? e.target.closest('.ck') : null;
+      if (ck) { self.app.setChecked([ck.dataset.ck], !self.app.checked[ck.dataset.ck]); return; }
+      var nb = e.target.closest ? e.target.closest('.nt') : null;
+      if (nb) {
+        var key = nb.dataset.nt, was = self.app.notes[key] || '';
+        var t = window.prompt('Примечание к ресурсу (столбец «Eslatma» документа). Пусто — убрать примечание.', was);
+        if (t == null) return;
+        t = String(t).trim().slice(0, 500);
+        if (t) self.app.notes[key] = t; else delete self.app.notes[key];
+        if (t !== was) { try { document.dispatchEvent(new Event('notes:change')); } catch (er) { /* old browser */ } }
+        self.list.refresh();
+        return;
+      }
       var b = e.target.closest ? e.target.closest('.tagm') : null;
       if (!b) return;
       document.getElementById('q').value = b.dataset.nm;
@@ -5622,6 +5703,7 @@ if (typeof self !== 'undefined') self.S = S;
 
     document.getElementById('q').addEventListener('input', S.debounce(function () { self.apply(); }, 90));
     document.getElementById('filter').addEventListener('change', function () { self.apply(); });
+    document.getElementById('secFilter').addEventListener('change', function () { self.apply(); });
     document.getElementById('sort').addEventListener('change', function () { self.apply(); });
 
     // A percentage of the estimate's price, on every resource shown — but never over a price the expert has set
@@ -5629,7 +5711,9 @@ if (typeof self !== 'undefined') self.S = S;
     // Rounded to the tiyin, and a price that would become 0 is left as it is.
     document.getElementById('pctBtn').addEventListener('click', function () {
       var own = self.view.filter(function (r) { return self.app.ownPrice(r); }).length;
-      var raw = prompt('Применить процент к ' + self.view.length + ' видимым ресурсам?\nНапример: -10  (на 10% ниже сметной цены)' +
+      var secSel = document.getElementById('secFilter');
+      var raw = prompt('Применить процент к ' + self.view.length + ' видимым ресурсам' +
+        (secSel.value !== 'all' ? ' (раздел «' + SEC_LABEL[secSel.value] + '»)' : '') + '?\nНапример: -10  (на 10% ниже сметной цены)' +
         (own ? '\n\nЦены, изменённые вручную или применённые из подсказок, не изменятся: ' + own + '.' : ''), '-10');
       if (raw == null) return;
       var pct = S.num(String(raw).replace(/%\s*$/, ''));
@@ -5663,6 +5747,19 @@ if (typeof self !== 'undefined') self.S = S;
     });
   };
 
+  /**
+   * The first «Применить» of the popover open for `key` — suggestions of earlier projects, reference prices or the
+   * exchange — pressed as by hand, with its own confirmations. A line of «Похожие ресурсы» is never taken this way.
+   */
+  S.acceptFirst = function (key) {
+    var H = S.Hints, R = S.Refs, U = S.Uzex, b = null;
+    if (H && H.pop && !H.pop.hidden && H.key === key) b = H.pop.querySelector('.hp-row:not(.near) button[data-i]');
+    else if (R && R.pop && !R.pop.hidden && R.open && R.open.key === key) b = R.pop.querySelector('button[data-i]');
+    else if (U && U.pop && !U.pop.hidden && U.open && U.open.key === key) b = U.pop.querySelector('button[data-i]');
+    if (b && !b.disabled) b.click();
+    return !!b;
+  };
+
   Prices.prototype.byKey = function (k) {
     var m = this.app.model;
     if (!m) return null;
@@ -5689,9 +5786,25 @@ if (typeof self !== 'undefined') self.S = S;
 
   Prices.prototype.focusRow = function (i) {
     if (i < 0 || i >= this.view.length) return;
-    this.list.scrollToRow(i);
+    // scrolled only when the row is not fully on screen: a scroll closes the popover the row's focus is about to open
+    var el0 = this.list.el, h = this.list.rowHeight, top = i * h;
+    if (top < el0.scrollTop || top + h > el0.scrollTop + el0.clientHeight) this.list.scrollToRow(i);
     var el = document.querySelector('#priceScroll .pin[data-i="' + i + '"]');
     if (el) { el.focus(); el.select(); }
+  };
+
+  /**
+   * A suggestion applied to `key` (E18): the list stays where it was and the caret moves to the next resource, so
+   * the next one is priced without the mouse.
+   */
+  Prices.prototype.afterApply = function (key) {
+    var was = -1;
+    for (var i = 0; i < this.view.length; i++) if (this.view[i].key === key) { was = i; break; }
+    this.apply(true);
+    var now = -1;
+    for (var j = 0; j < this.view.length; j++) if (this.view[j].key === key) { now = j; break; }
+    var next = (now >= 0 ? now : was) + (now >= 0 ? 1 : 0);
+    if (was >= 0 && next < this.view.length) this.focusRow(next);
   };
 
   /**
@@ -5704,9 +5817,12 @@ if (typeof self !== 'undefined') self.S = S;
     var q = S.nameKey(document.getElementById('q').value);
     var f = document.getElementById('filter').value;
     var sort = document.getElementById('sort').value;
+    var sec = document.getElementById('secFilter').value;
 
+    var app = this.app;
     var list = m.resources.filter(function (r) {
       if (q && S.nameKey(r.name).indexOf(q) < 0) return false;
+      if (sec !== 'all' && secOf(r) !== sec) return false;
       switch (f) {
         case 'changed': return isChanged(r);
         case 'same': return !isChanged(r);
@@ -5718,6 +5834,8 @@ if (typeof self !== 'undefined') self.S = S;
         case 'nearref': return !!(S.Refs && S.Refs.nearRow(r));
         case 'uzex': return !!(S.Uzex && S.Uzex.hasRow(r));
         case 'wrongsec': return !!secWarn(r);
+        case 'unchecked': return !app.checked[r.key];
+        case 'checked': return !!app.checked[r.key];
         default: return true;
       }
     });
@@ -5731,7 +5849,7 @@ if (typeof self !== 'undefined') self.S = S;
 
     // the same search, filter and sort over the same estimates is a refresh — a price applied, an answer arrived — and
     // keeps its place; a change of any of them, or new estimates, starts from the top (E4)
-    var sig = q + '\0' + f + '\0' + sort;
+    var sig = q + '\0' + f + '\0' + sort + '\0' + sec;
     if (keepScroll === undefined && sig === this._sig && m === this._sigModel) keepScroll = true;
     this._sig = sig; this._sigModel = m;
     this.view = list;
@@ -5746,8 +5864,18 @@ if (typeof self !== 'undefined') self.S = S;
     var hinted = m && S.Hints ? m.resources.filter(function (r) { return S.Hints.hasRow(r); }).length : 0;
     var near = m && S.Hints ? m.resources.filter(function (r) { return S.Hints.nearRow(r); }).length : 0;
     var mis = m ? m.resources.filter(secWarn).length : 0;
+    // the bands of the estimate, each with how many resources it has; offered only when there are two or more
+    var per = {}, bands = 0, sf = document.getElementById('secFilter');
+    if (m) m.resources.forEach(function (r) { var k = secOf(r); if (!per[k]) bands++; per[k] = (per[k] || 0) + 1; });
+    [].forEach.call(sf.options, function (o) {
+      if (o.value === 'all') return;
+      o.textContent = SEC_LABEL[o.value] + (per[o.value] ? ' (' + per[o.value] + ')' : '');
+      o.hidden = !per[o.value] && sf.value !== o.value;
+    });
+    sf.hidden = bands < 2 && sf.value === 'all';
     document.getElementById('priceCount').textContent =
       this.view.length + ' / ' + total + ' ресурсов · изменено ' + changed +
+      ' · проверено ' + (m ? m.resources.filter(function (r) { return this.app.checked[r.key]; }, this).length : 0) + ' из ' + total +
       (hinted ? ' · с подсказками ' + hinted : '') +
       (near ? ' · похожих ' + near : '') +
       (mis ? ' · не тот раздел ' + mis : '') +
@@ -5772,9 +5900,9 @@ if (typeof self !== 'undefined') self.S = S;
       var sec = secTag(r);
       out.push(
         '<div class="vrow' + (changed ? ' chg' : '') + (many ? ' many' : '') + '">' +
-        cell(COLS[0], i + 1) +
+        cell(COLS[0], ckBtn(this.app, r) + (i + 1)) +
         '<div class="c" style="' + width(COLS[1]) + '" title="' + S.esc(r.name) + '"><span class="nmt">' + S.esc(r.name) + '</span>' +
-        multi + hint + sec + '</div>' +
+        multi + hint + sec + noteBtn(this.app, r) + '</div>' +
         cell(COLS[2], S.esc(r.unit)) +
         cell(COLS[3], r.count) +
         cell(COLS[4], S.qty(r.qty)) +
@@ -6384,7 +6512,8 @@ if (typeof self !== 'undefined') self.S = S;
     equipOn: true, equipLimit: 20000000,
     minDiff: 5 * 1000 * 1000,
     autoNote: true, hideSums: true, hideQty: true, contents: true,
-    cfLimit: 10000000, sheetName: 'Лист1'
+    cfLimit: 10 * 1000 * 1000, sheetName: 'Лист1',
+    resNotes: false            // the expert's own notes on resources (E17): off, and the document is what it always was
   };
 
   function App() {
@@ -6392,6 +6521,8 @@ if (typeof self !== 'undefined') self.S = S;
     this.model = null;
     this.prices = {};        // resource key -> market unit price
     this.pct = {};           // resource key -> 1 when its price was set by «Применить %» (and may be set by it again)
+    this.checked = {};       // resource key -> 1: the expert marked it «проверено» (E14)
+    this.notes = {};         // resource key -> the expert's own note for the document (E17, behind opts.resNotes)
     this.spareBook = null;   // price-book lines for a resource key no estimate has yet; see loadPriceBook()
     this.opts = Object.assign({}, DEFAULTS, loadOpts());
     this.seq = 0;
@@ -6516,6 +6647,8 @@ if (typeof self !== 'undefined') self.S = S;
     bindOpt(this, 'optSheetName', 'sheetName');
     bindOpt(this, 'optCf', 'cfLimit', true);
     bindChk(this, 'optAutoNote', 'autoNote');
+    bindChk(this, 'optResNotes', 'resNotes');
+    document.getElementById('optResNotes').addEventListener('change', function () { self.prices_ui.list.refresh(); });
     bindOpt(this, 'optEquipNote', 'equipNote');
     bindChk(this, 'optEquipOn', 'equipOn');
     bindOpt(this, 'optEquipLimit', 'equipLimit', true);
@@ -6575,6 +6708,19 @@ if (typeof self !== 'undefined') self.S = S;
         } }
       });
     }
+  };
+
+  /** Mark resources «проверено» or not (E14). `quiet`: no redraw of the list (the caret is leaving a box). */
+  App.prototype.setChecked = function (keys, on, quiet) {
+    var self = this;
+    keys.forEach(function (k) { if (on) self.checked[k] = 1; else delete self.checked[k]; });
+    this.prices_ui.status();
+    if (!quiet) this.prices_ui.list.refresh();
+    else keys.forEach(function (k) {
+      var b = document.querySelector('#priceScroll .ck[data-ck="' + String(k).replace(/["\\]/g, '\\$&') + '"]');
+      if (b) { b.classList.toggle('on', !!on); b.textContent = on ? '✓' : '○'; b.setAttribute('aria-pressed', String(!!on)); }
+    });
+    try { document.dispatchEvent(new Event('checked:change')); } catch (e) { /* old browser */ }
   };
 
   /**
@@ -6725,6 +6871,7 @@ if (typeof self !== 'undefined') self.S = S;
     document.getElementById('optSheetName').value = this.opts.sheetName;
     document.getElementById('optCf').value = this.opts.cfLimit;
     document.getElementById('optAutoNote').checked = !!this.opts.autoNote;
+    document.getElementById('optResNotes').checked = !!this.opts.resNotes;
     document.getElementById('optEquipNote').value = this.opts.equipNote;
     document.getElementById('optEquipOn').checked = this.opts.equipOn !== false;
     document.getElementById('optEquipLimit').value = this.opts.equipLimit;
@@ -7374,6 +7521,7 @@ if (typeof self !== 'undefined') self.S = S;
       mode: document.getElementById('reportMode').value,
       stamp: this.opts.stamp, docTitle: this.opts.docTitle, noteText: this.opts.noteText,
       autoNote: this.opts.autoNote, hideSums: this.opts.hideSums, hideQty: this.opts.hideQty,
+      notes: this.opts.resNotes ? this.notes : null,
       equipNote: this.opts.equipOn !== false ? this.opts.equipNote : '',
       equipLimit: this.opts.equipLimit, minDiff: this.opts.minDiff,
       cfLimit: this.opts.cfLimit, sheetName: this.opts.sheetName,
@@ -7471,9 +7619,17 @@ if (typeof self !== 'undefined') self.S = S;
   function fileName(app) {
     var d = new Date();
     var p = String(d.getFullYear()) + pad(d.getMonth() + 1) + pad(d.getDate());
-    var base = app.projects.length === 1 ? app.projects[0].name : 'Taqqoslash';
-    return base.replace(/[^\wЀ-ӿ\- ]+/g, '') + '_taqqoslash_' + p + '.xlsx';
+    return S.safeName(app.exportBase()) + '_taqqoslash_' + p + '.xlsx';
   }
+  /**
+   * What the downloaded document is named after: the project when there is one, else «Taqqoslash». Server mode puts
+   * the application's number and contractor in its place (sync.js, E19).
+   */
+  App.prototype.exportBase = function () { return this.projects.length === 1 ? this.projects[0].name : 'Taqqoslash'; };
+  /** A name a file system takes: letters, digits, dashes and single spaces, at most 80 characters. */
+  S.safeName = function (s) {
+    return String(s || '').replace(/\//g, '-').replace(/[^\wЀ-ӿ\- ]+/g, '').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Taqqoslash';
+  };
   function pad(n) { return (n < 10 ? '0' : '') + n; }
 
   function download(bytes, name) {
@@ -7490,20 +7646,27 @@ if (typeof self !== 'undefined') self.S = S;
   App.prototype.savePriceBook = function () {
     if (!this.model) { this.toast('Сначала добавьте файлы смет', true); return; }
     var self = this;
+    var notes = this.notes || {}, checked = this.checked || {};
     var book = this.model.resources
-      .filter(function (r) { return !S.near(r.price, r.market); })
+      .filter(function (r) { return !S.near(r.price, r.market) || notes[r.key] || checked[r.key]; })
       .map(function (r) {
-        // `smeta` identifies which priced line this belongs to when reloaded.
-        return { name: r.name, unit: r.unit, price: r.market, smeta: r.price, note: self.opts.noteText };
+        // `smeta` identifies which priced line this belongs to when reloaded. A resource with only an own note (E17)
+        // has no price in the book: an older page skips such a line, and none is counted as a price.
+        var e = { name: r.name, unit: r.unit, smeta: r.price, note: self.opts.noteText };
+        if (!S.near(r.price, r.market)) e.price = r.market;
+        if (notes[r.key]) e.own_note = notes[r.key];
+        if (checked[r.key]) e.checked = true;       // «Проверено» (E14) travels with the book, priced or not
+        return e;
       });
     if (!book.length) { this.toast('Ни одна цена ещё не изменена', true); return; }
+    var priced = book.filter(function (e) { return e.price != null; }).length;
     var blob = new Blob([JSON.stringify(book, null, 1)], { type: 'application/json' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url; a.download = 'narx_kitobi.json';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
-    this.toast('Сохранено цен: ' + book.length);
+    this.toast('Сохранено цен: ' + priced + (book.length > priced ? ' · строк без цены (примечания, отметки «проверено»): ' + (book.length - priced) : ''));
   };
 
   App.prototype.loadPriceBook = function (file) {
@@ -7542,6 +7705,10 @@ if (typeof self !== 'undefined') self.S = S;
       var exact = {}, loose = {}, n = 0;
       entries.forEach(function (e) {
         var p = S.num(e.price != null ? e.price : e.market);
+        // the expert's own note (E17) comes back with its line, priced or not
+        var sm0 = S.num(e.smeta);
+        if (e && e.name && sm0 != null && typeof e.own_note === 'string' && e.own_note.trim()) self.notes[S.resKey(e.name, e.unit || '', sm0)] = e.own_note.trim().slice(0, 500);
+        if (e && e.name && sm0 != null && e.checked === true) self.checked[S.resKey(e.name, e.unit || '', sm0)] = 1;
         if (!e.name || p == null) return;
         var sm = S.num(e.smeta);
         if (sm != null) exact[S.resKey(e.name, e.unit || '', sm)] = p;
@@ -8544,6 +8711,16 @@ if (typeof self !== 'undefined') self.S = S;
     saveRetry: SAVE_RETRY_MS,
 
     init: function () {
+      document.addEventListener('notes:change', function () { Sync.touch(); });
+      document.addEventListener('checked:change', function () { if (!Sync.loading) Sync.touch(); });
+      // the document of an application is named after it: its number and its contractor (E19)
+      var baseOf = S.App.prototype.exportBase;
+      S.App.prototype.exportBase = function () {
+        var a = Sync.ws && Sync.app;
+        if (!a) return baseOf.apply(this, arguments);
+        var c = a.expand && a.expand.contragent;
+        return 'Zayavka_' + a.number + ((c && c.name) || a.org_name ? '_' + ((c && c.name) || a.org_name) : '');
+      };
       var self = this;
       var P = S.App.prototype;
       wrap(P, 'rebuild', function () { self.touch(); });
@@ -8628,7 +8805,7 @@ if (typeof self !== 'undefined') self.S = S;
       this.savedOnOpen = w.updated || '';      // the server's own clock: corrections are compared with it
       this.corrReady = false; this.merged = false;
       var app = A();
-      app.projects = []; app.prices = {}; app.pct = {}; app.looseBook = null; app.spareBook = null; app.queue = [];
+      app.projects = []; app.prices = {}; app.pct = {}; app.notes = {}; app.checked = {}; app.looseBook = null; app.spareBook = null; app.queue = [];
       this.refused = ''; this.cutSaid = 0;
       app.rebuild(); app.renderSide();
       this.renderBox();
@@ -8781,6 +8958,9 @@ if (typeof self !== 'undefined') self.S = S;
         if (st.keys === KEYS && st.prices2 && Array.isArray(st.pct)) st.pct.forEach(function (k) { if (r.map[k] != null) app.pct[k] = 1; });
         if (r.moved) { this.dirty = true; app.toast('Цены перенесены на обновлённые названия ресурсов: ' + r.moved); }
       }
+      // the expert's own notes on resources (E17), under this version's keys
+      if (st.notes && typeof st.notes === 'object') app.notes = st.keys === KEYS ? Object.assign({}, st.notes) : this.reindex(st.notes).map;
+      if (st.checked && typeof st.checked === 'object') { app.checked = st.keys === KEYS ? Object.assign({}, st.checked) : this.reindex(st.checked).map; app.prices_ui.status(); app.prices_ui.list.refresh(); }
       this.indexCorr();
       var remapped = this.dirty;
       this.loading = false; this.dirty = false;
@@ -9117,6 +9297,8 @@ if (typeof self !== 'undefined') self.S = S;
         prices: this.downgrade(prices),       // readable by the previous version
         prices2: prices,
         pct: Object.keys(prices).filter(function (k) { return app.pct && app.pct[k]; }),
+        notes: app.notes && Object.keys(app.notes).length ? app.notes : undefined,
+        checked: app.checked && Object.keys(app.checked).length ? app.checked : undefined,
         looseBook: app.looseBook || null,
         book: app.spareBook || null,
         compare: { old: this.cmp.old || null, new: this.cmp.new || null, reply: this.cmp.reply || null, base: this.cmp.base || '' },
@@ -9446,7 +9628,7 @@ if (typeof self !== 'undefined') self.S = S;
       var self = this, app = A();
       if (!this.ws || this.frozen) return;
       var d = new Date(), pad = function (n) { return (n < 10 ? '0' : '') + n; };
-      var name = 'Zayavka_' + this.app.number + '_sopostavlenie_' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) +
+      var name = S.safeName(app.exportBase()) + '_' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) +
         '_' + pad(d.getHours()) + pad(d.getMinutes()) + '.xlsx';
       var fd = new FormData();
       fd.append('workspace', this.ws.id);
@@ -9538,7 +9720,7 @@ if (typeof self !== 'undefined') self.S = S;
         self.thaw();
         S.hashSet('ws', '');
         self.loading = true;
-        app.projects = []; app.prices = {}; app.pct = {}; app.looseBook = null; app.spareBook = null; app.queue = [];
+        app.projects = []; app.prices = {}; app.pct = {}; app.notes = {}; app.checked = {}; app.looseBook = null; app.spareBook = null; app.queue = [];
         app.resetOpts();
         $('reportMode').value = 'changed';
         app.rebuild(); app.renderSide();
@@ -9567,6 +9749,86 @@ if (typeof self !== 'undefined') self.S = S;
   S.priceSource = function (key, value) { return Sync.priceSource(key, value); };
   document.addEventListener('DOMContentLoaded', function () { Sync.init(); });
   if (document.readyState !== 'loading') Sync.init();
+})(S);
+
+;
+/*
+ * A page left open across an update (F6).
+ *
+ * The program on the server can be updated while a page stays open for days; that page went on with the old code
+ * against the new server, and nothing said so. Now and then — when the tab is shown again, when the network comes
+ * back, every five minutes while it is on screen — the page reads the version the server serves now, from the same
+ * label the launchers read («class="ver"»), and when it is another one says so in a bar that stays, with a button
+ * that saves the work and reloads. It never reloads by itself. The single-file page has no server and does nothing.
+ */
+(function (S) {
+  'use strict';
+  if (typeof location === 'undefined' || location.protocol === 'file:' || !S.pb) return;
+
+  var RE = /class="ver"[^>]*>(v[0-9][0-9.]*)</;
+  var own = '', dismissed = {}, bar = null, busy = null;
+
+  /** The version the server serves now: read from the start of the page, as far as its label; null when it cannot be told. */
+  function served() {
+    return fetch(location.pathname, { cache: 'no-store', headers: { Range: 'bytes=0-65535' } }).then(function (r) {
+      if (!r.ok) return null;
+      if (!r.body || !r.body.getReader) return r.text().then(function (t) { var m = RE.exec(t); return m ? m[1] : null; });
+      var reader = r.body.getReader(), dec = new TextDecoder(), text = '';
+      function more() {
+        return reader.read().then(function (x) {
+          if (x.done) return null;
+          text += dec.decode(x.value, { stream: true });
+          var m = RE.exec(text);
+          if (m) { try { reader.cancel(); } catch (e) { /* done anyway */ } return m[1]; }
+          if (text.length > 4 * 1024 * 1024) { try { reader.cancel(); } catch (e) { /* done anyway */ } return null; }
+          return more();
+        });
+      }
+      return more();
+    }).catch(function () { return null; });   // no server just now: that is said elsewhere (the save mark)
+  }
+
+  function reload() {
+    var Sy = S.Sync;
+    if (Sy && Sy.ws && !Sy.frozen) {
+      try { Sy.flush(); } catch (e) { /* the journal of this browser keeps the last prices */ }
+      Promise.resolve(Sy.saveNow && Sy.saveNow()).then(function () { location.reload(); }, function () { location.reload(); });
+    } else location.reload();
+  }
+
+  function show(v) {
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'verBar';
+      bar.className = 'verbar';
+      document.body.appendChild(bar);
+    }
+    bar.innerHTML = '<span>На сервере обновлена программа: <b>' + S.esc(v) + '</b> (у вас открыта ' + S.esc(own) +
+      '). Обновите страницу.</span> <button class="btn sm" data-reload>Обновить страницу</button> <button class="link" data-x title="Скрыть">×</button>';
+    bar.hidden = false;
+    bar.querySelector('[data-reload]').addEventListener('click', reload);
+    bar.querySelector('[data-x]').addEventListener('click', function () { dismissed[v] = 1; bar.hidden = true; });
+  }
+
+  function check() {
+    if (busy) return busy;
+    busy = served().then(function (v) {
+      busy = null;
+      if (v && own && v !== own && !dismissed[v]) show(v);
+      else if (bar && (!v || v === own)) bar.hidden = true;
+      return { served: v, own: own };
+    });
+    return busy;
+  }
+
+  function start() {
+    own = ((document.querySelector('.ver') || {}).textContent || '').trim();
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') check(); });
+    window.addEventListener('online', check);
+    setInterval(function () { if (document.visibilityState === 'visible') check(); }, 5 * 60 * 1000);
+  }
+  S.Version = { check: check, own: function () { return own; } };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })(S);
 
 ;
@@ -9649,6 +9911,9 @@ if (typeof self !== 'undefined') self.S = S;
       }
       document.addEventListener('click', function (e) {
         if (self.pop.hidden) return;
+        // a click on what is no longer on the page — the «Применить» of the popover just drawn anew for the next row —
+        // was a click inside it
+        if (!document.documentElement.contains(e.target)) return;
         if (self.pop.contains(e.target) || (e.target.classList && e.target.classList.contains('tagh'))) return;
         // the click that put the caret in a price box opened its popover a moment ago (focusin): it must not close it.
         // Compared by key — the list may have drawn the box anew in between (E3)
@@ -9661,7 +9926,13 @@ if (typeof self !== 'undefined') self.S = S;
         var sc = $(id);
         sc.addEventListener('click', function (e) {
           var b = e.target.closest && e.target.closest('.tagh');
-          if (b) { e.preventDefault(); self.show(b, b.dataset.hk, b.dataset.key); }
+          if (b) { e.preventDefault(); self.show(b, b.dataset.hk, b.dataset.key); return; }
+          // a click into the price box the caret is already in opens its popover again, if it was closed
+          var inp = e.target;
+          if (inp.classList && inp.classList.contains('pin') && self.pop.hidden) {
+            var rec = self.recOf(inp.dataset.key);
+            if (rec && self.any(mkOf(rec))) self.show(inp, mkOf(rec), rec.key);
+          }
         });
         sc.addEventListener('focusin', function (e) {
           var inp = e.target;
@@ -9870,8 +10141,8 @@ if (typeof self !== 'undefined') self.S = S;
       if (!hs.length && !ss.length) { this.hide(); return; }
       var rec = this.recOf(key);
       var shown = hs.slice(0, 12);
-      var html = '<div class="hp-head">Прежние проекты · ' + S.esc(S.regionLabel(S.Sync.ws.region)) +
-        '<button class="link" data-x>×</button></div>';
+      var html = '<div class="hp-head"><span>Прежние проекты · ' + S.esc(S.regionLabel(S.Sync.ws.region)) +
+        ' <small class="hp-vat0">цены без НДС</small></span><button class="link" data-x>×</button></div>';
       html += shown.map(function (h, i) { return row(h, i, rec, false); }).join('');
       if (ss.length) {
         html += '<div class="hp-sub">Похожие ресурсы' +
@@ -9884,12 +10155,15 @@ if (typeof self !== 'undefined') self.S = S;
       this.pop.querySelectorAll('button[data-i]').forEach(function (b) {
         b.addEventListener('click', function () {
           var h = all[+b.dataset.i];
+          // a price the expert set is replaced only when asked, as the reference prices and the exchange do (E18)
+          if (rec && !S.near(rec.market, rec.price) && !S.near(rec.market, h.price) &&
+              !window.confirm('Заменить вашу цену ' + S.price(rec.market) + ' на ' + S.price(h.price) + '?')) return;
           if (S.markSource && h.id) S.markSource(key, h.price, 'hint:' + h.id);
           app.setPrice(key, h.price);
-          app.prices_ui.apply();
+          self.hide();
+          if ($('sheetScroll').contains(anchor)) app.stepSheet(+anchor.dataset.i, 1); else app.prices_ui.afterApply(key);
           app.sheetList.refresh();
           app.toast('Применено: ' + S.price(h.price));
-          self.hide();
         });
       });
       this.key = key;
@@ -9934,6 +10208,9 @@ if (typeof self !== 'undefined') self.S = S;
       (h.same ? ' <em>тот же контрагент</em>' : '') +
       (h.ref ? ' <em class="hp-ref" title="Эту цену эксперт применил из справочника цен, а не ввёл сам">из справочника</em>' : '') +
       (h.uzex ? ' <em class="hp-uzex" title="Эту цену эксперт применил из котировок биржи UZEX, а не ввёл сам">с биржи UZEX</em>' : '') +
+      // a price typed there as that estimate's price × 1,12 was most likely one with VAT (E12)
+      (!h.ref && !h.uzex && h.smeta > 0 && S.vat && S.vat.looksGross(h.price, h.smeta)
+        ? ' <em class="hp-vat" title="= сметная цена там × 1,12; без НДС: ' + S.price(h.smeta) + '">похоже на цену с НДС</em>' : '') +
       (h.count > 1 ? ' · ×' + h.count : '') +
       (h.smeta != null && rec && !S.near(h.smeta, rec.price) ? '<small>сметная цена там: ' + S.price(h.smeta) + '</small>' : '') +
       '</span>' +
@@ -10511,7 +10788,13 @@ var S = (typeof S !== 'undefined' && S) || {};
         var b = e.target.closest && e.target.closest('.tagr');
         if (b) { e.preventDefault(); self.show(b, b.dataset.res); }
       });
-      sc.addEventListener('scroll', function () { self.hide(); }, { passive: true });
+      // a scroll keeps the popover with its row while the row is on screen, and closes it once it is not
+      sc.addEventListener('scroll', function () {
+        if (self.pop.hidden || !self.open) return;
+        var tag = sc.querySelector('.tagr[data-res="' + String(self.open.key).replace(/["\\]/g, '\\$&') + '"]'), box = sc.getBoundingClientRect();
+        if (tag) { var r = tag.getBoundingClientRect(); if (r.top >= box.top && r.bottom <= box.bottom) { self.place(tag); return; } }
+        self.hide();
+      }, { passive: true });
     },
 
     /* ------------------------------------------------------------------ workspace */
@@ -10793,7 +11076,7 @@ var S = (typeof S !== 'undefined' && S) || {};
       var ctx = { sources: this.sources, asof: this.asofNow(), smetaPrice: rec.price, unit: rec.unit, regionLabel: S.regionLabel, queryName: rec.name };
       var html = '<div class="rp-head"><span>Справочные цены · ' + S.esc(S.regionLabel(S.Sync.ws.region) || '') +
         ' · на <b class="rp-date" title="' + (this.asofSet ? 'Дата выбрана вручную' : 'Дата регистрации заявки') + '">' +
-        ruDate(ctx.asof) + '</b> <button class="link" data-asof>изменить</button></span>' +
+        ruDate(ctx.asof) + '</b> <button class="link" data-asof>изменить</button> · <span class="rp-vat">цены без НДС</span></span>' +
         '<button class="link" data-x title="Закрыть">×</button></div>';
       html += '<div class="rp-asof" hidden>' + this.dateEditorHtml(ctx.asof) + '</div>';
       if (!S.near(rec.market, rec.price)) html += '<div class="rp-mine">Ваша цена: <b>' + fmt(rec.market) + '</b></div>';
@@ -10887,10 +11170,10 @@ var S = (typeof S !== 'undefined' && S) || {};
           !window.confirm('Заменить вашу цену ' + fmt(rec.market) + ' на ' + fmt(price) + '?')) return;
       if (S.markSource) S.markSource(key, price, this.sourceOf(line));
       app.setPrice(key, price);
-      app.prices_ui.apply(true);
+      this.hide();
+      app.prices_ui.afterApply(key);
       app.sheetList.refresh();
       app.toast('Применено: ' + fmt(price) + ' (справочник)');
-      this.hide();
     },
 
     /** ref:<package>:<record>, or ref:<package>:median:<record>,<record>… (≤ 200 characters). */
@@ -11746,10 +12029,10 @@ var S = (typeof S !== 'undefined' && S) || {};
           !window.confirm('Заменить вашу цену ' + fmt(rec.market) + ' на ' + fmt(price) + '?')) return;
       if (S.markSource) S.markSource(key, price, S.uzex.sourceOf(this.imp.import_id, line));
       app.setPrice(key, price);
-      app.prices_ui.apply(true);
+      this.hide();
+      app.prices_ui.afterApply(key);
       app.sheetList.refresh();
       app.toast('Применено: ' + fmt(price) + ' (UZEX, неделя ' + this.weekText() + ')');
-      this.hide();
     }
   };
 

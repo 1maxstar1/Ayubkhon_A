@@ -754,6 +754,26 @@ ko'rish.
 | E8 ✓ v2.10.0 | Bitta-fayl sahifasi o'zida yo'q manbalar filtrini ko'rsatadi | past | Server yo'q bo'lsa yashirish | S |
 | E9 | Til aralash: «Ichki/Eksport», xom rol nomlari, `changed` | past | Interfeys ruscha — bitta lug'at | S |
 
+**E12a, E14, E15, E17, E18, E19 — bajarildi (v2.10.0).** E12a: «Прежние проекты» va
+справочник oynalari «цены без НДС» deydi; oldingi loyihada smeta narxi × 1,12 qilib yozilgan
+narx «похоже на цену с НДС» bilan belgilanadi. E12b (hujjat bo'yicha QQS, v2.9.0 UZEX
+narxlari) — egasining tasdig'ini kutadi (`vat_default` nimani anglatadi). E14: «○/✓»
+«№» katagida; narx yozilsa resurs o'zi «проверено» bo'ladi (ommaviy o'zgarishlar
+belgilamaydi); Shift+Enter — belgilab keyingisiga; «Не проверенные»/«Проверенные»
+filtrlari; holat qatorida «проверено X из N»; server rejimida ish maydoni bilan, serversiz —
+narx kitobi bilan saqlanadi. E15: «Раздел» filtri (smeta o'zi aytgan bo'lim, sonlari bilan;
+ikki va undan ko'p bo'lim bo'lsa ko'rinadi). E17: sozlama (standartda o'chiq) — «✎» bilan
+resursga izoh, hujjatning «Eslatma» ustuniga standart matn o'rniga; o'chiq holatda hujjat
+bayt-ma-bayt avvalgidek (test). E18: taklif qo'llangach ro'yxat joyida qoladi, kursor
+keyingi resursga o'tadi va uning oynasi ochiq qoladi; Ctrl+Enter — ochiq oynadagi birinchi
+«Применить» («Похожие» hech qachon emas); yozilgan narx ustidan oldingi loyiha narxi ham
+so'raladi. E19: server rejimida hujjat nomi `Zayavka_<raqam>_<kontragent>_…`.
+
+**F6 — bajarildi (v2.10.0).** Ochiq sahifa vaqti-vaqti bilan (vkladka ko'ringanda, tarmoq
+qaytganda, har 5 daqiqada) server bergan versiyani ishga tushirgichlar o'qiydigan yorliqdan
+o'qiydi; boshqa bo'lsa — doimiy panel va «Обновить страницу» (avval ish maydonini saqlaydi);
+o'zi hech qachon qayta yuklamaydi. Test — `test/version-notice.mjs`.
+
 **E5 — bajarildi (v2.10.0).** Sarlavhalar endi o'z ustunlari ustida turadi (aylantirish
 chizig'i uchun joy qoldiriladi, yon tomonga aylantirilganda ergashadi — `VList.alignHead`);
 uzun sarlavha «…» bilan qisqaradi, to'liq matni `title` da. Ixcham rejim: 1440 × 820 dan
@@ -786,19 +806,19 @@ keyin bu muhim: mijoz narxlar **QQSsiz** bo'lishini talab qilgan.
 |---|---|---|
 | E10 ✓ | Ustun sarlavhalari: «Цена по смете, без НДС», «Рыночная цена, без НДС» (faqat ekran). **Bajarildi (v2.10.0):** «Цены», «Сводная таблица» va hisobot ko'rinishida narx sarlavhalari ostida kichik «без НДС»; eksport o'zgarmadi (E13) | S |
 | E11 ✓ | Qo'lda yozilgan narx smeta narxidan roppa-rosa ×1,12 bo'lsa — yumshoq ogohlantirish «похоже на цену с НДС» va «÷ 1,12» tugmasi. **Bajarildi (v2.10.0):** `S.vat.looksGross`; tugma smeta narxini aynan qo'yadi va faqat narx o'shandan beri o'zgarmagan bo'lsa; test — `test/num.cjs`, `test/browser.mjs` | S |
-| E12 | «Прежние проекты» va справочник oynasida QQS holati (справочник uchun `src/lib/refs` ko'rinishiga tegadi — parity o'lchovi bilan) | M |
+| E12 ✓ v2.10.0 (a) | «Прежние проекты» va справочник oynasida QQS holati (справочник uchun `src/lib/refs` ko'rinishiga tegadi — parity o'lchovi bilan) | M |
 | E13 ✓ | Eksport hujjatida QQS haqida satr — `321.xlsx` ko'rinishiga bog'liq → egasining qarori 1. **Hal bo'ldi: qo'shilmaydi** — hujjat o'zgarmaydi | S |
 
 ### Yaxshilashlar
 
 | № | Taklif | Nega | Hajm |
 |---|---|---|---|
-| E14 | «Проверено» belgisi va jarayon ko'rsatkichi («проверено 212 из 541») | Ekspert qayerda to'xtaganini eslab yurmaydi | M |
-| E15 | Bo'lim bo'yicha filtr (materiallar, mashinalar, uskunalar…) | Bo'limlar allaqachon aniqlanadi, lekin filtrda yo'q | S |
+| E14 ✓ v2.10.0 | «Проверено» belgisi va jarayon ko'rsatkichi («проверено 212 из 541») | Ekspert qayerda to'xtaganini eslab yurmaydi | M |
+| E15 ✓ v2.10.0 | Bo'lim bo'yicha filtr (materiallar, mashinalar, uskunalar…) | Bo'limlar allaqachon aniqlanadi, lekin filtrda yo'q | S |
 | E16 | Narx manbasi belgisi справочник va «Прежние проекты» uchun ham — UZEX dagi «U» kabi | Narx qayerdan kelgani bir qarashda ko'rinadi | S |
-| E17 | Resursga izoh → «Eslatma» ustuniga (sozlama, standart holatda o'chiq) | Nega shu narx qo'yilgani hujjatda qoladi | M |
-| E18 | Klaviatura oqimi: qo'llagandan keyin fokus keyingi qatorga; taklifni bitta tugma bilan qabul qilish | Hozir har bir taklifga 2 bosish va fokus yo'qoladi | S–M |
-| E19 | Yuklab olinadigan fayl nomida ariza raqami va kontragent | Talabda bor (F8) | S |
+| E17 ✓ v2.10.0 | Resursga izoh → «Eslatma» ustuniga (sozlama, standart holatda o'chiq) | Nega shu narx qo'yilgani hujjatda qoladi | M |
+| E18 ✓ v2.10.0 | Klaviatura oqimi: qo'llagandan keyin fokus keyingi qatorga; taklifni bitta tugma bilan qabul qilish | Hozir har bir taklifga 2 bosish va fokus yo'qoladi | S–M |
+| E19 ✓ v2.10.0 | Yuklab olinadigan fayl nomida ariza raqami va kontragent | Talabda bor (F8) | S |
 | E20 | Server o'chganda tushunarli holat (hozir faqat «!») | Noutbuk rejimida «server ishlamayapti — ishga tushiring» | S |
 
 ---
@@ -814,7 +834,7 @@ keyin bu muhim: mijoz narxlar **QQSsiz** bo'lishini talab qilgan.
 | F3 | «Наш ответ» uchun saqlangan eksportni taklif qilish | Hozir fayl diskdan so'raladi, holbuki eksportlar serverda turadi | S |
 | F4 | Tugallangan ariza qatorida «Сравнить версию» | Qaytgan smetani bir bosishda solishtirish | S |
 | F5 | UZEX haftasini arizaning ro'yxatga olingan sanasi bo'yicha tanlash | Hozir qo'lda → egasining qarori 7 | S |
-| F6 | Ochiq sahifa server versiyasi o'zgarganini bilib, «обновите страницу» deyishi | Hozir yangilanishdan keyin eski sahifa yangi server bilan ishlayveradi | S |
+| F6 ✓ v2.10.0 | Ochiq sahifa server versiyasi o'zgarganini bilib, «обновите страницу» deyishi | Hozir yangilanishdan keyin eski sahifa yangi server bilan ishlayveradi | S |
 | F7 ✓ | Reliz skripti: versiya, qurish, testlar, `releases.txt`, `versiyalar.md` — bitta buyruq va tekshiruvlar. **Bajarildi — commit `ffccdc2`:** `sh server/release.sh X.Y.Z "izoh" --row matn.md [--dry]`; test — `test/release-script.sh`. Kod ko'rigidan keyin: PowerShell, playwright va shox (`claude/excel-price-validation-5ehbvb` — Windows `releases.txt` ni shundan o'qiydi) to'plamdan oldin tekshiriladi; natijalarda skript bilmagan test bo'lsa — rad; origin oldinga ketsa reliz commit'i rebase qilinmaydi (tashlab, qaytadan); `--row` yo'li skript ishga tushirilgan papkadan o'qiladi | Hozir 6 qadam qo'lda; `releases.txt` 14/14 to'g'ri, lekin faqat ehtiyotkorlik hisobiga | M |
 
 ### [ ] F8 `docs/2-bosqich-reja.md` dagi bajarilmagan talablar

@@ -308,5 +308,36 @@ run('form 4А, re-priced', S.smeta.parseWorkbook(form4aBook(), 'b.xlsx'), f4, sl
   check(plain.frozen.count === 0, 'an ordinary estimate has nothing of the kind');
 }
 
+/* ------------------------------------------------- the expert's own note on a resource (E17), off by default */
+{
+  const objects = S.smeta.parseWorkbook(standardBook(), 'a.xlsx');
+  const base = S.assemble([{ id: 'p', name: 'Тест', title: 'ТЕСТ', objects }], {});
+  const items = base.resources.filter((r) => r.price > 0);
+  const K = items[0], U = items[1];
+  const prices = {}; prices[K.key] = Math.round(K.price * 90) / 100;
+  const model = S.assemble([{ id: 'p', name: 'Тест', title: 'ТЕСТ', objects }], prices);
+  const R = S.report.cols;
+  const noteOf = (rep, key) => rep.rows.filter((r) => r.kind === 'item' && r.key === key).map((r) => r.cells[R.NOTE] && r.cells[R.NOTE].v);
+  const xmlOf = (opts) => { const files = S.__fflate.unzipSync(S.buildWorkbook(model, opts)); const out = {};
+    Object.keys(files).filter((n) => /^xl\/(worksheets\/|sharedStrings)/.test(n)).forEach((n) => { out[n] = Buffer.from(files[n]).toString('utf8'); }); return out; };
+  ['changed', 'dedup', 'full'].forEach((mode) => {
+    const o = { mode, minDiff: 0, autoNote: true, noteText: 'Пересмотреть стоимость' };
+    const a = S.report.build(model, model.spans[0], o);
+    const b = S.report.build(model, model.spans[0], Object.assign({}, o, { notes: null }));
+    check(JSON.stringify(a.rows) === JSON.stringify(b.rows), mode + ': with the notes off the sheet is exactly what it was');
+    check(JSON.stringify(xmlOf(o)) === JSON.stringify(xmlOf(Object.assign({}, o, { notes: null }))), mode + ': and so is the written workbook, byte for byte');
+    const nk = {}; nk[K.key] = 'КП №1';
+    const c = S.report.build(model, model.spans[0], Object.assign({}, o, { notes: nk }));
+    const diff = c.rows.map((r, i) => JSON.stringify(r) === JSON.stringify(a.rows[i]) ? null : r).filter(Boolean);
+    check(noteOf(c, K.key).length > 0 && noteOf(c, K.key).every((v) => v === 'КП №1') && diff.every((r) => r.key === K.key),
+      mode + ': an own note on a changed resource stands in its note column, and nothing else changes');
+    const nu = {}; nu[U.key] = 'нет КП';
+    const d = S.report.build(model, model.spans[0], Object.assign({}, o, { notes: nu }));
+    const got = noteOf(d, U.key);
+    check(mode === 'changed' ? got.length === 0 : got.length > 0 && got.every((v) => v === 'нет КП'),
+      mode + (mode === 'changed' ? ': an unchanged resource is not on the sheet of changes, note or not' : ': an own note on an unchanged resource is on the sheet with it'));
+  });
+}
+
 console.log(fail ? '\nFAILED: ' + fail : '\nall passed');
 process.exit(fail ? 1 : 0);

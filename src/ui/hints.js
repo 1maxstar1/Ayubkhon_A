@@ -77,6 +77,9 @@
       }
       document.addEventListener('click', function (e) {
         if (self.pop.hidden) return;
+        // a click on what is no longer on the page — the «Применить» of the popover just drawn anew for the next row —
+        // was a click inside it
+        if (!document.documentElement.contains(e.target)) return;
         if (self.pop.contains(e.target) || (e.target.classList && e.target.classList.contains('tagh'))) return;
         // the click that put the caret in a price box opened its popover a moment ago (focusin): it must not close it.
         // Compared by key — the list may have drawn the box anew in between (E3)
@@ -89,7 +92,13 @@
         var sc = $(id);
         sc.addEventListener('click', function (e) {
           var b = e.target.closest && e.target.closest('.tagh');
-          if (b) { e.preventDefault(); self.show(b, b.dataset.hk, b.dataset.key); }
+          if (b) { e.preventDefault(); self.show(b, b.dataset.hk, b.dataset.key); return; }
+          // a click into the price box the caret is already in opens its popover again, if it was closed
+          var inp = e.target;
+          if (inp.classList && inp.classList.contains('pin') && self.pop.hidden) {
+            var rec = self.recOf(inp.dataset.key);
+            if (rec && self.any(mkOf(rec))) self.show(inp, mkOf(rec), rec.key);
+          }
         });
         sc.addEventListener('focusin', function (e) {
           var inp = e.target;
@@ -298,8 +307,8 @@
       if (!hs.length && !ss.length) { this.hide(); return; }
       var rec = this.recOf(key);
       var shown = hs.slice(0, 12);
-      var html = '<div class="hp-head">Прежние проекты · ' + S.esc(S.regionLabel(S.Sync.ws.region)) +
-        '<button class="link" data-x>×</button></div>';
+      var html = '<div class="hp-head"><span>Прежние проекты · ' + S.esc(S.regionLabel(S.Sync.ws.region)) +
+        ' <small class="hp-vat0">цены без НДС</small></span><button class="link" data-x>×</button></div>';
       html += shown.map(function (h, i) { return row(h, i, rec, false); }).join('');
       if (ss.length) {
         html += '<div class="hp-sub">Похожие ресурсы' +
@@ -312,12 +321,15 @@
       this.pop.querySelectorAll('button[data-i]').forEach(function (b) {
         b.addEventListener('click', function () {
           var h = all[+b.dataset.i];
+          // a price the expert set is replaced only when asked, as the reference prices and the exchange do (E18)
+          if (rec && !S.near(rec.market, rec.price) && !S.near(rec.market, h.price) &&
+              !window.confirm('Заменить вашу цену ' + S.price(rec.market) + ' на ' + S.price(h.price) + '?')) return;
           if (S.markSource && h.id) S.markSource(key, h.price, 'hint:' + h.id);
           app.setPrice(key, h.price);
-          app.prices_ui.apply();
+          self.hide();
+          if ($('sheetScroll').contains(anchor)) app.stepSheet(+anchor.dataset.i, 1); else app.prices_ui.afterApply(key);
           app.sheetList.refresh();
           app.toast('Применено: ' + S.price(h.price));
-          self.hide();
         });
       });
       this.key = key;
@@ -362,6 +374,9 @@
       (h.same ? ' <em>тот же контрагент</em>' : '') +
       (h.ref ? ' <em class="hp-ref" title="Эту цену эксперт применил из справочника цен, а не ввёл сам">из справочника</em>' : '') +
       (h.uzex ? ' <em class="hp-uzex" title="Эту цену эксперт применил из котировок биржи UZEX, а не ввёл сам">с биржи UZEX</em>' : '') +
+      // a price typed there as that estimate's price × 1,12 was most likely one with VAT (E12)
+      (!h.ref && !h.uzex && h.smeta > 0 && S.vat && S.vat.looksGross(h.price, h.smeta)
+        ? ' <em class="hp-vat" title="= сметная цена там × 1,12; без НДС: ' + S.price(h.smeta) + '">похоже на цену с НДС</em>' : '') +
       (h.count > 1 ? ' · ×' + h.count : '') +
       (h.smeta != null && rec && !S.near(h.smeta, rec.price) ? '<small>сметная цена там: ' + S.price(h.smeta) + '</small>' : '') +
       '</span>' +

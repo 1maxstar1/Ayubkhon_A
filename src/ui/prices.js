@@ -9,7 +9,7 @@
   'use strict';
 
   var COLS = [
-    { k: 'n', w: 46, wc: 38, cls: 'mid', h: '№' },
+    { k: 'n', w: 62, wc: 52, cls: 'mid', h: '№' },
     { k: 'name', w: 0, h: 'Наименование ресурса' },
     { k: 'unit', w: 70, wc: 58, cls: 'mid', h: 'Ед. изм.' },
     { k: 'count', w: 54, wc: 48, cls: 'num', h: 'Повт.', t: 'Повторов' },
@@ -29,6 +29,9 @@
   function econOf(r) { return r.smetaSum - r.marketSum; }
   function pctOf(r) { return r.smetaSum ? econOf(r) / r.smetaSum * 100 : 0; }
   function isChanged(r) { return !S.near(r.smetaSum, r.marketSum); }
+  /** The band of the estimate the resource stands under (E15): as the estimate has it, nothing guessed. */
+  function secOf(r) { return r.section && r.section !== 'other' && SEC_LABEL[r.section] ? r.section : 'other'; }
+  var SEC_LABEL = { labor: 'Затраты труда', machines: 'Машины и механизмы', materials: 'Материалы', equipment: 'Оборудование', other: 'Прочие / без раздела' };
 
   var SEC_RU = {
     labor: 'затраты труда',
@@ -73,6 +76,24 @@
 
   function width(c) { var w = S.colW(c); return w ? 'flex:0 0 ' + w + 'px' : 'flex:1 1 auto;min-width:220px'; }
 
+  /**
+   * «Проверено» (E14): the expert's own mark that a resource has been looked at, priced or not. Its data-focus lets
+   * the list give the focus back to it after a repaint; it carries no data-key (the tags of the name cell do).
+   */
+  function ckBtn(app, r) {
+    var on = !!app.checked[r.key];
+    return '<button class="ck' + (on ? ' on' : '') + '" data-ck="' + S.esc(r.key) + '" data-focus="ck:' + S.esc(r.key) + '" aria-pressed="' + on +
+      '" title="' + (on ? 'Проверено — нажмите, чтобы снять' : 'Отметить как проверенный (Shift+Enter в поле цены)') + '">' + (on ? '✓' : '○') + '</button>';
+  }
+
+  /** «✎»: the expert's own note on the resource, for the document's «Eslatma» column — only with the setting on (E17). */
+  function noteBtn(app, r) {
+    if (!app.opts.resNotes) return '';
+    var n = app.notes[r.key];
+    return '<button class="nt' + (n ? ' on' : '') + '" data-nt="' + S.esc(r.key) + '" title="' +
+      S.esc(n ? 'Примечание: ' + n : 'Примечание к ресурсу — в столбец «Eslatma» документа') + '">✎</button>';
+  }
+
   Prices.prototype.paintHead = function () {
     this.head.innerHTML = COLS.map(function (c) {
       return '<div class="c' + (c.cls ? ' ' + c.cls : '') + '" style="' + width(c) + '">' + S.headText(c) + '</div>';
@@ -106,13 +127,26 @@
       var inp = e.target;
       if (!inp.classList || !inp.classList.contains('pin')) return;
       var rec = self.byKey(inp.dataset.key);
-      if (rec) { self.app.leftPrice(inp, rec.price); inp.value = S.price(rec.market); }
+      if (rec) {
+        self.app.leftPrice(inp, rec.price);
+        // a price typed here is a resource looked at: it is checked (Esc put the old one back: nothing typed)
+        if (inp.dataset.was != null && !S.near(rec.market, +inp.dataset.was) && !self.app.checked[rec.key]) self.app.setChecked([rec.key], true, true);
+        inp.value = S.price(rec.market);
+      }
     });
 
     scroll.addEventListener('keydown', function (e) {
       var inp = e.target;
       if (!inp.classList || !inp.classList.contains('pin')) return;
-      if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) {
+      if (e.key === 'Enter' && e.shiftKey) {
+        // Shift+Enter: this one is checked, on to the next
+        e.preventDefault();
+        self.app.setChecked([inp.dataset.key], true);
+        self.focusRow(+inp.dataset.i + 1);
+      } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        // Ctrl+Enter: the first suggestion of the popover open for this resource, as if its «Применить» were pressed
+        e.preventDefault(); S.acceptFirst(inp.dataset.key);
+      } else if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) {
         var i = +inp.dataset.i;
         if (i + 1 < self.view.length) {
           e.preventDefault();
@@ -127,6 +161,19 @@
     });
 
     scroll.addEventListener('click', function (e) {
+      var ck = e.target.closest ? e.target.closest('.ck') : null;
+      if (ck) { self.app.setChecked([ck.dataset.ck], !self.app.checked[ck.dataset.ck]); return; }
+      var nb = e.target.closest ? e.target.closest('.nt') : null;
+      if (nb) {
+        var key = nb.dataset.nt, was = self.app.notes[key] || '';
+        var t = window.prompt('Примечание к ресурсу (столбец «Eslatma» документа). Пусто — убрать примечание.', was);
+        if (t == null) return;
+        t = String(t).trim().slice(0, 500);
+        if (t) self.app.notes[key] = t; else delete self.app.notes[key];
+        if (t !== was) { try { document.dispatchEvent(new Event('notes:change')); } catch (er) { /* old browser */ } }
+        self.list.refresh();
+        return;
+      }
       var b = e.target.closest ? e.target.closest('.tagm') : null;
       if (!b) return;
       document.getElementById('q').value = b.dataset.nm;
@@ -136,6 +183,7 @@
 
     document.getElementById('q').addEventListener('input', S.debounce(function () { self.apply(); }, 90));
     document.getElementById('filter').addEventListener('change', function () { self.apply(); });
+    document.getElementById('secFilter').addEventListener('change', function () { self.apply(); });
     document.getElementById('sort').addEventListener('change', function () { self.apply(); });
 
     // A percentage of the estimate's price, on every resource shown — but never over a price the expert has set
@@ -143,7 +191,9 @@
     // Rounded to the tiyin, and a price that would become 0 is left as it is.
     document.getElementById('pctBtn').addEventListener('click', function () {
       var own = self.view.filter(function (r) { return self.app.ownPrice(r); }).length;
-      var raw = prompt('Применить процент к ' + self.view.length + ' видимым ресурсам?\nНапример: -10  (на 10% ниже сметной цены)' +
+      var secSel = document.getElementById('secFilter');
+      var raw = prompt('Применить процент к ' + self.view.length + ' видимым ресурсам' +
+        (secSel.value !== 'all' ? ' (раздел «' + SEC_LABEL[secSel.value] + '»)' : '') + '?\nНапример: -10  (на 10% ниже сметной цены)' +
         (own ? '\n\nЦены, изменённые вручную или применённые из подсказок, не изменятся: ' + own + '.' : ''), '-10');
       if (raw == null) return;
       var pct = S.num(String(raw).replace(/%\s*$/, ''));
@@ -177,6 +227,19 @@
     });
   };
 
+  /**
+   * The first «Применить» of the popover open for `key` — suggestions of earlier projects, reference prices or the
+   * exchange — pressed as by hand, with its own confirmations. A line of «Похожие ресурсы» is never taken this way.
+   */
+  S.acceptFirst = function (key) {
+    var H = S.Hints, R = S.Refs, U = S.Uzex, b = null;
+    if (H && H.pop && !H.pop.hidden && H.key === key) b = H.pop.querySelector('.hp-row:not(.near) button[data-i]');
+    else if (R && R.pop && !R.pop.hidden && R.open && R.open.key === key) b = R.pop.querySelector('button[data-i]');
+    else if (U && U.pop && !U.pop.hidden && U.open && U.open.key === key) b = U.pop.querySelector('button[data-i]');
+    if (b && !b.disabled) b.click();
+    return !!b;
+  };
+
   Prices.prototype.byKey = function (k) {
     var m = this.app.model;
     if (!m) return null;
@@ -203,9 +266,25 @@
 
   Prices.prototype.focusRow = function (i) {
     if (i < 0 || i >= this.view.length) return;
-    this.list.scrollToRow(i);
+    // scrolled only when the row is not fully on screen: a scroll closes the popover the row's focus is about to open
+    var el0 = this.list.el, h = this.list.rowHeight, top = i * h;
+    if (top < el0.scrollTop || top + h > el0.scrollTop + el0.clientHeight) this.list.scrollToRow(i);
     var el = document.querySelector('#priceScroll .pin[data-i="' + i + '"]');
     if (el) { el.focus(); el.select(); }
+  };
+
+  /**
+   * A suggestion applied to `key` (E18): the list stays where it was and the caret moves to the next resource, so
+   * the next one is priced without the mouse.
+   */
+  Prices.prototype.afterApply = function (key) {
+    var was = -1;
+    for (var i = 0; i < this.view.length; i++) if (this.view[i].key === key) { was = i; break; }
+    this.apply(true);
+    var now = -1;
+    for (var j = 0; j < this.view.length; j++) if (this.view[j].key === key) { now = j; break; }
+    var next = (now >= 0 ? now : was) + (now >= 0 ? 1 : 0);
+    if (was >= 0 && next < this.view.length) this.focusRow(next);
   };
 
   /**
@@ -218,9 +297,12 @@
     var q = S.nameKey(document.getElementById('q').value);
     var f = document.getElementById('filter').value;
     var sort = document.getElementById('sort').value;
+    var sec = document.getElementById('secFilter').value;
 
+    var app = this.app;
     var list = m.resources.filter(function (r) {
       if (q && S.nameKey(r.name).indexOf(q) < 0) return false;
+      if (sec !== 'all' && secOf(r) !== sec) return false;
       switch (f) {
         case 'changed': return isChanged(r);
         case 'same': return !isChanged(r);
@@ -232,6 +314,8 @@
         case 'nearref': return !!(S.Refs && S.Refs.nearRow(r));
         case 'uzex': return !!(S.Uzex && S.Uzex.hasRow(r));
         case 'wrongsec': return !!secWarn(r);
+        case 'unchecked': return !app.checked[r.key];
+        case 'checked': return !!app.checked[r.key];
         default: return true;
       }
     });
@@ -245,7 +329,7 @@
 
     // the same search, filter and sort over the same estimates is a refresh — a price applied, an answer arrived — and
     // keeps its place; a change of any of them, or new estimates, starts from the top (E4)
-    var sig = q + '\0' + f + '\0' + sort;
+    var sig = q + '\0' + f + '\0' + sort + '\0' + sec;
     if (keepScroll === undefined && sig === this._sig && m === this._sigModel) keepScroll = true;
     this._sig = sig; this._sigModel = m;
     this.view = list;
@@ -260,8 +344,18 @@
     var hinted = m && S.Hints ? m.resources.filter(function (r) { return S.Hints.hasRow(r); }).length : 0;
     var near = m && S.Hints ? m.resources.filter(function (r) { return S.Hints.nearRow(r); }).length : 0;
     var mis = m ? m.resources.filter(secWarn).length : 0;
+    // the bands of the estimate, each with how many resources it has; offered only when there are two or more
+    var per = {}, bands = 0, sf = document.getElementById('secFilter');
+    if (m) m.resources.forEach(function (r) { var k = secOf(r); if (!per[k]) bands++; per[k] = (per[k] || 0) + 1; });
+    [].forEach.call(sf.options, function (o) {
+      if (o.value === 'all') return;
+      o.textContent = SEC_LABEL[o.value] + (per[o.value] ? ' (' + per[o.value] + ')' : '');
+      o.hidden = !per[o.value] && sf.value !== o.value;
+    });
+    sf.hidden = bands < 2 && sf.value === 'all';
     document.getElementById('priceCount').textContent =
       this.view.length + ' / ' + total + ' ресурсов · изменено ' + changed +
+      ' · проверено ' + (m ? m.resources.filter(function (r) { return this.app.checked[r.key]; }, this).length : 0) + ' из ' + total +
       (hinted ? ' · с подсказками ' + hinted : '') +
       (near ? ' · похожих ' + near : '') +
       (mis ? ' · не тот раздел ' + mis : '') +
@@ -286,9 +380,9 @@
       var sec = secTag(r);
       out.push(
         '<div class="vrow' + (changed ? ' chg' : '') + (many ? ' many' : '') + '">' +
-        cell(COLS[0], i + 1) +
+        cell(COLS[0], ckBtn(this.app, r) + (i + 1)) +
         '<div class="c" style="' + width(COLS[1]) + '" title="' + S.esc(r.name) + '"><span class="nmt">' + S.esc(r.name) + '</span>' +
-        multi + hint + sec + '</div>' +
+        multi + hint + sec + noteBtn(this.app, r) + '</div>' +
         cell(COLS[2], S.esc(r.unit)) +
         cell(COLS[3], r.count) +
         cell(COLS[4], S.qty(r.qty)) +

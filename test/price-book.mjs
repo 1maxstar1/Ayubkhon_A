@@ -169,6 +169,37 @@ now = await changed(p5);
 check(now.length === 3 && now.some((r) => r.name === pick.twin[0].name && r.price === pick.twin[0].price && r.market === pick.twin[0].price - 7),
   `and the estimates are priced from it when they arrive (${now.length} resources)`);
 
+/* the expert's own note on a resource (E17): behind a setting, off by default */
+const p6 = await open();
+await p6.setInputFiles('#pick', [F1, F2]);
+await loaded(p6, 2);
+check(await p6.evaluate(() => !document.querySelector('#priceScroll .nt')), 'with the setting off there is no «✎» on the list');
+await p6.click('.tab[data-pane="settings"]');
+await p6.check('#optResNotes');
+await p6.click('.tab[data-pane="prices"]');
+await p6.waitForTimeout(200);
+const noted = pick.single[0];
+await p6.fill('#q', noted.name);
+await p6.waitForTimeout(300);
+p6.once('dialog', (d) => d.accept('КП поставщика №7'));
+await p6.click('#priceScroll .nt[data-nt="' + noted.key.replace(/["\\]/g, '\\$&') + '"]');
+await p6.waitForTimeout(200);
+check(await p6.evaluate((k) => app.notes[k] === 'КП поставщика №7' && document.querySelector('#priceScroll .nt.on') != null, noted.key), 'with it on, «✎» takes a note for the resource, and shows it is there');
+const dl6 = p6.waitForEvent('download', { timeout: 15 * 1000 });
+await p6.click('#saveBook');
+const BOOK6 = join(dir, 'notes-book.json');
+await (await dl6).saveAs(BOOK6);
+const book6 = JSON.parse(readFileSync(BOOK6, 'utf8'));
+const line6 = book6.find((e) => e.name === noted.name);
+check(book6.length === 1 && line6 && line6.own_note === 'КП поставщика №7' && line6.price === undefined && line6.smeta === noted.price,
+  'the book keeps the note on a line of its own, with no price (an older page skips it)');
+const p7 = await open();
+await p7.setInputFiles('#pick', [F1, F2]);
+await loaded(p7, 2);
+await bookIn(p7, BOOK6, 'примечаний без цены|Загружено цен: 0|Загружено');
+check(await p7.evaluate((k) => app.notes[k] === 'КП поставщика №7', noted.key) && (await changed(p7)).length === 0,
+  'loaded back, the note is there and no price changed');
+
 await browser.close();
 rmSync(dir, { recursive: true, force: true });
 if (errors.length) { console.log(errors.join('\n')); fail++; }

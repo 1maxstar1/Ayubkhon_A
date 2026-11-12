@@ -593,10 +593,10 @@
           !window.confirm('Заменить вашу цену ' + fmt(rec.market) + ' на ' + fmt(price) + '?')) return;
       if (S.markSource) S.markSource(key, price, S.uzex.sourceOf(this.imp.import_id, line));
       app.setPrice(key, price);
-      app.prices_ui.apply(true);
+      this.hide();
+      app.prices_ui.afterApply(key);
       app.sheetList.refresh();
       app.toast('Применено: ' + fmt(price) + ' (UZEX, неделя ' + this.weekText() + ')');
-      this.hide();
     }
   };
 

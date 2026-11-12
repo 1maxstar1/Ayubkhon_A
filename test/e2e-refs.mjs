@@ -287,6 +287,7 @@ check(lab.lines[0].badge === 'Ставка по таблице' && /таблиц
 await closePop();
 const anc = await popover('Анкер М8');
 check(anc.lines.length === 1 && anc.lines.every((l) => /М8/.test(l.name) && !/М5/.test(l.text)), 'Анкер М8: no М5 line');
+check(/цены без НДС/.test(await ep.textContent('#refPop .rp-head')), 'the popover says its prices are without VAT (E12)');
 
 /* ------------------------------------------------------------- «Применить» */
 check(await ep.evaluate(() => Object.keys(app.prices).length === 0), 'still nothing applied after looking');

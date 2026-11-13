@@ -19,6 +19,18 @@ hisoblanadi, datasetda arizalar shu sana bo'yicha tartiblanadi (test qismi — h
 yakunlangan kun olinardi va bugun kiritilgan bir yillik narx «yangi» bo'lib ko'rinardi. Namuna juftlikda (541
 resurs, javobda 103 qator) javobning barcha qatorlari smetada topildi, 102 narx qo'yildi.
 
+**Egasining ekran yozuvi (2026-11-13) — xulosa va keyingi qadam.** Egasi ~50 va undan ko'p eski arizani (smeta +
+o'shanda yuborilgan javob fayli, «✓ Завершить») kiritmoqchi va model **«Рыночная цена» ustunidagi har bir qiymatdan**
+o'rganishini xohlaydi. Namuna juftlikda o'zgartirilgan narxlarning ko'pi spravochnik qatoridan 2 % dan uzoq yoki
+qatori yo'q — demak faqat spravochnik qatorlarini qayta tartiblaydigan model bu ma'lumotdan kam o'rganadi. Taklif
+qilingan yo'nalish (egasining javobi kutilmoqda, §6 oxiri): model har bir resurs uchun **bozor narxini taxmin
+qiladi** (spravochnik, xotira, o'xshash nomlar, UZEX — belgi sifatida; smeta narxini ko'rmaydi), dastur esa smeta
+narxini shu taxmin bilan solishtirib «qimmat — taklif: X» deb belgilaydi. Shunda smeta narxi tartiblash belgisi
+bo'lmaydi (qoida saqlanadi), ma'lumot esa har bir resursdan foydalanadi: o'zgartirilgani — aniq narx, qoldirilgani —
+«smeta narxi qimmat emas» (pastki chegara). Hisobotdagi «bitta qator yo'qoldi» tekshirildi: yo'qolmagan — javob
+faylida bitta mashina ikki marta yozilgan (birida lotincha «K»), ikkalasi bitta resursga tushgan. v2.13.2: «Сравнение
+версий» tuzatilgan smetasiz ham javob qo'llanganini, topilmagan qatorlarni va takrorlarni aytadi.
+
 **3-bosqichda aslida nima qilindi:**
 
 - `src/lib/ml/features.js` — bitta taklif qatorining 62 ta belgisi (sxema xeshi bilan): moslik darajasi va usuli,
@@ -244,6 +256,9 @@ Har bosqich — reliz; `releases.txt` ga faqat egasi sinagach (**darvoza 3**).
 | Smeta narxi qoldirilgan, lekin spravochnikda undan past qator bor edi — bu «taklif rad etildi» deganimi? | Ha, yarim og'irlik bilan (`left`); «проверено» belgisi bo'lsa — to'liq |
 | Qo'lda yozgan narxingiz spravochnik qatoridan necha foiz ichida bo'lsa «o'sha qator» hisoblansin? | 2 % |
 | Qo'lda belgilangan «проверочный список» tuzasizmi (50–100 ta resurs: nom, birlik, viloyat, sana, to'g'ri narx)? | Majburiy emas; bo'lsa — eng ishonchli o'lchov |
+| Model yangi smetada nima qilsin: qimmat narxni belgilab, o'z taxminini taklif qilsinmi (narx faqat «Применить» bilan)? | Ha — shu yo'nalishda loyihalanadi (javob kutilmoqda) |
+| Javobda yo'q (o'zgartirilmagan) resurs — «smeta narxi qimmat emas» deganimi? | Ha, eski ishda hamma resurs ko'rib chiqilgan deb |
+| 0 qo'yilgan resurs (o'chirilgan) | Narx sifatida o'rganilmaydi |
 
 ## 7. Egasi o'z kompyuterida qiladigan ish (darvoza 1)
 

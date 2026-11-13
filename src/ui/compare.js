@@ -271,9 +271,10 @@
       }
       var m = S.reply.match(parsed.entries, objects);
       self.reply = { base: b, name: file.name, entries: parsed.entries, unread: parsed.unread, match: m };
+      var n = Object.keys(m.prices).length;
+      self.reply.applied = b !== 'file' ? n : 0;
       if (back) { back(); return; }
       chose('reply', file);
-      var n = Object.keys(m.prices).length;
       if (b !== 'file' && n) app.setPrices(m.prices);
       app.toast('Наш ответ: строк ' + parsed.entries.length + ', найдено в смете ' + m.found.length +
         (m.missing.length ? ', не найдено ' + m.missing.length : '') +
@@ -418,7 +419,20 @@
       head.innerHTML = '';
       body.innerHTML = '';
       cnt.textContent = '';
-      sum.innerHTML = '<div class="cmp-empty">' +
+      // «Наш ответ» loaded and no corrected smeta: say that the reply did land — the corrected smeta is optional
+      // (old work fed for learning usually has none), and what of the reply did not
+      var rp = this.reply && this.reply.base === $('cmpOld').value ? this.reply : null, done = '';
+      if (rp) {
+        var m = rp.match, seen = {}, twice = 0;
+        m.found.forEach(function (f) { var dup = f.keys.every(function (k) { return seen[k]; }); f.keys.forEach(function (k) { seen[k] = 1; }); if (dup) twice++; });
+        done = '<div class="cmp-done" id="cmpReplyDone"><b>Наш ответ применён</b> — файл «' + S.esc(rp.name) + '»: строк ' + rp.entries.length +
+          ', найдено в смете ' + m.found.length + (rp.applied ? ', цен проекта обновлено: ' + rp.applied : '') +
+          (twice ? ', повторов (та же позиция сметы ещё раз): ' + twice : '') +
+          (m.missing.length ? ', <b>не найдено ' + m.missing.length + '</b> — список ниже' : '') + '.<br>' +
+          'Исправленная смета не обязательна. Если её нет — проверьте цены на вкладке «Проверка цен» и нажмите «✓ Завершить»: ' +
+          'цены этой заявки будут запомнены.' + replyNotes(rp) + '</div>';
+      }
+      sum.innerHTML = done + '<div class="cmp-empty">' +
         (this.app.projects.length || this.oldFile ? '' : 'Сначала добавьте первую версию сметы как проект (с вашими рыночными ценами) или выберите её файлом.<br>') +
         'Выберите исправленную смету, которую прислал отправитель: «Загрузить исправленную смету».<br>' +
         'Строки будут сопоставлены по листам и наименованиям; цвет показывает, что сделано с каждым замечанием: ' +

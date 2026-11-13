@@ -189,6 +189,10 @@ try {
     return r && r.market;
   });
   check(priced === 16, 'the reply\'s price is now the project\'s market price (' + priced + ')');
+  // no corrected smeta yet (old work fed for learning has none): the tab says the reply landed and what did not
+  const done = await page.textContent('#cmpReplyDone').catch(() => '');
+  check(/Наш ответ применён/.test(done) && /строк 7, найдено в смете 6/.test(done) && /не найдено 1/.test(done) && /Исправленная смета не обязательна/.test(done) &&
+    /Не найдено в смете: 1/.test(done), 'without a corrected smeta the tab says the reply was applied, what was not found, and that the corrected smeta is optional');
   await page.setInputFiles('#cmpNewFile', f2);
   await page.waitForFunction(() => app.compare_ui.res, null, { timeout: 30 * 1000 });
   const files = await page.textContent('.cmp-files');

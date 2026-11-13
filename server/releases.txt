@@ -27,3 +27,4 @@ v2.9.4 1487d990badb8e80d4ba32dcc67e6ab0fbe59525 Begona fayl va chetdagi holatlar
 v2.10.0 5264eae7f7a9e8fa7b34c7e76f5f8babf1ee7554 Qulaylik va QQS: QQS ekranda, Primenit % qolda yozilganga tegmaydi, kontragent narxlari royxatda, server ochganda panel, sahifa yangilanishi, viloyat va qaytarish, taqqoslash juftlashi
 v2.10.1 01fc27e37c8f7f20e428aef19fae2cc024772bee Bosish yoqolmaydi va manba belgisi sekin serverda ham chiqadi
 v2.10.2 ae308c26a7b5cbc0836ef0c5d613c26988aecf5c Korib chiqish tuzatishlari: serversiz chiqish, Otmenit, Ctrl+Enter, taqqoslash sorovlari
+v2.10.3 696fd2b2157aff23072bd4daa4b99ffef68e5c79 Spravochnik: QQS bilan yozilgan hujjat aytiladi

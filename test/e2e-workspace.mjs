@@ -519,7 +519,16 @@ await api('/api/collections/workspaces/records', {
 }, su);
 
 await page.reload();
-await page.waitForSelector('#screen-list:not([hidden])');
+try {
+  await page.waitForSelector('#screen-list:not([hidden])');
+} catch (e) {
+  // what the page shows instead, so that a failure here says what it saw
+  console.log('after the reload: ' + JSON.stringify(await page.evaluate(() => ({
+    hash: location.hash, auth: !!(S.pb && S.pb.authStore.isValid), ws: !!(S.Sync && S.Sync.ws), starting: !!(S.Registry && S.Registry.starting),
+    shown: [...document.querySelectorAll('[id^="screen-"]')].filter((x) => !x.hidden).map((x) => x.id), ready: document.readyState
+  })).catch((x) => String(x))));
+  throw e;
+}
 await page.waitForFunction(() => document.querySelectorAll('#appTable tbody tr').length >= 50);
 const shownFor = async (sel, val, want) => {
   await page.selectOption(sel, val);

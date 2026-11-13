@@ -71,5 +71,17 @@ check(S.memory.verdict(100, c) === 'accepted' && S.memory.verdict(80, c) === 'ac
   'a smeta price at or below the ceiling was accepted before');
 check(S.memory.verdict(100.5, c) === 'above' && S.memory.verdict(100, null) === '' && S.memory.verdict(0, c) === '', 'above it is pointed out; no ceiling, no word');
 
+
+/* the date a price is for: its application's date, not the day it was finished */
+check(S.memory.dateOf({ asof: '2025-03-01', finished: '2031-05-01T10:00:00.000Z' }) === '2025-03-01' && S.memory.dateOf({ finished: '2031-05-01T10:00:00.000Z' }) === '2031-05-01' &&
+  S.memory.dateOf({ asof: '2031-06-01', finished: '2031-05-01' }) === '2031-05-01' && S.memory.dateOf({ asof: 'вчера', finished: '2031-05-01' }) === '2031-05-01' && S.memory.dateOf({}) === '',
+  'a price is dated by its application (or by its finishing day when that is earlier or the only date)');
+{
+  const oldApp = (o) => row(Object.assign({ asof: '2029-01-10', finished: TODAY }, o));
+  const r1 = rank([oldApp({ id: 'o1', contragent: 'B', final_price: 77 })]);
+  check(r1.prices.length === 0, 'a corrected price of an application three years old is not offered, even when it was finished today');
+  const r2 = rank([oldApp({ kind: 'checked', contragent: 'B', smeta_price: 50, final_price: 50 }), oldApp({ kind: 'checked', contragent: 'C', smeta_price: 50, final_price: 50 })]);
+  check(r2.ceiling === null, 'nor is an old acceptance a ceiling because it was put in today');
+}
 console.log(fail ? `FAILED (${fail})` : 'memory OK');
 process.exit(fail ? 1 : 0);

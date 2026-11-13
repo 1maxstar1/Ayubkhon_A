@@ -23,7 +23,7 @@
   var PER = 40;              // match keys in one request
   var PREF = 'smeta.memory.off';
   var SEP = '␟';
-  var FIELDS = 'id,workspace,application,contragent,match_key,match_unit_key,kind,source,smeta_price,final_price,finished,accepted,' +
+  var FIELDS = 'id,workspace,application,contragent,match_key,match_unit_key,kind,source,smeta_price,final_price,asof,finished,accepted,' +
     'expand.application.number,expand.application.org_name,expand.contragent.name';
 
   function $(id) { return document.getElementById(id); }
@@ -79,7 +79,7 @@
               var a = c.expand && c.expand.application, ct = c.expand && c.expand.contragent;
               var pair = c.match_key + SEP + c.match_unit_key;
               (self.map[pair] = self.map[pair] || []).push({ id: c.id, workspace: c.workspace, application: c.application, contragent: c.contragent,
-                kind: c.kind, source: c.source || '', smeta_price: c.smeta_price, final_price: c.final_price, finished: c.finished, accepted: !!c.accepted,
+                kind: c.kind, source: c.source || '', smeta_price: c.smeta_price, final_price: c.final_price, asof: c.asof, finished: c.finished, accepted: !!c.accepted,
                 number: a ? a.number : '', who: ct ? ct.name : (a ? a.org_name : '') });
               delete self.cache[pair];
             });
@@ -163,7 +163,7 @@
         html += '<div class="mp-row"><b class="mp-price">' + fmt(p.price) + '</b><div class="mp-what">' +
           (p.accepted ? '<em class="mp-acc" title="В возвращённой смете подрядчик поставил эту цену («Исправлено»)">принята подрядчиком</em> ' : '') +
           '<span>' + S.esc(srcText(r.source)) + '</span>' +
-          '<small>№ ' + S.esc(r.number) + ' · ' + S.esc(r.who) + ' · ' + S.esc(day(r.finished)) +
+          '<small>№ ' + S.esc(r.number) + ' · ' + S.esc(r.who) + ' · ' + S.esc(day(S.memory.dateOf(r))) +
           (r.smeta_price > 0 ? ' · сметная цена там: ' + fmt(r.smeta_price) : '') + '</small></div>' +
           '<button class="btn sm" data-i="' + i + '">Применить</button></div>';
       });
@@ -174,7 +174,7 @@
             : '✓ Ранее принято: без изменений оставляли до <b>' + fmt(c.price) + '</b>') + ' — ' + c.apps + ' независимых заявок' +
           '<small>это не рыночная цена, а граница: цену ниже рынка программа не трогает</small></div>' +
           c.rows.slice(0, 6).map(function (r) {
-            return '<div class="mp-ev">' + fmt(r.final_price) + ' · № ' + S.esc(r.number) + ' · ' + S.esc(r.who) + ' · ' + S.esc(day(r.finished)) +
+            return '<div class="mp-ev">' + fmt(r.final_price) + ' · № ' + S.esc(r.number) + ' · ' + S.esc(r.who) + ' · ' + S.esc(day(S.memory.dateOf(r))) +
               ' · ' + (r.kind === 'checked' ? 'проверено' : 'оставлено') + '</div>';
           }).join('');
       }

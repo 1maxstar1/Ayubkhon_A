@@ -11,6 +11,14 @@ dataseti, metrikalar va bugungi qoidalarning (`p3`) o'lchovi — admin sahifasid
 (`src/lib/ml/{logreg,mlp,calib}.js`, tajribalar jadvali) boshlanadi. Sonlar kelmaguncha model kodi yozilmaydi:
 qaysi model kerakligi (yoki umuman kerak emasligi) savollar soniga va `p3` ning hozirgi aniqligiga bog'liq.
 
+**v2.13.1 — eski arizalar bilan to'ldirish (egasining taklifi, 2026-11-13):** ilgari ishlangan ariza smetasi va
+o'shanda yuborilgan javob fayli («Сравнение версий» → «Наш ответ (Excel)») yuklanib, «✓ Завершить» bosiladi — narxlar
+xotiraga yoziladi. Shu uchun narxning sanasi endi **arizaning o'z sanasi** (`asof` — ro'yxatga olingan sana yoki
+tanlangan sana; yakunlangan kundan keyin bo'lsa — yakunlangan kun; `S.memory.dateOf`): xotirada yosh shundan
+hisoblanadi, datasetda arizalar shu sana bo'yicha tartiblanadi (test qismi — haqiqatan eng yangi arizalar). Avval
+yakunlangan kun olinardi va bugun kiritilgan bir yillik narx «yangi» bo'lib ko'rinardi. Namuna juftlikda (541
+resurs, javobda 103 qator) javobning barcha qatorlari smetada topildi, 102 narx qo'yildi.
+
 **3-bosqichda aslida nima qilindi:**
 
 - `src/lib/ml/features.js` — bitta taklif qatorining 62 ta belgisi (sxema xeshi bilan): moslik darajasi va usuli,

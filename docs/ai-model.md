@@ -54,6 +54,13 @@ baribir siz qo'yasiz.
 Admin sahifasi → «Обучение»: faqat sonlar (nom va narx yo'q). «Скопировать числа» shu sonlarni matn qilib beradi —
 uni dasturchiga yuborish xavfsiz.
 
+## Eski arizalarni qo'shish
+
+Ilgari ishlangan arizani xotiraga qo'shish mumkin: arizani oching, o'sha smetani yuklang, «Сравнение версий» da
+«Было» — shu smeta, «Наш ответ (Excel)» — o'shanda yuborilgan javob fayli. Javobdagi narxlar smetaga qo'yiladi.
+Keyin «✓ Завершить». Narxning sanasi — arizaning o'z sanasi, bugungi kun emas: bir yillik narx bir yillik
+hisoblanadi (xotirada 12 oydan eski «ранее принято» belgisi chiqmaydi, 24 oydan eski narx taklif qilinmaydi).
+
 ## Hozirgi takliflar qanchalik to'g'ri — «Набор для обучения»
 
 Admin sahifasi → «Обучение» → **«Собрать и измерить»**. Dastur yakunlangan arizalaringizdagi har bir narxni

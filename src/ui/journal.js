@@ -95,7 +95,7 @@
         // the expert's own earlier prices (src/ui/memory.js), in the order they are offered
         var Mm = S.Memory;
         if (Mm && Mm.of) Mm.of(rec).prices.slice(0, 8).forEach(function (p, i) {
-          add('mem', i, { id: p.row.id, price: p.price, date: String(p.row.finished || '').slice(0, 10), same: p.cls === 1, accepted: !!p.accepted,
+          add('mem', i, { id: p.row.id, price: p.price, date: S.memory.dateOf(p.row), same: p.cls === 1, accepted: !!p.accepted,
             src: /^ref:/.test(p.row.source) ? 'ref' : /^uzex:/.test(p.row.source) ? 'uzex' : 'typed' }, !!source && source === 'mem:' + p.row.id);
         });
       } catch (e) { /* none */ }

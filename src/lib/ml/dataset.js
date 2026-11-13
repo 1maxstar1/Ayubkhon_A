@@ -126,10 +126,13 @@ var S = (typeof S !== 'undefined' && S) || {};
     return out;
   }
 
-  /** The newest fifth of the applications (by the day they were finished) is the test set. */
+  /** The newest fifth of the applications (by their date, then the day they were finished) is the test set. */
   function split(apps) {
     var real = apps.filter(function (a) { return a.split !== 'gold'; })
-      .sort(function (a, b) { return a.finished < b.finished ? -1 : a.finished > b.finished ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0; });
+      .sort(function (a, b) {
+        var x = String(a.date || ''), y = String(b.date || '');
+        return x < y ? -1 : x > y ? 1 : a.finished < b.finished ? -1 : a.finished > b.finished ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+      });
     var nTest = real.length < 2 ? 0 : Math.max(1, Math.round(real.length * TEST_SHARE));
     real.forEach(function (a, i) { a.split = i >= real.length - nTest ? 'test' : 'train'; });
     return apps;
@@ -145,7 +148,9 @@ var S = (typeof S !== 'undefined' && S) || {};
       var id = row.gold ? 'gold' : String(row.workspace || '?');
       if (appIx[id] == null) {
         appIx[id] = ds.apps.length;
-        ds.apps.push({ id: id, finished: String(row.finished || row.asof || '').slice(0, 10), region: row.region || '', split: row.gold ? 'gold' : null, n: 0 });
+        // the application's date first (an old application finished today is still old), then the day it was finished
+        ds.apps.push({ id: id, date: String(row.asof || row.finished || '').slice(0, 10), finished: String(row.finished || row.asof || '').slice(0, 10),
+          region: row.region || '', split: row.gold ? 'gold' : null, n: 0 });
       }
       return appIx[id];
     }

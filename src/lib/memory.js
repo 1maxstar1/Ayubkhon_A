@@ -4,8 +4,11 @@
  *
  *   S.memory.rank(rows, ctx) → { prices: [entry…], ceiling: { price, apps, weight, rows } | null }
  *   S.memory.verdict(smetaPrice, ceiling) → 'accepted' | 'above' | ''
+ *   S.memory.dateOf(row) → 'YYYY-MM-DD' | '': the date a price is for — its application's date (`asof`: the date the
+ *         reference was asked as of, the registration date unless one was picked), or the day it was finished when
+ *         that is earlier or the other is missing. An application of last year finished today is last year's price.
  *   rows: price_memory records of ONE resource (same match key and unit key), same region, other workspaces:
- *         { id, workspace, application, contragent, kind, source, smeta_price, final_price, finished, accepted, number, who }
+ *         { id, workspace, application, contragent, kind, source, smeta_price, final_price, asof, finished, accepted, number, who }
  *   ctx:  { contragent, today: 'YYYY-MM-DD' }
  *
  * Two kinds of evidence, two meanings (the owner's rule):
@@ -14,6 +17,8 @@
  *     1  the same contragent, 2  another contragent; inside each, one the contractor took («Исправлено») first, then
  *     the newest. One line per application. A price «Применить %» set is not one (a blanket discount is not a price
  *     looked up), a price of 0 is a resource struck out — neither is ever offered. Older than PRICE_MONTHS: not shown.
+ *
+ *   Ages are counted from the application's date (dateOf), not from the day «✓ Завершить» was pressed.
  *
  *   An untouched price is not a market price: by the program's own rule a smeta price below the market is left
  *   alone. It is a CEILING — «accepted up to this price». It counts only when independent applications agree:
@@ -48,6 +53,11 @@ var S = (typeof S !== 'undefined' && S) || {};
     var half = CEIL_MONTHS / 2;
     return age <= half ? 1 : Math.max(0, 1 - (age - half) / (CEIL_MONTHS - half));
   }
+  function dateOf(r) {
+    var a = /^\d{4}-\d{2}-\d{2}/.test(String(r && r.asof || '')) ? String(r.asof).slice(0, 10) : '';
+    var f = /^\d{4}-\d{2}-\d{2}/.test(String(r && r.finished || '')) ? String(r.finished).slice(0, 10) : '';
+    return a && f ? (a < f ? a : f) : a || f;
+  }
   function near(a, b) { var d = Math.abs(a - b); return d < 1e-6 || d < Math.abs(a) * 1e-9; }
 
   function rank(rows, ctx) {
@@ -56,7 +66,7 @@ var S = (typeof S !== 'undefined' && S) || {};
     var prices = [], seen = {}, groups = {};
     (rows || []).forEach(function (r) {
       if (!r || !(r.final_price > 0)) return;                       // struck out, or nothing
-      var age = months(r.finished, today);
+      var age = months(dateOf(r), today);
       if (age == null) return;
       if (r.kind === 'corrected') {
         if (r.source === 'pct' || age > PRICE_MONTHS) return;
@@ -96,5 +106,5 @@ var S = (typeof S !== 'undefined' && S) || {};
     return smeta <= ceiling.price || near(smeta, ceiling.price) ? 'accepted' : 'above';
   }
 
-  S.memory = { rank: rank, verdict: verdict, ageFactor: ageFactor, PRICE_MONTHS: PRICE_MONTHS, CEIL_MONTHS: CEIL_MONTHS, UNMARKED: UNMARKED, NEED: NEED };
+  S.memory = { rank: rank, verdict: verdict, ageFactor: ageFactor, dateOf: dateOf, PRICE_MONTHS: PRICE_MONTHS, CEIL_MONTHS: CEIL_MONTHS, UNMARKED: UNMARKED, NEED: NEED };
 })(S);

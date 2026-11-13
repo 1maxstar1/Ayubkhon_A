@@ -33,6 +33,13 @@ const C = rows.find((r) => r.inn && rows.some((x) => x.inn === r.inn && x.number
 const A = rows.find((r) => r.inn === C.inn && r.number !== C.number);
 const B = rows.find((r) => r.inn && r.inn !== A.inn);
 const D = rows.find((r) => r.inn && r.inn !== A.inn && r.inn !== B.inn);
+// a price is dated by its application (S.memory.dateOf): the sample registry is years old, so these four are
+// registered a few days ago — the memory must not have aged out by the day the test runs
+for (const [x, days] of [[A, 9], [B, 7], [C, 2], [D, 1]]) {
+  const rec = (await api('/api/collections/applications/records?perPage=1&filter=' + encodeURIComponent(`number='${x.number}'`), {}, su)).items[0];
+  await api('/api/collections/applications/records/' + rec.id, { method: 'PATCH',
+    body: JSON.stringify({ registered_at: new Date(Date.now() - days * 864e5).toISOString().replace('T', ' ') }) }, su);
+}
 
 let fail = 0;
 const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) fail++; };

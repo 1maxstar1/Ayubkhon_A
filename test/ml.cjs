@@ -227,6 +227,20 @@ const byRid = (r, res) => { const ids = ridsOf(r.name, r.unit, r.section), o = {
         t.some((x) => apps.some((a) => a.split === 'train' && (a.finished > x.finished || (a.finished === x.finished && a.id > x.id))))) { ok(false, 'split of ' + n1); }
   }
   ok(true, 'the test part is the newest fifth (one application of 2–7, two of 8–12), none of a single application; ties go by id');
+  {
+    // last year's applications, all finished today (their prices put in again from the replies sent then), and one of this year
+    const back = [];
+    ['2025-03-01', '2025-01-10', '2025-06-01', '2025-02-01'].forEach((d, i) => back.push({ id: 'old' + i, date: d, finished: '2026-11-13', split: null }));
+    back.push({ id: 'new', date: '2026-10-01', finished: '2026-10-20', split: null });
+    D.split(back);
+    ok(back.find((a) => a.id === 'new').split === 'test' && back.filter((a) => a.split === 'test').length === 1,
+      'applications are ordered by their own date: old ones finished today do not become the newest');
+    const rws = [row('Бетон тяжёлый В15', 'м3', { workspace: 'wa', asof: '2025-03-01', finished: '2026-11-13', source: 'typed', final_price: P.c, smeta_price: P.h }),
+      row('Бетон тяжёлый В15', 'м3', { workspace: 'wb', asof: '2026-06-30', finished: '2026-07-01', source: 'typed', final_price: P.c, smeta_price: P.h })];
+    const d2 = D.build(sug, rws, { package_id: PID });
+    ok(d2.apps.find((a) => a.id === 'wa').split === 'train' && d2.apps.find((a) => a.id === 'wb').split === 'test' && d2.apps[0].date === '2025-03-01',
+      'and so in the dataset: an application of last year finished today trains, this year\'s is tested');
+  }
 
   const b = D.baseline(ds, { n: 200, seed: 1 });
   ok(b.policy === 'p3' && b.train.n_pos === 8 && b.train.n_none === 4 && b.train.n_left === 4 && eq(b.train.p1, 0.5) && eq(b.train.r3, 1) && eq(b.train.mrr, 0.75) &&

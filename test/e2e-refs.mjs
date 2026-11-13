@@ -253,6 +253,7 @@ await ep.waitForFunction((n) => document.querySelectorAll('#priceScroll .vrow').
 
 /* ------------------------------------------------------------- the popover */
 const cab = await popover('Кабель ВВГ 3х2,5');
+check(/в 1 из 2 документов цены с НДС/.test(cab.text), 'a median says how many of its documents printed VAT (' + (cab.text.match(/в \S+ из \S+ документов[^·]*/) || [''])[0] + ')');
 check(cab.lines.length >= 1 && cab.lines.length <= 6 && cab.lines.every((l) => l.name.trim().length > 0),
   'cable: ≤ 6 lines, the matched record\'s name on every line');
 check(cab.lines[0].badge === 'Документ' && /Медиана: 2 документа/.test(cab.lines[0].text), 'its top line: «Документ», the median of two documents');
@@ -292,6 +293,7 @@ await closePop();
 const anc = await popover('Анкер М8');
 check(anc.lines.length === 1 && anc.lines.every((l) => /М8/.test(l.name) && !/М5/.test(l.text)), 'Анкер М8: no М5 line');
 check(/цены без НДС/.test(await ep.textContent('#refPop .rp-head')), 'the popover says its prices are without VAT (E12)');
+check(/в документе цена с НДС — здесь без НДС/.test(anc.text), 'a document that printed its prices with VAT is said to be divided (E12b)');
 
 /* ------------------------------------------------------------- «Применить» */
 check(await ep.evaluate(() => Object.keys(app.prices).length === 0), 'still nothing applied after looking');
@@ -398,6 +400,7 @@ await ep.evaluate(() => S.Refs.resume());
 await ep.waitForFunction(() => S.Refs.state === 'ready' && S.Refs.worker && !Object.keys(S.Refs.batches).length, null, { timeout: 60 * SEC });
 check(await ep.evaluate(() => S.Refs.count().all === 9 && S.Refs.cached), 'and comes back from the cache when it is needed again');
 const exc = await popover('Экскаватор одноковшовый 0,65 м3');
+check(!/цен[аы] с НДС/.test(exc.text), 'a document without VAT says nothing of it');
 check(/Ваша цена: 44 444,44/.test(exc.text), 'the popover shows the expert\'s own price');
 await ep.click('#refPop button[data-i="0"]');
 await settle();

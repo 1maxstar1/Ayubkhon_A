@@ -370,6 +370,7 @@ form.grid .foot{grid-column:1 / -1;display:flex;gap:8px;align-items:center}
 .rp-name{font-weight:600;color:var(--ink);margin-top:3px;overflow-wrap:anywhere}
 .rp-ev,.rp-src,.rp-conv,.rp-vs{color:var(--mute);font-size:11px;margin-top:1px;overflow-wrap:anywhere}
 .rp-vs{color:#3b4652}
+.rp-vatdoc{color:#8a5300;font-size:11px;margin-top:1px}
 .rp-fold{font-size:11px;margin-top:3px}
 .rp-comps{margin:4px 0 0 8px;border-left:2px solid var(--rule);padding-left:8px}
 .rp-comp{display:grid;grid-template-columns:96px 1fr;gap:6px;padding:3px 0}

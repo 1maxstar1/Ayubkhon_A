@@ -764,8 +764,12 @@ ko'rish.
 
 **E12a, E14, E15, E17, E18, E19 — bajarildi (v2.10.0).** E12a: «Прежние проекты» va
 справочник oynalari «цены без НДС» deydi; oldingi loyihada smeta narxi × 1,12 qilib yozilgan
-narx «похоже на цену с НДС» bilan belgilanadi. E12b (hujjat bo'yicha QQS, v2.9.0 UZEX
-narxlari) — egasining tasdig'ini kutadi (`vat_default` nimani anglatadi). E14: «○/✓»
+narx «похоже на цену с НДС» bilan belgilanadi. **E12b — bajarildi (v2.10.3).** Egasining javobi
+(2026-11-13): paketda `vat_default: true` — hujjatning o'zida narx QQS bilan yozilgan, paketga 1,12 ga
+bo'linib QQSsiz qo'yilgan. Справочник oynasida shunday hujjatning qatori «в документе цена с НДС — здесь
+без НДС» deydi, mediana esa nechtasi ekanini («в 1 из 2 документов…»); boshqa qiymat (false, matn) hech
+narsa demaydi (`src/refs-worker.js` `sourcesFor` → `vat`, `src/ui/refs.js` `vatNote`; `src/lib/refs` ga
+tegilmadi). Test — `test/e2e-refs.mjs` (fixturada bitta hujjat `vat_default: true`). E14: «○/✓»
 «№» katagida; narx yozilsa resurs o'zi «проверено» bo'ladi (ommaviy o'zgarishlar
 belgilamaydi); Shift+Enter — belgilab keyingisiga; «Не проверенные»/«Проверенные»
 filtrlari; holat qatorida «проверено X из N»; server rejimida ish maydoni bilan, serversiz —
@@ -1322,5 +1326,6 @@ oladi.
    qolsinmi? (A2)
 
 Oldingi ishdan ochiq qolgan ikki savol: TNQurilish ro'yxatlaridagi narxlar
-QQS bilanmi (tasdiq kutilmoqda); v2.9.0 da UZEX dan qo'llangan narxlar («U»
-belgili kataklar) QQS bilan qolgan — ko'zdan kechirish kerak.
+QQS bilanmi — **hal bo'ldi (egasi, 2026-11-13): QQSsiz**, paketda ularning `vat_default` i `true`
+bo'lmasligi kerak; v2.9.0 da UZEX dan qo'llangan narxlar («U»
+belgili kataklar) QQS bilan qolgan — ko'zdan kechirish kerak (javob kutilmoqda).

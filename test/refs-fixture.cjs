@@ -29,7 +29,8 @@ const SOURCES = [
   { id: 'fake-src-0001', doc_type: 'supplier-offer', issuer: 'ООО «Тест-Поставщик-1»', customer: null, doc_no: 'ТЕСТ-1',
     issue_date: '2025-03-14', as_of_date: null, region: 'xorazm', ships_nationally: false, vat_default: false, method: 'fixture' },
   { id: 'fake-src-0002', doc_type: 'manufacturer-list', issuer: 'ООО «Тест-Поставщик-2»', customer: null, doc_no: 'ТЕСТ-2',
-    issue_date: '2025-11-20', as_of_date: null, region: 'toshkent_sh', ships_nationally: true, vat_default: false, method: 'fixture' },
+    // a document that printed its prices with VAT (the package carries them divided): its lines say so (E12b)
+    issue_date: '2025-11-20', as_of_date: null, region: 'toshkent_sh', ships_nationally: true, vat_default: true, method: 'fixture' },
   { id: 'fake-src-0003', doc_type: 'machine-hour-list', issuer: 'ООО «Тест-Поставщик-3»', customer: null, doc_no: 'ТЕСТ-3',
     issue_date: '2026-01-01', as_of_date: '2026-01-01', region: 'national', ships_nationally: true, vat_default: false, method: 'fixture' },
   { id: 'fake-src-0004', doc_type: 'wage-table', issuer: 'ООО «Тест-Поставщик-4»', customer: null, doc_no: 'ТЕСТ-4',

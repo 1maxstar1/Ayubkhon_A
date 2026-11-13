@@ -11,7 +11,8 @@
  *                   { cmd: 'forget' }                                                     delete the cache (sign-out)
  *   worker → page   { type: 'progress', phase: 'cache'|'download'|'unpack'|'check'|'derive'|'store'|'index', done, total }
  *                   { type: 'ready', package_id, records, skipped, cached, ms, sources: { id: { doc_type, issuer,
- *                     doc_no, issue_date, as_of_date, region } } }
+ *                     doc_no, issue_date, as_of_date, region, vat } } }   vat: the document printed its prices with
+ *                     VAT and the package carries them divided by it (vat_default === true; owner, 2026-11-13)
  *                   { type: 'results', batch, items: [{ k, lines }] }
  *                   { type: 'error', phase, message }                                     Russian, never a value
  *
@@ -164,7 +165,10 @@
     for (var i = 0; i < list.length; i++) {
       var s = list[i];
       out[s.id] = { doc_type: s.doc_type || null, issuer: s.issuer || null, doc_no: s.doc_no || null,
-        issue_date: s.issue_date || null, as_of_date: s.as_of_date || null, region: s.region || null };
+        issue_date: s.issue_date || null, as_of_date: s.as_of_date || null, region: s.region || null,
+        // vat_default: true — the document printed its prices with VAT, the package carries them without (the
+        // owner's package builder, confirmed 2026-11-13). Anything else (false, a string, missing) says nothing.
+        vat: s.vat_default === true };
     }
     return out;
   }

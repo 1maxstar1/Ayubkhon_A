@@ -468,7 +468,27 @@
       this.pop.style.top = Math.max(edge, down ? r.bottom + gap : r.top - gap - hh) + 'px';
     },
 
-    /** One line of the popover (S.refs.view gives every text; nothing here reads an internal field). */
+    /**
+     * The documents behind a line that printed their prices with VAT (E12b, owner 2026-11-13): the package carries
+     * every price without VAT, so the line says it was divided — for one document, or how many of a median's.
+     */
+    vatNote: function (l, ctx) {
+      var src = (ctx && ctx.sources) || {};
+      var vatOf = function (id) { return !!(id && src[id] && src[id].vat === true); };
+      if (l.summary && l.components && l.components.length) {
+        var all = {}, n = 0, m = 0;
+        l.components.forEach(function (c) { if (c.src && !all[c.src]) { all[c.src] = 1; m++; if (vatOf(c.src)) n++; } });
+        if (!n) return '';
+        return n === m ? (m === 1 ? 'в документе цена с НДС — здесь без НДС' : 'во всех документах цены с НДС — здесь без НДС')
+          : 'в ' + n + ' из ' + m + ' документов цены с НДС — здесь без НДС';
+      }
+      return vatOf(l.src) ? 'в документе цена с НДС — здесь без НДС' : '';
+    },
+
+    /**
+     * One line of the popover. S.refs.view gives every text; the one thing read here beside it is whether the
+     * document printed its prices with VAT (`sources[id].vat`, see vatNote).
+     */
     lineHtml: function (l, i, ctx) {
       var v = S.refs.view(l, ctx);
       var near = !!NEAR[l.tier];
@@ -485,6 +505,8 @@
       var basis = l.summary || v.source.indexOf(v.basis) === 0 ? '' : v.basis;
       var conv = [v.conv, basis].filter(function (x) { return x; }).join(' · ');
       if (conv) h += '<div class="rp-conv">' + S.esc(conv) + '</div>';
+      var vat = this.vatNote(l, ctx);
+      if (vat) h += '<div class="rp-vatdoc">' + S.esc(vat) + '</div>';
       if (v.vsSmeta) h += '<div class="rp-vs">' + S.esc(v.vsSmeta) + '</div>';
       if (v.components.length) {
         h += '<button class="link rp-fold" data-fold="' + i + '">▸ документы (' + v.components.length + ')</button>' +

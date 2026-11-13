@@ -320,6 +320,7 @@ src/
     contragent-prices.js  shu kontragentning oldingi narxlari bitta ro'yxatda (F1)
     journal.js, learning-admin.js  o'rganish uchun yozuvlar: qarorlar jurnali, «Завершить» oynasi, admin sonlari
     memory.js         xotira ekranda: «пам.» tegi, «ранее принято» belgisi (qoidalari — lib/memory.js)
+    dataset-admin.js  admin: «Набор для обучения» — yakunlangan narxlar qayta so'raladi, bugungi takliflar o'lchanadi
     compare.js, registry.js, auth.js, admin.js, *-admin.js
 server/
   pb_schema.json, pb_hooks/  PocketBase sxemasi va server qoidalari
@@ -678,6 +679,13 @@ yozib boriladi; ekran, takliflar va narxlar bundan **o'zgarmaydi**:
   birinchi, pudratchi qabul qilgani oldinda), «Применить» bilan qo'yiladi; smeta narxi yonida «✓» — kamida ikki
   mustaqil arizada shu narxgacha qabul qilingan, «▲» — undan baland. «Память» kaliti hammasini o'chiradi. Qoidalar —
   `src/lib/memory.js`; testlar — `node test/memory.cjs`, `node test/e2e-memory.mjs`.
+
+* **«Набор для обучения» (v2.13.0):** admin sahifasi → «Обучение» → «Собрать и измерить». Har bir yakunlangan narx
+  o'z arizasi sanasida spravochnikdan qayta so'raladi va bugungi taklif ekspert qarori bilan solishtiriladi
+  (`src/lib/ml/`: `features.js` — qator belgilari, smeta narxisiz; `metrics.js` — o'lchovlar; `dataset.js` —
+  belgilash, bo'lish, bugungi qoidalar o'lchovi). Hisob brauzerda, spravochnik worker'ida; ekranda va «Скопировать
+  числа» da faqat sonlar. «Сохранить набор в файл» — dataset (belgilar va belgilar, nom va narxsiz); u repoga
+  tushmaydi. Takliflarning o'zi bundan o'zgarmaydi. Testlar — `node test/ml.cjs`, `node test/e2e-dataset.mjs`.
 
 Yozish faqat server yo'llari orqali (`server/pb_hooks/learning.pb.js`); jurnal yozilmay qolsa ish to'xtamaydi.
 Test: `node test/learning.mjs`.

@@ -1,9 +1,64 @@
 # O'zi o'rganadigan takliflar — ish rejasi (AI ranker)
 
-Holati: **0-, 1- va 2-bosqich bajarildi (2026-11-13; v2.11.0 va v2.12.0 — ro'yxatsiz relizlar: egasi sinagach
-`--list`).** 1-bosqich: qarorlar jurnali (`suggest_events`) va yakunlangan narxlar xotirasi (`price_memory`) — faqat
-yozish. 2-bosqich: xotira ekranda («пам.» tegi, «ранее принято» / «выше принятого» belgisi, «Память» kaliti).
-Keyingisi — 3-bosqich (qayta o'ynatish datasetı va `p3` baseline), undan keyin **darvoza 1**: egasining sonlari.
+Holati: **0-, 1-, 2- va 3-bosqich bajarildi (2026-11-13; v2.11.0, v2.12.0 va v2.13.0 — ro'yxatsiz relizlar:
+egasi sinagach `--list`). Hozir — DARVOZA 1 da to'xtalgan:** 4-bosqich (modellar) boshlanishidan oldin egasining
+haqiqiy ma'lumotidagi sonlari kerak (pastda §7: nima bosiladi va qaysi qatorlar yuboriladi). 1-bosqich: qarorlar
+jurnali (`suggest_events`) va yakunlangan narxlar xotirasi (`price_memory`) — faqat yozish. 2-bosqich: xotira
+ekranda («пам.» tegi, «ранее принято» / «выше принятого» belgisi, «Память» kaliti). 3-bosqich: qayta o'ynatish
+dataseti, metrikalar va bugungi qoidalarning (`p3`) o'lchovi — admin sahifasida.
+
+**Keyingi sessiya uchun — qayerdan davom etiladi:** egasi §7 dagi sonlarni yuborgach, ularga qarab 4-bosqich
+(`src/lib/ml/{logreg,mlp,calib}.js`, tajribalar jadvali) boshlanadi. Sonlar kelmaguncha model kodi yozilmaydi:
+qaysi model kerakligi (yoki umuman kerak emasligi) savollar soniga va `p3` ning hozirgi aniqligiga bog'liq.
+
+**3-bosqichda aslida nima qilindi:**
+
+- `src/lib/ml/features.js` — bitta taklif qatorining 62 ta belgisi (sxema xeshi bilan): moslik darajasi va usuli,
+  viloyat, narx yoshi, asos, bayroqlar, qator ortidagi yozuvlar, **shu savolning boshqa qatorlari orasidagi o'rni**
+  (faqat ularning narxlari bo'yicha) va ekrandagi o'rni. Smeta narxi o'qilmaydi — savolning o'zida u yo'q; test
+  buni ikki xil smeta narxida bir xil belgilar chiqishi bilan tekshiradi. Ekrandagi o'rin faqat o'qitish uchun:
+  modeldan so'ralganda har bir qator «birinchi o'rinda» deb beriladi (`neutral`).
+- `src/lib/ml/metrics.js` — Precision@1, Recall@3, MRR, «hech biri to'g'ri emas» savollarida sukut aniqligi,
+  ishonch xatosi (ECE), narxning median nisbiy xatosi, bootstrap ishonch oralig'i (urug'li generator — har safar
+  bir xil). O'lchanadigan narsa bo'lmasa — `null`, 0 emas.
+- `src/lib/ml/dataset.js` — har bir yakunlangan narx o'z arizasi sanasida spravochnikdan qayta so'raladi
+  (`gather(q)` — darvozadan o'tgan barcha nomzodlar; `choose` — bugungi tartib) va ekspert qaroriga qarab
+  belgilanadi:
+  | Tur | Qachon | Belgilar |
+  |---|---|---|
+  | `ref` | narx spravochnikdan «Применить» bilan olingan | o'sha qator 1, qolganlari 0; «медиана N строк» olingan bo'lsa — uning har bir qatori 0,5 |
+  | `near` | narx qo'lda yozilgan (yoki boshqa manbadan) va biror qatordan 2 % ichida | o'sha qator 0,5, qolganlari 0; savol og'irligi 0,5 |
+  | `none` | narx qo'lda yozilgan, hech bir qator yaqin emas | «hech biri to'g'ri emas» — model sukut qilishni o'rganadi |
+  | `left` | smeta narxi qoldirilgan, lekin undan past qator bor edi | past qatorlar 0, qolganlari baholanmaydi (−1); og'irlik: «проверено» 1, shunchaki qoldirilgan 0,5 |
+  | tashlab ketiladi | `above` (qoldirilgan, barcha qatorlar smeta narxidan yuqori yoki 2 % ichida), `pct` («Применить %»), `zeroed`, `empty` (spravochnikda qator yo'q), `lost` (qo'llangan yozuv bugungi paketda yo'q) | sanaladi, o'qitilmaydi |
+- Bo'lish: arizalar bo'yicha va vaqt bo'yicha — eng yangi beshdan biri **test qismi**, unda hech narsa
+  o'qitilmaydi (2–7 arizada bitta, 8–12 da ikkita; bitta arizada test qismi yo'q). Qo'lda belgilangan
+  «проверочный список» alohida turadi. Nom «ko'rilgan» — o'quv qismidagi ariza ham shu nomni so'ragan bo'lsa.
+- `p3` o'lchovi (tajribalar jadvalining 1-qatori): bugungi tartib o'sha savollarda. `p3` hech qachon sukut
+  qilmaydi va o'z ishonchini aytmaydi — ishonchi sifatida «shu darajadagi birinchi qator o'quv qismida necha marta
+  to'g'ri chiqqan» olinadi. Ekranda «медиана» qatori ichiga yig'ilgan hujjatlar undan keyingi o'rinlarda sanaladi.
+- `evaluate(ds, score)` — istalgan boshqa tartib xuddi shu savollarda, xuddi shu metrikalar bilan (4-bosqich
+  shundan foydalanadi). Daraja tartibi shu yerda ham saqlanadi: baho qanday bo'lmasin, «Похожий» / «Оценка» qatori
+  «Документ» / «Ставка по таблице» dan yuqoriga chiqmaydi; baho faqat darvozadan o'tgan qatorlarni tartiblaydi.
+- Worker: `src/refs-worker.js` ga `replay` va `dataset` buyruqlari (dvigatel faqat o'qiladi; `src/lib/refs/**`
+  ga tegilmagan — o'lchov muhri o'zgarmadi). Admin: «Обучение» → «Набор для обучения» (`src/ui/dataset-admin.js`):
+  «Собрать и измерить», «Скопировать числа», «Сохранить набор в файл», «Проверочный список…». Hisob shu brauzerda;
+  serverga hech narsa yozilmaydi (test so'rovlarni sanaydi).
+- Sintetik dunyo (`test/ml-synth.cjs`): o'ylab topilgan paket va **yashirin afzalligi bor soxta ekspert** (o'z
+  viloyati, eng yangi narx, «declared» ga ishonmaydi; 5 % shovqin). `test/ml.cjs` tekshiradi: metrikalar qo'lda
+  hisoblangan misollarga teng; belgilar chegarada; har bir tur to'g'ri belgilanadi; dataset qurilgach dvigatel
+  javoblari **bayt-bayt** o'zgarmaydi; yashirin afzallik bo'yicha tartib `p3` dan ancha aniq, teskarisi — ancha
+  yomon. `test/e2e-dataset.mjs` — xuddi shu sonlar haqiqiy brauzerda, admin sahifasida.
+
+**3-bosqichda ishlatilgan qiymatlar (egasi o'zgartirishi mumkin):** yaqinlik chegarasi 2 % (brifdan); `left`
+turi — brifda aniq yozilmagan holat (qoldirilgan, lekin pastroq qator bor edi): «hech biri olinmadi» deb, yarim
+og'irlik bilan hisoblanadi; boshqa manbadan (xotira, UZEX, «Прежние проекты») olingan narx — qo'lda yozilgan
+kabi; ekrandagi o'rin jurnaldan emas, qayta hisoblangan bugungi tartibdan olinadi (jurnal faqat v2.11.0 dan beri
+bor, tartib esa aniq qayta tiklanadi).
+
+**3-bosqichda qilinmagan / o'lchanmagan:** haqiqiy ma'lumotda hech narsa — sonlar egasidan kutiladi; jurnal
+(`suggest_events`) bilan solishtirish (ekspert oynani ochganmi, aynan nima ko'rgan) — 4-bosqichda kerak bo'lsa;
+katta bazada (minglab yakunlangan narx) hisob vaqti — sintetikada 450 savol 1 soniyadan kam.
 
 **2-bosqichda aslida nima qilindi:**
 
@@ -145,7 +200,7 @@ O'rin: ekrandagi o'rni (o'qitishda belgi, bashoratda o'zgarmas qiymat — o'rin 
 | 0 | O'qish, tekshirish, reja | `docs/ai-reja.md` | ✓ shu hujjat |
 | 1 ✓ v2.11.0 | Jurnal + xotira (faqat yozish), «Завершить» oynasi, «Обучение» paneli (faqat sonlar), `release.sh --unlisted` | yangi `src/ui/journal.js`, `src/ui/learning-admin.js`, `server/pb_schema.json`, `server/pb_hooks/learning.pb.js`, `src/ui/sync.js` (`finish`) | `test/learning.mjs`: qo'llash/yozish/qaytarish/yakunlash to'g'ri qatorlar qoldiradi |
 | 2 ✓ v2.12.0 | Xotira ekranda (ustuvorlik, «ранее принято», eskirish, o'zini tasdiqlashga qarshi himoya, o'chirish kaliti) | yangi `src/lib/memory.js`, `src/ui/memory.js` | `test/memory.cjs`, `test/e2e-memory.mjs` |
-| 3 | Qayta o'ynatish datasetı, metrikalar, `p3` baseline | `src/lib/ml/{features,metrics,dataset}.js`, worker buyrug'i | **darvoza 1:** egasining sonlari |
+| 3 ✓ v2.13.0 | Qayta o'ynatish dataseti, metrikalar, `p3` o'lchovi, admin «Набор для обучения» | yangi `src/lib/ml/{features,metrics,dataset}.js`, `src/ui/dataset-admin.js`; `src/refs-worker.js` (`replay`) | `test/ml.cjs`, `test/e2e-dataset.mjs`; **darvoza 1:** egasining sonlari (§7) |
 | 4 | Modellar (logistik regressiya, juftlab; MLP; kalibrlash) | `src/lib/ml/{logreg,mlp,calib}.js` | tajribalar jadvali |
 | 5 | Dasturda: soya rejimi → (egasi rozi bo'lsa) yoqish | `src/lib/ml/rank.js` | **darvoza 2** |
 | 6 | O'zini yangilash (chempion/da'vogar, qaytarish, kuzatuv) | admin paneli | yomon da'vogar rad etiladi |
@@ -178,12 +233,23 @@ Har bosqich — reliz; `releases.txt` ga faqat egasi sinagach (**darvoza 3**).
 | «Прежние проекты» va «пам.» bitta oynaga birlashtirilsinmi? | Yo'q — ikkalasi alohida turadi |
 | «Применить %» bilan qo'yilgan narx xotirada taklif bo'lsinmi? | Yo'q — u aniq bozor narxi emas |
 | «✓ ранее принято» belgisi ko'p qatorda chiqsa xalaqit beradimi? | Ko'rsatiladi; «Память» kaliti bilan o'chiriladi |
+| Smeta narxi qoldirilgan, lekin spravochnikda undan past qator bor edi — bu «taklif rad etildi» deganimi? | Ha, yarim og'irlik bilan (`left`); «проверено» belgisi bo'lsa — to'liq |
+| Qo'lda yozgan narxingiz spravochnik qatoridan necha foiz ichida bo'lsa «o'sha qator» hisoblansin? | 2 % |
+| Qo'lda belgilangan «проверочный список» tuzasizmi (50–100 ta resurs: nom, birlik, viloyat, sana, to'g'ri narx)? | Majburiy emas; bo'lsa — eng ishonchli o'lchov |
 
-## 7. Egasi o'z kompyuterida qiladigan ish (1-bosqichdan keyin)
+## 7. Egasi o'z kompyuterida qiladigan ish (darvoza 1)
 
-1. Mac'ni yangilash: `cd ~/Smeta && sh server/laptop.sh update`, brauzerda Cmd+Shift+R — sarlavhada v2.11.0.
-2. 2–3 ta haqiqiy arizada odatdagidek ishlash va «✓ Завершить» bosish (oynani o'qib, tasdiqlash). Avval
-   yakunlangan arizalarni «Вернуть в работу» → «✓ Завершить» qilib xotiraga yozish ham mumkin.
-3. Admin sahifasi (`http://127.0.0.1:8090/admin.html`) → «Обучение» → «Скопировать числа» → matnni yuborish.
-   Unda faqat sonlar bor.
-4. Hammasi joyida bo'lsa aytish — shundan keyin `sh server/release.sh --list 2.11.0` (Windows o'zi o'rnatadi).
+1. Mac'ni yangilash: `cd ~/Smeta && sh server/laptop.sh update`, brauzerda Cmd+Shift+R — sarlavhada **v2.13.0**.
+2. Haqiqiy arizalarda odatdagidek ishlash va har birida «✓ Завершить» bosish (oynani o'qib, tasdiqlash). Avval
+   yakunlangan arizalarni «Вернуть в работу» → «✓ Завершить» qilib xotiraga yozish ham mumkin. Qancha ko'p ariza
+   bo'lsa, sonlar shuncha ishonchli: test qismi paydo bo'lishi uchun kamida 2 ta, ma'noli o'lchov uchun 5+ ta.
+3. Admin sahifasi (`http://127.0.0.1:8090/admin.html`) → «Обучение»:
+   - yuqoridagi «Скопировать числа» (nechta qaror va narx to'plangani);
+   - pastdagi «Набор для обучения» → **«Собрать и измерить»** → tugagach **«Скопировать числа»**.
+   Ikkala matnni yuborish. Ularda faqat kalit va sonlar bor — nom, narx, hujjat yo'q (`schema = …`, `rows = …`,
+   `queries.ref = …`, `p3.test.p1 = …`, `lift.same_region = …` kabi qatorlar).
+4. Hammasi joyida bo'lsa aytish — shundan keyin `sh server/release.sh --list 2.11.0`, `--list 2.12.0`,
+   `--list 2.13.0` (Windows o'zi o'rnatadi).
+
+Sonlarga qarab hal qilinadi: `queries.ref` + `queries.near` yuzlab bo'lsa — logistik regressiya va kichik MLP
+sinaladi; o'nlab bo'lsa — faqat eng sodda model yoki hech qanday (xotira va `p3` qoladi), ma'lumot yig'ilguncha.

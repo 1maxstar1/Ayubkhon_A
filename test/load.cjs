@@ -93,6 +93,12 @@ const ORDER = ['fflate', 'xlsx', 'normalize', 'match', 'sections', 'regions', 'u
 // (added on lines of their own: the lines above that name the reference-price files are read by that work's
 // measurement, and stay as they are)
 ORDER.push('memory');
+// learning from the expert (docs/ai-reja.md, phase 3): what a line looks like to a model, the metrics, the dataset
+FILE['ml-features'] = 'src/lib/ml/features.js';
+FILE['ml-metrics'] = 'src/lib/ml/metrics.js';
+FILE['ml-dataset'] = 'src/lib/ml/dataset.js';
+const ML = ['ml-features', 'ml-metrics', 'ml-dataset'];
+ORDER.push(...ML);
 
 /** Everything needed to read a workbook and build the comparison document. */
 const PIPELINE = ['fflate', 'normalize', 'match', 'sections', 'util', 'formula',
@@ -127,6 +133,7 @@ load.CORE = CORE;
 load.PIPELINE = PIPELINE;
 load.REGISTRY = REGISTRY;
 load.REFS = REFS;
+load.ML = ML;
 load.ROOT = ROOT;
 load.FILE = FILE;
 

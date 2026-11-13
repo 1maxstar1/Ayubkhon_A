@@ -103,7 +103,12 @@ const REFS_WORKER_LIBS = [
   'src/lib/refs/retrieve.js',
   'src/lib/refs/suggest.js',
   'src/lib/refs/cache.js',
-];
+  // learning from the expert (docs/ai-reja.md): what a line looks like to a model, the metrics, and the dataset the
+  // admin page asks this worker to build — beside the engine, which they only read
+  'src/lib/ml/features.js',
+  'src/lib/ml/metrics.js',
+  'src/lib/ml/dataset.js',
+].filter((p) => existsSync(join(root, p)));
 // Everything a derived pool record depends on. Its hash is the stamp the worker's IndexedDB cache is kept under, so a
 // release that changes how keys are derived derives them again by itself, once.
 const REFS_KEYS_FILES = [
@@ -161,12 +166,17 @@ function build() {
       .replace('/*__VERSION__*/', () => VERSION)
       .replace('/*__CSS__*/', () => read('src/app.css'))
       .replace('<!--__SCREENS__-->', () => read('src/screens.html'))
+      // «Обучение» builds its dataset in the reference worker — the same one the working page starts
+      .replace(/<script>window\.__REFS_WORKER_SRC__ = \/\*__REFS_WORKER__\*\/;<\/script>\n?/, () => {
+        const refs = refsWorkerSrc();
+        return refs ? '<script>window.__REFS_WORKER_SRC__ = ' + JSON.stringify(refs) + ';</script>\n' : '';
+      })
       // the reference-price importer checks a package in the browser before it uploads it: fflate when the browser
       // has no DecompressionStream, the package format and its validator, and the Russian document labels
       .replace('/*__JS__*/', () => ['src/vendor/pocketbase.umd.js', 'src/vendor/xlsx.full.min.js', 'src/vendor/fflate.umd.js',
         'src/lib/normalize.js', 'src/lib/match.js', 'src/lib/util.js', 'src/lib/pb.js', 'src/lib/regions.js', 'src/lib/registry-parse.js',
         'src/lib/refs/package.js', 'src/lib/refs/view.js',
-        'src/ui/auth.js', 'src/ui/apps-admin.js', 'src/ui/admin.js', 'src/ui/refs-admin.js', 'src/ui/uzex-admin.js', 'src/ui/learning-admin.js', 'src/ui/version.js']
+        'src/ui/auth.js', 'src/ui/apps-admin.js', 'src/ui/admin.js', 'src/ui/refs-admin.js', 'src/ui/uzex-admin.js', 'src/ui/learning-admin.js', 'src/ui/dataset-admin.js', 'src/ui/version.js']
         .filter((p) => existsSync(join(root, p))).map(read).join('\n;\n'));
     emit('admin.html', admin);
   }

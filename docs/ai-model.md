@@ -53,3 +53,57 @@ baribir siz qo'yasiz.
 
 Admin sahifasi → «Обучение»: faqat sonlar (nom va narx yo'q). «Скопировать числа» shu sonlarni matn qilib beradi —
 uni dasturchiga yuborish xavfsiz.
+
+## Hozirgi takliflar qanchalik to'g'ri — «Набор для обучения»
+
+Admin sahifasi → «Обучение» → **«Собрать и измерить»**. Dastur yakunlangan arizalaringizdagi har bir narxni
+spravochnikdan qaytadan so'raydi — o'sha arizaning sanasida — va bugun nima taklif qilishini siz o'shanda nima
+qilganingiz bilan solishtiradi. Hisob shu brauzerda bajariladi; hech narsa tashqariga ketmaydi va bazaga
+yozilmaydi.
+
+Har bir narx to'rt turdan biriga tushadi:
+
+| Siz nima qilgansiz | Dastur buni qanday tushunadi |
+|---|---|
+| Spravochnik qatorini «Применить» bilan olgansiz | o'sha qator — to'g'ri javob |
+| Narxni qo'lda yozgansiz va u biror qatordan 2 % ichida | o'sha qator — «deyarli to'g'ri» javob |
+| Narxni qo'lda yozgansiz, hech bir qator yaqin emas | «hech biri to'g'ri emas» — bunday paytda jim turish kerak |
+| Smeta narxini qoldirgansiz, garchi pastroq qator bor edi | hech biri olinmagan (kuchsizroq dalil) |
+
+Hisobga kirmaydi: smeta narxi qoldirilgan va barcha qatorlar undan yuqori bo'lgan resurslar (taklif rad etilmagan —
+shunchaki kerak bo'lmagan), «Применить %» narxlari, nolga tushirilgan resurslar, spravochnikda umuman topilmagan
+resurslar.
+
+Sonlar nimani anglatadi:
+
+- **«первая строка — та, что выбрал эксперт»** — dastur birinchi qilib ko'rsatgan qator siz tanlagan qator bo'lgan
+  savollar ulushi. Kvadrat qavsdagi ikki son — ishonch oralig'i: savollar kam bo'lsa u keng bo'ladi.
+- **«правильная строка среди первых трёх»** — to'g'ri qator birinchi uchtalikda bo'lgan ulush.
+- **«программа промолчала…»** — hech bir qator to'g'ri kelmaganda dastur jim turgan ulush. Bugungi qoidalar hech
+  qachon jim turmaydi, shuning uchun hozir bu 0 — model aynan shuni o'rganishi kerak.
+- **«медианное расхождение…»** — birinchi qator narxi siz qo'ygan narxdan o'rtacha necha foiz farq qilgani.
+- **«проверочная часть»** — eng yangi arizalarning beshdan biri. Ularda hech narsa o'qitilmaydi: model keyin
+  aynan shularda sinaladi, shunda u «yodlab olgan»ini emas, haqiqatan o'rganganini ko'ramiz.
+
+**«Скопировать числа»** — shu sonlar matn ko'rinishida (kalit = son). Nom, narx, hujjat yo'q; dasturchiga
+yuborish xavfsiz. **«Сохранить набор в файл»** — datasetning o'zi (`….dataset.json`): har bir qator uchun 62 ta son
+(belgilar) va belgi; nom, birlik, narx va hujjat unda ham yo'q. Faylni o'zingizda saqlang — dastur papkasiga
+qo'ymang.
+
+**«Проверочный список…»** — majburiy emas. O'zingiz qo'lda tuzgan ro'yxat: Excel jadvali (ustunlar:
+`Наименование`, `Ед. изм.`, `Регион`, `Дата`, `Цена`) yoki JSON. U shu brauzerda saqlanadi, alohida o'lchanadi va
+unda hech qachon hech narsa o'qitilmaydi — eng halol imtihon.
+
+### Dataset fayli (format `smeta-ml-dataset`, 1-versiya)
+
+```
+{ "format": "smeta-ml-dataset", "version": 1,
+  "schema": { "hash": "f1-…", "names": ["t_exact", …] },    // belgilar sxemasi; boshqa sxemadagi model yuklanmaydi
+  "package_id": "…", "built": "…", "near": 0.02, "rows": N,
+  "apps": [{ "id": "…", "finished": "YYYY-MM-DD", "region": "…", "split": "train|test|gold", "n": N }],
+  "queries": [{ "a": ariza raqami, "kind": "ref|near|none|left", "w": og'irlik, "acc": pudratchi qabul qilganmi,
+                "sec": bo'lim, "k": nom kalitining xeshi, "seen": 0|1,
+                "x": [[62 son] …],  "y": [1 | 0.5 | 0 | -1 …],  "tiers": [daraja …],
+                "base": { "y": [bugungi tartibdagi belgilar], "tier": birinchi qator darajasi, "rel": narx xatosi } }],
+  "skipped": { "above": N, "pct": N, "zeroed": N, "empty": N, "empty_corrected": N, "lost": N } }
+```

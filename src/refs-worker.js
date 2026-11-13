@@ -9,11 +9,18 @@
  *   page → worker   { cmd: 'open', pkgs: [{ id, package_id, sha256, url, records }] }      url: absolute (blob worker)
  *                   { cmd: 'suggest', batch, ctx: { region, asof }, items: [{ k, name, unit, section, mk }] }
  *                   { cmd: 'forget' }                                                     delete the cache (sign-out)
+ *                   { cmd: 'replay', rows: [price_memory…], gold: […], now }              admin page: every finished
+ *                     price asked again (S.ml.dataset, docs/ai-reja.md phase 3)
+ *                   { cmd: 'dataset' }                                                    the dataset of the last replay
  *   worker → page   { type: 'progress', phase: 'cache'|'download'|'unpack'|'check'|'derive'|'store'|'index', done, total }
  *                   { type: 'ready', package_id, records, skipped, cached, ms, sources: { id: { doc_type, issuer,
  *                     doc_no, issue_date, as_of_date, region, vat } } }   vat: the document printed its prices with
  *                     VAT and the package carries them divided by it (vat_default === true; owner, 2026-11-13)
  *                   { type: 'results', batch, items: [{ k, lines }] }
+ *                   { type: 'replay-progress', done, total }
+ *                   { type: 'replay', summary: [[key, value]…], ms } | { type: 'replay', error }   counts and metrics
+ *                     only — never a name or a price
+ *                   { type: 'dataset', dataset | null }                                   feature numbers and labels
  *                   { type: 'error', phase, message }                                     Russian, never a value
  *
  * The derived pool is cached in IndexedDB (`smeta-refs`, store `pool`, key `current`) under the stamp of the
@@ -29,7 +36,7 @@
   var DB = 'smeta-refs', STORE = 'pool', KEY = 'current';
   var POLICY = 'p3';
 
-  var st = { ready: false, failed: false, sug: null, cache: new Map(), queue: [] };
+  var st = { ready: false, failed: false, sug: null, cache: new Map(), queue: [], pkg: null, ds: null };
 
   function post(m) { self.postMessage(m); }
   var lastPct = {};
@@ -219,13 +226,14 @@
       var sug = R.create({ policy: POLICY });
       sug.init({ handle: h, sources: got.sources });
       st.sug = sug;
+      st.pkg = p.package_id;
       st.ready = true;
       progress('index', 1, 1);
       post({ type: 'ready', package_id: p.package_id, records: got.recs.length, skipped: got.skipped, cached: !!cached,
         ms: Date.now() - t0, sources: sourcesFor(got.sources) });
       var q = st.queue;
       st.queue = [];
-      for (var i = 0; i < q.length; i++) suggest(q[i]);
+      for (var i = 0; i < q.length; i++) run(q[i]);
     }).catch(function (e) {
       if (db) { try { db.close(); } catch (x) { /* already closed */ } db = null; }
       fail(phase, (e && /[А-Яа-я]/.test(e.message || '')) ? e.message : 'Справочник не подготовлен (' + phase + ')');
@@ -260,10 +268,36 @@
     post({ type: 'results', batch: msg.batch, items: out });
   }
 
+  /* ------------------------------------------------------------------ learning (docs/ai-reja.md, phase 3) */
+  /**
+   * Every finished price asked again, as of its application's date, and compared with what the expert decided. The
+   * suggester is only read (gather, choose) — what the working page is answered does not change. The dataset stays
+   * here; the page gets counts and metrics.
+   */
+  function replay(msg) {
+    if (st.failed || !S.ml || !S.ml.dataset) { post({ type: 'replay', error: 'Справочник не подготовлен' }); return; }
+    if (!st.ready) { st.queue.push(msg); return; }
+    var t0 = Date.now();
+    try {
+      st.ds = null;
+      var ds = S.ml.dataset.build(st.sug, msg.rows || [], { package_id: st.pkg, gold: msg.gold || [], now: msg.now || null,
+        progress: function (d, n) { post({ type: 'replay-progress', done: d, total: n }); } });
+      var summary = S.ml.dataset.summary(ds, { n: 500 });
+      st.ds = ds;
+      post({ type: 'replay', summary: summary, ms: Date.now() - t0 });
+    } catch (e) { post({ type: 'replay', error: 'Набор не собран' }); }
+  }
+
+  function run(m) {
+    if (m.cmd === 'suggest') suggest(m);
+    else if (m.cmd === 'replay') replay(m);
+  }
+
   self.onmessage = function (e) {
     var m = e.data || {};
     if (m.cmd === 'open') open(m);
-    else if (m.cmd === 'suggest') suggest(m);
-    else if (m.cmd === 'forget') { forget(); st.cache = new Map(); }
+    else if (m.cmd === 'suggest' || m.cmd === 'replay') run(m);
+    else if (m.cmd === 'dataset') post({ type: 'dataset', dataset: st.ds });
+    else if (m.cmd === 'forget') { forget(); st.cache = new Map(); st.ds = null; }
   };
 })();

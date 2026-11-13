@@ -112,6 +112,7 @@ run export-formulas  node test/export-formulas.cjs
 run worker-parity    node test/worker-parity.cjs
 run uzex             node test/uzex.cjs
 run memory          node test/memory.cjs
+run ml              node test/ml.cjs
 run sections         node test/sections.cjs
 run regions          node test/regions.cjs
 run refs             node test/refs.cjs
@@ -183,6 +184,7 @@ browser_run e2e-hints    node test/e2e-hints.mjs "$S1"
 browser_run contragent-prices node test/contragent-prices.mjs
 browser_run learning     node test/learning.mjs
 browser_run e2e-memory   node test/e2e-memory.mjs
+browser_run e2e-dataset  node test/e2e-dataset.mjs
 if [ -n "$REG" ]; then browser_run e2e-fullregistry node test/e2e-fullregistry.mjs "$REG"; else skip e2e-fullregistry "reyestr fayli berilmagan"; fi
 echo "-----------------------------------"
 # Counted by column rather than by grepping for the word: «\t» is a tab to GNU

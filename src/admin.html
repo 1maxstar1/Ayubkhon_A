@@ -85,6 +85,22 @@
     <button class="btn" type="button" id="learnCopy" title="Скопировать эти числа текстом — их можно отправить разработчику: в них нет ни названий, ни цен">Скопировать числа</button>
     <div class="stat" id="learnStat"></div>
     <table class="tbl" id="learnTable"><thead><tr><th>Что</th><th>Сколько</th></tr></thead><tbody></tbody></table>
+
+    <h3>Набор для обучения и точность нынешних подсказок</h3>
+    <p class="lead">Каждая цена завершённых заявок спрашивается у справочника заново — на дату своей заявки, — и то, что программа
+      предлагает сейчас, сравнивается с тем, что решили вы. Считается в этом браузере, наружу ничего не уходит. Новейшая пятая часть
+      заявок — проверочная: на ней ничего не учится. В числах нет ни названий, ни цен — их можно скопировать и отправить разработчику.</p>
+    <button class="btn primary" type="button" id="dsBuild">Собрать и измерить</button>
+    <button class="btn" type="button" id="dsCopy" disabled title="Скопировать числа текстом: в них нет ни названий, ни цен">Скопировать числа</button>
+    <button class="btn" type="button" id="dsSave" disabled title="Сам набор: числа признаков и отметки, без названий и цен. Храните файл у себя — не в папке программы">Сохранить набор в файл</button>
+    <label class="btn" title="Список, размеченный вручную: Наименование · Ед. · Регион · Дата · Цена (таблица или JSON). Хранится в этом браузере, измеряется отдельно, на нём ничего не учится">Проверочный список…
+      <input type="file" id="dsGold" accept=".json,.xlsx,.xls,.csv" hidden></label>
+    <button class="btn" type="button" id="dsGoldDrop" hidden>Убрать проверочный список</button>
+    <div class="progress" id="dsProgress" hidden><div class="bar-fill" style="width:100%"></div><span></span></div>
+    <p class="err" id="dsErr" hidden></p>
+    <div class="stat" id="dsStat"></div>
+    <div class="stat" id="dsGoldStat"></div>
+    <table class="tbl" id="dsTable" hidden><thead><tr><th>Что</th><th>Значение</th></tr></thead><tbody></tbody></table>
   </section>
 
   <section class="panel">
@@ -131,6 +147,7 @@
 <!--__SCREENS__-->
 <div id="toast" class="toast"></div>
 
+<script>window.__REFS_WORKER_SRC__ = /*__REFS_WORKER__*/;</script>
 <script>/*__JS__*/</script>
 </body>
 </html>

@@ -50,6 +50,7 @@ node test/contragent-prices.mjs                       # «Цены этого к
 node test/learning.mjs                                # o'rganish uchun yozuvlar: qarorlar jurnali, «Завершить» oynasi va narxlar xotirasi
 node test/memory.cjs; node test/e2e-memory.mjs        # xotira ishlatilishi: «пам.» tartibi, «ранее принято» chegarasi (mustaqil arizalar, yosh), kalit
 node test/ml.cjs; node test/e2e-dataset.mjs           # o'rganish: belgilar (smeta narxisiz), metrikalar, dataset va bugungi qoidalar o'lchovi; admin «Набор для обучения»
+node test/ml-price.cjs                                # narx modeli: dalillar (oldingi arizalar, spravochnik), yo'qotish va gradient, qaror, sintetik ekspert
 sh server/release.sh X.Y.Z "izoh" --row matn.md --unlisted; sh server/release.sh --list X.Y.Z   # egasi avval sinaydigan reliz: ro'yxatsiz chiqarish, sinalgach ro'yxatga qo'shish
 node test/num.cjs; node test/xlsx-guard.cjs           # son qat'iy o'qiladi («1,234.50» — ha, yonida so'z bo'lsa — yo'q); begona .xlsx o'quvchini osib qo'ymaydi
 node test/normalize.cjs; node test/sections.cjs; node test/regions.cjs   # NLP o'lchovlari
@@ -149,6 +150,12 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   egasining qarori bilan o'zgaradi. Eng yangi arizalarning beshdan biri — test qismi: unda hech narsa o'qitilmaydi,
   hatto ko'z bilan tanlash ham. Belgilar sxemasi (`features.js` `NAMES`) o'zgarsa `VERSION` ko'tariladi — xesh
   o'zgaradi va eski model yuklanmaydi. Admin sahifasi faqat son ko'rsatadi; dataset fayli nom va narxsiz.
+  **Narx modeli** (`src/lib/ml/pricedata.js`, `pricemodel.js`, v2.14.0; egasining qarori 2026-11-13): model ekspertning
+  bozor narxini taxmin qiladi va dastur smeta narxini u bilan solishtiradi. Resursning **o'z smeta narxi hech qachon
+  kirish emas** — u faqat qoldirilgan narxning belgisi («kamida shuncha») va qaror paytidagi solishtirish. Dalil faqat
+  **oldingi** arizalardan (o'z sanasidan avvalgi, shu viloyat). Uch usul (spravochnik, tayanch, model) bir xil test
+  qismida o'lchanadi; eng yaxshisidan bir punkt ichidagilarning eng soddasi tanlanadi; test qismi hech narsani
+  tanlamaydi. Model egasi sonlarni ko'rib rozi bo'lmaguncha ish sahifasida ishlatilmaydi.
 * Raqamlar hech qachon yo'qolmaydi: `АНКЕР М5` ≠ `АНКЕР М8`, `4.1.1` ≠ `4.11`;
   ikki raqam orasidagi ajratgich o'chirilmaydi.
 * **Xavfsizlik bo'limi hozircha o'chirilgan (egasining qarori, 2026-10-24).**

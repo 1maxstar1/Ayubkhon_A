@@ -54,6 +54,36 @@ baribir siz qo'yasiz.
 Admin sahifasi → «Обучение»: faqat sonlar (nom va narx yo'q). «Скопировать числа» shu sonlarni matn qilib beradi —
 uni dasturchiga yuborish xavfsiz.
 
+## Narx modeli («Модель цен») — hozircha faqat o'lchov
+
+«Собрать и измерить» bosilganda dastur **narx modelini** ham o'qitadi va sinaydi. G'oya: har bir resurs uchun
+dastur smeta narxiga qaramasdan «sizning bozor narxingiz» taxminini chiqaradi, keyin smeta narxini u bilan
+solishtiradi — smeta narxi ancha baland bo'lsa, «qimmat» deb belgilaydi va o'z narxini taklif qiladi.
+
+Taxmin nimaga tayanadi (shu tartibda):
+
+1. shu resursga shu viloyatdagi **oldingi** arizalarda o'zingiz qo'ygan narx;
+2. bo'lmasa — spravochnikning birinchi qatori;
+3. bo'lmasa — ilgari siz qabul qilgan (o'zgartirmagan) eng baland smeta narxi.
+
+Hech biri bo'lmasa — taklif ham bo'lmaydi. Model shu tayanchga kichik tuzatish o'rganadi (masalan: «spravochnik
+"Документ" qatoridan odatda biroz past qo'yasiz», «"Похожий" qatoriga kamroq ishonasiz»). O'zgartirmagan narxlaringiz
+ham ishlatiladi: ular «bozor narxi kamida shuncha» degan ma'noni beradi — model ularni behuda «qimmat» demaslikni
+o'rganadi.
+
+Jadvalda uch usul yonma-yon turadi — «по строке справочника», «по прежней цене, иначе по справочнику», «с обученной
+поправкой» — va har biri uchun, **faqat eng yangi arizalarda** (model ularni ko'rmagan):
+
+- **«из отмеченных — действительно снижены экспертом»** — dastur «qimmat» deganlarining nechtasini siz haqiqatan
+  pasaytirgansiz;
+- **«из сниженных экспертом — отмечены»** — siz pasaytirganlarning nechtasini dastur topgan;
+- **«из принятых экспертом цен — отмечены зря»** — siz qabul qilgan narxlarning nechtasini dastur behuda belgilagan;
+- **«медианное расхождение…»** — taklif qilgan narxi siznikidan o'rtacha qancha farq qilgan.
+
+«выбран (1 — да)» — dastur o'zi tanlagan usul: natijasi eng yaxshisidan bir punkt ichida bo'lganlarning eng soddasi.
+Model hozircha **ish sahifasida ishlatilmaydi**: avval shu sonlarni ko'rasiz, rozi bo'lsangiz — keyingi versiyada
+takliflar ekranga chiqadi (narx baribir faqat «Применить» bilan qo'yiladi).
+
 ## Eski arizalarni qo'shish
 
 Ilgari ishlangan arizani xotiraga qo'shish mumkin: arizani oching, o'sha smetani yuklang, «Сравнение версий» da

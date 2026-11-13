@@ -37,6 +37,20 @@
     'section.labor': 'Раздел: труд', 'section.machines': 'Раздел: машины', 'section.transport': 'Раздел: перевозка', 'section.materials': 'Раздел: материалы', 'section.equipment': 'Раздел: оборудование',
     'lines.median': 'Строк на вопрос (медиана)', 'lines.max': 'Строк на вопрос (наибольшее)', 'p3.conf_from': 'Уверенность оценена по', 'p3.rank': 'Место правильной строки: 1 2 3 4 5 6'
   };
+  /* the price model: what is proposed for a resource, three ways, measured on the newest applications */
+  var PRICE = { 'price.schema': 'схема признаков', 'price.rows': 'цен завершённых заявок', 'price.applications': 'заявок', 'price.applications.test': 'заявок в проверочной части',
+    'price.items': 'ресурсов, о которых что-то известно заранее', 'price.items.corrected': '— цена снижена экспертом', 'price.items.accepted': '— сметная цена принята',
+    'price.anchor.memory': 'опора: ваша прежняя цена этого ресурса', 'price.anchor.reference': 'опора: строка справочника', 'price.anchor.accepted': 'опора: ранее принятая сметная цена',
+    'price.skipped.struck': 'не вошло: ресурс обнулён', 'price.skipped.pct': 'не вошло: «Применить %»', 'price.skipped.nodate': 'не вошло: нет даты заявки',
+    'price.skipped.noevidence': 'не вошло: о ресурсе ничего не известно (нет ни прежних цен, ни строки справочника)',
+    'price.skipped.noevidence_price': '— из них: цена была снижена', 'price.skipped.noevidence_price_other_region': '— — из них: прежняя цена есть в другом регионе',
+    'price.validation': 'подбор порога', 'price.model.steps': 'шагов обучения' };
+  var PBY = { mem: 'ваша прежняя цена', ref: 'строка справочника', acc: 'ранее принятая сметная цена' };
+  var PWAY = { ref: 'по строке справочника', anchor: 'по прежней цене, иначе по справочнику', model: 'с обученной поправкой' };
+  var PMET = { tau: 'порог: сметная цена выше предложенной более чем на (доля)', selected: 'выбран (1 — да)', n: 'ресурсов в проверочной части',
+    lowered: 'из них снижено экспертом', flagged: 'отмечено программой как завышенные', precision: 'из отмеченных — действительно снижены экспертом',
+    recall: 'из сниженных экспертом — отмечены', alarm: 'из принятых экспертом цен — отмечены зря', coverage: 'из сниженных — для скольких есть предложение',
+    price_err: 'медианное расхождение предложенной цены с ценой эксперта' };
   var TIER = { '0': '«Ставка по таблице»', '1': '«Документ»', '1.5': '«Оценка»', '2': '«Похожий»', '2.5': '«Похожий» (другая единица)' };
   var SPLIT = { train: 'учебная часть', test: 'проверочная часть', gold: 'проверочный список' };
   function labelOf(k) {
@@ -47,6 +61,11 @@
     if (m && PART[m[1]] && METRIC[m[2]]) return 'Сейчас · ' + PART[m[1]] + ' · ' + METRIC[m[2]];
     m = /^queries\.[a-z]+\.([a-z]+)$/.exec(k);
     if (m && SPLIT[m[1]]) return '— — ' + SPLIT[m[1]];
+    if (PRICE[k]) return 'Модель цен · ' + PRICE[k];
+    m = /^price\.(ref|anchor|model)\.(?:test\.)?([a-z_]+)$/.exec(k);
+    if (m && PWAY[m[1]] && PMET[m[2]]) return 'Модель цен · ' + PWAY[m[1]] + ' · ' + PMET[m[2]];
+    m = /^price\.(anchor|model)\.by_(mem|ref|acc)$/.exec(k);
+    if (m) return 'Модель цен · ' + PWAY[m[1]] + ' · отдельно, когда опора — ' + PBY[m[2]];
     return 'Прочее: ' + k;
   }
 
@@ -169,7 +188,8 @@
       return this.ready;
     },
     onMessage: function (m) {
-      if (m.type === 'replay-progress') this.progress('Спрашиваем справочник: ' + m.done + ' из ' + m.total, m.total ? m.done / m.total * 100 : null);
+      if (m.type === 'replay-progress' && m.phase === 'model') this.progress('Обучаем и проверяем модель цен…');
+      else if (m.type === 'replay-progress') this.progress('Спрашиваем справочник: ' + m.done + ' из ' + m.total, m.total ? m.done / m.total * 100 : null);
       else if (m.type === 'replay' && this.waitRun) { var w = this.waitRun; this.waitRun = null; if (m.error) w.reject(new Error(m.error)); else w.resolve(m); }
       else if (m.type === 'dataset' && this.waitDs) { var d = this.waitDs; this.waitDs = null; if (m.dataset) d.resolve(m.dataset); else d.reject(new Error('Набор не собран')); }
     },
@@ -204,7 +224,7 @@
     },
 
     paint: function (rows, note) {
-      var main = (rows || []).filter(function (r) { return !/^lift\./.test(r[0]); });
+      var main = (rows || []).filter(function (r) { return !/^lift\.|^price\.w\./.test(r[0]); });
       $('dsTable').hidden = !main.length;
       $('dsTable').querySelector('tbody').innerHTML = main.map(function (r) {
         return '<tr data-k="' + S.esc(r[0]) + '"><td>' + S.esc(labelOf(r[0])) + '</td><td class="num">' + S.esc(String(r[1])) + '</td></tr>';

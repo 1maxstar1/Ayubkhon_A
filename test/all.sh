@@ -113,6 +113,7 @@ run worker-parity    node test/worker-parity.cjs
 run uzex             node test/uzex.cjs
 run memory          node test/memory.cjs
 run ml              node test/ml.cjs
+run ml-price        node test/ml-price.cjs
 run sections         node test/sections.cjs
 run regions          node test/regions.cjs
 run refs             node test/refs.cjs

@@ -97,7 +97,9 @@ ORDER.push('memory');
 FILE['ml-features'] = 'src/lib/ml/features.js';
 FILE['ml-metrics'] = 'src/lib/ml/metrics.js';
 FILE['ml-dataset'] = 'src/lib/ml/dataset.js';
-const ML = ['ml-features', 'ml-metrics', 'ml-dataset'];
+FILE['ml-pricedata'] = 'src/lib/ml/pricedata.js';
+FILE['ml-pricemodel'] = 'src/lib/ml/pricemodel.js';
+const ML = ['ml-features', 'ml-metrics', 'ml-dataset', 'ml-pricedata', 'ml-pricemodel'];
 ORDER.push(...ML);
 
 /** Everything needed to read a workbook and build the comparison document. */

@@ -109,4 +109,49 @@ function world(S, opts) {
   return { pkg, sug, rows, truth, region: REGION, items };
 }
 
-module.exports = { world, PREFER, REGION };
+
+/*
+ * priceWorld(S, opts): on the same invented package, an expert who knows a market price for every good and «answers»
+ * smetas the way old replies do: a smeta price above his market price is lowered to it, anything else is left. His
+ * market price is hidden from the program; what the program can see is planted:
+ *   - where the reference has a line, his price is REF_RATIO of the reference first line (he trusts documents, a
+ *     little under them), with a few percent of noise;
+ *   - where it has none, his price is his own (a hidden value per good) — the program can know it only from an
+ *     earlier application;
+ *   - his own prices drift upward by DRIFT a year.
+ */
+const REF_RATIO = 0.9, DRIFT = 0.12;
+function priceWorld(S, opts) {
+  const o = Object.assign({ seed: 5, items: 120, apps: 30, perApp: 60, noise: 0.03 }, opts || {});
+  const w = world(S, { seed: o.seed, items: o.items, apps: 1, perApp: 1 });
+  const rand = S.ml.metrics.rng(o.seed + 1000);
+  const R = S.refs;
+  // a third of the goods are not in the reference at all: only the expert knows them
+  const extra = [];
+  for (let i = 0; i < Math.round(o.items / 2); i++) extra.push({ name: 'Материал вне справочника ' + String.fromCharCode(1040 + (i % 20)) + '-' + (500 + i), unit: 'шт', base: 100 + Math.round(rand() * 900) });
+  const goods = w.items.concat(extra);
+  const rows = [], truth = { lowered: 0, left: 0, struck: 0 };
+  const iso = (d) => new Date(Date.UTC(2026, 2, 1) + d * 86400000).toISOString().slice(0, 10);
+  for (let a = 0; a < o.apps; a++) {
+    const asof = iso(a * 8), ws = 'pw' + String(a + 1).padStart(13, '0');
+    const years = a * 8 / 365;
+    goods.slice().sort(() => rand() - 0.5).slice(0, o.perApp).forEach((g, n) => {
+      const q = R.queryOf({ name: g.name, unit: g.unit, section: 'materials' }, { region: REGION, asof });
+      const lines = w.sug.gather(q).lines;
+      const top = lines.length ? w.sug.choose(lines, q)[0] : null;
+      const market = (top ? top.price * REF_RATIO : g.base * (1 + DRIFT * years)) * (1 + (rand() - 0.5) * 2 * o.noise);
+      const u = rand();
+      const smeta = u < 0.35 ? market * (1.08 + rand() * 0.6) : market * (0.7 + rand() * 0.32);      // a third are too high
+      const row = { workspace: ws, contragent: 'c' + (a % 5), region: REGION, name: g.name, unit: g.unit, section: 'materials',
+        match_key: S.matchKey(g.name), match_unit_key: S.matchUnitKey(g.unit), res_key: 'k' + n, asof, finished: '2026-11-13', accepted: false,
+        smeta_price: smeta, kind: 'checked', source: 'finish', final_price: smeta };
+      if (smeta > market * 1.05) {
+        if (rand() < 0.02) { row.kind = 'zeroed'; row.final_price = 0; row.source = ''; truth.struck++; }
+        else { row.kind = 'corrected'; row.source = 'typed'; row.final_price = Math.round(market); truth.lowered++; }
+      } else truth.left++;
+      rows.push(row);
+    });
+  }
+  return { sug: w.sug, pkg: w.pkg, rows, truth, REF_RATIO, DRIFT };
+}
+module.exports = { world, priceWorld, PREFER, REGION, REF_RATIO, DRIFT };

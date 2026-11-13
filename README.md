@@ -687,6 +687,11 @@ yozib boriladi; ekran, takliflar va narxlar bundan **o'zgarmaydi**:
   числа» da faqat sonlar. «Сохранить набор в файл» — dataset (belgilar va belgilar, nom va narxsiz); u repoga
   tushmaydi. Takliflarning o'zi bundan o'zgarmaydi. Testlar — `node test/ml.cjs`, `node test/e2e-dataset.mjs`.
 
+* **Narx modeli — o'lchov (v2.14.0):** «Собрать и измерить» narx modelini ham o'qitadi va sinaydi
+  (`src/lib/ml/pricedata.js` — resurs haqidagi dalillar: oldingi arizalardagi narxlaringiz va spravochnik, smeta
+  narxisiz; `pricemodel.js` — chiziqli model va qaror «smeta narxi qimmat → taklif»). Uch usul eng yangi arizalarda
+  solishtiriladi. Model hozircha ish sahifasida ishlatilmaydi. Test — `node test/ml-price.cjs`.
+
 Yozish faqat server yo'llari orqali (`server/pb_hooks/learning.pb.js`); jurnal yozilmay qolsa ish to'xtamaydi.
 Test: `node test/learning.mjs`.
 

@@ -17,9 +17,9 @@
  *                     doc_no, issue_date, as_of_date, region, vat } } }   vat: the document printed its prices with
  *                     VAT and the package carries them divided by it (vat_default === true; owner, 2026-11-13)
  *                   { type: 'results', batch, items: [{ k, lines }] }
- *                   { type: 'replay-progress', done, total }
+ *                   { type: 'replay-progress', done, total[, phase: 'model'] }
  *                   { type: 'replay', summary: [[key, value]…], ms } | { type: 'replay', error }   counts and metrics
- *                     only — never a name or a price
+ *                     only — never a name or a price; keys `price.*` are the price model's (S.ml.pricemodel)
  *                   { type: 'dataset', dataset | null }                                   feature numbers and labels
  *                   { type: 'error', phase, message }                                     Russian, never a value
  *
@@ -36,7 +36,7 @@
   var DB = 'smeta-refs', STORE = 'pool', KEY = 'current';
   var POLICY = 'p3';
 
-  var st = { ready: false, failed: false, sug: null, cache: new Map(), queue: [], pkg: null, ds: null };
+  var st = { ready: false, failed: false, sug: null, cache: new Map(), queue: [], pkg: null, ds: null, price: null };
 
   function post(m) { self.postMessage(m); }
   var lastPct = {};
@@ -279,11 +279,25 @@
     if (!st.ready) { st.queue.push(msg); return; }
     var t0 = Date.now();
     try {
-      st.ds = null;
-      var ds = S.ml.dataset.build(st.sug, msg.rows || [], { package_id: st.pkg, gold: msg.gold || [], now: msg.now || null,
+      st.ds = null; st.price = null;
+      // both datasets ask the same questions: each is asked of the engine once
+      var G = new Map(), C = new Map();
+      var sug = {
+        gather: function (q) { var v = G.get(q.id); if (!v) { v = st.sug.gather(q); G.set(q.id, v); } return v; },
+        choose: function (lines, q) { var v = C.get(q.id); if (!v) { v = st.sug.choose(lines, q); C.set(q.id, v); } return v; }
+      };
+      var ds = S.ml.dataset.build(sug, msg.rows || [], { package_id: st.pkg, gold: msg.gold || [], now: msg.now || null,
         progress: function (d, n) { post({ type: 'replay-progress', done: d, total: n }); } });
       var summary = S.ml.dataset.summary(ds, { n: 500 });
       st.ds = ds;
+      // the price model («Модель цен»): fitted and measured here, used nowhere yet
+      if (S.ml.pricedata && S.ml.pricemodel) {
+        post({ type: 'replay-progress', phase: 'model', done: 0, total: 1 });
+        var pd = S.ml.pricedata.build(sug, msg.rows || [], { now: msg.now || null });
+        var exp = S.ml.pricemodel.experiments(pd, { n: 300, now: msg.now || null });
+        summary = summary.concat(S.ml.pricemodel.summary(pd, exp));
+        st.price = { model: exp.model };
+      }
       post({ type: 'replay', summary: summary, ms: Date.now() - t0 });
     } catch (e) { post({ type: 'replay', error: 'Набор не собран' }); }
   }

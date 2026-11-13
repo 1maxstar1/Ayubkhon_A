@@ -1,11 +1,11 @@
 # O'zi o'rganadigan takliflar — ish rejasi (AI ranker)
 
-Holati: **0-, 1-, 2- va 3-bosqich bajarildi (2026-11-13; v2.11.0, v2.12.0 va v2.13.0 — ro'yxatsiz relizlar:
-egasi sinagach `--list`). Hozir — DARVOZA 1 da to'xtalgan:** 4-bosqich (modellar) boshlanishidan oldin egasining
-haqiqiy ma'lumotidagi sonlari kerak (pastda §7: nima bosiladi va qaysi qatorlar yuboriladi). 1-bosqich: qarorlar
-jurnali (`suggest_events`) va yakunlangan narxlar xotirasi (`price_memory`) — faqat yozish. 2-bosqich: xotira
-ekranda («пам.» tegi, «ранее принято» / «выше принятого» belgisi, «Память» kaliti). 3-bosqich: qayta o'ynatish
-dataseti, metrikalar va bugungi qoidalarning (`p3`) o'lchovi — admin sahifasida.
+Holati: **0–3-bosqichlar bajarildi; egasining qarori bilan (2026-11-13) yo'nalish o'zgardi — «Модель цен»
+(narx modeli), 1-qadami v2.14.0 da.** Relizlar v2.11.0 – v2.14.0 ro'yxatsiz (egasi sinagach `--list`). Egasi hozir
+eski ishlarini kiritmoqda (~50 ariza: smeta + «Наш ответ (Excel)» + «✓ Завершить»); tugatgach «done» deydi va admin
+sahifasidagi sonlarni yuboradi. **Keyingi qadam (v2.15.0, 2-qadam):** modelni saqlash (`ml_models` kolleksiyasi),
+ish sahifasida «вероятно завышено → предлагаемая цена X» va «Применить все предложения» — faqat egasi 1-qadam
+sonlarini ko'rib rozi bo'lgach yoqiladi (darvoza 2).
 
 **Keyingi sessiya uchun — qayerdan davom etiladi:** egasi §7 dagi sonlarni yuborgach, ularga qarab 4-bosqich
 (`src/lib/ml/{logreg,mlp,calib}.js`, tajribalar jadvali) boshlanadi. Sonlar kelmaguncha model kodi yozilmaydi:
@@ -18,6 +18,42 @@ tanlangan sana; yakunlangan kundan keyin bo'lsa — yakunlangan kun; `S.memory.d
 hisoblanadi, datasetda arizalar shu sana bo'yicha tartiblanadi (test qismi — haqiqatan eng yangi arizalar). Avval
 yakunlangan kun olinardi va bugun kiritilgan bir yillik narx «yangi» bo'lib ko'rinardi. Namuna juftlikda (541
 resurs, javobda 103 qator) javobning barcha qatorlari smetada topildi, 102 narx qo'yildi.
+
+**«Модель цен» — egasining javoblari (2026-11-13) va 1-qadam (v2.14.0).** Javoblar: (1) model yangi smetada
+qimmat narxni belgilab, o'z taxminini ko'rsatsin, narx faqat «Применить» bilan; (2) javobda yo'q resurs — «ko'rib
+chiqilgan, qimmat emas» (eski ishlarda hammasi ko'rilgan); (3) «Применить все предложения» kerak.
+
+- `src/lib/ml/pricedata.js` — bitta resurs haqida **smeta narxiga qaramasdan** ma'lum bo'lgan dalillar (31 belgi,
+  o'z sxema xeshi): shu viloyatdagi **oldingi** arizalarda ekspert qo'ygan narxlar (keyingi arizadan, arizaning
+  o'zidan, boshqa viloyatdan, «Применить %» dan, 24 oydan eskisidan o'qilmaydi), ilgari qabul qilingan smeta narxlari
+  (pastki chegara), spravochnikning birinchi qatori (darajasi, bayroqlari). **Tayanch** — birinchisi mavjud bo'lgani:
+  o'z oldingi narxi → spravochnik qatori → qabul qilingan eng baland narx; qolgan sonlar tayanchga nisbatan log-nisbat.
+  Dalil yo'q bo'lsa — taklif ham yo'q.
+- `src/lib/ml/pricemodel.js` — chiziqli model: taklif = tayanch × o'rganilgan tuzatish. Yo'qotish: o'zgartirilgan
+  narx — log-xatoning kvadrati; qoldirilgan narx — bir tomonlama (faqat taklif smeta narxidan **past** bo'lsa
+  jarima: bozor narxi kamida shuncha), og'irligi 0,3; ridge — dalil bo'lmasa tayanch o'zgarmaydi. Oddiy gradient
+  tushish, noldan, tasodifsiz (bir xil ma'lumot — bir xil model); to'xtash va chegara (`tau`: smeta narxi taklifdan
+  necha foiz baland bo'lsa belgilanadi) o'quv qismining eng yangi beshdan birida tanlanadi (F0,5 — gapirganda to'g'ri
+  bo'lish ikki barobar muhim). Test qismi hech narsani tanlamaydi.
+- Tajribalar jadvali, bir xil test qismida uch usul: `ref` (spravochnikning birinchi qatori), `anchor` (tayanch),
+  `model` (tayanch + tuzatish). Tanlash qoidasi: eng yaxshisidan bir punkt ichidagilarning eng soddasi. O'lchovlar:
+  belgilanganlarning nechtasini ekspert haqiqatan pasaytirgan (precision), u pasaytirganlarning nechtasi belgilangan
+  (recall), qabul qilingan narxlarning nechtasi behuda belgilangan, taklif narxining ekspert narxidan median farqi —
+  ishonch oralig'i bilan; tayanch turi bo'yicha alohida.
+- Worker `replay` ikkala datasetni bitta o'tishda quradi (har savol dvigateldan bir marta so'raladi). Admin →
+  «Обучение» → «Собрать и измерить» modelni ham o'qitadi va o'lchaydi; kalitlari `price.*`. **Model hozircha
+  hech qayerda ishlatilmaydi** — ish sahifasi o'zgarmagan.
+- Testlar: `test/ml-price.cjs` (yo'qotish va gradient qo'lda va chekli ayirmalar bilan; qoldirilgan narx faqat
+  yuqoriga itaradi; boshqa sxemadagi model qaror bermaydi; sintetik ekspert — `priceWorld`, yashirin qoida
+  «spravochnik qatorining 0,9 i» topiladi), `test/e2e-dataset.mjs`.
+- Egasining ikki fayli bilan tekshirildi (maxfiy, repodan tashqarida, faqat sonlar): smeta 541 resurs → javob 103
+  qator, 102 narx → «Завершить» 514 xotira qatori (101 pasaytirilgan, 412 qabul, 1 o'chirilgan; 27 ta nol narxli
+  resurs yozilmaydi). 50 arizali bazada (50 × 514 qator): yangi smeta ochilishi va ro'yxat sekinlashmadi (eng uzun
+  qotish 0,15 s), admin o'lchovi ~95 s (fon oqimida).
+
+**Ochiq savollar (model uchun):** boshqa viloyatdagi oldingi narx dalil bo'lsinmi (hozir yo'q; `price.skipped.
+noevidence_price_other_region` nechta holatda yordam berishini sanaydi); faqat «qabul qilingan narx»ga tayangan
+taklif ko'rsatilsinmi (`price.model.by_acc` alohida o'lchaydi).
 
 **Egasining ekran yozuvi (2026-11-13) — xulosa va keyingi qadam.** Egasi ~50 va undan ko'p eski arizani (smeta +
 o'shanda yuborilgan javob fayli, «✓ Завершить») kiritmoqchi va model **«Рыночная цена» ustunidagi har bir qiymatdan**
@@ -221,9 +257,10 @@ O'rin: ekrandagi o'rni (o'qitishda belgi, bashoratda o'zgarmas qiymat — o'rin 
 | 1 ✓ v2.11.0 | Jurnal + xotira (faqat yozish), «Завершить» oynasi, «Обучение» paneli (faqat sonlar), `release.sh --unlisted` | yangi `src/ui/journal.js`, `src/ui/learning-admin.js`, `server/pb_schema.json`, `server/pb_hooks/learning.pb.js`, `src/ui/sync.js` (`finish`) | `test/learning.mjs`: qo'llash/yozish/qaytarish/yakunlash to'g'ri qatorlar qoldiradi |
 | 2 ✓ v2.12.0 | Xotira ekranda (ustuvorlik, «ранее принято», eskirish, o'zini tasdiqlashga qarshi himoya, o'chirish kaliti) | yangi `src/lib/memory.js`, `src/ui/memory.js` | `test/memory.cjs`, `test/e2e-memory.mjs` |
 | 3 ✓ v2.13.0 | Qayta o'ynatish dataseti, metrikalar, `p3` o'lchovi, admin «Набор для обучения» | yangi `src/lib/ml/{features,metrics,dataset}.js`, `src/ui/dataset-admin.js`; `src/refs-worker.js` (`replay`) | `test/ml.cjs`, `test/e2e-dataset.mjs`; **darvoza 1:** egasining sonlari (§7) |
-| 4 | Modellar (logistik regressiya, juftlab; MLP; kalibrlash) | `src/lib/ml/{logreg,mlp,calib}.js` | tajribalar jadvali |
-| 5 | Dasturda: soya rejimi → (egasi rozi bo'lsa) yoqish | `src/lib/ml/rank.js` | **darvoza 2** |
-| 6 | O'zini yangilash (chempion/da'vogar, qaytarish, kuzatuv) | admin paneli | yomon da'vogar rad etiladi |
+| 4a ✓ v2.14.0 | **Модель цен, 1-qadam:** dalillar, narx dataseti, chiziqli model, uch usul tajribasi — faqat o'lchov | yangi `src/lib/ml/{pricedata,pricemodel}.js`; `src/refs-worker.js`, `src/ui/dataset-admin.js` | `test/ml-price.cjs`; egasining sonlari |
+| 4b | **Модель цен, 2-qadam:** modelni saqlash (`ml_models`), ish sahifasida «вероятно завышено → X», «Применить все предложения» | `server/pb_schema.json`, yangi `src/ui/ml.js` | **darvoza 2:** egasi 1-qadam sonlarini ko'rib rozi bo'lgach |
+| 5 | O'zini yangilash (har yakunlangan arizadan keyin qayta o'qitish, chempion/da'vogar, qaytarish) | admin paneli | yomon da'vogar rad etiladi |
+| — | Spravochnik qatorlarini qayta tartiblovchi model (dastlabki reja) | `src/lib/ml/{features,dataset}.js` tayyor | to'xtatilgan: egasining ma'lumotida o'zgartirilgan narxlarning ko'pi qatorlarga to'g'ri kelmaydi; «Применить» bilan ishlangan arizalar yig'ilsa qaytiladi |
 
 Har bosqich — reliz; `releases.txt` ga faqat egasi sinagach (**darvoza 3**).
 

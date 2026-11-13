@@ -108,6 +108,8 @@ const REFS_WORKER_LIBS = [
   'src/lib/ml/features.js',
   'src/lib/ml/metrics.js',
   'src/lib/ml/dataset.js',
+  'src/lib/ml/pricedata.js',
+  'src/lib/ml/pricemodel.js',
 ].filter((p) => existsSync(join(root, p)));
 // Everything a derived pool record depends on. Its hash is the stamp the worker's IndexedDB cache is kept under, so a
 // release that changes how keys are derived derives them again by itself, once.

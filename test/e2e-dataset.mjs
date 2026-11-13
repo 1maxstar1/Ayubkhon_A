@@ -132,11 +132,22 @@ try {
   check(/^0\.500 \[/.test(await cell('p3.train.p1')) && /^1 \[/.test(await cell('p3.train.r3')) && /^0\.750 \[/.test(await cell('p3.train.mrr')) && /^0 \[/.test(await cell('p3.train.abstention')),
     'today\'s rules on the training part: first line right in half, always within three, never silent — as under Node');
   const labels = await page.evaluate(() => [...document.querySelectorAll('#dsTable tbody tr')].map((tr) => tr.firstElementChild.textContent));
-  check(labels.every((l) => /[А-Яа-я]/.test(l)) && labels.some((l) => /проверочная часть/.test(l)) && !(await page.$('#dsTable tr[data-k^="lift."]')),
-    'every row of the table is named in Russian; the per-feature lines stay out of the table');
+  check(labels.every((l) => /[А-Яа-я]/.test(l) && !/^Прочее/.test(l)) && labels.some((l) => /проверочная часть/.test(l)) && !(await page.$('#dsTable tr[data-k^="lift."]')) &&
+    !(await page.$('#dsTable tr[data-k^="price.w."]')), 'every row of the table is named in Russian; the per-feature lines stay out of the table');
+  // the price model is fitted and measured in the same run, and only measured
+  const pm = {};
+  for (const k of ['price.rows', 'price.applications', 'price.applications.test', 'price.items', 'price.items.corrected', 'price.items.accepted', 'price.skipped.struck', 'price.skipped.pct',
+    'price.model.test.n', 'price.model.tau', 'price.schema']) pm[k] = await cell(k);
+  check(pm['price.rows'] === '41' && pm['price.applications'] === '5' && pm['price.applications.test'] === '1' && +pm['price.items'] > 20 && +pm['price.items.corrected'] >= 10 &&
+    +pm['price.items.accepted'] >= 10 && pm['price.skipped.struck'] === '5' && pm['price.skipped.pct'] === '5' && +pm['price.model.test.n'] > 0 && +pm['price.model.tau'] > 0 &&
+    pm['price.schema'] === S.ml.pricedata.HASH, 'the price model is fitted on the same finished prices and measured on the newest application (' + JSON.stringify(pm) + ')');
+  const sel = [await cell('price.ref.selected'), await cell('price.anchor.selected'), await cell('price.model.selected')];
+  check(sel.filter((v) => v === '1').length === 1 && /Модель цен · с обученной поправкой · из отмеченных/.test(labels.join('\n')) && /Пока это только измерение/.test(await page.textContent('#learnPanel')),
+    'one of the three ways is selected, the rows are named, and the page says the model is only measured (' + sel.join('/') + ')');
   const text = await page.evaluate(() => S.DatasetAdmin.text());
   const panel = await page.evaluate(() => document.getElementById('learnPanel').innerText);
-  check(!secret(text) && !/[А-Яа-я]/.test(text) && /^schema = f\d+-[0-9a-f]{8}$/m.test(text) && /^lift\.same_region = /m.test(text) && /^p3\.test\.p1 = /m.test(text),
+  check(!secret(text) && !/[А-Яа-я]/.test(text) && /^schema = f\d+-[0-9a-f]{8}$/m.test(text) && /^lift\.same_region = /m.test(text) && /^p3\.test\.p1 = /m.test(text) &&
+    /^price\.model\.test\.precision = /m.test(text) && /^price\.w\.[a-z_]+ = /m.test(text),
     '«Скопировать числа» gives keys and numbers only — no name, no price, no document (' + text.split('\n').length + ' lines)');
   check(!secret(panel), 'the panel shows no name, price or document either');
   check(await page.isEnabled('#dsCopy') && await page.isEnabled('#dsSave'), 'the numbers can be copied and the dataset saved');

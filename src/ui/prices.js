@@ -100,6 +100,11 @@
       var t = h ? 'Цена из прежнего проекта № ' + h.number + ' · ' + h.contragent : 'Цена из прежнего проекта';
       return '<span class="upill h" title="' + S.esc(t + '. Введите цену вручную, чтобы снять отметку') + '">П</span>';
     }
+    if (/^mem:/.test(s)) {
+      var mr = S.Memory && S.Memory.byId ? S.Memory.byId(s.slice(4)) : null;
+      var mt = mr ? 'Ваша цена из завершённой заявки № ' + mr.number + ' · ' + mr.who : 'Ваша цена из завершённой заявки';
+      return '<span class="upill h" title="' + S.esc(mt + '. Введите цену вручную, чтобы снять отметку') + '">П</span>';
+    }
     return '';
   }
 
@@ -261,8 +266,9 @@
    * exchange — pressed as by hand, with its own confirmations. A line of «Похожие ресурсы» is never taken this way.
    */
   S.acceptFirst = function (key) {
-    var H = S.Hints, R = S.Refs, U = S.Uzex, b = null;
-    if (H && H.pop && !H.pop.hidden && H.key === key) b = H.pop.querySelector('.hp-row:not(.near) button[data-i]');
+    var H = S.Hints, R = S.Refs, U = S.Uzex, M = S.Memory, b = null;
+    if (M && M.pop && !M.pop.hidden && M.key === key) b = M.pop.querySelector('button[data-i]');
+    else if (H && H.pop && !H.pop.hidden && H.key === key) b = H.pop.querySelector('.hp-row:not(.near) button[data-i]');
     else if (R && R.pop && !R.pop.hidden && R.open && R.open.key === key) b = R.pop.querySelector('.rp-line:not(.near) button[data-i]');
     else if (U && U.pop && !U.pop.hidden && U.open && U.open.key === key) b = U.pop.querySelector('.up-line:not(.near) button[data-i]');
     if (b && !b.disabled) b.click();
@@ -390,7 +396,8 @@
       (near ? ' · похожих ' + near : '') +
       (mis ? ' · не тот раздел ' + mis : '') +
       (S.Refs ? S.Refs.statusText() : '') +
-      (S.Uzex ? S.Uzex.statusText() : '');
+      (S.Uzex ? S.Uzex.statusText() : '') +
+      (S.Memory ? S.Memory.statusText() : '');
   };
 
   Prices.prototype.renderRange = function (from, to) {
@@ -404,7 +411,10 @@
       var many = r.variants > 1;
       var multi = many ? '<button class="tagm" data-nm="' + S.esc(r.name) + '" title="' +
         S.esc(multiHint(r)) + '">' + r.variants + ' цены</button>' : '';
-      var hint = (S.Hints ? S.Hints.tag(r) : '') + (S.Refs ? S.Refs.tag(r) : '') + (S.Uzex ? S.Uzex.tag(r) : '');
+      // the expert's own earlier prices first (src/ui/memory.js), then earlier projects, the reference prices, the exchange
+      var hint = (S.Memory ? S.Memory.tag(r) : '') + (S.Hints ? S.Hints.tag(r) : '') + (S.Refs ? S.Refs.tag(r) : '') + (S.Uzex ? S.Uzex.tag(r) : '');
+      // «ранее принято» / «выше принятого» beside the smeta price
+      var mc = S.Memory ? S.Memory.ceil(r) : { cls: '', html: '' };
       // a price applied from an exchange quote keeps its mark in the cell until it is typed over (src/ui/uzex.js)
       var uz = srcMark(r), uzOnly = uz && /upill u\b/.test(uz);
       var sec = secTag(r);
@@ -416,7 +426,7 @@
         cell(COLS[2], S.esc(r.unit)) +
         cell(COLS[3], r.count) +
         cell(COLS[4], S.qty(r.qty)) +
-        '<div class="c num" style="' + width(COLS[5]) + '">' + S.price(r.price) + '</div>' +
+        '<div class="c num' + mc.cls + '" style="' + width(COLS[5]) + '">' + mc.html + S.price(r.price) + '</div>' +
         '<div class="c num' + (uz ? ' uzc' : '') + '" style="' + width(COLS[6]) + '">' + uz +
         '<input class="pin' + (changed ? ' edited' : '') + (uzOnly ? ' uz' : uz ? ' src' : '') + '" data-key="' + S.esc(r.key) + '" data-i="' + i +
         '" inputmode="decimal" value="' + S.price(r.market) + '"></div>' +

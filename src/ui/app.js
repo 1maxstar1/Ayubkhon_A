@@ -292,7 +292,7 @@
    * now with «Отменить»: one key too many no longer costs a price (E3).
    */
   App.prototype.escPrice = function (key, smeta) {
-    if (document.querySelector('#hintPop:not([hidden]),#refPop:not([hidden]),#uzexPop:not([hidden])')) return;
+    if (document.querySelector('#hintPop:not([hidden]),#refPop:not([hidden]),#uzexPop:not([hidden]),#memPop:not([hidden])')) return;
     var now = this.prices[key] != null ? this.prices[key] : smeta;
     if (S.near(now, smeta)) return;
     var o = {}; o[key] = smeta;

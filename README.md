@@ -319,6 +319,7 @@ src/
     hints.js, refs.js, uzex.js   takliflar: oldingi loyihalar, справочник, birja
     contragent-prices.js  shu kontragentning oldingi narxlari bitta ro'yxatda (F1)
     journal.js, learning-admin.js  o'rganish uchun yozuvlar: qarorlar jurnali, «Завершить» oynasi, admin sonlari
+    memory.js         xotira ekranda: «пам.» tegi, «ранее принято» belgisi (qoidalari — lib/memory.js)
     compare.js, registry.js, auth.js, admin.js, *-admin.js
 server/
   pb_schema.json, pb_hooks/  PocketBase sxemasi va server qoidalari
@@ -673,6 +674,10 @@ yozib boriladi; ekran, takliflar va narxlar bundan **o'zgarmaydi**:
   qolgan, nechtasi «проверено»), keyin har bir resursni turi bilan yozadi. «Не учитывать в обучении» — sinov
   arizalari uchun. Qayta yakunlash yozuvlarni almashtiradi.
 * Admin sahifasi → **«Обучение»**: faqat sonlar; «Скопировать числа».
+* **Xotira ekranda (v2.12.0):** nom yonida «пам.» — yakunlangan arizada o'zingiz qo'ygan narx (shu kontragentniki
+  birinchi, pudratchi qabul qilgani oldinda), «Применить» bilan qo'yiladi; smeta narxi yonida «✓» — kamida ikki
+  mustaqil arizada shu narxgacha qabul qilingan, «▲» — undan baland. «Память» kaliti hammasini o'chiradi. Qoidalar —
+  `src/lib/memory.js`; testlar — `node test/memory.cjs`, `node test/e2e-memory.mjs`.
 
 Yozish faqat server yo'llari orqali (`server/pb_hooks/learning.pb.js`); jurnal yozilmay qolsa ish to'xtamaydi.
 Test: `node test/learning.mjs`.

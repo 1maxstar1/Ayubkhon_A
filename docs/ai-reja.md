@@ -1,8 +1,35 @@
 # O'zi o'rganadigan takliflar — ish rejasi (AI ranker)
 
-Holati: **0- va 1-bosqich bajarildi (2026-11-13, v2.11.0 — ro'yxatsiz reliz: egasi sinagach `--list`).**
-1-bosqich: qarorlar jurnali (`suggest_events`) va yakunlangan narxlar xotirasi (`price_memory`) — faqat yozish;
-ekran, takliflar va narxlar o'zgarmadi. Keyingisi — 2-bosqich (xotira ekranda).
+Holati: **0-, 1- va 2-bosqich bajarildi (2026-11-13; v2.11.0 va v2.12.0 — ro'yxatsiz relizlar: egasi sinagach
+`--list`).** 1-bosqich: qarorlar jurnali (`suggest_events`) va yakunlangan narxlar xotirasi (`price_memory`) — faqat
+yozish. 2-bosqich: xotira ekranda («пам.» tegi, «ранее принято» / «выше принятого» belgisi, «Память» kaliti).
+Keyingisi — 3-bosqich (qayta o'ynatish datasetı va `p3` baseline), undan keyin **darvoza 1**: egasining sonlari.
+
+**2-bosqichda aslida nima qilindi:**
+
+- `src/lib/memory.js` (sof mantiq, `test/memory.cjs`): bitta resursning xotira qatorlaridan — taklif qilinadigan
+  narxlar va chegara.
+  - **Narx takliflari** — faqat tuzatilgan narxlar: 1) shu kontragent, 2) boshqa kontragent; har birida avval
+    pudratchi qabul qilgani, keyin eng yangisi. Hech qachon taklif qilinmaydi: «Применить %» narxi, 0 narx, 24 oydan
+    eski narx. Bitta arizadan bitta qator.
+  - **Chegara** («shu narxgacha qabul qilingan») — faqat tegilmagan narxlardan, va faqat **mustaqil arizalar**
+    (turli kontragentlar) kelishsa: har biri og'irlik bilan sanaladi — «проверено» 1, shunchaki qoldirilgan 0,5; yoshi
+    6 oygacha to'liq, keyin 12 oyda nolga tushadi. Chegara — kamida ikki mustaqil ariza (kamida bittasi boshqa
+    kontragent) shu yoki undan yuqori narxni qabul qilgan eng baland narx, og'irliklar yig'indisi ≥ 1,5 (ikkita
+    «проверено»; bitta «проверено» + bitta qoldirilgan; uchta qoldirilgan). Kontragentning o'z narxi, necha marta
+    takrorlansa ham, o'zini tasdiqlamaydi.
+- `src/ui/memory.js`: nom katagida **«пам.»** tegi (shu kontragentniki to'qroq), oynasi — narx, qayerdan, ariza №,
+  kontragent, sana, «принята подрядчиком», «Применить»; smeta narxi katagida **«✓»** (ilgari qabul qilingan) yoki
+  **«▲»** va sariq katak (ilgari qabul qilinganidan yuqori), oynasi mustaqil arizalarni sanaydi; holat qatorida
+  «в памяти N · выше принятого M»; asboblar qatorida **«Память»** kaliti (shu brauzerda eslab qolinadi).
+- Xotiradan qo'llangan narx manbasi — `mem:<qator>` (server tekshiradi; katakda «П» belgisi; jurnalda `mem` turi,
+  jurnal sxemasi 2). Ctrl+Enter xotira oynasida ham birinchi qatorni oladi.
+- Boshqa takliflarning tartibi va matni o'zgarmadi; hech narsa o'zi qo'yilmaydi; boshqa viloyat o'qilmaydi.
+- Test: `test/memory.cjs` (sof), `test/e2e-memory.mjs` (brauzer), `test/learning.mjs`.
+
+**Bilib qoldirilgan:** «Прежние проекты» (hali yakunlanmagan arizalar tuzatishlarini ham ko'rsatadi) va «пам.»
+(faqat yakunlanganlar) bir xil narxni ikki joyda ko'rsatishi mumkin — ikkalasini birlashtirish egasining qarori
+(savol 8). Chegara belgisi faqat «Проверка цен» ro'yxatida, «Сводная таблица» da emas.
 
 **1-bosqichda aslida nima qilindi (rejadan farqlari bilan):**
 
@@ -117,7 +144,7 @@ O'rin: ekrandagi o'rni (o'qitishda belgi, bashoratda o'zgarmas qiymat — o'rin 
 |---|---|---|---|
 | 0 | O'qish, tekshirish, reja | `docs/ai-reja.md` | ✓ shu hujjat |
 | 1 ✓ v2.11.0 | Jurnal + xotira (faqat yozish), «Завершить» oynasi, «Обучение» paneli (faqat sonlar), `release.sh --unlisted` | yangi `src/ui/journal.js`, `src/ui/learning-admin.js`, `server/pb_schema.json`, `server/pb_hooks/learning.pb.js`, `src/ui/sync.js` (`finish`) | `test/learning.mjs`: qo'llash/yozish/qaytarish/yakunlash to'g'ri qatorlar qoldiradi |
-| 2 | Xotira ekranda (ustuvorlik, «ранее принято», eskirish, o'zini tasdiqlashga qarshi himoya, o'chirish sozlamasi) | yangi `src/ui/memory.js` | alohida testlar |
+| 2 ✓ v2.12.0 | Xotira ekranda (ustuvorlik, «ранее принято», eskirish, o'zini tasdiqlashga qarshi himoya, o'chirish kaliti) | yangi `src/lib/memory.js`, `src/ui/memory.js` | `test/memory.cjs`, `test/e2e-memory.mjs` |
 | 3 | Qayta o'ynatish datasetı, metrikalar, `p3` baseline | `src/lib/ml/{features,metrics,dataset}.js`, worker buyrug'i | **darvoza 1:** egasining sonlari |
 | 4 | Modellar (logistik regressiya, juftlab; MLP; kalibrlash) | `src/lib/ml/{logreg,mlp,calib}.js` | tajribalar jadvali |
 | 5 | Dasturda: soya rejimi → (egasi rozi bo'lsa) yoqish | `src/lib/ml/rank.js` | **darvoza 2** |
@@ -148,6 +175,9 @@ Har bosqich — reliz; `releases.txt` ga faqat egasi sinagach (**darvoza 3**).
 | Mijozning ekspertlari bitta o'rnatmadami? Qarorlar umumiymi? | O'rnatma bo'yicha umumiy, har qatorda `by` |
 | Mijoz sizning modelingiz va xotirangizni oladimi yoki bo'sh boshlaydimi? | Bo'sh boshlaydi |
 | `release.sh --unlisted` (ro'yxatsiz reliz) qo'shilsinmi? | Ha (1-bosqichda) |
+| «Прежние проекты» va «пам.» bitta oynaga birlashtirilsinmi? | Yo'q — ikkalasi alohida turadi |
+| «Применить %» bilan qo'yilgan narx xotirada taklif bo'lsinmi? | Yo'q — u aniq bozor narxi emas |
+| «✓ ранее принято» belgisi ko'p qatorda chiqsa xalaqit beradimi? | Ko'rsatiladi; «Память» kaliti bilan o'chiriladi |
 
 ## 7. Egasi o'z kompyuterida qiladigan ish (1-bosqichdan keyin)
 

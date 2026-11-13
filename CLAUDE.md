@@ -48,6 +48,7 @@ node test/close-tab.mjs; node test/state-size.mjs    # yopilgan vkladkada oxirgi
 sh test/pb-smoke.sh; node test/e2e-workspace.mjs      # server rejimi testlari
 node test/contragent-prices.mjs                       # «Цены этого контрагента…»: oldingi narxlar bitta ro'yxatda, bitta tasdiq
 node test/learning.mjs                                # o'rganish uchun yozuvlar: qarorlar jurnali, «Завершить» oynasi va narxlar xotirasi
+node test/memory.cjs; node test/e2e-memory.mjs        # xotira ishlatilishi: «пам.» tartibi, «ранее принято» chegarasi (mustaqil arizalar, yosh), kalit
 sh server/release.sh X.Y.Z "izoh" --row matn.md --unlisted; sh server/release.sh --list X.Y.Z   # egasi avval sinaydigan reliz: ro'yxatsiz chiqarish, sinalgach ro'yxatga qo'shish
 node test/num.cjs; node test/xlsx-guard.cjs           # son qat'iy o'qiladi («1,234.50» — ha, yonida so'z bo'lsa — yo'q); begona .xlsx o'quvchini osib qo'ymaydi
 node test/normalize.cjs; node test/sections.cjs; node test/regions.cjs   # NLP o'lchovlari
@@ -139,7 +140,9 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   dataset va o'qitilgan model fayllari repoga tushmaydi (`test/refs-privacy.cjs` ushlaydi). Model kodi
   `src/lib/ml/` da yoziladi — `src/lib/refs/**` ga tegilmaydi (o'lchov xeshi), darvoza (raqam, birlik, bo'lim, sana)
   o'rganilmaydi, daraja tartibi buzilmaydi, narx faqat «Применить» bilan qo'yiladi. Egasi sinamagan versiya
-  `--unlisted` bilan chiqariladi.
+  `--unlisted` bilan chiqariladi. Xotira qoidalari (`src/lib/memory.js`): tegilmagan narx — bozor narxi emas,
+  chegara; u faqat mustaqil arizalar (turli kontragentlar) kelishsa kuchga kiradi; kontragentning o'z narxi o'zini
+  tasdiqlamaydi; boshqa viloyat o'qilmaydi.
 * Raqamlar hech qachon yo'qolmaydi: `АНКЕР М5` ≠ `АНКЕР М8`, `4.1.1` ≠ `4.11`;
   ikki raqam orasidagi ajratgich o'chirilmaydi.
 * **Xavfsizlik bo'limi hozircha o'chirilgan (egasining qarori, 2026-10-24).**

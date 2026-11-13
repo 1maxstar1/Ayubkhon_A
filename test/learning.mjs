@@ -124,7 +124,7 @@ try {
     'the server fills in the region, the application, the keys and the author; the page gives the section and the date asked');
   check(Array.isArray(e.lines) && e.lines.length >= 1 && e.lines[0].k === 'ref' && e.lines[0].p === 0 && e.lines[0].tier && e.lines[0].price > 0 &&
     e.lines.every((l) => !('name' in l) && !('why' in l) && !('raw' in l)), 'the lines shown are kept as features — level, price, place — never a name');
-  check(e.schema === 1 && /^v\d+\.\d+\.\d+$/.test(e.app_version), `with the journal's schema and the program's version (${e.schema}, ${e.app_version})`);
+  check(e.schema === 2 && /^v\d+\.\d+\.\d+$/.test(e.app_version), `with the journal's schema and the program's version (${e.schema}, ${e.app_version})`);
   check(!('smeta_price' in e) && !('smeta' in e), 'the journal has no field for the estimate\'s price');
 
   /* ------------------------------------------------------------- a price typed, then put back */

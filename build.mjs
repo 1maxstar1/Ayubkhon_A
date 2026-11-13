@@ -77,7 +77,10 @@ const SERVER_SCRIPTS = [
   // src/uzex-worker.js, appended at run time to the reference worker's libraries, which carry the engine)
   'src/lib/uzex.js',
   'src/ui/uzex.js',
-  // what is kept to learn from (docs/ai-reja.md): last, it reads what the modules above hold
+  // what is kept to learn from (docs/ai-reja.md): the memory of finished applications in use, and — last, it reads
+  // what the modules above hold — the journal of decisions
+  'src/lib/memory.js',
+  'src/ui/memory.js',
   'src/ui/journal.js',
 ].filter((p) => existsSync(join(root, p)));
 

@@ -572,6 +572,29 @@ body.compact main:not(.narrow){grid-template-columns:232px 1fr}
 .cpbox td small{display:block;color:var(--mute)}
 .cpbox .cp-f{padding:10px 14px;border-top:1px solid var(--rule2);display:flex;gap:8px;align-items:center}
 .cpbox .cp-f .count{flex:1;color:var(--mute);font-size:12px}
+.tagp{margin-left:6px;font-size:10px;line-height:14px;padding:0 5px;border-radius:7px;border:1px solid #9a7b2f;background:#fbf3dc;color:#6b4e00;cursor:pointer}
+.tagp.own{background:#f3e3ad;font-weight:600}
+.mceil{border:0;background:none;padding:0 3px 0 0;font-size:10px;cursor:pointer;vertical-align:1px}
+.mceil.ok{color:#5d7a5d}
+.mceil.over{color:#b26a00}
+.c.num.mover{background:#fff4de}
+.memtog{font-size:12px;margin-right:8px;white-space:nowrap}
+.memtog[hidden]{display:none}
+.mempop{position:fixed;z-index:56;width:min(520px,94vw);overflow:auto;background:#fff;border:1px solid var(--rule2);border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.14);font-size:12px}
+.mempop[hidden]{display:none}
+.mempop .mp-head{display:flex;justify-content:space-between;gap:8px;padding:6px 10px;border-bottom:1px solid var(--rule2);font-weight:600}
+.mempop .mp-head small{font-weight:400;color:var(--mute)}
+.mempop .mp-mine{padding:4px 10px;color:var(--mute)}
+.mempop .mp-sub{padding:5px 10px 2px;font-weight:600;color:#6b4e00;font-size:11px;text-transform:uppercase;letter-spacing:.02em}
+.mempop .mp-row{display:flex;gap:8px;align-items:flex-start;padding:5px 10px;border-top:1px solid #f1f1f1}
+.mempop .mp-price{min-width:88px;text-align:right;white-space:nowrap}
+.mempop .mp-what{flex:1;min-width:0}
+.mempop .mp-what small{display:block;color:var(--mute);overflow-wrap:anywhere}
+.mempop .mp-acc{font-style:normal;color:var(--greentx);background:var(--green);border-radius:3px;padding:0 4px}
+.mempop .mp-ceil{padding:5px 10px}
+.mempop .mp-ceil.over{background:#fff4de}
+.mempop .mp-ceil small{display:block;color:var(--mute)}
+.mempop .mp-ev{padding:1px 10px 1px 22px;color:var(--mute)}
 .finbox .cp-in{width:min(620px,94vw)}
 .finbox .fin-body{padding:10px 14px;font-size:13px}
 .finbox .fin-counts{margin:0 0 6px}
@@ -5761,6 +5784,11 @@ if (typeof self !== 'undefined') self.S = S;
       var t = h ? 'Цена из прежнего проекта № ' + h.number + ' · ' + h.contragent : 'Цена из прежнего проекта';
       return '<span class="upill h" title="' + S.esc(t + '. Введите цену вручную, чтобы снять отметку') + '">П</span>';
     }
+    if (/^mem:/.test(s)) {
+      var mr = S.Memory && S.Memory.byId ? S.Memory.byId(s.slice(4)) : null;
+      var mt = mr ? 'Ваша цена из завершённой заявки № ' + mr.number + ' · ' + mr.who : 'Ваша цена из завершённой заявки';
+      return '<span class="upill h" title="' + S.esc(mt + '. Введите цену вручную, чтобы снять отметку') + '">П</span>';
+    }
     return '';
   }
 
@@ -5922,8 +5950,9 @@ if (typeof self !== 'undefined') self.S = S;
    * exchange — pressed as by hand, with its own confirmations. A line of «Похожие ресурсы» is never taken this way.
    */
   S.acceptFirst = function (key) {
-    var H = S.Hints, R = S.Refs, U = S.Uzex, b = null;
-    if (H && H.pop && !H.pop.hidden && H.key === key) b = H.pop.querySelector('.hp-row:not(.near) button[data-i]');
+    var H = S.Hints, R = S.Refs, U = S.Uzex, M = S.Memory, b = null;
+    if (M && M.pop && !M.pop.hidden && M.key === key) b = M.pop.querySelector('button[data-i]');
+    else if (H && H.pop && !H.pop.hidden && H.key === key) b = H.pop.querySelector('.hp-row:not(.near) button[data-i]');
     else if (R && R.pop && !R.pop.hidden && R.open && R.open.key === key) b = R.pop.querySelector('.rp-line:not(.near) button[data-i]');
     else if (U && U.pop && !U.pop.hidden && U.open && U.open.key === key) b = U.pop.querySelector('.up-line:not(.near) button[data-i]');
     if (b && !b.disabled) b.click();
@@ -6051,7 +6080,8 @@ if (typeof self !== 'undefined') self.S = S;
       (near ? ' · похожих ' + near : '') +
       (mis ? ' · не тот раздел ' + mis : '') +
       (S.Refs ? S.Refs.statusText() : '') +
-      (S.Uzex ? S.Uzex.statusText() : '');
+      (S.Uzex ? S.Uzex.statusText() : '') +
+      (S.Memory ? S.Memory.statusText() : '');
   };
 
   Prices.prototype.renderRange = function (from, to) {
@@ -6065,7 +6095,10 @@ if (typeof self !== 'undefined') self.S = S;
       var many = r.variants > 1;
       var multi = many ? '<button class="tagm" data-nm="' + S.esc(r.name) + '" title="' +
         S.esc(multiHint(r)) + '">' + r.variants + ' цены</button>' : '';
-      var hint = (S.Hints ? S.Hints.tag(r) : '') + (S.Refs ? S.Refs.tag(r) : '') + (S.Uzex ? S.Uzex.tag(r) : '');
+      // the expert's own earlier prices first (src/ui/memory.js), then earlier projects, the reference prices, the exchange
+      var hint = (S.Memory ? S.Memory.tag(r) : '') + (S.Hints ? S.Hints.tag(r) : '') + (S.Refs ? S.Refs.tag(r) : '') + (S.Uzex ? S.Uzex.tag(r) : '');
+      // «ранее принято» / «выше принятого» beside the smeta price
+      var mc = S.Memory ? S.Memory.ceil(r) : { cls: '', html: '' };
       // a price applied from an exchange quote keeps its mark in the cell until it is typed over (src/ui/uzex.js)
       var uz = srcMark(r), uzOnly = uz && /upill u\b/.test(uz);
       var sec = secTag(r);
@@ -6077,7 +6110,7 @@ if (typeof self !== 'undefined') self.S = S;
         cell(COLS[2], S.esc(r.unit)) +
         cell(COLS[3], r.count) +
         cell(COLS[4], S.qty(r.qty)) +
-        '<div class="c num" style="' + width(COLS[5]) + '">' + S.price(r.price) + '</div>' +
+        '<div class="c num' + mc.cls + '" style="' + width(COLS[5]) + '">' + mc.html + S.price(r.price) + '</div>' +
         '<div class="c num' + (uz ? ' uzc' : '') + '" style="' + width(COLS[6]) + '">' + uz +
         '<input class="pin' + (changed ? ' edited' : '') + (uzOnly ? ' uz' : uz ? ' src' : '') + '" data-key="' + S.esc(r.key) + '" data-i="' + i +
         '" inputmode="decimal" value="' + S.price(r.market) + '"></div>' +
@@ -6972,7 +7005,7 @@ if (typeof self !== 'undefined') self.S = S;
    * now with «Отменить»: one key too many no longer costs a price (E3).
    */
   App.prototype.escPrice = function (key, smeta) {
-    if (document.querySelector('#hintPop:not([hidden]),#refPop:not([hidden]),#uzexPop:not([hidden])')) return;
+    if (document.querySelector('#hintPop:not([hidden]),#refPop:not([hidden]),#uzexPop:not([hidden]),#memPop:not([hidden])')) return;
     var now = this.prices[key] != null ? this.prices[key] : smeta;
     if (S.near(now, smeta)) return;
     var o = {}; o[key] = smeta;
@@ -10336,7 +10369,7 @@ if (typeof self !== 'undefined') self.S = S;
         if (self.pop.contains(e.target) || (e.target.classList && e.target.classList.contains('tagh'))) return;
         // «Применить» of the reference or exchange popover: the caret has just moved to the next row and opened its
         // suggestions (afterApply) — the same click, bubbling on, must not close them
-        if (e.target.closest && e.target.closest('#refPop,#uzexPop')) return;
+        if (e.target.closest && e.target.closest('#refPop,#uzexPop,#memPop')) return;
         // the click that put the caret in a price box opened its popover a moment ago (focusin): it must not close it.
         // Compared by key — the list may have drawn the box anew in between (E3)
         var p = e.target.closest && e.target.closest('.pin');
@@ -12667,6 +12700,401 @@ var S = (typeof S !== 'undefined' && S) || {};
 
 ;
 /*
+ * The memory of finished applications, put to use (docs/ai-reja.md, phase 2): what the rows of price_memory mean for
+ * one resource of the application open now. Pure — no page, no server: the page gives the rows and reads the answer.
+ *
+ *   S.memory.rank(rows, ctx) → { prices: [entry…], ceiling: { price, apps, weight, rows } | null }
+ *   S.memory.verdict(smetaPrice, ceiling) → 'accepted' | 'above' | ''
+ *   rows: price_memory records of ONE resource (same match key and unit key), same region, other workspaces:
+ *         { id, workspace, application, contragent, kind, source, smeta_price, final_price, finished, accepted, number, who }
+ *   ctx:  { contragent, today: 'YYYY-MM-DD' }
+ *
+ * Two kinds of evidence, two meanings (the owner's rule):
+ *
+ *   A corrected price is the expert's market price — a suggestion. In this order:
+ *     1  the same contragent, 2  another contragent; inside each, one the contractor took («Исправлено») first, then
+ *     the newest. One line per application. A price «Применить %» set is not one (a blanket discount is not a price
+ *     looked up), a price of 0 is a resource struck out — neither is ever offered. Older than PRICE_MONTHS: not shown.
+ *
+ *   An untouched price is not a market price: by the program's own rule a smeta price below the market is left
+ *   alone. It is a CEILING — «accepted up to this price». It counts only when independent applications agree:
+ *     - applications are independent when their contragents differ (one contragent's own untouched price, however
+ *       often repeated, never confirms itself);
+ *     - each counts with a weight: 1 when the resource was marked «проверено» (by hand or at the finish), UNMARKED
+ *       when it was merely left; times the age factor — whole for the first half of CEIL_MONTHS, then falling in a
+ *       straight line to 0 at CEIL_MONTHS (prices rise: an old acceptance says less);
+ *     - the ceiling is the highest price that at least two independent applications — at least one of them not the
+ *       contragent of the application open now — accepted at or above, with weights adding up to NEED or more.
+ *   A smeta price at or below the ceiling is «ранее принято»; above it, the row is pointed out.
+ *
+ * Other regions are never read (the query is by region, as «Прежние проекты»).
+ */
+var S = (typeof S !== 'undefined' && S) || {};
+(function (S) {
+  'use strict';
+
+  var PRICE_MONTHS = 24;      // a corrected price older than this is not offered
+  var CEIL_MONTHS = 12;       // an untouched price stops being a ceiling after this (the owner's default)
+  var UNMARKED = 0.5;         // the weight of a price merely left, against 1 for one marked «проверено»
+  var NEED = 1.5;             // weights that make a ceiling: two marked; one marked and one left; three left
+  var DAY = 86400000;
+
+  function months(from, today) {
+    var a = Date.parse(String(from || '').slice(0, 10)), b = Date.parse(String(today || '').slice(0, 10));
+    if (isNaN(a) || isNaN(b)) return null;
+    return Math.max(0, (b - a) / DAY / 30.4375);
+  }
+  /** 1 for the first half of CEIL_MONTHS, then down to 0 at CEIL_MONTHS. */
+  function ageFactor(age) {
+    var half = CEIL_MONTHS / 2;
+    return age <= half ? 1 : Math.max(0, 1 - (age - half) / (CEIL_MONTHS - half));
+  }
+  function near(a, b) { var d = Math.abs(a - b); return d < 1e-6 || d < Math.abs(a) * 1e-9; }
+
+  function rank(rows, ctx) {
+    ctx = ctx || {};
+    var mine = ctx.contragent || '', today = ctx.today || new Date().toISOString().slice(0, 10);
+    var prices = [], seen = {}, groups = {};
+    (rows || []).forEach(function (r) {
+      if (!r || !(r.final_price > 0)) return;                       // struck out, or nothing
+      var age = months(r.finished, today);
+      if (age == null) return;
+      if (r.kind === 'corrected') {
+        if (r.source === 'pct' || age > PRICE_MONTHS) return;
+        var one = (r.workspace || r.id) + '|' + r.final_price;      // variants of one name in one application: one line
+        if (seen[one]) return;
+        seen[one] = 1;
+        prices.push({ row: r, cls: mine && r.contragent === mine ? 1 : 2, accepted: !!r.accepted, age: age, price: r.final_price });
+      } else if (r.kind === 'checked' || r.kind === 'untouched') {
+        if (age >= CEIL_MONTHS) return;
+        var w = (r.kind === 'checked' ? 1 : UNMARKED) * ageFactor(age);
+        // independent = another contragent; an application with none stands for itself
+        var g = r.contragent || ('ws:' + (r.workspace || r.id));
+        var cur = groups[g];
+        // one contragent says one thing: its highest accepted price, at the best weight it was accepted with
+        if (!cur) groups[g] = { price: r.final_price, w: w, own: !!mine && r.contragent === mine, rows: [r] };
+        else { cur.rows.push(r); if (r.final_price > cur.price) cur.price = r.final_price; if (w > cur.w) cur.w = w; }
+      }
+    });
+    prices.sort(function (a, b) {
+      return a.cls - b.cls || (b.accepted ? 1 : 0) - (a.accepted ? 1 : 0) || a.age - b.age || a.price - b.price;
+    });
+
+    var list = Object.keys(groups).map(function (k) { return groups[k]; }).sort(function (a, b) { return b.price - a.price; });
+    var ceiling = null, w = 0, n = 0, other = false, used = [];
+    for (var i = 0; i < list.length && !ceiling; i++) {
+      w += list[i].w; n++; other = other || !list[i].own; used.push(list[i]);
+      if (n >= 2 && other && w >= NEED - 1e-9) {
+        ceiling = { price: list[i].price, apps: n, weight: w, rows: used.reduce(function (o, g) { return o.concat(g.rows); }, []) };
+      }
+    }
+    return { prices: prices, ceiling: ceiling };
+  }
+
+  /** How a smeta price stands to the ceiling: at or below it — accepted before; above — to be looked at. */
+  function verdict(smeta, ceiling) {
+    if (!ceiling || !(smeta > 0)) return '';
+    return smeta <= ceiling.price || near(smeta, ceiling.price) ? 'accepted' : 'above';
+  }
+
+  S.memory = { rank: rank, verdict: verdict, ageFactor: ageFactor, PRICE_MONTHS: PRICE_MONTHS, CEIL_MONTHS: CEIL_MONTHS, UNMARKED: UNMARKED, NEED: NEED };
+})(S);
+
+;
+/*
+ * «Память»: the prices of finished applications, shown for the resources of the open one (docs/ai-reja.md, phase 2).
+ *
+ * What a finished application left in price_memory (src/ui/journal.js) comes back here, for the same resource (name
+ * and unit by the cross-project keys) in the same region — never another region, as «Прежние проекты»:
+ *
+ *   - the tag «пам.» on a resource the expert priced before, and its popover: his corrected prices, the same
+ *     contragent's first, then the others'; one the contractor took («принята подрядчиком») before a newer one; each
+ *     with its application, contragent and date. «Применить» sets the price as every suggestion does (and only it);
+ *   - the mark in the «цена по смете» cell: «✓» when independent applications accepted this smeta price or a higher
+ *     one before («ранее принято»), «▲» and an amber cell when the smeta price is above what was accepted. The popover
+ *     names the applications. What makes a ceiling, and how it ages, is S.memory (src/lib/memory.js).
+ *
+ * The switch «Память» on the toolbar turns all of it off (kept in this browser). Nothing here sets a price by itself,
+ * and nothing here reorders the other suggestions.
+ *
+ * Server only. A server from before the memory answers 404 and the page stays as it was.
+ */
+(function (S) {
+  'use strict';
+  if (!S.pb) return;
+
+  var PER = 40;              // match keys in one request
+  var PREF = 'smeta.memory.off';
+  var SEP = '␟';
+  var FIELDS = 'id,workspace,application,contragent,match_key,match_unit_key,kind,source,smeta_price,final_price,finished,accepted,' +
+    'expand.application.number,expand.application.org_name,expand.contragent.name';
+
+  function $(id) { return document.getElementById(id); }
+  function A() { return window.app; }
+  function mkOf(r) { return r.mk || S.matchPair(r.name, r.unit || ''); }
+  function fmt(v) { return S.price(v); }
+  function day(d) { var t = new Date(String(d || '').replace(' ', 'T')); return isNaN(t) ? '' : t.toLocaleDateString('ru-RU'); }
+  function today() { return new Date().toISOString().slice(0, 10); }
+  function off() { try { return localStorage.getItem(PREF) === '1'; } catch (e) { return false; } }
+  function srcText(s) {
+    return /^ref:/.test(s) ? 'из справочника' : /^uzex:/.test(s) ? 'с биржи UZEX' : /^(hint|mem):/.test(s) ? 'из прежней заявки' : 'введена вручную';
+  }
+
+  var M = {
+    on: !off(),
+    map: {},           // match pair → rows of price_memory
+    asked: {},         // match key → 1
+    cache: {},         // match pair → S.memory.rank(...)
+    gen: 0, t: 0, key: null, pop: null,
+
+    usable: function () { var Sy = S.Sync; return !!(this.on && Sy && Sy.ws && !Sy.loading && A() && A().model); },
+
+    reset: function () { this.gen++; this.map = {}; this.asked = {}; this.cache = {}; this.hide(); clearTimeout(this.t); },
+
+    loadSoon: function () {
+      var self = this;
+      clearTimeout(this.t);
+      this.t = setTimeout(function () { self.load(); }, 400);
+    },
+
+    /** Ask for every resource not asked about yet. */
+    load: function () {
+      if (!this.usable()) return;
+      var self = this, gen = this.gen, Sy = S.Sync, want = [];
+      A().model.resources.forEach(function (r) {
+        var k = S.matchKey(r.name);
+        if (k && !self.asked[k]) { self.asked[k] = 1; want.push(k); }
+      });
+      if (!want.length) return;
+      var chunks = [];
+      for (var i = 0; i < want.length; i += PER) chunks.push(want.slice(i, i + PER));
+      chunks.reduce(function (p, ch) {
+        return p.then(function () {
+          if (gen !== self.gen) return;
+          var params = { r: Sy.ws.region, w: Sy.ws.id };
+          var ors = ch.map(function (k, n) { params['k' + n] = k; return 'match_key = {:k' + n + '}'; }).join(' || ');
+          return S.pb.collection('price_memory').getFullList({
+            batch: 500, sort: '-finished', expand: 'application,contragent', fields: FIELDS,
+            filter: S.pb.filter('region = {:r} && workspace != {:w} && (' + ors + ')', params)
+          }).then(function (rows) {
+            if (gen !== self.gen || !rows.length) return;
+            rows.forEach(function (c) {
+              var a = c.expand && c.expand.application, ct = c.expand && c.expand.contragent;
+              var pair = c.match_key + SEP + c.match_unit_key;
+              (self.map[pair] = self.map[pair] || []).push({ id: c.id, workspace: c.workspace, application: c.application, contragent: c.contragent,
+                kind: c.kind, source: c.source || '', smeta_price: c.smeta_price, final_price: c.final_price, finished: c.finished, accepted: !!c.accepted,
+                number: a ? a.number : '', who: ct ? ct.name : (a ? a.org_name : '') });
+              delete self.cache[pair];
+            });
+            self.repaint();
+          });
+        });
+      }, Promise.resolve()).catch(function () { /* an older server, or none: the page stays as it was */ });
+    },
+
+    repaint: function () {
+      var app = A();
+      if (!app || !app.prices_ui) return;
+      app.prices_ui.list.refresh();
+      app.prices_ui.status();
+    },
+
+    /** What the memory says about a resource: { prices, ceiling }. */
+    of: function (r) {
+      if (!this.on || !r) return { prices: [], ceiling: null };
+      var mk = mkOf(r), c = this.cache[mk];
+      if (!c) {
+        var Sy = S.Sync;
+        c = this.cache[mk] = S.memory.rank(this.map[mk] || [], { contragent: Sy && Sy.app ? Sy.app.contragent : '', today: today() });
+      }
+      return c;
+    },
+    hasRow: function (r) { return this.of(r).prices.length > 0; },
+
+    /** The tag of the name cell: the expert priced this resource before. */
+    tag: function (r) {
+      var e = this.of(r);
+      if (!e.prices.length) return '';
+      var top = e.prices[0];
+      return '<button class="tagp' + (top.cls === 1 ? ' own' : '') + '" data-mem="' + S.esc(r.key) + '" title="' +
+        S.esc('Память: ваша цена из завершённой заявки — ' + fmt(top.price) + (top.cls === 1 ? ' (этот контрагент)' : '') +
+          (e.prices.length > 1 ? ', всего ' + e.prices.length : '') + '. Нажмите — подробности') + '">пам.</button>';
+    },
+
+    /** The mark of the smeta-price cell: { cls, html }. */
+    ceil: function (r) {
+      var e = this.of(r), v = S.memory.verdict(r.price, e.ceiling);
+      if (!v) return { cls: '', html: '' };
+      var c = e.ceiling;
+      var t = v === 'accepted'
+        ? 'Ранее принято: такую или более высокую сметную цену оставили без изменений в ' + c.apps + ' независимых заявках (до ' + fmt(c.price) + ')'
+        : 'Выше принятого ранее: без изменений оставляли до ' + fmt(c.price) + ' (' + c.apps + ' независимых заявок), здесь ' + fmt(r.price);
+      return { cls: v === 'above' ? ' mover' : '', html: '<button class="mceil ' + (v === 'accepted' ? 'ok' : 'over') + '" data-memc="' + S.esc(r.key) +
+        '" title="' + S.esc(t + '. Нажмите — подробности') + '">' + (v === 'accepted' ? '✓' : '▲') + '</button>' };
+    },
+
+    statusText: function () {
+      if (!this.usable()) return '';
+      var n = 0, over = 0, self = this;
+      A().model.resources.forEach(function (r) {
+        var e = self.of(r);
+        if (e.prices.length) n++;
+        if (S.memory.verdict(r.price, e.ceiling) === 'above') over++;
+      });
+      return (n ? ' · в памяти ' + n : '') + (over ? ' · выше принятого ' + over : '');
+    },
+
+    recOf: function (key) {
+      var m = A().model;
+      if (!m) return null;
+      for (var i = 0; i < m.resources.length; i++) if (m.resources[i].key === key) return m.resources[i];
+      return null;
+    },
+
+    show: function (anchor, key) {
+      var self = this, rec = this.recOf(key), e = this.of(rec);
+      if (!rec || (!e.prices.length && !e.ceiling)) { this.hide(); return; }
+      this.key = key;
+      var region = S.Sync && S.Sync.ws ? S.regionLabel(S.Sync.ws.region) : '';
+      var html = '<div class="mp-head"><span>Память: завершённые заявки · ' + S.esc(region) + ' <small>цены без НДС</small></span>' +
+        '<button class="link" data-x title="Закрыть">×</button></div>';
+      if (!S.near(rec.market, rec.price)) html += '<div class="mp-mine">Ваша цена: <b>' + fmt(rec.market) + '</b></div>';
+      var cls = 0;
+      e.prices.slice(0, 8).forEach(function (p, i) {
+        if (p.cls !== cls) { cls = p.cls; html += '<div class="mp-sub">' + (cls === 1 ? 'Этот контрагент' : 'Другие контрагенты') + '</div>'; }
+        var r = p.row;
+        html += '<div class="mp-row"><b class="mp-price">' + fmt(p.price) + '</b><div class="mp-what">' +
+          (p.accepted ? '<em class="mp-acc" title="В возвращённой смете подрядчик поставил эту цену («Исправлено»)">принята подрядчиком</em> ' : '') +
+          '<span>' + S.esc(srcText(r.source)) + '</span>' +
+          '<small>№ ' + S.esc(r.number) + ' · ' + S.esc(r.who) + ' · ' + S.esc(day(r.finished)) +
+          (r.smeta_price > 0 ? ' · сметная цена там: ' + fmt(r.smeta_price) : '') + '</small></div>' +
+          '<button class="btn sm" data-i="' + i + '">Применить</button></div>';
+      });
+      if (e.ceiling) {
+        var c = e.ceiling, v = S.memory.verdict(rec.price, c);
+        html += '<div class="mp-sub">Оставлено как в смете</div><div class="mp-ceil ' + (v === 'above' ? 'over' : 'ok') + '">' +
+          (v === 'above' ? '▲ Сметная цена ' + fmt(rec.price) + ' выше принятого ранее: без изменений оставляли до <b>' + fmt(c.price) + '</b>'
+            : '✓ Ранее принято: без изменений оставляли до <b>' + fmt(c.price) + '</b>') + ' — ' + c.apps + ' независимых заявок' +
+          '<small>это не рыночная цена, а граница: цену ниже рынка программа не трогает</small></div>' +
+          c.rows.slice(0, 6).map(function (r) {
+            return '<div class="mp-ev">' + fmt(r.final_price) + ' · № ' + S.esc(r.number) + ' · ' + S.esc(r.who) + ' · ' + S.esc(day(r.finished)) +
+              ' · ' + (r.kind === 'checked' ? 'проверено' : 'оставлено') + '</div>';
+          }).join('');
+      }
+      this.pop.innerHTML = html;
+      this.pop.querySelector('[data-x]').addEventListener('click', function () { self.hide(); });
+      this.pop.querySelectorAll('button[data-i]').forEach(function (b) {
+        b.addEventListener('click', function () { self.apply(key, e.prices[+b.dataset.i]); });
+      });
+      this.place(anchor);
+    },
+
+    /** Below the row or above it, whichever has more room. */
+    place: function (anchor) {
+      var row = (anchor.closest && anchor.closest('.vrow')) || anchor;
+      var r = row.getBoundingClientRect(), a = anchor.getBoundingClientRect();
+      var vh = window.innerHeight, gap = 4, edge = 6;
+      this.pop.style.maxHeight = '';
+      this.pop.style.top = '0px';
+      this.pop.hidden = false;
+      var w = this.pop.offsetWidth, h = this.pop.offsetHeight;
+      var below = vh - r.bottom - gap - edge, above = r.top - gap - edge;
+      var down = h <= below || below >= above;
+      var room = Math.max(120, down ? below : above);
+      this.pop.style.maxHeight = room + 'px';
+      this.pop.style.left = Math.max(8, Math.min(a.left, window.innerWidth - w - 8)) + 'px';
+      this.pop.style.top = Math.max(edge, down ? r.bottom + gap : r.top - gap - Math.min(h, room)) + 'px';
+    },
+
+    hide: function () { if (this.pop) this.pop.hidden = true; this.key = null; },
+
+    /** «Применить»: that earlier price on the resource, and where it came from (mem:<row>). */
+    apply: function (key, p) {
+      var app = A(), rec = this.recOf(key);
+      if (!rec || !p || !(p.price > 0)) return;
+      if (!S.near(rec.market, rec.price) && !S.near(rec.market, p.price) &&
+          !window.confirm('Заменить вашу цену ' + fmt(rec.market) + ' на ' + fmt(p.price) + '?')) return;
+      if (S.markSource) S.markSource(key, p.price, 'mem:' + p.row.id);
+      app.setPrice(key, p.price);
+      this.hide();
+      app.prices_ui.afterApply(key);
+      app.sheetList.refresh();
+      app.toast('Применено: ' + fmt(p.price) + ' (память, заявка № ' + p.row.number + ')');
+    },
+
+    /** The row a memory source names, when it is among those read (for the cell's badge). */
+    byId: function (id) {
+      var maps = this.map, out = null;
+      Object.keys(maps).some(function (k) { return maps[k].some(function (r) { if (r.id === id) { out = r; return true; } return false; }); });
+      return out;
+    },
+
+    toggle: function (on) {
+      this.on = !!on;
+      try { if (on) localStorage.removeItem(PREF); else localStorage.setItem(PREF, '1'); } catch (e) { /* not kept */ }
+      this.hide();
+      this.cache = {};
+      if (on) this.load();
+      this.repaint();
+    },
+
+    init: function () {
+      var self = this;
+      if (this.inited || !$('priceScroll')) return;
+      this.inited = true;
+      this.pop = document.createElement('div');
+      this.pop.id = 'memPop';
+      this.pop.className = 'mempop';
+      this.pop.hidden = true;
+      document.body.appendChild(this.pop);
+      var sc = $('priceScroll');
+      sc.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('.tagp,.mceil');
+        if (b) { e.preventDefault(); self.show(b, b.dataset.mem || b.dataset.memc); }
+      });
+      sc.addEventListener('scroll', function () { if (!self.pop.hidden) self.hide(); }, { passive: true });
+      document.addEventListener('click', function (e) {
+        if (self.pop.hidden) return;
+        if (!document.documentElement.contains(e.target)) return;
+        if (self.pop.contains(e.target) || (e.target.closest && e.target.closest('.tagp,.mceil'))) return;
+        self.hide();
+      });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') self.hide(); });
+      // the switch, beside the other tools of the list
+      var reset = $('resetBtn');
+      if (reset && !$('memOn')) {
+        var lab = document.createElement('label');
+        lab.className = 'memtog'; lab.hidden = true; lab.id = 'memTog';
+        lab.title = 'Показывать цены завершённых заявок: ваши прежние цены («пам.») и отметку «ранее принято» у сметной цены';
+        lab.innerHTML = '<input type="checkbox" id="memOn"' + (this.on ? ' checked' : '') + '> Память';
+        reset.parentNode.insertBefore(lab, reset);
+        $('memOn').addEventListener('change', function (e) { self.toggle(e.target.checked); });
+      }
+      document.addEventListener('ws:open', function () { self.reset(); if ($('memTog')) $('memTog').hidden = false; self.loadSoon(); });
+      document.addEventListener('ws:close', function () { self.reset(); if ($('memTog')) $('memTog').hidden = true; });
+      // the estimates of the application are read after it opens, and more may be added: asked again whenever the
+      // suggestions of earlier projects are (sync.js calls S.Hints.loadSoon then), and after a rebuild
+      var again = function (obj, name) {
+        var orig = obj && obj[name];
+        if (typeof orig !== 'function') return;
+        obj[name] = function () {
+          var out = orig.apply(this, arguments);
+          try { if (S.Sync && S.Sync.ws) self.loadSoon(); } catch (e) { /* never in the way */ }
+          return out;
+        };
+      };
+      again(S.Hints, 'loadSoon');
+      again(S.App.prototype, 'rebuild');
+    }
+  };
+
+  S.Memory = M;
+  document.addEventListener('DOMContentLoaded', function () { M.init(); });
+  if (document.readyState !== 'loading') M.init();
+})(S);
+
+;
+/*
  * What the program keeps to learn from (docs/ai-reja.md, phase 1). Recording only: nothing here changes what is
  * shown, in which order, or any price.
  *
@@ -12690,9 +13118,9 @@ var S = (typeof S !== 'undefined' && S) || {};
   'use strict';
   if (!S.pb) return;
 
-  var SCHEMA = 1;            // the shape of a journal line (server/pb_hooks/lib/learning.js `line`)
+  var SCHEMA = 2;            // the shape of a journal line (server/pb_hooks/lib/learning.js `line`); 2: the kind «mem»
   var COMMIT_MS = 2500;      // after the last change of a price: the typing is over and sync.js has sent it
-  var MAX_LINES = 12, CAP = { ref: 6, uzex: 2, hint: 3, sim: 1 };
+  var MAX_LINES = 12, CAP = { mem: 2, ref: 5, uzex: 2, hint: 2, sim: 1 };
   var BATCH = 100;           // events per request (the server takes 200)
   var KEEP = 500;            // events waiting for a server that does not answer; older ones are let go
   var ROWS = 1000;           // finished prices per request (the server takes 3000)
@@ -12760,6 +13188,14 @@ var S = (typeof S !== 'undefined' && S) || {};
         return o;
       }
       try {
+        // the expert's own earlier prices (src/ui/memory.js), in the order they are offered
+        var Mm = S.Memory;
+        if (Mm && Mm.of) Mm.of(rec).prices.slice(0, 8).forEach(function (p, i) {
+          add('mem', i, { id: p.row.id, price: p.price, date: String(p.row.finished || '').slice(0, 10), same: p.cls === 1, accepted: !!p.accepted,
+            src: /^ref:/.test(p.row.source) ? 'ref' : /^uzex:/.test(p.row.source) ? 'uzex' : 'typed' }, !!source && source === 'mem:' + p.row.id);
+        });
+      } catch (e) { /* none */ }
+      try {
         var R = S.Refs;
         if (R && R.lines) R.lines(rec).forEach(function (l, i) { add('ref', i, engine(l), !!source && R.sourceOf(l) === source); });
       } catch (e) { /* none */ }
@@ -12806,7 +13242,7 @@ var S = (typeof S !== 'undefined' && S) || {};
           var value = rec.market, kind = pend[k].kind;
           var mark = Sy.priceSource ? Sy.priceSource(k, value) : null;
           var source = mark && mark.source ? mark.source : 'typed';
-          var applied = /^(ref|uzex|hint):/.test(source);
+          var applied = /^(ref|uzex|hint|mem):/.test(source);
           var action = S.near(value, rec.price) ? 'reset' : kind === 'autopick' && applied ? 'autopick' : kind ? 'bulk' : applied ? 'applied' : 'typed';
           if (action === 'reset') { source = 'typed'; mark = null; }
           var sig = action + '|' + value + '|' + source;
@@ -12963,6 +13399,7 @@ var S = (typeof S !== 'undefined' && S) || {};
       wrap(S.Refs, 'show', function (anchor, key) { if (key) self.seen[key] = 1; });
       wrap(S.Uzex, 'show', function (anchor, key) { if (key) self.seen[key] = 1; });
       wrap(S.Hints, 'show', function (anchor, mk, key) { if (key) self.seen[key] = 1; });
+      wrap(S.Memory, 'show', function (anchor, key) { if (key) self.seen[key] = 1; });
       // leaving the application, by the list or by the tab: what was decided is written down first
       wrap(S.Sync, 'close', function () { self.commit(); });
       window.addEventListener('pagehide', function () { try { self.commit(); } catch (e) { /* gone */ } });

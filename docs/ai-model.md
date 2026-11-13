@@ -1,7 +1,21 @@
 # Dastur nimadan o'rganadi — egasi va mijoz uchun oddiy tilda
 
-Bu hujjat bosqichma-bosqich to'ldiriladi (reja — `docs/ai-reja.md`). Hozirgi holat: **1-bosqich — faqat yozib
-borish**. Dastur hali hech narsani o'zgartirmaydi: takliflar, ularning tartibi va narxlar aynan avvalgidek.
+Bu hujjat bosqichma-bosqich to'ldiriladi (reja — `docs/ai-reja.md`). Hozirgi holat: **2-bosqich — yozib borish va
+xotirani ko'rsatish**. Bu hali «model» emas: dastur yakunlangan arizalaringizni eslab, shu viloyatdagi shu resurs
+uchun ko'rsatadi. Boshqa takliflar (справочник, birja, oldingi loyihalar) va ularning tartibi avvalgidek; narxni
+baribir siz qo'yasiz.
+
+## Xotira ekranda nima ko'rsatadi
+
+- **«пам.»** tegi — bu resursga yakunlangan arizada o'zingiz narx qo'ygansiz. Oynasida: avval shu kontragentning
+  arizalari, keyin boshqalar; pudratchi qabul qilgan narx («принята подрядчиком») birinchi; har biri ariza raqami,
+  kontragent va sana bilan. «Применить» bosilsagina narx qo'yiladi.
+- Smeta narxi yonidagi **«✓»** — bu yoki undan baland smeta narxi kamida ikki **mustaqil** arizada (turli
+  kontragentlar) o'zgarishsiz qoldirilgan: «ilgari qabul qilingan». **«▲»** va sariq katak — smeta narxi ilgari qabul
+  qilinganidan baland: qarab chiqish kerak. Bu bozor narxi emas, chegara: bozordan arzon smeta narxiga dastur
+  tegmaydi. Kontragentning o'z eski narxi o'zini tasdiqlamaydi; qabul 6 oygacha to'liq kuchda, 12 oyda tugaydi.
+- Faqat shu viloyat. «Применить %» bilan qo'yilgan va 0 qilingan narxlar taklif qilinmaydi.
+- **O'chirish:** ro'yxat ustidagi «Память» kaliti (shu brauzerda eslab qolinadi).
 
 ## Nima yozib boriladi
 

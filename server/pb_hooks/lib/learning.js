@@ -19,7 +19,7 @@ const MAX_TEXT = 500;
 const ACTIONS = ["applied", "typed", "reset", "autopick", "bulk"];
 const KINDS = ["corrected", "checked", "untouched", "zeroed"];
 const SECTIONS = ["labor", "machines", "materials", "equipment", "transport", "other"];
-const LINE_KINDS = ["ref", "uzex", "hint", "sim"];
+const LINE_KINDS = ["ref", "uzex", "hint", "sim", "mem"];
 
 function text(v, max) { return String(v == null ? "" : v).slice(0, max || MAX_TEXT); }
 function num(v) { const n = Number(v); return isFinite(n) ? n : 0; }
@@ -46,6 +46,7 @@ function line(l) {
   if (l.n != null) out.n = int(l.n, 0, 99);
   if (l.id != null) out.id = text(l.id, 15);
   if (l.same != null) out.same = !!l.same;
+  if (l.accepted != null) out.accepted = !!l.accepted;
   if (l.src != null) out.src = oneOf(l.src, ["ref", "uzex", "typed"], "typed");
   if (l.unit != null) out.unit = oneOf(l.unit, ["same", "conv", "derived"], "same");
   return out;

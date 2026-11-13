@@ -572,6 +572,29 @@ body.compact main:not(.narrow){grid-template-columns:232px 1fr}
 .cpbox td small{display:block;color:var(--mute)}
 .cpbox .cp-f{padding:10px 14px;border-top:1px solid var(--rule2);display:flex;gap:8px;align-items:center}
 .cpbox .cp-f .count{flex:1;color:var(--mute);font-size:12px}
+.tagp{margin-left:6px;font-size:10px;line-height:14px;padding:0 5px;border-radius:7px;border:1px solid #9a7b2f;background:#fbf3dc;color:#6b4e00;cursor:pointer}
+.tagp.own{background:#f3e3ad;font-weight:600}
+.mceil{border:0;background:none;padding:0 3px 0 0;font-size:10px;cursor:pointer;vertical-align:1px}
+.mceil.ok{color:#5d7a5d}
+.mceil.over{color:#b26a00}
+.c.num.mover{background:#fff4de}
+.memtog{font-size:12px;margin-right:8px;white-space:nowrap}
+.memtog[hidden]{display:none}
+.mempop{position:fixed;z-index:56;width:min(520px,94vw);overflow:auto;background:#fff;border:1px solid var(--rule2);border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.14);font-size:12px}
+.mempop[hidden]{display:none}
+.mempop .mp-head{display:flex;justify-content:space-between;gap:8px;padding:6px 10px;border-bottom:1px solid var(--rule2);font-weight:600}
+.mempop .mp-head small{font-weight:400;color:var(--mute)}
+.mempop .mp-mine{padding:4px 10px;color:var(--mute)}
+.mempop .mp-sub{padding:5px 10px 2px;font-weight:600;color:#6b4e00;font-size:11px;text-transform:uppercase;letter-spacing:.02em}
+.mempop .mp-row{display:flex;gap:8px;align-items:flex-start;padding:5px 10px;border-top:1px solid #f1f1f1}
+.mempop .mp-price{min-width:88px;text-align:right;white-space:nowrap}
+.mempop .mp-what{flex:1;min-width:0}
+.mempop .mp-what small{display:block;color:var(--mute);overflow-wrap:anywhere}
+.mempop .mp-acc{font-style:normal;color:var(--greentx);background:var(--green);border-radius:3px;padding:0 4px}
+.mempop .mp-ceil{padding:5px 10px}
+.mempop .mp-ceil.over{background:#fff4de}
+.mempop .mp-ceil small{display:block;color:var(--mute)}
+.mempop .mp-ev{padding:1px 10px 1px 22px;color:var(--mute)}
 .finbox .cp-in{width:min(620px,94vw)}
 .finbox .fin-body{padding:10px 14px;font-size:13px}
 .finbox .fin-counts{margin:0 0 6px}
@@ -5195,6 +5218,11 @@ if (typeof self !== 'undefined') self.S = S;
       var t = h ? 'Цена из прежнего проекта № ' + h.number + ' · ' + h.contragent : 'Цена из прежнего проекта';
       return '<span class="upill h" title="' + S.esc(t + '. Введите цену вручную, чтобы снять отметку') + '">П</span>';
     }
+    if (/^mem:/.test(s)) {
+      var mr = S.Memory && S.Memory.byId ? S.Memory.byId(s.slice(4)) : null;
+      var mt = mr ? 'Ваша цена из завершённой заявки № ' + mr.number + ' · ' + mr.who : 'Ваша цена из завершённой заявки';
+      return '<span class="upill h" title="' + S.esc(mt + '. Введите цену вручную, чтобы снять отметку') + '">П</span>';
+    }
     return '';
   }
 
@@ -5356,8 +5384,9 @@ if (typeof self !== 'undefined') self.S = S;
    * exchange — pressed as by hand, with its own confirmations. A line of «Похожие ресурсы» is never taken this way.
    */
   S.acceptFirst = function (key) {
-    var H = S.Hints, R = S.Refs, U = S.Uzex, b = null;
-    if (H && H.pop && !H.pop.hidden && H.key === key) b = H.pop.querySelector('.hp-row:not(.near) button[data-i]');
+    var H = S.Hints, R = S.Refs, U = S.Uzex, M = S.Memory, b = null;
+    if (M && M.pop && !M.pop.hidden && M.key === key) b = M.pop.querySelector('button[data-i]');
+    else if (H && H.pop && !H.pop.hidden && H.key === key) b = H.pop.querySelector('.hp-row:not(.near) button[data-i]');
     else if (R && R.pop && !R.pop.hidden && R.open && R.open.key === key) b = R.pop.querySelector('.rp-line:not(.near) button[data-i]');
     else if (U && U.pop && !U.pop.hidden && U.open && U.open.key === key) b = U.pop.querySelector('.up-line:not(.near) button[data-i]');
     if (b && !b.disabled) b.click();
@@ -5485,7 +5514,8 @@ if (typeof self !== 'undefined') self.S = S;
       (near ? ' · похожих ' + near : '') +
       (mis ? ' · не тот раздел ' + mis : '') +
       (S.Refs ? S.Refs.statusText() : '') +
-      (S.Uzex ? S.Uzex.statusText() : '');
+      (S.Uzex ? S.Uzex.statusText() : '') +
+      (S.Memory ? S.Memory.statusText() : '');
   };
 
   Prices.prototype.renderRange = function (from, to) {
@@ -5499,7 +5529,10 @@ if (typeof self !== 'undefined') self.S = S;
       var many = r.variants > 1;
       var multi = many ? '<button class="tagm" data-nm="' + S.esc(r.name) + '" title="' +
         S.esc(multiHint(r)) + '">' + r.variants + ' цены</button>' : '';
-      var hint = (S.Hints ? S.Hints.tag(r) : '') + (S.Refs ? S.Refs.tag(r) : '') + (S.Uzex ? S.Uzex.tag(r) : '');
+      // the expert's own earlier prices first (src/ui/memory.js), then earlier projects, the reference prices, the exchange
+      var hint = (S.Memory ? S.Memory.tag(r) : '') + (S.Hints ? S.Hints.tag(r) : '') + (S.Refs ? S.Refs.tag(r) : '') + (S.Uzex ? S.Uzex.tag(r) : '');
+      // «ранее принято» / «выше принятого» beside the smeta price
+      var mc = S.Memory ? S.Memory.ceil(r) : { cls: '', html: '' };
       // a price applied from an exchange quote keeps its mark in the cell until it is typed over (src/ui/uzex.js)
       var uz = srcMark(r), uzOnly = uz && /upill u\b/.test(uz);
       var sec = secTag(r);
@@ -5511,7 +5544,7 @@ if (typeof self !== 'undefined') self.S = S;
         cell(COLS[2], S.esc(r.unit)) +
         cell(COLS[3], r.count) +
         cell(COLS[4], S.qty(r.qty)) +
-        '<div class="c num" style="' + width(COLS[5]) + '">' + S.price(r.price) + '</div>' +
+        '<div class="c num' + mc.cls + '" style="' + width(COLS[5]) + '">' + mc.html + S.price(r.price) + '</div>' +
         '<div class="c num' + (uz ? ' uzc' : '') + '" style="' + width(COLS[6]) + '">' + uz +
         '<input class="pin' + (changed ? ' edited' : '') + (uzOnly ? ' uz' : uz ? ' src' : '') + '" data-key="' + S.esc(r.key) + '" data-i="' + i +
         '" inputmode="decimal" value="' + S.price(r.market) + '"></div>' +
@@ -6406,7 +6439,7 @@ if (typeof self !== 'undefined') self.S = S;
    * now with «Отменить»: one key too many no longer costs a price (E3).
    */
   App.prototype.escPrice = function (key, smeta) {
-    if (document.querySelector('#hintPop:not([hidden]),#refPop:not([hidden]),#uzexPop:not([hidden])')) return;
+    if (document.querySelector('#hintPop:not([hidden]),#refPop:not([hidden]),#uzexPop:not([hidden]),#memPop:not([hidden])')) return;
     var now = this.prices[key] != null ? this.prices[key] : smeta;
     if (S.near(now, smeta)) return;
     var o = {}; o[key] = smeta;

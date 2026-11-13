@@ -75,7 +75,9 @@ const FILE = {
   'refs-suggest': 'src/lib/refs/suggest.js',
   'refs-cache': 'src/lib/refs/cache.js',
   // UZEX weekly quotes: matching and units (the second price source, apart from refs)
-  uzex: 'src/lib/uzex.js'
+  uzex: 'src/lib/uzex.js',
+  // what the program learns from (docs/ai-reja.md): the memory of finished applications
+  memory: 'src/lib/memory.js'
 };
 
 /**
@@ -87,6 +89,10 @@ const ORDER = ['fflate', 'xlsx', 'normalize', 'match', 'sections', 'regions', 'u
   'registry-parse', 'refs-package', 'refs-units', 'refs-machines', 'refs-cable', 'refs-steel',
   'refs-mineral', 'refs-electro', 'refs', 'refs-view', 'refs-query', 'refs-pool', 'refs-retrieve',
   'refs-suggest', 'refs-cache', 'uzex'];
+
+// (added on lines of their own: the lines above that name the reference-price files are read by that work's
+// measurement, and stay as they are)
+ORDER.push('memory');
 
 /** Everything needed to read a workbook and build the comparison document. */
 const PIPELINE = ['fflate', 'normalize', 'match', 'sections', 'util', 'formula',

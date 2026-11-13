@@ -22,9 +22,9 @@
   'use strict';
   if (!S.pb) return;
 
-  var SCHEMA = 1;            // the shape of a journal line (server/pb_hooks/lib/learning.js `line`)
+  var SCHEMA = 2;            // the shape of a journal line (server/pb_hooks/lib/learning.js `line`); 2: the kind «mem»
   var COMMIT_MS = 2500;      // after the last change of a price: the typing is over and sync.js has sent it
-  var MAX_LINES = 12, CAP = { ref: 6, uzex: 2, hint: 3, sim: 1 };
+  var MAX_LINES = 12, CAP = { mem: 2, ref: 5, uzex: 2, hint: 2, sim: 1 };
   var BATCH = 100;           // events per request (the server takes 200)
   var KEEP = 500;            // events waiting for a server that does not answer; older ones are let go
   var ROWS = 1000;           // finished prices per request (the server takes 3000)
@@ -92,6 +92,14 @@
         return o;
       }
       try {
+        // the expert's own earlier prices (src/ui/memory.js), in the order they are offered
+        var Mm = S.Memory;
+        if (Mm && Mm.of) Mm.of(rec).prices.slice(0, 8).forEach(function (p, i) {
+          add('mem', i, { id: p.row.id, price: p.price, date: String(p.row.finished || '').slice(0, 10), same: p.cls === 1, accepted: !!p.accepted,
+            src: /^ref:/.test(p.row.source) ? 'ref' : /^uzex:/.test(p.row.source) ? 'uzex' : 'typed' }, !!source && source === 'mem:' + p.row.id);
+        });
+      } catch (e) { /* none */ }
+      try {
         var R = S.Refs;
         if (R && R.lines) R.lines(rec).forEach(function (l, i) { add('ref', i, engine(l), !!source && R.sourceOf(l) === source); });
       } catch (e) { /* none */ }
@@ -138,7 +146,7 @@
           var value = rec.market, kind = pend[k].kind;
           var mark = Sy.priceSource ? Sy.priceSource(k, value) : null;
           var source = mark && mark.source ? mark.source : 'typed';
-          var applied = /^(ref|uzex|hint):/.test(source);
+          var applied = /^(ref|uzex|hint|mem):/.test(source);
           var action = S.near(value, rec.price) ? 'reset' : kind === 'autopick' && applied ? 'autopick' : kind ? 'bulk' : applied ? 'applied' : 'typed';
           if (action === 'reset') { source = 'typed'; mark = null; }
           var sig = action + '|' + value + '|' + source;
@@ -295,6 +303,7 @@
       wrap(S.Refs, 'show', function (anchor, key) { if (key) self.seen[key] = 1; });
       wrap(S.Uzex, 'show', function (anchor, key) { if (key) self.seen[key] = 1; });
       wrap(S.Hints, 'show', function (anchor, mk, key) { if (key) self.seen[key] = 1; });
+      wrap(S.Memory, 'show', function (anchor, key) { if (key) self.seen[key] = 1; });
       // leaving the application, by the list or by the tab: what was decided is written down first
       wrap(S.Sync, 'close', function () { self.commit(); });
       window.addEventListener('pagehide', function () { try { self.commit(); } catch (e) { /* gone */ } });

@@ -30,3 +30,11 @@ test/.refs/
 refs*.json
 sources-all.json
 private/
+
+# what the program learns from, and trained models (docs/ai-reja.md): private data, never in the repository
+*.ndjson
+*.model.json
+*.dataset.json
+ranker*.json
+dataset*.json
+ml-data/

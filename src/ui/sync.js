@@ -1158,14 +1158,32 @@
       }).catch(function (e) { A().toast(S.pbErr(e), true); });
     },
 
+    /**
+     * «✓ Завершить». The journal (src/ui/journal.js) asks first — what was changed, what was left, whether this
+     * application is to be learned from — and writes its prices to the memory before the mark is set. The memory
+     * never stands in the way: when it cannot be written, that is said, and the application is finished all the same
+     * (finishing it again writes it).
+     */
     finish: function () {
-      var self = this;
-      this.saveNow().then(function () {
-        return S.pb.collection('workspaces').update(self.ws.id, { status: 'done', updated_by: S.me().id });
-      }).then(function (w) {
-        self.ws.status = w.status;
-        self.renderBox();
-        A().toast('Заявка отмечена как завершённая. Её можно открыть и продолжить позже.');
+      var self = this, ws = this.ws, J = S.Journal;
+      if (!ws || this.frozen) return Promise.resolve();
+      var ask = J && J.finishDialog ? J.finishDialog() : Promise.resolve({ plain: true });
+      return ask.then(function (opts) {
+        if (!opts || self.ws !== ws) return;                       // «Отмена», or the application was left meanwhile
+        var kept = null;
+        return self.saveNow().then(function () {
+          if (opts.plain) return;
+          return J.remember(opts).then(function (r) { kept = r; }, function () { kept = false; });
+        }).then(function () {
+          return S.pb.collection('workspaces').update(ws.id, { status: 'done', updated_by: S.me().id });
+        }).then(function (w) {
+          if (self.ws !== ws) return;
+          ws.status = w.status;
+          self.renderBox();
+          A().toast('Заявка отмечена как завершённая. Её можно открыть и продолжить позже.' +
+            (kept && opts.record ? ' Цен запомнено: ' + kept.saved + '.' : kept && !opts.record ? ' В обучении не учитывается.' : ''));
+          if (kept === false) A().toast('Цены этой заявки не записаны в память (сервер не принял) — завершите её ещё раз позже', true);
+        });
       }).catch(function (e) { A().toast(S.pbErr(e), true); });
     },
 

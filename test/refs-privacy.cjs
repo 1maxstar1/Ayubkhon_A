@@ -16,7 +16,10 @@
  *      reference worker's source decoded from its string literal, for the string kinds only (a dist build holds
  *      vendor numbers and hashes);
  *   C  dist equals a fresh build of src (build.mjs has no clock or random input), and src/vendor is unchanged.
- * Always: no tracked package or data file (*.json.gz, *.jsonl, refs-*.json); no 12-hex token (a source id) in A or B;
+ * Always: no tracked package or data file (*.json.gz, *.jsonl, refs-*.json), and no dataset or trained model of the
+ * learning work (by name: .ndjson, .model.json, .dataset.json, and .json or .csv files named ranker…, dataset…,
+ * suggest_events…, price_memory… or ml_models…; or any .json holding journal rows or model weights); no 12-hex token
+ * (a source id) in A or B;
  * every number of five or more digits in test/refs-fixture.cjs is one of its declared synthetic prices.
  * With REFS_KIT (the package): in A, B and H no source id, document number, issuer or plant string (≥ 6 chars), none
  * of the 2k longest record names and no number of five or more digits equal to a rounded package price (or with VAT);
@@ -129,6 +132,15 @@ if (!STAGED) {
 /* ------------------------------------------------------------------ always */
 for (const f of git('ls-files').split('\n')) {
   if (/\.json\.gz$|\.jsonl$|(^|\/)refs-[^/]*\.json$/.test(f)) hit('tracked-data-file', f);
+  // What the program learns from, and what it learns (docs/ai-reja.md), is made of the owner's prices and decisions:
+  // a dataset or a trained model is never a file of the repository — by its name, or by what a .json file holds
+  // (the rows of the journal or of the memory; the weights of a model with their feature schema).
+  if (/\.ndjson$|\.(model|dataset)\.json$|(^|\/)(ranker|dataset|suggest_events|price_memory|ml_models)[^/]*\.(json|csv)$/i.test(f)) hit('tracked-learning-file', f);
+  else if (/\.json$/.test(f) && !/(^|\/)(package(-lock)?\.json|pb_schema\.json)$/.test(f) && !/^src\/vendor\//.test(f)) {
+    let t = '';
+    try { t = fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { t = ''; }
+    if (/"final_price"\s*:/.test(t) || (/"weights"\s*:/.test(t) && /"schema(_hash)?"\s*:/.test(t))) hit('tracked-learning-file', f);
+  }
 }
 for (const [where, t] of [...A, ...B, ...H]) {
   if (/(^|[^0-9a-f])[0-9a-f]{12}([^0-9a-f]|$)/.test(t) && /\b[0-9a-f]{12}\b/.test(t)) hit('hex12', where, t);

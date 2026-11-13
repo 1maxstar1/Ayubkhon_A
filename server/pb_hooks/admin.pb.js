@@ -17,7 +17,7 @@
 // Handlers run in isolated VMs, so shared helpers come from a module.
 
 routerAdd("POST", "/api/admin/workspaces/{id}/clear", (e) => {
-  const { requireAdmin, deleteWhere } = require(`${__hooks}/lib/admin.js`);
+  const { requireAdmin, deleteWhere, forget } = require(`${__hooks}/lib/admin.js`);
   requireAdmin(e);
   const id = e.request.pathValue("id");
   let corrections = 0, exports = 0;
@@ -25,6 +25,8 @@ routerAdd("POST", "/api/admin/workspaces/{id}/clear", (e) => {
     const w = tx.findRecordById("workspaces", id);
     corrections = deleteWhere(tx, "corrections", "workspace", id);
     exports = deleteWhere(tx, "exports", "workspace", id);
+    // work that is thrown away is no evidence: its journal and its finished prices go with it (docs/ai-reja.md)
+    forget(tx, id);
     w.set("files", []);
     w.set("state", {});
     w.set("changed", 0);
@@ -61,20 +63,21 @@ routerAdd("POST", "/api/admin/workspaces/{id}/region", (e) => {
 }, $apis.requireAuth());
 
 routerAdd("DELETE", "/api/admin/workspaces/{id}", (e) => {
-  const { requireAdmin, deleteWhere } = require(`${__hooks}/lib/admin.js`);
+  const { requireAdmin, deleteWhere, forget } = require(`${__hooks}/lib/admin.js`);
   requireAdmin(e);
   const id = e.request.pathValue("id");
   $app.runInTransaction((tx) => {
     const w = tx.findRecordById("workspaces", id);
     deleteWhere(tx, "corrections", "workspace", id);
     deleteWhere(tx, "exports", "workspace", id);
+    forget(tx, id);
     tx.delete(w);
   });
   return e.json(200, { deleted: id });
 }, $apis.requireAuth());
 
 routerAdd("DELETE", "/api/admin/applications/{id}", (e) => {
-  const { requireAdmin, deleteWhere } = require(`${__hooks}/lib/admin.js`);
+  const { requireAdmin, deleteWhere, forget } = require(`${__hooks}/lib/admin.js`);
   requireAdmin(e);
   const id = e.request.pathValue("id");
   let workspaces = 0;
@@ -84,6 +87,7 @@ routerAdd("DELETE", "/api/admin/applications/{id}", (e) => {
     for (const w of ws) {
       deleteWhere(tx, "corrections", "workspace", w.id);
       deleteWhere(tx, "exports", "workspace", w.id);
+      forget(tx, w.id);
       tx.delete(w);
       workspaces++;
     }
@@ -245,6 +249,11 @@ routerAdd("POST", "/api/admin/reset", (e) => {
   // too. A page at a time: asking for every correction of a busy year at once
   // means holding all of them in memory before deleting the first.
   const PAGE = 500;
+  // what was kept to learn from goes first, in one statement each (no files; otherwise every workspace deleted
+  // below would take its rows away one by one)
+  for (const table of ["suggest_events", "price_memory"]) {
+    try { $app.db().newQuery("DELETE FROM " + table).execute(); } catch (_) { /* a database from before these tables */ }
+  }
   for (const name of ["exports", "corrections", "workspaces", "registry_imports"]) {
     let gone = 0;
     for (let round = 0; round < 20000; round++) {

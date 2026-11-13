@@ -15,6 +15,16 @@ module.exports = {
   },
 
   /**
+   * The journal of decisions and the finished prices of a workspace (docs/ai-reja.md), removed with it. With SQL: a
+   * finished estimate leaves a row per resource, and a database from before these tables has nothing to remove.
+   */
+  forget(tx, id) {
+    for (const t of ["suggest_events", "price_memory"]) {
+      try { tx.db().newQuery("DELETE FROM " + t + " WHERE workspace = {:w}").bind({ w: id }).execute(); } catch (_) { /* no such table yet */ }
+    }
+  },
+
+  /**
    * Fills match_key / match_unit_key on corrections saved before those columns
    * existed. Without them a price correction written by the old page is
    * invisible to the hint lookup, which searches by match key.

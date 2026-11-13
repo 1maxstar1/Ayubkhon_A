@@ -170,7 +170,9 @@ try {
   await openApp(rows[2].number);
   await page.setInputFiles('#pick', f1);
   await page.waitForFunction(() => app.model && app.model.rows.length > 0 && S.Sync.ws.files.length === 1 && !S.Sync.loading, null, T);
-  await page.evaluate(() => { const r = app.model.resources.find((x) => x.name === 'ТЕСТОВЫЙ АНКЕР М8'); const p = {}; p[r.key] = 13; app.setPrices(p); });
+  // (the crane at the price the returned estimate has for it: «Исправлено» there, used further down)
+  await page.evaluate(() => { const r = app.model.resources.find((x) => x.name === 'ТЕСТОВЫЙ АНКЕР М8'), c = app.model.resources.find((x) => x.name === 'ТЕСТОВЫЙ КРАН 10 Т');
+    const p = {}; p[r.key] = 13; p[c.key] = 11; app.setPrices(p); });
   // every resource on the sheet: «Только изменённые» would leave out a change under the threshold, and the sheet empty
   await page.selectOption('#reportMode', 'dedup');
   const dl = page.waitForEvent('download', T);
@@ -193,6 +195,8 @@ try {
   await saved();
   await page.click('.tab[data-pane="prices"]');
   await page.click('#wsDone');
+  await page.waitForSelector('#finishBox:not([hidden])', T);
+  await page.click('#finOk');
   await page.waitForFunction(() => document.querySelector('#wsBox .done'), null, T);
   await page.click('#wsList');
   await page.waitForSelector('#screen-list:not([hidden])');
@@ -206,6 +210,16 @@ try {
   check(await page.evaluate(() => document.getElementById('pane-compare').classList.contains('on')) && await page.textContent('#cmpNewName') === 'Тест_v2.xlsx',
     '«Сравнить версию» opens the application on the compare tab, with the returned smeta compared');
   check(await page.evaluate(() => app.projects.length) === 1, 'the returned smeta did not become a project');
+  // the corrected prices the returned estimate took are marked in what was remembered of the application (docs/ai-reja.md)
+  await page.waitForFunction(() => S.Journal.acceptedSig, null, T);
+  await new Promise((r) => setTimeout(r, 800));
+  const fixedKeys = await page.evaluate(() => Object.keys(S.Journal.fixedKeys()));
+  const wsId = await page.evaluate(() => S.Sync.ws.id);
+  const memRows = (await api(`/api/collections/price_memory/records?perPage=500&filter=${encodeURIComponent(`workspace='${wsId}'`)}`, {}, su)).items;
+  const acc = memRows.filter((r) => r.accepted).map((r) => r.res_key).sort();
+  check(memRows.length > 0 && acc.length >= 1 && memRows.find((r) => r.accepted).name === 'ТЕСТОВЫЙ КРАН 10 Т' &&
+    JSON.stringify(acc) === JSON.stringify(memRows.filter((r) => r.kind === 'corrected' && fixedKeys.includes(r.res_key)).map((r) => r.res_key).sort()),
+    `«Исправлено» of the comparison marks the remembered corrected prices as accepted (${acc.length} of ${fixedKeys.length} fixed, ${memRows.length} remembered)`);
 
   check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' / ') : ''));
 } catch (e) {

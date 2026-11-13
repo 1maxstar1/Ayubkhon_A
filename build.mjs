@@ -77,6 +77,8 @@ const SERVER_SCRIPTS = [
   // src/uzex-worker.js, appended at run time to the reference worker's libraries, which carry the engine)
   'src/lib/uzex.js',
   'src/ui/uzex.js',
+  // what is kept to learn from (docs/ai-reja.md): last, it reads what the modules above hold
+  'src/ui/journal.js',
 ].filter((p) => existsSync(join(root, p)));
 
 // The reference-price worker of the server page (src/refs-worker.js): the whole-country pool, the family parsers and
@@ -161,7 +163,7 @@ function build() {
       .replace('/*__JS__*/', () => ['src/vendor/pocketbase.umd.js', 'src/vendor/xlsx.full.min.js', 'src/vendor/fflate.umd.js',
         'src/lib/normalize.js', 'src/lib/match.js', 'src/lib/util.js', 'src/lib/pb.js', 'src/lib/regions.js', 'src/lib/registry-parse.js',
         'src/lib/refs/package.js', 'src/lib/refs/view.js',
-        'src/ui/auth.js', 'src/ui/apps-admin.js', 'src/ui/admin.js', 'src/ui/refs-admin.js', 'src/ui/uzex-admin.js', 'src/ui/version.js']
+        'src/ui/auth.js', 'src/ui/apps-admin.js', 'src/ui/admin.js', 'src/ui/refs-admin.js', 'src/ui/uzex-admin.js', 'src/ui/learning-admin.js', 'src/ui/version.js']
         .filter((p) => existsSync(join(root, p))).map(read).join('\n;\n'));
     emit('admin.html', admin);
   }

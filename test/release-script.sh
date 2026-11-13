@@ -11,7 +11,8 @@
 # a branch not yet on origin is no obstacle, and is not mistaken for another branch ending in the same name; a --row
 # path is read from where the script was started, and one not there is said to be not found; results naming a test
 # the script does not know refuse the release; origin moving on during the release refuses the push with «drop the
-# release commit», never «rebase it».
+# release commit», never «rebase it»; an --unlisted release leaves server/releases.txt alone, and --list adds its line
+# later, by the version alone.
 #
 # The suite is stood in for by a command that writes test/all-results.txt the way test/all.sh does.
 #
@@ -203,6 +204,29 @@ rm -f .git/hooks/pre-commit
   && [ "$(git --git-dir="$T/origin.git" rev-parse "$BR")" = "$(git rev-parse HEAD)" ]
 check $? "a listing commit refused after the release is pushed: says it is written and staged, the line is there once, and no «add the line» advice"
 git reset -q --hard HEAD
+
+# ---- a release the owner is to try first: made and pushed, not listed; listed later by its version alone
+NEXT3=$(node -e "const v=process.argv[1].split('.').map(Number); process.stdout.write(v[0]+'.'+v[1]+'.'+(v[2]+1))" "$NEXT2")
+LINES0=$(wc -l < server/releases.txt)
+HEAD1=$(git rev-parse HEAD)
+run "$NEXT3" "tried first" --row "$T/row.md" --unlisted; R=$?
+check $R "an unlisted release goes through ($(grep -c 'not listed' "$T/out.txt") «not listed» said)"
+REL3=$(git rev-parse HEAD~1)
+[ "$(git rev-list --count "$HEAD1"..HEAD)" = 2 ] && [ "$(wc -l < server/releases.txt)" = "$LINES0" ] && ! grep -q "^v$NEXT3 " server/releases.txt \
+  && ! git show --stat --format= HEAD | grep -q "releases.txt"; check $? "two commits, and server/releases.txt is left alone"
+grep -q "^| \*\*v$NEXT3\*\* | .* | \`$REL3\` |$" docs/versiyalar.md && git show "$REL3:package.json" | grep -q "\"version\": \"$NEXT3\""
+check $? "its row is in docs/versiyalar.md, naming the release commit"
+[ "$(git --git-dir="$T/origin.git" rev-parse "$BR")" = "$(git rev-parse HEAD)" ] && [ -z "$(git status --porcelain)" ]; check $? "both are pushed, the tree is clean"
+env -u RELEASE_TRAILER REFS_KIT= sh server/release.sh --list 9.9.9 >"$T/out.txt" 2>&1; R=$?
+[ $R != 0 ] && grep -q "no row for v9.9.9" "$T/out.txt" && [ "$(wc -l < server/releases.txt)" = "$LINES0" ]; check $? "--list of a version never released is refused"
+env -u RELEASE_TRAILER REFS_KIT= sh server/release.sh --list "$NEXT3" >"$T/out.txt" 2>&1; R=$?
+check $R "--list goes through ($(tail -1 "$T/out.txt" | cut -c1-50))"
+[ "$(tail -1 server/releases.txt)" = "v$NEXT3 $REL3 tried first" ] && [ "$(wc -l < server/releases.txt)" = $((LINES0 + 1)) ]
+check $? "it adds exactly the line of that release: its version, its commit, its note"
+git show --stat --format= HEAD | grep -q "releases.txt" && [ "$(git show --stat --format= HEAD | grep -c '|')" = 1 ] \
+  && [ "$(git --git-dir="$T/origin.git" rev-parse "$BR")" = "$(git rev-parse HEAD)" ]; check $? "in a commit of its own, pushed"
+env -u RELEASE_TRAILER REFS_KIT= sh server/release.sh --list "$NEXT3" >"$T/out.txt" 2>&1; R=$?
+[ $R != 0 ] && grep -q "already in server/releases.txt" "$T/out.txt"; check $? "and a release already listed is not listed twice"
 
 if [ "$FAIL" = 0 ]; then echo "release-script OK"; else echo "FAILED ($FAIL)"; tail -5 "$T/out.txt"; fi
 [ "$FAIL" = 0 ]

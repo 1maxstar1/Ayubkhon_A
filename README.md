@@ -318,6 +318,7 @@ src/
     sync.js           ish maydoni: saqlash, tuzatishlar, ikki vkladka, yopilgan vkladka
     hints.js, refs.js, uzex.js   takliflar: oldingi loyihalar, справочник, birja
     contragent-prices.js  shu kontragentning oldingi narxlari bitta ro'yxatda (F1)
+    journal.js, learning-admin.js  o'rganish uchun yozuvlar: qarorlar jurnali, «Завершить» oynasi, admin sonlari
     compare.js, registry.js, auth.js, admin.js, *-admin.js
 server/
   pb_schema.json, pb_hooks/  PocketBase sxemasi va server qoidalari
@@ -660,6 +661,21 @@ node test/e2e-workspace.mjs    # brauzer: ariza → viloyat → fayllar → narx
 node test/upload-order.mjs     # brauzer: ketma-ket ikki fayl — har biri o'z manziliga tushadi
 node test/e2e-hints.mjs        # brauzer: eslatmalar (viloyat, kontragent)
 ```
+
+### Dastur o'rganishi uchun yozuvlar (v2.11.0)
+
+Dastur ekspertning ishidan o'rganishi uchun (reja — `docs/ai-reja.md`, oddiy tilda — `docs/ai-model.md`) ikki narsa
+yozib boriladi; ekran, takliflar va narxlar bundan **o'zgarmaydi**:
+
+* **Qarorlar jurnali** (`suggest_events`): narx hal qilinganda o'sha resursga ko'rsatilgan takliflar (belgilari bilan,
+  nomsiz) va qaysi biri tanlangani. Smeta narxi yozilmaydi.
+* **Yakunlangan arizalar narxlari** (`price_memory`): «✓ Завершить» avval so'raydi (nechta narx o'zgargan, nechtasi
+  qolgan, nechtasi «проверено»), keyin har bir resursni turi bilan yozadi. «Не учитывать в обучении» — sinov
+  arizalari uchun. Qayta yakunlash yozuvlarni almashtiradi.
+* Admin sahifasi → **«Обучение»**: faqat sonlar; «Скопировать числа».
+
+Yozish faqat server yo'llari orqali (`server/pb_hooks/learning.pb.js`); jurnal yozilmay qolsa ish to'xtamaydi.
+Test: `node test/learning.mjs`.
 
 ### Lokal sinov (bir buyruq)
 

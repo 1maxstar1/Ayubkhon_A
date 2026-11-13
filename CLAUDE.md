@@ -8,7 +8,8 @@ Versiyalar, orqaga qaytish va NLP jadvallarini o'lchov bilan o'zgartirish —
 `docs/versiyalar.md`. Uchta to'liq tekshiruv va ularning natijalari — `docs/audit-plan.md`
 (birinchi), `docs/audit-2-reja.md` (ikkinchi) va `docs/audit-3-reja.md`
 (uchinchi, o'lchov bilan: rad etilgan takliflar ham yozilgan). To'rtinchisi —
-`docs/audit-4-reja.md` — butun dastur bo'yicha **bosqichma-bosqich bajarilayotgan
+`docs/ai-reja.md` — takliflarni ekspert ishidan o'rgatish rejasi (jurnal, xotira, tartiblovchi model; qaysi bosqich
+bajarilgani boshida yozilgan), `docs/ai-model.md` — shuning oddiy tildagi tavsifi. `docs/audit-4-reja.md` — butun dastur bo'yicha **bosqichma-bosqich bajarilayotgan
 reja**: topilmalar, ustuvorlik tartibi va egasi hal qiladigan savollar; 1–5-bosqichlar
 bajarilgan (v2.9.2 – v2.10.0: yashil to'plam va CI, qulaylik va QQS), 6–7 navbatda — har bir band yonida holati yozilgan.
 
@@ -46,6 +47,8 @@ node test/upload-fail.mjs; node test/two-tabs.mjs     # serverga yuklanmagan sme
 node test/close-tab.mjs; node test/state-size.mjs    # yopilgan vkladkada oxirgi narx yo'qolmaydi; holat server cheklovidan oshmaydi
 sh test/pb-smoke.sh; node test/e2e-workspace.mjs      # server rejimi testlari
 node test/contragent-prices.mjs                       # «Цены этого контрагента…»: oldingi narxlar bitta ro'yxatda, bitta tasdiq
+node test/learning.mjs                                # o'rganish uchun yozuvlar: qarorlar jurnali, «Завершить» oynasi va narxlar xotirasi
+sh server/release.sh X.Y.Z "izoh" --row matn.md --unlisted; sh server/release.sh --list X.Y.Z   # egasi avval sinaydigan reliz: ro'yxatsiz chiqarish, sinalgach ro'yxatga qo'shish
 node test/num.cjs; node test/xlsx-guard.cjs           # son qat'iy o'qiladi («1,234.50» — ha, yonida so'z bo'lsa — yo'q); begona .xlsx o'quvchini osib qo'ymaydi
 node test/normalize.cjs; node test/sections.cjs; node test/regions.cjs   # NLP o'lchovlari
 node test/hints.cjs a.xlsx [b.xlsx]                    # o'xshash resurs takliflari: smeta ichida (85/5) va qayd etilgan bazaga nisbatan (aniqlik, to'liqlik, xavfsizlik) — baza bo'lsa (`REFS_KIT`/`HINTS_GOLDEN`), kompyuterdagi barcha qayd etilgan to'plamlarda
@@ -130,6 +133,13 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   qabul qilgan yozuv, `--accept`), va faqat o'lchangan kod yangi bo'lsa — sanasi
   uchun emas. `server/release.sh` ularni reliz commit'iga o'zi qo'shadi. `src` o'zgarsa, to'plamdan oldin `node build.mjs`:
   to'plam birinchi bo'lib `dist/` src dan qurilganini tekshiradi (CI da shu muhim).
+* **O'rganish uchun ma'lumot** (`docs/ai-reja.md`, v2.11.0): qarorlar jurnali (`suggest_events`) va yakunlangan
+  arizalar narxlari (`price_memory`) faqat server yo'llari orqali yoziladi (`server/pb_hooks/learning.pb.js`);
+  jurnal xatosi hech qachon ishni to'xtatmaydi; smeta narxi jurnalga yozilmaydi va tartiblash belgisi bo'lmaydi;
+  dataset va o'qitilgan model fayllari repoga tushmaydi (`test/refs-privacy.cjs` ushlaydi). Model kodi
+  `src/lib/ml/` da yoziladi — `src/lib/refs/**` ga tegilmaydi (o'lchov xeshi), darvoza (raqam, birlik, bo'lim, sana)
+  o'rganilmaydi, daraja tartibi buzilmaydi, narx faqat «Применить» bilan qo'yiladi. Egasi sinamagan versiya
+  `--unlisted` bilan chiqariladi.
 * Raqamlar hech qachon yo'qolmaydi: `АНКЕР М5` ≠ `АНКЕР М8`, `4.1.1` ≠ `4.11`;
   ikki raqam orasidagi ajratgich o'chirilmaydi.
 * **Xavfsizlik bo'limi hozircha o'chirilgan (egasining qarori, 2026-10-24).**

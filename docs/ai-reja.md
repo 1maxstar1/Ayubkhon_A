@@ -1,8 +1,30 @@
 # O'zi o'rganadigan takliflar — ish rejasi (AI ranker)
 
-Holati: **0-bosqich bajarildi (2026-11-13)** — kod o'qildi, brifdagi da'volar tekshirildi, reja va savollar
-yozildi. Dastur kodi bu bosqichda o'zgarmadi. Keyingisi — 1-bosqich (qarorlar jurnali va yakunlangan narxlar
-xotirasi, faqat yozish).
+Holati: **0- va 1-bosqich bajarildi (2026-11-13, v2.11.0 — ro'yxatsiz reliz: egasi sinagach `--list`).**
+1-bosqich: qarorlar jurnali (`suggest_events`) va yakunlangan narxlar xotirasi (`price_memory`) — faqat yozish;
+ekran, takliflar va narxlar o'zgarmadi. Keyingisi — 2-bosqich (xotira ekranda).
+
+**1-bosqichda aslida nima qilindi (rejadan farqlari bilan):**
+
+- Jurnal: `src/ui/journal.js` (yangi, faqat server rejimi). Narx o'zgargandan 2,5 soniya keyin (yozish tugagach) yoki
+  arizadan chiqishda qaror yoziladi: `applied` / `typed` / `reset` / `autopick` / `bulk` (reja ro'yxatiga `bulk`
+  qo'shildi — «Применить %», «Цены этого контрагента…», «Отменить»). Takliflari yo'q resurs bo'yicha qaror ham
+  yoziladi (qatorlarsiz) — «qo'lda yozilgan ulush» kuzatuvi uchun. Bir xil qaror ikki marta yozilmaydi.
+- Qator belgilari: `k` (ref/uzex/hint/sim), `p` (o'z oynasidagi o'rni), daraja, `how`, `sim`, `drop`, `stage`,
+  bayroqlar, narx, sana, viloyat, asos, yozuv raqamlari, birlik holati (same/conv/derived). Nom va smeta narxi yo'q.
+- Xotira: «✓ Завершить» oynasi (`#finishBox`) — sonlar, «qolganlarini tekshirilgan deb hisoblash» (oldindan
+  belgilangan), «не учитывать в обучении». Xotira yozilmay qolsa ariza baribir yakunlanadi va bu aytiladi.
+- `source` tegilmaganlar uchun ham: `mark` (o'zi belgilagan) / `finish` (oynada hisoblangan); tuzatilganlarda `pct`
+  alohida — «Применить %» narxi ekspertning aniq bozor narxi emas (2-bosqichda taklif sifatida ko'rsatilmaydi).
+- Server: `server/pb_hooks/learning.pb.js`, `lib/learning.js` — to'rt yo'l; kolleksiyalarga yozish faqat shular
+  orqali; cheklovlar: 200 qaror / so'rov, 12 qator / qaror, 20 KB / qator, uch ming narx / so'rov.
+- Admin: «Обучение» paneli (`src/ui/learning-admin.js`) — faqat sonlar, «Скопировать числа».
+- Maxfiylik: `test/refs-privacy.cjs` endi dataset/model fayllarini ham ushlaydi (nomi yoki ichidagisi bo'yicha).
+- Reliz: `server/release.sh --unlisted` va `--list X.Y.Z` (test — `test/release-script.sh`).
+- Test: `test/learning.mjs` (yangi), `test/e2e-compare-keep.mjs` («Исправлено» → `accepted`), `e2e-workspace`.
+
+**O'lchanmagan / tekshirilmagan:** haqiqiy ma'lumotda hech narsa (men uni ko'rmayman); 3000 dan ortiq resursli
+smetada yakunlash tezligi; Windows'da qo'lda sinov (to'plamdagi `laptop-windows` o'tadi).
 
 Manba: egasining ikki hujjati («Smeta Taqqoslash: o'zi o'rganadigan AI tizimi rejasi» va Claude Code uchun brif,
 2026-11-13). Bu fayl ularning kodga moslangan ko'rinishi; kod va `CLAUDE.md` bilan zid joyi bo'lsa — kod va
@@ -94,7 +116,7 @@ O'rin: ekrandagi o'rni (o'qitishda belgi, bashoratda o'zgarmas qiymat — o'rin 
 | # | Bosqich | Asosiy fayllar | Tugash belgisi |
 |---|---|---|---|
 | 0 | O'qish, tekshirish, reja | `docs/ai-reja.md` | ✓ shu hujjat |
-| 1 | Jurnal + xotira (faqat yozish), «Завершить» oynasi, «Обучение» paneli (faqat sonlar), `release.sh --unlisted` | yangi `src/ui/journal.js`, `server/pb_schema.json`, `server/pb_hooks/*`, `src/ui/sync.js` (`finish`), `src/ui/admin.js` | e2e: qo'llash/yozish/qaytarish/yakunlash to'g'ri qatorlar qoldiradi; ekran o'zgarmagan |
+| 1 ✓ v2.11.0 | Jurnal + xotira (faqat yozish), «Завершить» oynasi, «Обучение» paneli (faqat sonlar), `release.sh --unlisted` | yangi `src/ui/journal.js`, `src/ui/learning-admin.js`, `server/pb_schema.json`, `server/pb_hooks/learning.pb.js`, `src/ui/sync.js` (`finish`) | `test/learning.mjs`: qo'llash/yozish/qaytarish/yakunlash to'g'ri qatorlar qoldiradi |
 | 2 | Xotira ekranda (ustuvorlik, «ранее принято», eskirish, o'zini tasdiqlashga qarshi himoya, o'chirish sozlamasi) | yangi `src/ui/memory.js` | alohida testlar |
 | 3 | Qayta o'ynatish datasetı, metrikalar, `p3` baseline | `src/lib/ml/{features,metrics,dataset}.js`, worker buyrug'i | **darvoza 1:** egasining sonlari |
 | 4 | Modellar (logistik regressiya, juftlab; MLP; kalibrlash) | `src/lib/ml/{logreg,mlp,calib}.js` | tajribalar jadvali |
@@ -127,12 +149,11 @@ Har bosqich — reliz; `releases.txt` ga faqat egasi sinagach (**darvoza 3**).
 | Mijoz sizning modelingiz va xotirangizni oladimi yoki bo'sh boshlaydimi? | Bo'sh boshlaydi |
 | `release.sh --unlisted` (ro'yxatsiz reliz) qo'shilsinmi? | Ha (1-bosqichda) |
 
-## 7. Egasi o'z kompyuterida qiladigan bitta ish (hozir)
+## 7. Egasi o'z kompyuterida qiladigan ish (1-bosqichdan keyin)
 
-Bazada qancha material borligini bilish uchun — faqat sonlar, nom va narx emas:
-
-```
-sqlite3 -readonly ~/Smeta/server/pb_data/data.db "select 'tuzatishlar', count(*) from corrections union all select 'manba: '||case when source like 'ref:%' then 'ref' when source like 'hint:%' then 'hint' when source like 'uzex:%' then 'uzex' when source='typed' then 'typed' else 'boshqa' end, count(*) from corrections group by 2 union all select 'yakunlangan arizalar', count(*) from workspaces where status='done' union all select 'hamma ish maydonlari', count(*) from workspaces;"
-```
-
-Chiqqan qatorlarni menga yuborasiz.
+1. Mac'ni yangilash: `cd ~/Smeta && sh server/laptop.sh update`, brauzerda Cmd+Shift+R — sarlavhada v2.11.0.
+2. 2–3 ta haqiqiy arizada odatdagidek ishlash va «✓ Завершить» bosish (oynani o'qib, tasdiqlash). Avval
+   yakunlangan arizalarni «Вернуть в работу» → «✓ Завершить» qilib xotiraga yozish ham mumkin.
+3. Admin sahifasi (`http://127.0.0.1:8090/admin.html`) → «Обучение» → «Скопировать числа» → matnni yuborish.
+   Unda faqat sonlar bor.
+4. Hammasi joyida bo'lsa aytish — shundan keyin `sh server/release.sh --list 2.11.0` (Windows o'zi o'rnatadi).

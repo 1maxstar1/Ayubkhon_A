@@ -7,6 +7,11 @@
 #   <note>    one line, plain ASCII — what server/releases.txt says next to the version
 #   --row     a file with the text of the «Nima» cell for docs/versiyalar.md (what changed, for the owner)
 #   --dry     everything up to the commits, then puts package.json and dist/ back
+#   --unlisted   the release is made and pushed, its row is added to docs/versiyalar.md, but server/releases.txt is
+#             left alone: the Windows laptop does not install it by itself. For a version the owner is to try first
+#             (docs/ai-reja.md); afterwards:
+#   sh server/release.sh --list <X.Y.Z>     adds that release's line to server/releases.txt (its commit is read
+#             from its row in docs/versiyalar.md, its note from the release commit), in a commit of its own, and pushes
 #
 # The six steps used to be done by hand, in order, from memory: raise the version, build, run the tests, commit
 # and push, then — in a commit of its own — name that commit in server/releases.txt and add a row to
@@ -56,14 +61,56 @@ listed_tests() {
 }
 if [ "${1:-}" = --list-tests ]; then listed_tests; exit 0; fi
 
+# The branch the Windows laptop reads server/releases.txt from (server/laptop.ps1, server/install-windows.ps1): a
+# release listed on any other is never installed.
+RELEASE_BRANCH=claude/excel-price-validation-5ehbvb
+
+# ------------------------------------------------------------------ --list: a release made with --unlisted, now tried
+if [ "${1:-}" = --list ]; then
+  VER="${2:-}"
+  printf '%s' "$VER" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || die "usage: sh server/release.sh --list <X.Y.Z>"
+  if grep -q "^v$VER " server/releases.txt; then die "v$VER is already in server/releases.txt"; fi
+  HASH=$(sed -n "s/^| \*\*v$VER\*\* | .* | \`\([0-9a-f]\{40\}\)\` |\$/\1/p" docs/versiyalar.md | head -1)
+  [ -n "$HASH" ] || die "docs/versiyalar.md has no row for v$VER naming its commit — only a release this script made can be listed"
+  git cat-file -e "$HASH^{commit}" 2>/dev/null || die "the release commit $HASH of v$VER is not in this checkout"
+  git show "$HASH:package.json" | grep -q "\"version\": \"$VER\"" || die "the commit $HASH does not carry v$VER in package.json"
+  git merge-base --is-ancestor "$HASH" HEAD || die "the release commit $HASH is not in this branch"
+  NOTE=$(git log -1 --format=%s "$HASH" | sed -n "s/^v$VER: //p")
+  [ -n "$NOTE" ] || die "the release commit $HASH has no «v$VER: <note>» subject to take the note from"
+  if printf '%s' "$NOTE" | LC_ALL=C grep -q '[^ -~]'; then die "the note of $HASH is not plain ASCII (releases.txt is read by the Windows launcher)"; fi
+  BR=$(git rev-parse --abbrev-ref HEAD)
+  case "$(git remote get-url origin 2>/dev/null)" in
+    /*|file://*) ;;                  # the test of this script: a throwaway origin on this machine
+    *) [ "$BR" = "$RELEASE_BRANCH" ] || die "releases are listed on $RELEASE_BRANCH — the branch the Windows laptop reads server/releases.txt from (on $BR)" ;;
+  esac
+  [ -z "$(git status --porcelain)" ] || die "the working tree has changes — commit them or put them away first"
+  REMOTE=$(git ls-remote origin "refs/heads/$BR" | awk 'NR == 1 { print $1 }')
+  [ -n "$REMOTE" ] || die "cannot read $BR from origin"
+  git cat-file -e "$REMOTE^{commit}" 2>/dev/null || git fetch -q origin "$BR" || die "cannot fetch $BR from origin"
+  git merge-base --is-ancestor "$REMOTE" HEAD || die "the branch is behind origin/$BR — bring it up to date first"
+  git merge-base --is-ancestor "$HASH" "$REMOTE" || die "the release commit $HASH is not on origin — push it first"
+  printf 'v%s %s %s\n' "$VER" "$HASH" "$NOTE" >> server/releases.txt
+  LMSG=$(mktemp)
+  { printf 'List v%s as a release the Windows laptop installs by itself\n' "$VER"; if [ -n "${RELEASE_TRAILER:-}" ]; then printf '\n%s\n' "$RELEASE_TRAILER"; fi; } > "$LMSG"
+  git add server/releases.txt
+  git commit -q -F "$LMSG" || { rm -f "$LMSG"; git reset -q -- server/releases.txt; git checkout -q -- server/releases.txt; die "the listing commit was refused — nothing is listed"; }
+  rm -f "$LMSG"
+  OKPUSH=0
+  for wait in 0 2 4 8 16; do sleep "$wait"; if git push -q -u origin "$BR"; then OKPUSH=1; break; fi; done
+  [ "$OKPUSH" = 1 ] || die "the listing of v$VER is committed but could not be pushed — «git push» finishes it"
+  say "listed v$VER = $HASH: the Windows laptop installs it by itself from now on"
+  exit 0
+fi
+
 VER="${1:-}"; NOTE="${2:-}"
-[ $# -ge 2 ] || die "usage: sh server/release.sh <X.Y.Z> \"<note>\" --row <file> [--dry]"
+[ $# -ge 2 ] || die "usage: sh server/release.sh <X.Y.Z> \"<note>\" --row <file> [--dry] [--unlisted]   |   --list <X.Y.Z>"
 shift 2
-ROW=""; DRY=0
+ROW=""; DRY=0; UNLISTED=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --row) [ $# -ge 2 ] || die "--row needs a file: the text of the row for docs/versiyalar.md"; ROW="$2"; shift 2 ;;
     --dry) DRY=1; shift ;;
+    --unlisted) UNLISTED=1; shift ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -112,8 +159,7 @@ fi
 # What a release cannot go without, said now rather than after the suite: test/laptop-windows.sh runs on Linux only
 # and needs PowerShell; the browser tests need playwright. And the branch: the Windows laptop reads
 # server/releases.txt from this one branch (server/laptop.ps1, server/install-windows.ps1) — a release listed on any
-# other is never installed.
-RELEASE_BRANCH=claude/excel-price-validation-5ehbvb
+# other is never installed (RELEASE_BRANCH, above).
 if [ -z "$STANDIN" ]; then
   [ "$(uname -s)" = Linux ] || die "releases are made on Linux with PowerShell (PWSH=<path to pwsh>): the Windows launcher's test does not run on $(uname -s)"
   P=${PWSH:-$(command -v pwsh 2>/dev/null || true)}
@@ -179,6 +225,7 @@ cleanup() {
     # a stamp left in the tree stays: the next release carries it if it still names the code then (--check-stamp)
     for f in $(stamps_changed); do say "release: $f is changed in the tree and stays — a later release carries it if it still matches the code" >&2; done
   elif [ "$CODE" != 0 ]; then
+    if [ "$UNLISTED" = 1 ]; then say "release: (--unlisted: server/releases.txt is not to be written — below, «the listing» is the row of docs/versiyalar.md alone)" >&2; fi
     case "$STAGE" in
       committed) if [ "$PUSHWHY" = behind ]; then
                    # a rebase would give the release commit another hash than the one releases.txt is to name
@@ -332,7 +379,9 @@ STAGE=pushed
 # ------------------------------------------------------------------ and, in a commit of its own, its listing
 STAGE=writing
 LINEDONE=0; ROWDONE=0
-printf 'v%s %s %s\n' "$VER" "$HASH" "$NOTE" >> server/releases.txt
+# --unlisted: the Windows laptop installs what releases.txt names, by itself — a version the owner is to try first is
+# not named there yet («--list» names it later, by the commit its row in docs/versiyalar.md keeps)
+if [ "$UNLISTED" != 1 ]; then printf 'v%s %s %s\n' "$VER" "$HASH" "$NOTE" >> server/releases.txt; fi
 LINEDONE=1
 node -e "
   const fs = require('fs'), [ver, hash, text] = process.argv.slice(1);
@@ -344,8 +393,13 @@ node -e "
   fs.writeFileSync('docs/versiyalar.md', lines.join('\n'));
 " "$VER" "$HASH" "$ROWTEXT" || die "docs/versiyalar.md has no table of versions to add the row to (the release commit $HASH is pushed)"
 ROWDONE=1
-{ printf 'List v%s as a release the Windows laptop installs by itself\n' "$VER"; if [ -n "${RELEASE_TRAILER:-}" ]; then printf '\n%s\n' "$RELEASE_TRAILER"; fi; } > "$MSG"
-git add server/releases.txt docs/versiyalar.md
+if [ "$UNLISTED" = 1 ]; then
+  { printf 'Record v%s in docs/versiyalar.md (not listed yet: the owner tries it first)\n' "$VER"; if [ -n "${RELEASE_TRAILER:-}" ]; then printf '\n%s\n' "$RELEASE_TRAILER"; fi; } > "$MSG"
+  git add docs/versiyalar.md
+else
+  { printf 'List v%s as a release the Windows laptop installs by itself\n' "$VER"; if [ -n "${RELEASE_TRAILER:-}" ]; then printf '\n%s\n' "$RELEASE_TRAILER"; fi; } > "$MSG"
+  git add server/releases.txt docs/versiyalar.md
+fi
 STAGE=written
 privacy "the row for docs/versiyalar.md (the release commit $HASH is pushed; reword the row and commit the listing by hand)"
 STAGE=listing
@@ -355,5 +409,10 @@ push listing || { say "release: the listing commit could not be pushed" >&2; exi
 STAGE=done
 
 say "released v$VER = $HASH"
+if [ "$UNLISTED" = 1 ]; then
+  say "  not listed: the Windows laptop does not install it by itself. Once it is tried:  sh server/release.sh --list $VER"
+  say "  Mac:      cd ~/Smeta && sh server/laptop.sh update"
+  exit 0
+fi
 say "  Windows:  C:\\Smeta\\server\\laptop.cmd update      (or by itself)"
 say "  Mac:      https://github.com/1maxstar1/Ayubkhon_A/archive/$HASH.zip   (see README, «Yangilash»)"

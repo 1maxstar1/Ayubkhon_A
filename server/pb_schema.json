@@ -980,6 +980,293 @@
       "createRule": null,
       "updateRule": null,
       "deleteRule": null
+    },
+    {
+      "id": "c_suggest_evts_",
+      "name": "suggest_events",
+      "type": "base",
+      "fields": [
+        {
+          "name": "workspace",
+          "type": "relation",
+          "collectionId": "c_workspaces___",
+          "maxSelect": 1,
+          "required": true,
+          "cascadeDelete": true
+        },
+        {
+          "name": "application",
+          "type": "relation",
+          "collectionId": "c_applications_",
+          "maxSelect": 1,
+          "required": false,
+          "cascadeDelete": false
+        },
+        {
+          "name": "contragent",
+          "type": "relation",
+          "collectionId": "c_contragents__",
+          "maxSelect": 1,
+          "required": false,
+          "cascadeDelete": false
+        },
+        {
+          "name": "region",
+          "type": "select",
+          "values": [
+            "respublika",
+            "andijon",
+            "buxoro",
+            "fargona",
+            "jizzax",
+            "xorazm",
+            "namangan",
+            "navoiy",
+            "qashqadaryo",
+            "samarqand",
+            "sirdaryo",
+            "surxondaryo",
+            "toshkent_vil",
+            "qoraqalpogiston",
+            "toshkent_sh"
+          ],
+          "maxSelect": 1
+        },
+        {
+          "name": "asof",
+          "type": "text",
+          "max": 10
+        },
+        {
+          "name": "res_key",
+          "type": "text"
+        },
+        {
+          "name": "match_key",
+          "type": "text"
+        },
+        {
+          "name": "match_unit_key",
+          "type": "text"
+        },
+        {
+          "name": "section",
+          "type": "text",
+          "max": 20
+        },
+        {
+          "name": "lines",
+          "type": "json",
+          "maxSize": 20480
+        },
+        {
+          "name": "opened",
+          "type": "bool"
+        },
+        {
+          "name": "action",
+          "type": "select",
+          "values": [
+            "applied",
+            "typed",
+            "reset",
+            "autopick",
+            "bulk"
+          ],
+          "maxSelect": 1
+        },
+        {
+          "name": "chosen",
+          "type": "number"
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "max": 200
+        },
+        {
+          "name": "final_price",
+          "type": "number"
+        },
+        {
+          "name": "schema",
+          "type": "number"
+        },
+        {
+          "name": "app_version",
+          "type": "text",
+          "max": 20
+        },
+        {
+          "name": "by",
+          "type": "relation",
+          "collectionId": "_pb_users_auth_",
+          "maxSelect": 1,
+          "required": false,
+          "cascadeDelete": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "onCreate": true
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_suggest_events_ws ON suggest_events (workspace)",
+        "CREATE INDEX idx_suggest_events_region_match ON suggest_events (region, match_key)",
+        "CREATE INDEX idx_suggest_events_created ON suggest_events (created)"
+      ],
+      "listRule": "@request.auth.id != \"\"",
+      "viewRule": "@request.auth.id != \"\"",
+      "createRule": null,
+      "updateRule": null,
+      "deleteRule": null
+    },
+    {
+      "id": "c_price_memory_",
+      "name": "price_memory",
+      "type": "base",
+      "fields": [
+        {
+          "name": "workspace",
+          "type": "relation",
+          "collectionId": "c_workspaces___",
+          "maxSelect": 1,
+          "required": true,
+          "cascadeDelete": true
+        },
+        {
+          "name": "application",
+          "type": "relation",
+          "collectionId": "c_applications_",
+          "maxSelect": 1,
+          "required": false,
+          "cascadeDelete": false
+        },
+        {
+          "name": "contragent",
+          "type": "relation",
+          "collectionId": "c_contragents__",
+          "maxSelect": 1,
+          "required": false,
+          "cascadeDelete": false
+        },
+        {
+          "name": "region",
+          "type": "select",
+          "values": [
+            "respublika",
+            "andijon",
+            "buxoro",
+            "fargona",
+            "jizzax",
+            "xorazm",
+            "namangan",
+            "navoiy",
+            "qashqadaryo",
+            "samarqand",
+            "sirdaryo",
+            "surxondaryo",
+            "toshkent_vil",
+            "qoraqalpogiston",
+            "toshkent_sh"
+          ],
+          "maxSelect": 1
+        },
+        {
+          "name": "res_key",
+          "type": "text",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "text"
+        },
+        {
+          "name": "unit",
+          "type": "text"
+        },
+        {
+          "name": "match_key",
+          "type": "text"
+        },
+        {
+          "name": "match_unit_key",
+          "type": "text"
+        },
+        {
+          "name": "section",
+          "type": "text",
+          "max": 20
+        },
+        {
+          "name": "smeta_price",
+          "type": "number"
+        },
+        {
+          "name": "final_price",
+          "type": "number"
+        },
+        {
+          "name": "kind",
+          "type": "select",
+          "values": [
+            "corrected",
+            "checked",
+            "untouched",
+            "zeroed"
+          ],
+          "maxSelect": 1
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "max": 200
+        },
+        {
+          "name": "asof",
+          "type": "text",
+          "max": 10
+        },
+        {
+          "name": "finished",
+          "type": "text",
+          "max": 24
+        },
+        {
+          "name": "accepted",
+          "type": "bool"
+        },
+        {
+          "name": "by",
+          "type": "relation",
+          "collectionId": "_pb_users_auth_",
+          "maxSelect": 1,
+          "required": false,
+          "cascadeDelete": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "onCreate": true
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "onCreate": true,
+          "onUpdate": true
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_price_memory_ws_key ON price_memory (workspace, res_key)",
+        "CREATE INDEX idx_price_memory_region_match ON price_memory (region, match_key)",
+        "CREATE INDEX idx_price_memory_contragent_match ON price_memory (contragent, match_key)"
+      ],
+      "listRule": "@request.auth.id != \"\"",
+      "viewRule": "@request.auth.id != \"\"",
+      "createRule": null,
+      "updateRule": null,
+      "deleteRule": null
     }
   ],
   "deleteMissing": false

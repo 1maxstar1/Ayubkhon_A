@@ -174,5 +174,20 @@ check(hb.length === 1 && hb[0].rows.find((r) => r.r === 9).kind === 'extra' && h
 const hm = S.assemble([{ name: 'h', file: 'h.xlsx', objects: hb, enabled: true }], {});
 check(hm.resources.length === 2 && hm.resources.some((r) => r.name === 'Транспортировка ЩЕБЕНЬ ТЕСТОВЫЙ 19 км' && r.qty === 760), 'the two haulage lines assemble as two resources');
 
+/* 9 — a line under «ПЕРЕВОЗКА» is the haulage of a material: the same name under the materials is another resource */
+const hv = ved('1');
+// put a haulage band with the material's own name between the machines and the materials
+hv.rows.splice(17, 0, [, { v: 'ПЕРЕВОЗКА' }], [, { v: '1.' }, , { v: 7 }, { v: 'ЩЕБЕНЬ ТЕСТОВЫЙ' }, { v: 'м3' }, { v: 4 }, { v: 3 }, { f: '=G19*F19' }],
+  [, , , , { v: 'Итого по перевозке' }, { v: 'СУМ' }, , , { f: '=SUM(H19)' }]);
+hv.rows.length = hv.rows.length;
+const hvb = S.smeta.parseWorkbook({ sheets: [hv] }, 'h.xlsx');
+const hvm = S.assemble([{ name: 'h', file: 'h.xlsx', objects: hvb, enabled: true }], {});
+const stone = hvm.resources.filter((r) => /ЩЕБЕНЬ ТЕСТОВЫЙ$/.test(r.name) && r.unit === 'м3');
+check(stone.length === 2 && stone.some((r) => r.name === 'ПЕРЕВОЗКА ЩЕБЕНЬ ТЕСТОВЫЙ' && r.price === 3) && stone.some((r) => r.name === 'ЩЕБЕНЬ ТЕСТОВЫЙ' && r.price === 29) &&
+  stone.every((r) => r.variants === 1), 'a line under «ПЕРЕВОЗКА» is «ПЕРЕВОЗКА <материал>», apart from the material: a price typed for one never lands on the other');
+const priced = S.assemble([{ name: 'h', file: 'h.xlsx', objects: hvb, enabled: true }], { [stone.find((r) => r.name === 'ЩЕБЕНЬ ТЕСТОВЫЙ').key]: 25 });
+check(priced.resources.find((r) => r.name === 'ПЕРЕВОЗКА ЩЕБЕНЬ ТЕСТОВЫЙ').market === 3 && priced.resources.find((r) => r.name === 'ЩЕБЕНЬ ТЕСТОВЫЙ').market === 25,
+  '… the material\'s market price leaves the haulage line at its own price');
+
 console.log(fail ? '\nFAILED: ' + fail : '\nall passed');
 process.exit(fail ? 1 : 0);

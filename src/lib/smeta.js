@@ -85,6 +85,8 @@
    * Cyrillic name.
    */
   var LETTER = /[A-Za-z\u00C0-\u024F\u0400-\u04FF]/;
+  /** A band of haulage — «ПЕРЕВОЗКА», «Транспортировка…», «Доставка…» — and a name that already says it. */
+  var HAUL = /^(ПЕРЕВОЗК|ТРАНСПОРТ|ДОСТАВК|ТАШИШ|TASHISH)/;
   /** «1.», «12.» — how the statement of required resources numbers its items. */
   var NUMBERED = /^\s*\d+\.\s*$/;
   /** A line priced in sums («СУМ»): a money line of the statement (5 % of the materials…), not a resource. */
@@ -291,7 +293,7 @@
       }
     }
 
-    var out = [], section = '', items = 0, sections = 0, wide = L.lastCol;
+    var out = [], section = '', band = '', items = 0, sections = 0, wide = L.lastCol;
     for (var r = start; r <= last; r++) {
       var cells = sheet.rows[r] || [];
       var nm = txt(cells[L.name]);
@@ -317,6 +319,10 @@
       else if (noTxt) kind = 'section';
       else kind = 'blank';
 
+      if (kind === 'section') band = noTxt || nm;
+      // a line under «ПЕРЕВОЗКА» is the haulage of a material, not the material: the same name under
+      // «Строительные материалы» is another resource with another price (the owner, 2026-11-14)
+      if (kind === 'item' && HAUL.test(up(band)) && !HAUL.test(up(nm))) nm = (nm === nm.toUpperCase() ? 'ПЕРЕВОЗКА ' : 'Перевозка ') + nm;
       for (var w = cells.length - 1; w > wide; w--) {
         if (cells[w] && (cells[w].v != null || cells[w].f != null)) { wide = w; break; }
       }

@@ -10,8 +10,13 @@
  *   - «Наш ответ (Excel)» brings both back from a reply (the «объем» sheet beside the prices);
  *   - the document gets «Таблица №1 (объёмы)» — only what was decided.
  *
- * State: app.vol (work key → { v, note }), app.qtys (resource key → the expert's total). Saved with the workspace
- * (sync.js), kept across reloads; the prices and Table №2 are not touched by any of it.
+ * State: app.vol (work key → { v, note }), app.qtys (resource key → { v: the expert's total, base: the estimate's total
+ * it was set against }; a bare number from v2.15 is a total with no base). Saved with the workspace (sync.js), kept
+ * across reloads; the prices and Table №2 are not touched by any of it.
+ *
+ * A work's new volume moves only the lines of its own estimate (its project), spread over them by quantity. A total set
+ * by hand holds while the estimate's total is the one it was set against: untick an object, swap a file, and it waits
+ * (not applied, not in the document) until that total comes back.
  */
 (function (S) {
   'use strict';
@@ -23,23 +28,58 @@
     var out = [];
     (app.projects || []).forEach(function (p) {
       if (p.enabled === false || !p.works || !p.works.length) return;
-      V.list(p.works, p.file).forEach(function (w) { w.project = p.name; out.push(w); });
+      V.list(p.works, p.file).forEach(function (w) { w.project = p.name; w.projectTitle = p.title || p.name; out.push(w); });
     });
     return out;
   }
 
-  /** After the model is built: each resource's quantity by the expert (r.qty2), from the volumes and by hand. */
+  /** The expert's total for a resource, while it was set against the estimate's total there is now; else null. */
+  function handOf(app, r) {
+    var e = app.qtys && app.qtys[r.key];
+    if (e == null) return null;
+    if (typeof e === 'number') return e;                       // v2.15: a bare total
+    if (e.base != null && Math.abs(e.base - (r.qty || 0)) > 1e-9) return null;
+    return e.v;
+  }
+
+  /**
+   * After the model is built: each resource's quantity by the expert (r.qty2) — set by hand, or moved by the volumes of
+   * the works of its own estimate — and what the volumes alone give (r.qtyAuto, null when they move nothing).
+   */
   function applyQty(app) {
     var m = app.model;
     if (!m) return;
-    var d = V.deltas(worksOf(app), app.vol || {}), tot = {};
-    m.resources.forEach(function (r) { tot[r.nk] = (tot[r.nk] || 0) + (r.qty || 0); });
+    var add = {};
+    (app.projects || []).forEach(function (p, pi) {
+      if (p.enabled === false || !p.works || !p.works.length) return;
+      var d = V.deltas(V.list(p.works, p.file), app.vol || {});
+      if (!Object.keys(d).length) return;
+      var lines = {}, tot = {};
+      m.rows.forEach(function (row) {
+        if (row.kind !== 'item' || row.pi !== pi || !row.qty) return;
+        var nk = S.nameUnitKey(row.nm, row.unit);
+        if (!d[nk]) return;
+        tot[nk] = (tot[nk] || 0) + row.qty;
+        (lines[nk] = lines[nk] || []).push(row);
+      });
+      Object.keys(lines).forEach(function (nk) {
+        lines[nk].forEach(function (row) { add[row.key] = (add[row.key] || 0) + d[nk] * (row.qty / tot[nk]); });
+      });
+    });
     m.resources.forEach(function (r) {
-      var hand = app.qtys && app.qtys[r.key];
+      r.qtyAuto = add[r.key] ? Math.max(0, (r.qty || 0) + add[r.key]) : null;
+      var hand = handOf(app, r);
       if (hand != null) r.qty2 = hand;
-      else if (d[r.nk] && tot[r.nk] > 0) r.qty2 = Math.max(0, r.qty + d[r.nk] * (r.qty / tot[r.nk]));
+      else if (r.qtyAuto != null) r.qty2 = r.qtyAuto;
       else delete r.qty2;
     });
+  }
+
+  /** The quantities changed without a new model: the price list keeps its place; the workspace is saved. */
+  function quantitiesChanged(app) {
+    applyQty(app);
+    if (app.prices_ui) { app.prices_ui.apply(true); app.prices_ui.status(); }
+    try { document.dispatchEvent(new Event('volumes:change')); } catch (er) { /* old browser */ }
   }
 
   function fmtV(v) {
@@ -130,43 +170,53 @@
         if (field === 'just') { var n = tr.querySelector('.vnote'); if (n) n.value = ''; }
         if (field === 'note') { var j = tr.querySelector('[data-f="just"]'); if (j) j.checked = d.note === V.NOTE; }
       }
-      if (field === 'v') {         // the quantities follow (and the workspace is saved); the table stays as typed in
-        this.quiet = true;
-        try { app.rebuild(); } finally { this.quiet = false; }
-      } else {                     // a remark moves nothing: only saved
-        this.status(this.works());
-        try { document.dispatchEvent(new Event('volumes:change')); } catch (er) { /* old browser */ }
-      }
+      if (field === 'v') quantitiesChanged(app);      // the quantities follow; the table stays as typed in
+      else { try { document.dispatchEvent(new Event('volumes:change')); } catch (er) { /* old browser */ } }   // a remark: only saved
+      this.status(this.works());
     },
 
-    /** «Общее кол-во» clicked in «Проверка цен»: the expert's total for that resource, or back to the estimate's. */
+    /**
+     * «Общее кол-во» clicked in «Проверка цен»: the expert's total for that resource. Empty — back to the automatic one
+     * (the estimate's, or what the volumes of the works give); the number shown, untouched — nothing changes.
+     */
     editQty: function (key) {
       var app = A(), r = app.model && app.model.resources.filter(function (x) { return x.key === key; })[0];
       if (!r) return;
-      var cur = r.qty2 != null ? r.qty2 : r.qty;
+      var cur = r.qty2 != null ? r.qty2 : r.qty, auto = r.qtyAuto != null ? r.qtyAuto : r.qty;
+      var shown = fmtV(cur);
       var t = window.prompt('Количество по экспертизе для «' + r.name + '» (' + r.unit + ').\nПо смете: ' + fmtV(r.qty) +
-        '. Пусто — как в смете.', fmtV(cur));
-      if (t == null) return;
+        (r.qtyAuto != null ? '; по объёмам работ: ' + fmtV(r.qtyAuto) : '') + '. Пусто — автоматически.', shown);
+      if (t == null || String(t).trim() === shown) return;    // looked at, not changed
       var v = readV(t);
       if (v !== v) { app.toast('Количество — число', true); return; }
       app.qtys = app.qtys || {};
-      if (v == null || Math.abs(v - r.qty) < 1e-9) delete app.qtys[key]; else app.qtys[key] = v;
-      app.rebuild();
+      // the automatic quantity typed back (as it is shown) is no decision of its own
+      if (v == null || fmtV(v) === fmtV(auto)) delete app.qtys[key];
+      else app.qtys[key] = { v: v, base: r.qty || 0 };
+      quantitiesChanged(app);
+      this.status(this.works());
     },
 
-    /** The resources whose total the expert set by hand, for Table №1. */
+    /** The resources whose total the expert set by hand (and that holds for the estimate as it is), for Table №1. */
     resRows: function () {
       var app = A(), m = app.model;
       if (!m || !app.qtys) return [];
-      return m.resources.filter(function (r) { return app.qtys[r.key] != null; })
-        .map(function (r) { return { name: r.name, unit: r.unit, smeta: r.qty, expert: app.qtys[r.key], note: '' }; });
+      return m.resources.map(function (r) { return { r: r, v: handOf(app, r) }; }).filter(function (x) { return x.v != null; })
+        .map(function (x) { return { name: x.r.name, unit: x.r.unit, smeta: x.r.qty, expert: x.v, note: '' }; });
     },
 
-    /** «Таблица №1 (объёмы)» for the document. */
+    /** «Таблица №1 (объёмы)» for the document: the objects are the enabled projects that have a decided work. */
     table: function () {
-      var app = A();
-      var p = (app.projects || [])[0];
-      return V.table(this.works(), app.vol || {}, this.resRows(), { object: p ? p.title : '' });
+      var app = A(), works = this.works(), vol = app.vol || {}, titles = [];
+      works.forEach(function (w) {
+        var d = vol[w.key];
+        if (d && (d.v != null || d.note) && titles.indexOf(w.projectTitle) < 0) titles.push(w.projectTitle);
+      });
+      if (!titles.length) {
+        var first = (app.projects || []).filter(function (p) { return p.enabled !== false; })[0];
+        if (first) titles.push(first.title || first.name);
+      }
+      return V.table(works, vol, this.resRows(), { objects: titles });
     },
 
     /**

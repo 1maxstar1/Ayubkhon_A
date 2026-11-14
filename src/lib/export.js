@@ -210,7 +210,8 @@
     var headerRow = 0;
     for (var i = 0; i < mainRows.length; i++) if (mainRows[i].kind === 'numbering') { headerRow = i + 1; break; }
 
-    sheets.push(toSheet(styles, opts.sheetName || 'Лист1', mainRows, 10, mainStyle, {
+    // the summary sheet's name is typed by the user: made valid for Excel like every other (31 characters, no \ / * ? : [ ])
+    sheets.push(toSheet(styles, uniqueName(sheets, opts.sheetName || 'Лист1'), mainRows, 10, mainStyle, {
       cols: mainCols(model.nExtra),
       autoFilter: headerRow ? 'A' + headerRow + ':J' + mainRows.length : null,
       freeze: 0,
@@ -258,10 +259,15 @@
     return S.writeWorkbook({ sheets: sheets, styles: styles, title: opts.docTitle });
   }
 
+  /**
+   * A sheet name Excel takes: no \ / * ? : [ ], at most 31 characters, no apostrophe at either end, and unique among the
+   * workbook's sheets ignoring case («Смета» and «СМЕТА» are one name to Excel).
+   */
   function uniqueName(sheets, name) {
-    var base = String(name || 'Проект').replace(/[\\/*?:[\]]/g, ' ').slice(0, 31) || 'Проект';
+    var base = String(name || 'Проект').replace(/[\\/*?:[\]]/g, ' ').slice(0, 31).replace(/^'+|'+$/g, '').replace(/^\s+|\s+$/g, '') || 'Проект';
+    var taken = function (n) { var u = n.toUpperCase(); return sheets.some(function (s) { return String(s.name).toUpperCase() === u; }); };
     var n = base, i = 2;
-    while (sheets.some(function (s) { return s.name === n; })) n = base.slice(0, 28) + ' ' + (i++);
+    while (taken(n)) n = base.slice(0, 28).replace(/^\s+|\s+$/g, '') + ' ' + (i++);
     return n;
   }
 

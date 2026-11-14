@@ -36,12 +36,14 @@ Bitta yozuv (`smeta_files`) — bitta fayl:
 * `checked`, `score` — uchala soni bor qatorlar va ulardan kol-vo × narx = summa bo'lganlari ulushi (`S.ml.layout.agree`:
   butun yozilgan summa o'z yaxlitlashicha — yarim so'mgacha, kasrli summa — mingdan birigacha farq qilishi mumkin).
 * `doubt` — «o'qilgan, lekin summalar mos emas» (`score` < `S.ml.layout.DOUBT` = 0,9). Chegara bitta joyda: sahifa,
-  admin sanog'i va himoya testi shuni ishlatadi.
+  admin sanog'i va himoya testi shuni ishlatadi. v2.16.0 yozuvlarida bu maydon yo'q edi: admin ularni `version` < 2
+  va `score` bo'yicha o'zi sanaydi (`VERSION` 2 — v2.16.1; fayl qayta kelganda yozuv yangilanadi).
 * `signature` — format imzosi: sarlavha qatorlari (belgilar bilan) va ustunlar o'rni. Bir formatdagi fayllar bir xil
   imzo oladi (nechta ko'cha yoki varaq bo'lishidan qat'i nazar).
 * `sample`, `version` — **format namunasi** (pastda). Sxema o'zgarsa `VERSION` ko'tariladi va fayl qayta kelganda
   yozuv yangilanadi.
-* `file` — **faylning o'zi, faqat o'qilmagan yoki summalari mos kelmagan bo'lsa** (har qanday turdagi fayl — eski .xls,
+* `file` — (uni faqat admin olib tashlay yoki almashtira oladi; ekspertning yangilashi faylga, nomiga va hajmiga
+  tegmaydi) **faylning o'zi, faqat o'qilmagan yoki summalari mos kelmagan bo'lsa** (har qanday turdagi fayl — eski .xls,
   .xls deb saqlangan HTML jadval ham; 30 MB gacha; fayl qabul qilinmasa, yozuv faylsiz qoladi): egasi uni admin
   sahifasidan yuklab olib dasturchiga yuboradi; qoida qo'shilgach «Проверить снова».
 

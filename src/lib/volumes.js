@@ -212,7 +212,8 @@ var S = (typeof S !== 'undefined' && S) || {};
 
   function same(a, b) { return Math.abs(a - b) <= Math.max(1e-9, Math.abs(a) * 1e-6); }
 
-  /** Each line of a reply on the work it names: name and unit, and the estimate's volume when several share them. */
+  /** Each line of a reply on the work it names: name and unit, and the estimate's volume when several share them. A work
+   * already given to an earlier line is not given again: the extra line is said to be missing. */
   function match(entries, works) {
     var out = { set: {}, found: [], missing: [] }, taken = {};
     (entries || []).forEach(function (e) {
@@ -222,7 +223,7 @@ var S = (typeof S !== 'undefined' && S) || {};
       if (exact.length) cand = exact;
       else if (cand.length > 1) cand = [];                     // several works of that name, none of this volume
       var free = cand.filter(function (w) { return !taken[w.key]; });
-      var w = (free.length ? free : cand)[0];
+      var w = free[0];
       if (!w) { out.missing.push(e); return; }
       taken[w.key] = 1;
       out.set[w.key] = { v: e.project != null && !same(e.project, w.volume) ? e.project : null, note: e.note || '' };
@@ -257,21 +258,25 @@ var S = (typeof S !== 'undefined' && S) || {};
    */
   function table(works, vol, res, opts) {
     var o = opts || {}, rows = [], merges = [], n = 0;
+    var objects = (o.objects || (o.object ? [o.object] : [])).map(function (t) { return '«' + String(t).replace(/^«+|»+$/g, '') + '»'; });
     function row(kind, cells, ht) { rows.push({ kind: kind, cells: cells, ht: ht }); return rows.length; }
     row('vstamp', { 6: { v: o.stamp || 'Приложение №1 к экспертному заключению\nот "____" ________________ г.\n№__________________________' } }, 45);
     var t = row('vtitle', { 1: { v: 'СОПОСТАВИТЕЛЬНАЯ ТАБЛИЦА №1' } }, 20.25);
     merges.push('A' + t + ':F' + t);
-    var s = row('vintro', { 1: { v: 'объёмов работ рабочего проекта с локальной ресурсной ведомостью по объекту:' + (o.object ? '\n«' + String(o.object).replace(/^«+|»+$/g, '') + '»' : '') } }, 36);
+    var s = row('vintro', { 1: { v: 'объёмов работ рабочего проекта с локальной ресурсной ведомостью по ' + (objects.length > 1 ? 'объектам:' : 'объекту:') +
+      (objects.length ? '\n' + objects.join(', ') : '') } }, 36);
     merges.push('A' + s + ':F' + s);
     row('blank', {});
     var h1 = row('vheader', { 1: { v: '№\nп/п' }, 2: { v: 'Наименование работ и затрат' }, 3: { v: 'Ед.изм.' }, 4: { v: 'Объемы работ' }, 6: { v: 'Примечание' } }, 18);
     row('vheader', { 4: { v: 'по локальной ресурсной смете' }, 5: { v: 'по рабочему проекту' } }, 30);
     merges.push('A' + h1 + ':A' + (h1 + 1), 'B' + h1 + ':B' + (h1 + 1), 'C' + h1 + ':C' + (h1 + 1), 'D' + h1 + ':E' + h1, 'F' + h1 + ':F' + (h1 + 1));
     row('vnum', { 1: { v: 1 }, 2: { v: 2 }, 3: { v: 3 }, 4: { v: 4 }, 5: { v: 5 }, 6: { v: 6 } });
-    var section = null;
-    (works || []).forEach(function (w) {
-      var d = vol && vol[w.key];
-      if (!d || (d.v == null && !d.note)) return;
+    var section = null, project = null, decided = (works || []).filter(function (w) { var d = vol && vol[w.key]; return d && (d.v != null || d.note); });
+    var several = decided.some(function (w) { return w.projectTitle !== decided[0].projectTitle; });
+    decided.forEach(function (w) {
+      var d = vol[w.key];
+      // works of several estimates: each under its own object, its sections starting afresh
+      if (several && w.projectTitle !== project) { project = w.projectTitle; section = null; row('vsection', { 2: { v: project } }); }
       if (w.section !== section) { section = w.section; if (section) row('vsection', { 2: { v: section } }); }
       var cells = { 1: { v: ++n }, 2: { v: w.name }, 3: { v: w.unit }, 4: { v: w.volume }, 6: { v: d.note || '' } };
       if (d.v != null) cells[5] = { v: d.v };

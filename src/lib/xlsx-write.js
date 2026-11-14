@@ -256,12 +256,13 @@
     var defNames = '';
     sheets.forEach(function (s, i) {
       if (s.autoFilter) {
+        // the sheet name is XML text here as well as in <sheet name>: «Навои & Чилонзор» must not break workbook.xml
         defNames += '<definedName name="_xlnm._FilterDatabase" localSheetId="' + i + '" hidden="1">' +
-          "'" + s.name.replace(/'/g, "''") + "'!" + s.autoFilter.replace(/([A-Z]+)(\d+)/g, '$$$1$$$2') + '</definedName>';
+          esc("'" + s.name.replace(/'/g, "''") + "'!" + s.autoFilter.replace(/([A-Z]+)(\d+)/g, '$$$1$$$2')) + '</definedName>';
       }
       if (s.printTitles) {
         defNames += '<definedName name="_xlnm.Print_Titles" localSheetId="' + i + '">' +
-          "'" + s.name.replace(/'/g, "''") + "'!" + s.printTitles + '</definedName>';
+          esc("'" + s.name.replace(/'/g, "''") + "'!" + s.printTitles) + '</definedName>';
       }
     });
 

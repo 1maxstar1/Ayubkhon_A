@@ -244,8 +244,10 @@ try {
   await page.uncheck('#finAssume');
   await page.click('#finOk');
   await page.waitForFunction(() => document.querySelector('#wsBox .done'), null, { timeout: 30 * SEC });
+  const ids1 = {}; mem.forEach((r) => { ids1[r.res_key] = r.id; });
   mem = await all('price_memory', `workspace='${ws}'`); k = kinds(mem);
   check(mem.length === want.total && mem.every((r) => r.finished > finished1), `a second finish replaces the rows, it does not add to them (${mem.length})`);
+  check(mem.every((r) => ids1[r.res_key] === r.id), 'and each resource keeps its row id: a later application\'s «mem:<id>» still points at it');
   check(k.corrected === want.corrected + 1 && want2.corrected === k.corrected && k.untouched === want2.untouched - want2.checked && (k.checked || 0) === want2.checked &&
     mem.filter((r) => r.kind === 'checked').every((r) => r.source === 'mark') && mem.find((r) => r.res_key === markKey).final_price === 123,
     `with the answer unticked the unmarked rest is «untouched»; the price changed in between is the new one (${JSON.stringify(k)})`);
@@ -334,6 +336,12 @@ try {
   const copied = await ap.evaluate(() => S.LearningAdmin.text());
   check(/^events = \d+$/m.test(copied) && !/[А-Яа-яЁё]/.test(copied), '«Скопировать числа» gives counts only, safe to pass on');
   await ap.close();
+
+  /* ------------------------------------------------------------- a workspace moved to another region takes them with it */
+  r = await call('POST', `/api/admin/workspaces/${ws}/region`, boss, { region: 'andijon' });
+  ev = await all('suggest_events', `workspace='${ws}'`);
+  check(r.status === 200 && r.body.learning === ev.length && ev.length > 0 && ev.every((x) => x.region === 'andijon'),
+    'an application moved to another region by the administrator takes its journal with it (' + r.body.learning + ' rows)');
 
   /* ------------------------------------------------------------- a cleared workspace takes them with it */
   check((await all('suggest_events', `workspace='${ws}'`)).length > 0, '(the journal of the workspace is there)');

@@ -58,10 +58,14 @@
     // Form 4А's «Шифр ресурсов» sits between № and the name, where the
     // comparison table has no column for it: it is left out, not written over №.
     if (L.code) t[L.code] = 0;
+    var lo = Math.min(L.no, L.name);
     return function (c) {
       var m = t[c];
       if (m !== undefined) return m;
       if (c > L.sum) return C_EXTRA + (c - L.sum - 1);
+      // any other column inside the table («Обоснование», «Код») has no place in the comparison table: left out, never
+      // copied over its №, name or unit
+      if (c > lo && c < L.sum) return 0;
       return c; // columns left of the table proper: keep where they are
     };
   }
@@ -76,6 +80,18 @@
     };
   }
 
+  /** A formula that refers to a column the map leaves out. */
+  function deadRef(f, colMap) {
+    var re = /(^|[^A-Za-z0-9_.!$])\$?([A-Z]{1,3})\$?\d+/g, m;
+    while ((m = re.exec(f))) {
+      var after = f.charAt(m.index + m[0].length);
+      if (after === '(' || after === '!') continue;
+      var c = S.colIndex(m[2]);
+      if (c <= (1 << 14) && !colMap(c)) return true;     // up to XFD, the last column Excel has
+    }
+    return false;
+  }
+
   function copyCells(srcCells, L, colMap, rowDelta, into, kept) {
     for (var c = 1; c < srcCells.length; c++) {
       var cell = srcCells[c];
@@ -85,6 +101,8 @@
       // Formulas pointing at sheets we do not carry over (VLOOKUP into a price
       // book sheet, say) would export as #REF!, so keep their cached result.
       var alive = cell.f && cell.f.indexOf('!') < 0;
+      // … and a formula that reads a column left out of the table (it would point at nothing): its value
+      if (alive && deadRef(cell.f, colMap)) alive = false;
       // … and so does a formula that calls anything but the plain functions an estimate is made of
       // (S.formula.unsafe): it goes into the document as the number the estimate shows, and is counted.
       if (alive) {

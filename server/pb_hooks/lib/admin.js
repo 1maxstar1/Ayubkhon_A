@@ -25,6 +25,20 @@ module.exports = {
   },
 
   /**
+   * The journal and the finished prices of a workspace follow it to another region: the memory of a region reads only
+   * its own rows (src/lib/memory.js), so rows left behind would stand as evidence for the region picked by mistake.
+   * With SQL, as forget() — a database from before these tables has nothing to move. Returns the rows moved.
+   */
+  moveRegion(tx, id, region) {
+    let n = 0;
+    for (const t of ["suggest_events", "price_memory"]) {
+      try { n += tx.db().newQuery("UPDATE " + t + " SET region = {:r} WHERE workspace = {:w}").bind({ r: region, w: id }).execute().rowsAffected(); }
+      catch (_) { /* no such table yet */ }
+    }
+    return n;
+  },
+
+  /**
    * Fills match_key / match_unit_key on corrections saved before those columns
    * existed. Without them a price correction written by the old page is
    * invisible to the hint lookup, which searches by match key.

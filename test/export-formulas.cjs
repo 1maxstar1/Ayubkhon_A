@@ -46,7 +46,7 @@ function sheet(name, lines) {
  * An ordinary resource sheet: the totals are formulas, as the estimating program writes them. The names are
  * chosen so that sorting the re-priced ones by name carries them across the bands and past the totals.
  */
-function standardSheet(name, k) {
+function standardSheet(name, k, abs) {
   const L = [];
   const add = (line) => { L.push(line); return L.length; };
   add(['ТЕСТОВАЯ СТРОЙКА']);
@@ -55,7 +55,8 @@ function standardSheet(name, k) {
   add(['N п/п', 'НАИМЕНОВАНИЕ', 'ЕД. ИЗМ.', 'КОЛ-ВО', 'ЦЕНА ЗА ЕД.', 'СУММА (сум)']);
   add([1, 2, 3, 4, 5, 6]);
   const item = (no, nm, unit, qty, price) => { const r = L.length + 1; return add([no, nm, unit, qty, price, '=D' + r + '*E' + r]); };
-  const total = (from, to) => { return add(['ИТОГО', null, 'СУМ', null, null, '=SUM(F' + from + ':F' + to + ')']); };
+  // `abs`: the totals written with absolute rows (=SUM($F$7:$F$8)), as some estimating programs write them
+  const total = (from, to) => { const d = abs ? '$' : ''; return add(['ИТОГО', null, 'СУМ', null, null, '=SUM(' + d + 'F' + d + from + ':' + d + 'F' + d + to + ')']); };
   const totals = [];
   add(['ЗАТРАТЫ ТРУДА']);
   let a = item(1, 'ЯЧЕЙКА ТЕСТОВАЯ РАБОЧИХ', 'ЧЕЛ.-Ч', 10 * k, 11);
@@ -76,7 +77,7 @@ function standardSheet(name, k) {
   add(['ВСЕГО', null, 'СУМ', null, null, '=' + totals.map((t) => 'F' + t).join('+')]);
   return sheet(name, L);
 }
-const standardBook = () => ({ sheets: [standardSheet('УЛ1', 1), standardSheet('УЛ2', 3)] });
+const standardBook = (abs) => ({ sheets: [standardSheet('УЛ1', 1, abs), standardSheet('УЛ2', 3, abs)] });
 
 /** Form 4А: every total is a typed number. One of them does not agree with its own lines. */
 function form4aBook() {
@@ -242,6 +243,10 @@ S.smeta.parseWorkbook(standardBook(), 'a.xlsx').forEach((o) => o.rows.forEach((r
   if (r.kind === 'item') every[k(r.nm, r.unit, r.price)] = Math.round(r.price * 90) / 100;
 }));
 run('standard, all −10 %', S.smeta.parseWorkbook(standardBook(), 'a.xlsx'), every);
+
+// the same with absolute rows in the totals: the street is moved into Лист1 as a block, and a $-row that stayed where
+// it was pointed at the street above (or at the total itself)
+run('standard, absolute rows, re-priced', S.smeta.parseWorkbook(standardBook(true), 'a.xlsx'), std);
 
 // form 4А. The second estimate's band total says 70 where its lines come to 63: the document keeps those 7 on
 // both sides, and the «ПРЯМЫЕ ЗАТРАТЫ» line that repeats the 70 keeps them too.

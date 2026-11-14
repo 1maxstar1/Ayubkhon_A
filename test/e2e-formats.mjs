@@ -107,7 +107,7 @@ try {
   let r = await byHash(fRead);
   check(r && r.is_read === true && r.name === fRead.name && r.size === fRead.bytes.length && r.objects === 2 && r.items === 13 && r.checked === 13 && r.score === 1,
     'it says how the file was read: 2 estimates, 13 lines, every sum agreeing');
-  check(r && r.by === me && r.ws === ws && r.file === '' && r.doubt === false && /^v\d/.test(r.app_version) && r.version === 1 && /^[0-9a-f]{16}$/.test(r.signature),
+  check(r && r.by === me && r.ws === ws && r.file === '' && r.doubt === false && /^v\d/.test(r.app_version) && r.version === 2 && /^[0-9a-f]{16}$/.test(r.signature),
     'whose it is, in which application, by which version — and the file itself is not kept');
   check(r && r.sample && r.sample.sheets.length === 1 && r.sample.sheets[0].b.length === 2 && r.sample.sheets[0].b[0].L.name === 3 && /i/.test(r.sample.sheets[0].k),
     'its sample carries what the rules read: the blocks, their columns, the kind of every row');
@@ -158,6 +158,13 @@ try {
   r = await byHash(fRead);
   check(r && r.by === me && r.items === 14, 'a later reading may change what was read, never whose file it is or which file');
   await api('/api/collections/smeta_files/records/' + one.id, { method: 'PATCH', body: JSON.stringify({ items: 13 }) }, su);
+  // the kept file is the admin's: an expert's update can neither take it away nor rename it
+  const keptRec = await byHash(fNone);
+  await fetch(pb.base + '/api/collections/smeta_files/records/' + keptRec.id, { method: 'PATCH',
+    headers: { Authorization: mine, 'content-type': 'application/json' }, body: JSON.stringify({ file: null, name: 'другое.xlsx', size: 1 }) });
+  r = await byHash(fNone);
+  check(r && r.file === keptRec.file && r.file !== '' && r.name === keptRec.name && r.size === keptRec.size,
+    'an expert\'s update leaves the kept file, its name and its size as they were');
   const del = await fetch(pb.base + '/api/collections/smeta_files/records/' + one.id, { method: 'DELETE', headers: { Authorization: mine } });
   check(del.status >= 400 && (await records()).length === 5, 'and an expert cannot remove a record');
 

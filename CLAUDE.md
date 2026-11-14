@@ -32,6 +32,7 @@ node test/smeta-form4a.cjs                            # 4А shakli (АВС-4): b
 node test/smeta-header.cjs                            # oddiy varaq: shakli bo'yicha o'qilmasa — sarlavhasi bo'yicha
 SMETA_KIT=<kit> node test/smeta-corpus.cjs [--record]  # o'quvchi egasi yuborgan barcha smetalarda: qoida o'zgarsa, qolganlari avvalgidek o'qilishi shart (maxfiy, repoda emas)
 node test/export-formulas.cjs                         # eksport qayta o'qiladi, formulalari hisoblanadi: ИТОГО = qatorlar yig'indisi (uch turda)
+node test/export-names.cjs                            # varaq nomlari («&», 31 belgi, \ / * ? : [ ], katta-kichik harf) va bitta qo'shimcha ustun yashirin
 node test/worker-parity.cjs                           # sahifadagi worker o'quvchi qaytargan narsani aynan qaytaradi
 node test/compare.cjs; node test/e2e-compare.mjs      # «Сравнение версий» va «Наш ответ (Excel)»: qaytgan smetani birinchisi va jadvalimiz bilan solishtirish
 node test/volumes.cjs; node test/e2e-volumes.mjs      # «Объёмы работ»: 5-shakl ishlari, yangi hajm → resurs miqdori, javobning «объем» varag'i, Таблица №1
@@ -163,7 +164,8 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   tanlamaydi. Model egasi sonlarni ko'rib rozi bo'lmaguncha ish sahifasida ishlatilmaydi.
 * **Hajmlar va miqdorlar** (`src/lib/volumes.js`, `src/ui/volumes.js`, v2.15.0): ishlar 5-shakl vedomostidan
   (`01_ЛРВ`) o'qiladi; ekspertning qarori — `app.vol` (ish kaliti → loyiha hajmi, izoh) va `app.qtys` (resurs
-  kaliti → jami miqdor), ish maydonida saqlanadi. Yangi hajm resursni faqat bir birlikka × (yangi − eski) ga
+  kaliti → jami miqdor va u qaysi smeta jamiga nisbatan yozilgani; obyekt chiqarilib jami o'zgarsa — yozilgan miqdor
+  kutadi, kichikroq smetaga tushmaydi), ish maydonida saqlanadi. Yangi hajm resursni faqat bir birlikka × (yangi − eski) ga
   siljitadi. **Narxlar, tejash va Таблица №2 miqdorga tegmaydi** — miqdor faqat «Таблица №1 (объёмы)» varag'iga
   chiqadi, u esa faqat biror narsa belgilanganda qo'shiladi (aks holda hujjat avvalgidek).
 * **Smeta formatlari** (`docs/format-reja.md`, v2.16.0): fayllarni **qoidalar** o'qiydi (`src/lib/smeta.js`); qoida

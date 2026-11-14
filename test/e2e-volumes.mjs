@@ -109,6 +109,40 @@ try {
   check(/<s>/.test(await page.$eval('#priceScroll .vrow:has-text("ТЕСТОВЫЙ КРАН 10 Т") .qe', (b) => b.innerHTML)), 'the estimate\'s quantity is shown struck through beside it');
   // the prices are untouched by all of it: the saving is still by price only
   check(await page.evaluate(() => app.model.resources.every((r) => Math.abs(r.smetaSum - r.marketSum) < 1e-9)), 'no price moved');
+  // the quantity looked at and left as it was shown: nothing set (the shown number is rounded)
+  const before = await page.evaluate(() => JSON.stringify(app.qtys));
+  const model0 = await page.evaluate(() => { window.__m = app.model; return true; });
+  page.once('dialog', (d) => d.accept(d.defaultValue()));
+  await page.click('#priceScroll .vrow:has-text("ТЕСТОВЫЙ ЦЕМЕНТ") .qe');
+  await page.waitForTimeout(300);
+  check(model0 && await page.evaluate(() => JSON.stringify(app.qtys)) === before, 'OK on the number shown, untouched, sets nothing');
+  // a resource moved by a volume set back to the estimate's quantity: kept as the expert's decision
+  page.once('dialog', (d) => d.accept('1'));
+  await page.click('#priceScroll .vrow:has-text("ТЕСТОВЫЙ ЦЕМЕНТ") .qe');
+  await page.waitForFunction(() => Object.keys(app.qtys).length === 2, null, { timeout: 5000 });
+  check(near((await qty('ТЕСТОВЫЙ ЦЕМЕНТ')).qty2, 1), 'a quantity moved by a volume can be set back to the estimate\'s (0,75 → 1)');
+  check(await page.evaluate(() => app.model === window.__m), 'setting a quantity does not build the model again (the list keeps its place)');
+  // empty: back to what the volumes give
+  page.once('dialog', (d) => d.accept(''));
+  await page.click('#priceScroll .vrow:has-text("ТЕСТОВЫЙ ЦЕМЕНТ") .qe');
+  await page.waitForFunction(() => Object.keys(app.qtys).length === 1, null, { timeout: 5000 });
+  check(near((await qty('ТЕСТОВЫЙ ЦЕМЕНТ')).qty2, 0.75), 'empty: back to the automatic quantity (by the volumes)');
+  // a total set against the whole estimate waits while an object of it is left out (the total it was set against is gone)
+  page.once('dialog', (d) => d.accept('7'));
+  await page.click('#priceScroll .vrow:has-text("ТЕСТОВЫЙ АНКЕР М5") .qe');
+  await page.waitForFunction(() => Object.keys(app.qtys).length === 2, null, { timeout: 5000 });
+  const m5 = await qty('ТЕСТОВЫЙ АНКЕР М5');
+  check(m5.qty === 6 && near(m5.qty2, 7), 'a total set against the whole estimate (6 → 7)');
+  await page.click('#projects .proj li[data-o="1"] input[data-act=obj-on]');
+  await page.waitForFunction(() => app.model.resources.find((x) => x.name === 'ТЕСТОВЫЙ АНКЕР М5').qty === 4, null, { timeout: 5000 });
+  check((await qty('ТЕСТОВЫЙ АНКЕР М5')).qty2 == null && !(await page.evaluate(() => S.Volumes.resRows().some((x) => x.name === 'ТЕСТОВЫЙ АНКЕР М5'))),
+    'the object left out: the total waits — not applied to the smaller estimate, not in the document');
+  await page.click('#projects .proj li[data-o="1"] input[data-act=obj-on]');
+  await page.waitForFunction(() => app.model.resources.find((x) => x.name === 'ТЕСТОВЫЙ АНКЕР М5').qty === 6, null, { timeout: 5000 });
+  check(near((await qty('ТЕСТОВЫЙ АНКЕР М5')).qty2, 7), 'the object back: so is the total');
+  page.once('dialog', (d) => d.accept(''));
+  await page.click('#priceScroll .vrow:has-text("ТЕСТОВЫЙ АНКЕР М5") .qe');
+  await page.waitForFunction(() => Object.keys(app.qtys).length === 1, null, { timeout: 5000 });
 
   // the document: «Таблица №1 (объёмы)» with the two works and the resource set by hand
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#export')]);

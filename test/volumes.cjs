@@ -136,5 +136,25 @@ const mb = back && S.volumes.match(back.entries, a);
 check(back && back.entries.length === 3 && mb.found.length === 3 && JSON.stringify(mb.set) === JSON.stringify(m.set),
   'our own table read back gives the same decisions (' + (back && back.entries.length) + ' lines)');
 
+// a work given to one reply line is not given to another: the extra line is missing, the first decision stands
+const twice = S.volumes.match([
+  { name: 'Разработка грунта экскаватором', unit: '1000 м3', smeta: 0.4, project: 0.3, note: 'a' },
+  { name: 'Разработка грунта экскаватором', unit: '1000 м3', smeta: 0.4, project: 0.35, note: 'b' }
+], a);
+check(twice.found.length === 1 && twice.missing.length === 1 && near(twice.set[a[0].key].v, 0.3) && twice.set[a[0].key].note === 'a',
+  'reply: a work already given to a line is not given to a second one');
+
+// works of two estimates: each under its own object; the intro names both
+const two = S.volumes.list([st], 'a.xlsx').map((w) => Object.assign(w, { projectTitle: 'Склад' }))
+  .concat(S.volumes.list([st], 'b.xlsx').map((w) => Object.assign(w, { projectTitle: 'Гараж' })));
+const both = {}; both[two[0].key] = { v: null, note: NOTE }; both[two[4].key] = { v: 0.2, note: '' };
+const t2 = S.volumes.table(two, both, [], { objects: ['Склад', 'Гараж'] });
+const heads = t2.rows.filter((r) => r.kind === 'vsection').map((r) => r.cells[2].v);
+check(heads.join('|') === 'Склад|РАЗДЕЛ 1. Земляные работы|Гараж|РАЗДЕЛ 1. Земляные работы', 'table: works of two estimates, each under its own object, sections afresh (' + heads.join('|') + ')');
+check(/по объектам:\n«Склад», «Гараж»/.test(t2.rows.find((r) => r.kind === 'vintro').cells[1].v), 'table: the intro names both objects');
+const t1 = S.volumes.table(two, { [two[0].key]: { v: null, note: NOTE } }, [], { objects: ['Склад'] });
+check(!t1.rows.some((r) => r.kind === 'vsection' && r.cells[2].v === 'Склад') && /по объекту:\n«Склад»/.test(t1.rows.find((r) => r.kind === 'vintro').cells[1].v),
+  'table: one estimate — no object heading, the intro names it');
+
 console.log(fail ? fail + ' failed' : 'all ok');
 process.exit(fail ? 1 : 0);

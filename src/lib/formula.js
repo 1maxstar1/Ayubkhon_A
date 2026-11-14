@@ -40,7 +40,9 @@
       var c = S.colIndex(letters);
       if (c > 16384) return m;
       var nc = mapCol(c);
-      var nr = d2 ? +digits : +digits + rowDelta;
+      // an absolute row ($G$7) moves too: the whole source block is relocated into Лист1, and a row kept where it was
+      // pointed at another street's lines (or at the total itself); the $ stays in the output
+      var nr = +digits + rowDelta;
       if (nr < 1) nr = 1;
       return d1 + S.col(nc) + d2 + nr;
     });

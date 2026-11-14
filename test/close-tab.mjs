@@ -127,6 +127,7 @@ await wait(2500);
 link.delay = 0;
 check(await corrections() === 1, 'the correction reached the server (' + await corrections() + ')');
 check(await inState(0), 'and so did the state: both were sent at once, not the second after the first was answered');
+check(await pb.count('suggest_events', `workspace='${wsId}'`) === 1, 'and so did the decision: the journal is written as the tab goes (docs/ai-reja.md)');
 
 /* 2 — the state never arrives; the correction does. Opened in another browser, the price is in the table */
 page = await tab(ctx);

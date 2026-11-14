@@ -8,7 +8,7 @@ const STAMP = {
   exports: { create: ["by"], update: [] },
   // what a smeta file looks like (docs/format-reja.md): whoever uploaded it first; a later, better reading of the
   // same file changes neither whose it is nor which file it is
-  smeta_files: { create: ["by"], update: [], keep: ["by", "hash"] },
+  smeta_files: { create: ["by"], update: [], keep: ["by", "hash"], adminOnly: ["file", "name", "size"] },
 };
 
 module.exports = {
@@ -28,6 +28,11 @@ module.exports = {
         if (phase === "update" && rule.keep) {
           const was = e.record.original();
           for (let i = 0; i < rule.keep.length; i++) e.record.set(rule.keep[i], was.get(rule.keep[i]));
+        }
+        // the kept file (and what it is called) is the admin's to remove or replace: an expert's update leaves it be
+        if (phase === "update" && rule.adminOnly && auth.get("role") !== "admin") {
+          const was = e.record.original();
+          for (let i = 0; i < rule.adminOnly.length; i++) e.record.set(rule.adminOnly[i], was.get(rule.adminOnly[i]));
         }
       }
     }

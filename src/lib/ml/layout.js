@@ -51,7 +51,8 @@ var S = (typeof S !== 'undefined' && S) || {};
   'use strict';
   var ML = S.ml = S.ml || {};
 
-  var VERSION = 1;
+  // 2 (v2.16.1): quantity × price = sum by agree() (a flat half made small numbers agree), and `doubt` in the description
+  var VERSION = 2;
   var DOUBT = 0.9;
   var MAX_SHEETS = 12, MAX_ROWS = 600, MAX_COLS = 30, MAX_NUMS = 10, TOP_REL = 6;
   var LETTER = /[A-Za-zЀ-ӿ]/;

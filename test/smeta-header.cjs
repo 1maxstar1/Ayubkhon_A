@@ -189,5 +189,70 @@ const priced = S.assemble([{ name: 'h', file: 'h.xlsx', objects: hvb, enabled: t
 check(priced.resources.find((r) => r.name === 'ПЕРЕВОЗКА ЩЕБЕНЬ ТЕСТОВЫЙ').market === 3 && priced.resources.find((r) => r.name === 'ЩЕБЕНЬ ТЕСТОВЫЙ').market === 25,
   '… the material\'s market price leaves the haulage line at its own price');
 
+/* 10 — «№ п/п» with another column between it and the name: the № column is where the header says */
+const just = one({ sheets: [sheet('РЕСУРС', [
+  ['Ведомость ресурсов'],
+  ['№ п/п', 'Обоснование', 'Наименование', 'Ед. изм.', 'Количество', 'Цена за ед.', 'Сумма'],
+  ['СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'],
+  [1, 'С101-0001', 'ЩЕБЕНЬ ТЕСТОВЫЙ', 'М3', 4, 17, 68],
+  ['ПЕРЕВОЗКА'],
+  [1, 'С310-0002', 'ЩЕБЕНЬ ТЕСТОВЫЙ', 'М3', 4, 3, 12]
+])] });
+const ji = just.length ? just[0].rows.filter((r) => r.kind === 'item') : [];
+check(just.length === 1 && just[0].layout.no === 1 && ji.length === 2 && ji.every((r) => r.no === 1) &&
+  just[0].rows.filter((r) => r.kind === 'section').length === 2, 'a column between «№ п/п» and the name: the № and the bands are read from the № column');
+check(ji[1] && ji[1].nm === 'ПЕРЕВОЗКА ЩЕБЕНЬ ТЕСТОВЫЙ' && ji[0].nm === 'ЩЕБЕНЬ ТЕСТОВЫЙ', '… so the haulage band is seen and its line named apart');
+const jm = S.assemble([{ name: 'j', file: 'j.xlsx', objects: just, enabled: true }], {});
+const jRow = jm.rows.find((r) => r.kind === 'item');
+check(jRow && jRow.cells[jm.cols.NO] && jRow.cells[jm.cols.NO].v === 1 && jRow.cells[jm.cols.UNIT].v === 'М3' && !jm.rows.some((r) => r.cells && Object.keys(r.cells).some((k) => r.cells[k] && r.cells[k].v === 'С101-0001')),
+  'the code column between them is left out of the document, never written over the № or the unit');
+
+/* 11 — a band whose title begins like a haulage word but is a resource band */
+const eq = one({ sheets: [sheet('РЕСУРС', [
+  ['N п/п', 'НАИМЕНОВАНИЕ', 'ЕД. ИЗМ.', 'КОЛ-ВО', 'ЦЕНА ЗА ЕД.', 'СУММА (сум)'],
+  [1, 2, 3, 4, 5, 6],
+  ['ТРАНСПОРТНОЕ ОБОРУДОВАНИЕ'],
+  [1, 'ЛИФТ ТЕСТОВЫЙ ПАССАЖИРСКИЙ', 'ШТ', 1, 1000, 1000]
+])] });
+const ei = eq.length ? eq[0].rows.filter((r) => r.kind === 'item') : [];
+check(ei.length === 1 && ei[0].nm === 'ЛИФТ ТЕСТОВЫЙ ПАССАЖИРСКИЙ' && ei[0].section === 'equipment', '«ТРАНСПОРТНОЕ ОБОРУДОВАНИЕ» is equipment: its lines are not renamed as haulage');
+
+/* 12 — a sheet read by its shape that opens with «ПЕРЕВОЗКА» */
+const top = one({ sheets: [sheet('ПЕРЕВОЗКА', [
+  ['ТЕСТОВАЯ СТРОЙКА'],
+  ['ПЕРЕВОЗКА'],
+  [1, 'ЩЕБЕНЬ ТЕСТОВЫЙ', 'М3', 4, 3, 12],
+  [2, 'ПЕСОК ТЕСТОВЫЙ', 'М3', 2, 2, 4],
+  ['ИТОГО', null, 'СУМ', null, null, 16],
+  ['СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'],
+  [1, 'ГРАВИЙ ТЕСТОВЫЙ', 'М3', 1, 9, 9]
+])] });
+const ti = top.length ? top[0].rows.filter((r) => r.kind === 'item') : [];
+check(ti.length === 3 && ti[0].nm === 'ПЕРЕВОЗКА ЩЕБЕНЬ ТЕСТОВЫЙ' && ti[1].nm === 'ПЕРЕВОЗКА ПЕСОК ТЕСТОВЫЙ' && ti[2].nm === 'ГРАВИЙ ТЕСТОВЫЙ',
+  'a «ПЕРЕВОЗКА» band opening a sheet read by its shape names its lines; the next band ends it (' + ti.map((r) => r.nm).join(' | ') + ')');
+
+/* 13 — form 4А: the header repeated on a new printed page inside one estimate */
+const est = [
+  [null, null, ' ЛОКАЛЬНЫЙ   РЕСУРСНЫЙ   СМЕТНЫЙ   РАСЧЕТ', '№ 1'],
+  [null, 'на', 'ТЕСТОВЫЕ РАБОТЫ'],
+  [],
+  ['№ п/п', 'Шифр ресурсов', 'Наименование ресурсов, оборудования, конструкций, изделий и  деталей', 'Единица измерения', 'Количество единиц', 'Сметная стоимость'],
+  [null, null, null, null, null, 'на единицу', 'общая'],
+  [1, 2, 3, 4, 5, 6, 7],
+  [null, null, 'СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'],
+  ['1', 'С1', 'ЩЕБЕНЬ ТЕСТОВЫЙ', 'М3', 4, 29, 116],
+  // a new page: the header again, nothing above it but the page break
+  ['№ п/п', 'Шифр ресурсов', 'Наименование ресурсов, оборудования, конструкций, изделий и  деталей', 'Единица измерения', 'Количество единиц', 'Сметная стоимость'],
+  [null, null, null, null, null, 'на единицу', 'общая'],
+  [1, 2, 3, 4, 5, 6, 7],
+  ['2', 'С2', 'ПЕСОК ТЕСТОВЫЙ', 'М3', 2, 7, 14],
+  [null, null, 'ИТОГО СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ', 'СУМ', null, null, 130],
+  [null, null, 'ИТОГО ПРЯМЫЕ ЗАТРАТЫ', 'СУМ', null, null, 130]
+];
+const pg = one({ sheets: [sheet('РА', [[null, null, null, null, null, 'Форма 4А АВС-4'], ['Наименование стройки -', null, 'ТЕСТОВАЯ СТРОЙКА'], [], ...est])] });
+const pi = pg.flatMap((o) => o.rows.filter((r) => r.kind === 'item'));
+check(pg.length === 1 && pi.length === 2 && pi.map((r) => r.nm).join('|') === 'ЩЕБЕНЬ ТЕСТОВЫЙ|ПЕСОК ТЕСТОВЫЙ' && pi.every((r) => r.section === 'materials'),
+  'form 4А: a header repeated on a new page does not split the estimate; no line is lost, the band runs on (' + pg.length + ' objects, ' + pi.length + ' lines)');
+
 console.log(fail ? '\nFAILED: ' + fail : '\nall passed');
 process.exit(fail ? 1 : 0);

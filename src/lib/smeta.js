@@ -146,10 +146,10 @@
       }
       if (!L.price || !L.sum) return null;
     }
-    // «№ п/п» folds to «П П», so with a code column in between the number
-    // column is found by its raw «№», never guessed as the one left of the name.
-    if (L.code && !L.no) L.no = noRaw && noRaw !== L.code ? noRaw : (L.code - 1 || 1);
-    if (!L.no) L.no = L.name - 1 || 1;
+    // «№ п/п» folds to «П П», so the number column is found by its raw «№» — with a code column in between, or any
+    // other («Обоснование»): never guessed as the one left of the name when the header says where it is. A header
+    // with «№» right before the name gives the same column as the guess did.
+    if (!L.no) L.no = noRaw && noRaw !== L.code ? noRaw : (L.code ? (L.code - 1 || 1) : (L.name - 1 || 1));
     if (!L.unit) L.unit = L.name + 1;
     L.headerRow = r;
     // The "1 2 3 4 5 6" row directly beneath the header, when present.
@@ -213,6 +213,12 @@
       if (txt(cells[L.name]) && S.num(cells[L.qty] && cells[L.qty].v) != null) return r;
     }
     return 1;
+  }
+
+  /** Whether a row has anything in it. */
+  function lastFilled(cells) {
+    for (var c = 1; c < cells.length; c++) { var cell = cells[c]; if (cell && (cell.v != null && cell.v !== '' || cell.f != null)) return true; }
+    return false;
   }
 
   function lastContentRow(rows) {
@@ -294,6 +300,16 @@
     }
 
     var out = [], section = '', band = '', items = 0, sections = 0, wide = L.lastCol;
+    // A sheet read by its shape starts at its first resource band or line, below a «ПЕРЕВОЗКА» band that opens it:
+    // that band still names the lines under it (the reading itself — where it starts — stays as it was)
+    if (!L.headerRow) {
+      for (var u = start - 1; u >= 1; u--) {
+        var above = sheet.rows[u] || [], t = txt(above[L.no]) || txt(above[L.name]);
+        if (!t) { if (lastFilled(above)) break; continue; }
+        if (HAUL.test(up(t)) && !isSection(t)) band = t;
+        break;
+      }
+    }
     for (var r = start; r <= last; r++) {
       var cells = sheet.rows[r] || [];
       var nm = txt(cells[L.name]);
@@ -322,7 +338,8 @@
       if (kind === 'section') band = noTxt || nm;
       // a line under «ПЕРЕВОЗКА» is the haulage of a material, not the material: the same name under
       // «Строительные материалы» is another resource with another price (the owner, 2026-11-14)
-      if (kind === 'item' && HAUL.test(up(band)) && !HAUL.test(up(nm))) nm = (nm === nm.toUpperCase() ? 'ПЕРЕВОЗКА ' : 'Перевозка ') + nm;
+      // … but not under a resource band whose title happens to begin so («ТРАНСПОРТНОЕ ОБОРУДОВАНИЕ» is equipment)
+      if (kind === 'item' && HAUL.test(up(band)) && !isSection(band) && !HAUL.test(up(nm))) nm = (nm === nm.toUpperCase() ? 'ПЕРЕВОЗКА ' : 'Перевозка ') + nm;
       for (var w = cells.length - 1; w > wide; w--) {
         if (cells[w] && (cells[w].v != null || cells[w].f != null)) { wide = w; break; }
       }
@@ -483,7 +500,14 @@
       if (!one) one = transportSheet(sheet);
       return one ? [one] : [];
     }
-    var heads = headerRows(rows, L);
+    // A header repeated on a new printed page inside one estimate is not a new estimate: only a header with a title of
+    // its own above it (number, works, object, «ЛОКАЛЬНЫЙ…») starts one. Split there, the lines between the last
+    // ИТОГО and the repeated header were lost, and the band above them with them.
+    var heads = headerRows(rows, L).filter(function (h, i, all) {
+      if (!i) return true;
+      var m = blockMeta(rows, all[i - 1] + 1, h - 1);
+      return !!(m.number || m.work || m.object || m.stroika);
+    });
     var out = [], last = lastContentRow(rows), prevEnd = 0, stroika = '';
     for (var i = 0; i < heads.length; i++) {
       var Li = layoutAt(rows, heads[i]);

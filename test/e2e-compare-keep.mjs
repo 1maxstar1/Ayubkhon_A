@@ -222,6 +222,12 @@ try {
   check(memRows.length > 0 && acc.length >= 1 && memRows.find((r) => r.accepted).name === 'ТЕСТОВЫЙ КРАН 10 Т' &&
     JSON.stringify(acc) === JSON.stringify(memRows.filter((r) => r.kind === 'corrected' && fixedKeys.includes(r.res_key)).map((r) => r.res_key).sort()),
     `«Исправлено» of the comparison marks the remembered corrected prices as accepted (${acc.length} of ${fixedKeys.length} fixed, ${memRows.length} remembered)`);
+  // no comparison on screen (its file not back, another «Было») says nothing about what the contractor took: the marks stay
+  await page.evaluate(() => { app.compare_ui.res = null; S.Journal.acceptedSig = ''; S.Journal.accepted(); });
+  await new Promise((r) => setTimeout(r, 800));
+  const acc2 = (await api(`/api/collections/price_memory/records?perPage=500&filter=${encodeURIComponent(`workspace='${wsId}'`)}`, {}, su)).items
+    .filter((r) => r.accepted).map((r) => r.res_key).sort();
+  check(JSON.stringify(acc2) === JSON.stringify(acc), 'no comparison on screen leaves the marks as they are');
 
   // «Объёмы работ»: the volumes and the quantities set by hand are kept with the application (src/ui/volumes.js)
   await page.click('#wsList');

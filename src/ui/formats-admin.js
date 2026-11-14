@@ -35,13 +35,18 @@
       ];
     },
 
+    /** «read, sums do not agree»: as the page marked it; a record from v2.16.0 (no mark yet) by its score. */
+    doubtful: function (r) {
+      return !!(r.doubt || (r.is_read && (r.version || 0) < 2 && r.checked > 0 && r.score < S.ml.layout.DOUBT));
+    },
+
     /** What is wrong with a kept file, in words. */
     state: function (r) {
       if (!r.is_read) {
         var why = r.reason === 'no-sheets' || !r.reason ? 'листы ресурсов не найдены' : String(r.reason).replace(/^error:\s*/, '');
         return '<b>Не прочитан</b>: ' + S.esc(why);
       }
-      if (r.doubt) return 'Прочитан, но кол-во × цена = сумма только в ' + Math.round((r.score || 0) * 100) + ' % строк (' + r.checked + ' проверено)';
+      if (A.doubtful(r)) return 'Прочитан, но кол-во × цена = сумма только в ' + Math.round((r.score || 0) * 100) + ' % строк (' + r.checked + ' проверено)';
       return 'Теперь читается (строк ресурсов: ' + (r.items || 0) + '). Загрузите его в заявку ещё раз.';
     },
 
@@ -80,7 +85,7 @@
       var self = this;
       return S.pb.collection('smeta_files').getList(1, LIST_MAX, {
         filter: 'is_read = false || file != ""', sort: '-created', requestKey: null,
-        fields: 'id,collectionId,collectionName,hash,name,size,created,is_read,reason,score,checked,doubt,items,file'
+        fields: 'id,collectionId,collectionName,hash,name,size,created,is_read,reason,score,checked,doubt,items,file,version'
       }).then(function (res) {
         self.list = res.items || [];
         self.renderList(res.totalItems || 0);
@@ -124,8 +129,18 @@
       });
     },
 
-    /** The file read by the worker: { fmt, error }. Past `limit` the worker is replaced and the promise rejects. */
+    /**
+     * The file read by the worker: { fmt, error }. One file at a time — the worker reads one at a time, and a time limit
+     * counted from the moment a file was handed over would run out for the file waiting behind a slow one. Past `limit`
+     * the worker is replaced and the promise rejects.
+     */
     describe: function (bytes, name) {
+      var self = this, run = function () { return self.describeNow(bytes, name); };
+      var p = (this.chain || Promise.resolve()).then(run, run);
+      this.chain = p.catch(function () { /* the next one runs anyway */ });
+      return p;
+    },
+    describeNow: function (bytes, name) {
       var self = this;
       return new Promise(function (ok, bad) {
         if (!self.worker) {
@@ -164,7 +179,8 @@
           app_version: S.appVersion ? S.appVersion() : '' };
         if (fmt.sample) body.sample = fmt.sample;
         return S.pb.collection('smeta_files').update(r.id, body, { requestKey: null }).then(function (saved) {
-          Object.assign(r, { is_read: saved.is_read, reason: saved.reason, score: saved.score, checked: saved.checked, doubt: saved.doubt, items: saved.items });
+          Object.assign(r, { is_read: saved.is_read, reason: saved.reason, score: saved.score, checked: saved.checked, doubt: saved.doubt, items: saved.items,
+            version: saved.version });
           return read ? (r.doubt ? 'прочитан, суммы сходятся не везде' : 'теперь читается') : 'по-прежнему не читается';
         });
       });
@@ -219,6 +235,7 @@
         if (act === 'get') { self.download(r).catch(fail); return; }
         if (act === 'again') {
           b.disabled = true;
+          self.busy = true;          // one check at a time: «Проверить все» and the other rows wait for it
           var was = r.is_read;
           self.again(r).then(function (said) {
             var line = (r.name || '') + ': ' + said + '.';
@@ -226,7 +243,7 @@
             cell.innerHTML = self.state(r);
             // the counts follow a file that reads now; the row stays where it is, with what to do next
             if (r.is_read !== was) return S.pb.send('/api/formats/stats', { method: 'GET', requestKey: null }).then(function (d) { self.counts(d); });
-          }).catch(fail).then(function () { b.disabled = false; });
+          }).catch(fail).then(function () { b.disabled = false; self.busy = false; });
           return;
         }
         if (act === 'drop') {

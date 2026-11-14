@@ -201,9 +201,10 @@
     said: function (it) {
       var app = window.app;
       if (!app || !app.toast) return;
+      // an error-style notice: it stays long enough to be read and has its close button (a plain one is gone in 2.6 s)
       app.toast('«' + it.name + '» не прочитан и сохранён для разработчика: ' + (S.isAdmin && S.isAdmin()
         ? 'страница администратора → «Обучение» → «Распознавание форматов смет» → «Скачать».'
-        : 'администратор может скачать его на своей странице («Распознавание форматов смет»).'));
+        : 'администратор может скачать его на своей странице («Распознавание форматов смет»).'), true);
     }
   };
 

@@ -27,6 +27,7 @@
   var MAX_LINES = 12, CAP = { mem: 2, ref: 5, uzex: 2, hint: 2, sim: 1 };
   var BATCH = 100;           // events per request (the server takes 200)
   var KEEP = 500;            // events waiting for a server that does not answer; older ones are let go
+  var LEAVE_MAX = 6000;      // characters of events sent as the page goes (keepalive; at most 12 KB as sent)
   var ROWS = 1000;           // finished prices per request (the server takes 3000)
 
   function $(id) { return document.getElementById(id); }
@@ -129,8 +130,8 @@
       return { lines: out, chosen: pick };
     },
 
-    /** Everything decided since the last commit becomes events. */
-    commit: function () {
+    /** Everything decided since the last commit becomes events. `how`: as send() takes it (the page going). */
+    commit: function (how) {
       clearTimeout(this.t);
       var pend = this.pend, keys = Object.keys(pend), self = this, app = A(), Sy = S.Sync;
       this.pend = {};
@@ -160,15 +161,22 @@
         });
       } catch (e) { /* never in the way */ }
       if (this.q.length > KEEP) this.q.splice(0, this.q.length - KEEP);
-      this.send();
+      this.send(how);
     },
 
     /** One request per application, one after another; what does not go out waits for the next commit. */
     send: function (how) {
       var self = this;
       if (this.busy || !this.q.length) return Promise.resolve();
-      var ws = this.q[0].ws, part = [], rest = [];
-      this.q.forEach(function (x) { if (x.ws === ws && part.length < BATCH) part.push(x); else rest.push(x); });
+      var ws = this.q[0].ws, part = [], rest = [], size = 0, leaving = !!(how && how.keepalive);
+      this.q.forEach(function (x) {
+        if (x.ws !== ws || part.length >= BATCH) { rest.push(x); return; }
+        // the page going: a request that outlives it shares the browser's 64 KB with the state sync.js sends first —
+        // as many decisions as fit go (in the order they were made), the rest are let go with the page
+        if (leaving) { var n = JSON.stringify(x.ev).length; if (part.length && size + n > LEAVE_MAX) { rest.push(x); return; } size += n; }
+        part.push(x);
+      });
+      if (leaving && size > LEAVE_MAX) how = undefined;     // one decision too large to outlive the page: as any other request
       this.q = rest;
       this.busy = true;
       return S.pb.send('/api/journal/events', Object.assign({ method: 'POST', body: { workspace: ws, events: part.map(function (x) { return x.ev; }) } }, how || {}))
@@ -281,6 +289,10 @@
     accepted: function () {
       var Sy = S.Sync;
       if (!this.ready() || Sy.ws.status !== 'done') return;
+      // no comparison on screen (none made yet, its file not back, another «Было» with nothing to compare): it says
+      // nothing about what the contractor took — the marks of the last one stay
+      var cmp = A() && A().compare_ui;
+      if (!cmp || !cmp.res) return;
       var keys = Object.keys(this.fixedKeys()).sort(), sig = Sy.ws.id + '|' + keys.join('\u0001');
       if (sig === this.acceptedSig) return;
       this.acceptedSig = sig;
@@ -306,7 +318,8 @@
       wrap(S.Memory, 'show', function (anchor, key) { if (key) self.seen[key] = 1; });
       // leaving the application, by the list or by the tab: what was decided is written down first
       wrap(S.Sync, 'close', function () { self.commit(); });
-      window.addEventListener('pagehide', function () { try { self.commit(); } catch (e) { /* gone */ } });
+      // the tab closed within COMMIT_MS of the last price: the request has to outlive the page (keepalive)
+      window.addEventListener('pagehide', function () { try { self.commit({ keepalive: true }); } catch (e) { /* gone */ } });
       document.addEventListener('ws:open', function () { self.fresh(); });
       document.addEventListener('ws:close', function () { self.fresh(); });
       if (S.Compare) wrap(S.Compare.prototype, 'run', null, function () { self.accepted(); });

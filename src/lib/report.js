@@ -346,7 +346,7 @@
       { min: R_MSUM, max: R_DIFF, width: 14.29, hidden: opts.hideSums !== false },
       { min: R_NOTE, max: R_NOTE, width: wide }
     ];
-    if (nExtra > 1) cols.push({ min: R_EXTRA + 1, max: R_EXTRA + nExtra * 2, width: 11.86, hidden: true });
+    if (nExtra > 0) cols.push({ min: R_EXTRA + 1, max: R_EXTRA + nExtra * 2, width: 11.86, hidden: true });
     return cols;
   }
 

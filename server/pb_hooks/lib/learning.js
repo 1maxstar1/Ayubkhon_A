@@ -168,7 +168,12 @@ module.exports = {
         if (kind === "corrected" || kind === "zeroed") {
           source = row.source === "pct" ? "pct" : checkSource(row.source || "typed", row.source_price).source;
         } else if (kind === "checked") source = oneOf(row.source, ["mark", "finish"], "mark");
+        // the same id for the same resource of the same workspace at every finish: a later application that applied
+        // this price («mem:<id>», src/ui/memory.js) still says where it came from after this one is finished again
+        const id = $security.sha256(w.ws.id + "|" + key).slice(0, 15);
+        if (part > 0) { try { if (tx.findRecordById("price_memory", id)) continue; } catch (_) { /* not there: written below */ } }
         const rec = new Record(coll);
+        rec.set("id", id);
         rec.set("workspace", w.ws.id);
         rec.set("application", w.application);
         rec.set("contragent", w.contragent);
@@ -238,7 +243,7 @@ module.exports = {
       events_with_lines: one("SELECT COUNT(*) AS n FROM suggest_events WHERE lines != '[]' AND lines != '' AND lines IS NOT NULL"),
       events_opened: one("SELECT COUNT(*) AS n FROM suggest_events WHERE opened = TRUE"),
       memory: groups("SELECT kind AS v, COUNT(*) AS n FROM price_memory GROUP BY kind"),
-      memory_sources: groups("SELECT CASE WHEN source LIKE 'ref:%' THEN 'ref' WHEN source LIKE 'hint:%' THEN 'hint' WHEN source LIKE 'uzex:%' THEN 'uzex' " +
+      memory_sources: groups("SELECT CASE WHEN source LIKE 'ref:%' THEN 'ref' WHEN source LIKE 'hint:%' THEN 'hint' WHEN source LIKE 'uzex:%' THEN 'uzex' WHEN source LIKE 'mem:%' THEN 'mem' " +
         "WHEN source = '' THEN '-' ELSE source END AS v, COUNT(*) AS n FROM price_memory GROUP BY 1"),
       memory_accepted: one("SELECT COUNT(*) AS n FROM price_memory WHERE accepted = TRUE"),
       memory_applications: one("SELECT COUNT(DISTINCT workspace) AS n FROM price_memory"),
@@ -266,7 +271,8 @@ module.exports = {
         files: one(T),
         read: one(T + " WHERE is_read = TRUE"),
         unread: one(T + " WHERE is_read = FALSE"),
-        doubt: one(T + " WHERE is_read = TRUE AND doubt = TRUE"),
+        // a record from before `doubt` (v2.16.0, version 1) by its score, with the threshold of then
+        doubt: one(T + " WHERE is_read = TRUE AND (doubt = TRUE OR (version < 2 AND checked > 0 AND score < 0.9))"),
         kept: one(T + " WHERE file != ''"),
         formats: one("SELECT COUNT(DISTINCT signature) AS n FROM smeta_files WHERE is_read = TRUE AND signature != ''"),
         formats_unread: one("SELECT COUNT(DISTINCT signature) AS n FROM smeta_files WHERE is_read = FALSE AND signature != ''"),

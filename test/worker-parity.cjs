@@ -82,5 +82,16 @@ check(direct.length === 2 && direct[0].equipTitle === false && direct[1].equipTi
     page + ': the lines of the equipment estimate are marked as equipment (' + marked.length + ')');
 });
 
+// the works of form 5 (01_ЛРВ) go to the page beside the objects, as the parser reads them («Объёмы работ»)
+const Sv = load(load.PIPELINE, 'volumes');
+const wBytes = books.xlsx(Sv, books.bookWithWorks());
+const wDirect = JSON.parse(JSON.stringify(Sv.volumes.parseWorkbook(Sv.readXlsx(new Uint8Array(wBytes)))));
+check(wDirect.length === 1 && wDirect[0].works.length === 2, 'the parser reads the two works of form 5');
+['smeta-taqqoslash.html', 'index.html'].forEach((page) => {
+  const msg = throughWorker(workerSource(page), 'w.xlsx', wBytes);
+  check(msg && JSON.stringify(msg.works) === JSON.stringify(wDirect), page + ': the worker posts the works as the parser reads them');
+  check(msg && msg.objects && msg.objects.length === 2, page + ': and the resource sheets as before (' + (msg && msg.objects && msg.objects.length) + ')');
+});
+
 console.log(fail ? '\nFAILED: ' + fail : '\nall passed');
 process.exit(fail ? 1 : 0);

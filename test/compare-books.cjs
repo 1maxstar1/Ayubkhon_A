@@ -164,4 +164,55 @@ function replySmeta() {
   ] }]);
 }
 
-module.exports = { book, bookOf, prices, xlsx, replyBook, replyBook2, replySmeta, sheet, estimate, line };
+/**
+ * The local resource statement of form 5 (sheet 01_ЛРВ) of book(): two works, whose resources add up to the
+ * quantities of book()'s first estimate. For «Объёмы работ» (src/lib/volumes.js).
+ */
+function lrvSheet() {
+  return sheet('01_ЛРВ', [
+    ['ТЕСТОВАЯ СТРОЙКА'],
+    ['ЛОКАЛЬНАЯ РЕСУРСНАЯ ВЕДОМОСТЬ', '№ 1'],
+    ['на', 'ОБЩЕСТРОИТЕЛЬНЫЕ РАБОТЫ'],
+    [],
+    ['N п.п.', 'Шифр номера нормативов и коды ресурсов', 'Наименование работ и затрат', 'Единица измерения', 'Количество'],
+    [null, null, null, null, 'на ед. измерения', 'по проектным данным'],
+    [1, 2, 3, 4, 5, 6],
+    ['РАЗДЕЛ 1. ТЕСТОВЫЕ РАБОТЫ'],
+    [1, 'Е08-001-01', 'ТЕСТОВАЯ КЛАДКА СТЕН', 'М3', 2],
+    ['1.1', '1', 'ЗАТРАТЫ ТРУДА РАБОЧИХ-СТРОИТЕЛЕЙ', 'ЧЕЛ.-Ч', 4, 8],
+    ['1.2', '4', 'ТЕСТОВЫЙ ЦЕМЕНТ', 'Т', 0.5, 1],
+    [2, 'Е09-001-01', 'ТЕСТОВЫЙ МОНТАЖ АНКЕРОВ', '100 ШТ', 0.04],
+    ['2.1', '1', 'ЗАТРАТЫ ТРУДА РАБОЧИХ-СТРОИТЕЛЕЙ', 'ЧЕЛ.-Ч', 50, 2],
+    ['2.2', '2', 'ТЕСТОВЫЙ КРАН 10 Т', 'МАШ.-Ч', 50, 2],
+    ['2.3', '4', 'ТЕСТОВЫЙ АНКЕР М5', 'ШТ', 100, 4],
+    ['ИТОГО ПО ЛОКАЛЬНОЙ РЕСУРСНОЙ ВЕДОМОСТИ:']
+  ]);
+}
+
+/** book(1) with its form 5 beside it. */
+function bookWithWorks() {
+  const b = book(1);
+  return { sheets: [...b.sheets, lrvSheet()] };
+}
+
+/**
+ * A reply of two sheets, like the ones sent: «цены» (the prices) and «объем» (the volumes): the masonry by the
+ * project is 1.5 instead of 2, the mounting is to be justified. `onlyVolumes` leaves the prices out.
+ */
+function volReplyBook(onlyVolumes) {
+  const vol = sheet('объем', [
+    ['СОПОСТАВИТЕЛЬНАЯ ТАБЛИЦА №1'],
+    ['№ п/п', 'Наименование работ и затрат', 'Ед.изм.', 'Объемы работ', null, 'Примечание'],
+    [null, null, null, 'по локальной ресурсной смете', 'по рабочему проекту'],
+    [1, 2, 3, 4, 5, 6],
+    ['РАЗДЕЛ 1. ТЕСТОВЫЕ РАБОТЫ'],
+    [1, 'ТЕСТОВАЯ КЛАДКА СТЕН', 'М3', 2, 1.5, 'по рабочему проекту'],
+    [2, 'ТЕСТОВЫЙ МОНТАЖ АНКЕРОВ', '100 ШТ', 0.04, null, 'Необходимо обосновать объем в проекте'],
+    [3, 'ТЕСТОВАЯ РАБОТА, КОТОРОЙ НЕТ', 'М2', 1, null, 'Необходимо обосновать объем в проекте']
+  ]);
+  if (onlyVolumes) return { sheets: [vol] };
+  const prices = replyBook().sheets[0];
+  return { sheets: [Object.assign({}, prices, { name: 'цены' }), vol] };
+}
+
+module.exports = { book, bookOf, prices, xlsx, replyBook, replyBook2, replySmeta, sheet, estimate, line, lrvSheet, bookWithWorks, volReplyBook };

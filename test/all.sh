@@ -110,6 +110,7 @@ run smeta-header     node test/smeta-header.cjs
 run compare          node test/compare.cjs
 run export-formulas  node test/export-formulas.cjs
 run worker-parity    node test/worker-parity.cjs
+run volumes          node test/volumes.cjs
 run uzex             node test/uzex.cjs
 run memory          node test/memory.cjs
 run ml              node test/ml.cjs
@@ -174,6 +175,7 @@ browser_run e2e-admin    node test/e2e-admin.mjs
 browser_run e2e-refs     node test/e2e-refs.mjs
 browser_run e2e-uzex     node test/e2e-uzex.mjs
 browser_run e2e-compare  node test/e2e-compare.mjs
+browser_run e2e-volumes  node test/e2e-volumes.mjs
 browser_run e2e-compare-keep node test/e2e-compare-keep.mjs
 browser_run upload-order node test/upload-order.mjs
 browser_run upload-fail  node test/upload-fail.mjs

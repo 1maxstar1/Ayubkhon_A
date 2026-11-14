@@ -16,8 +16,10 @@
       // the parser gained later (`equipTitle`) was never added to the copy: the rule that rests on it worked
       // in every test and not in the page. test/worker-parity.cjs holds the two together.
       var objects = S.smeta.parseWorkbook(wb, msg.name);
+      // the works and their volumes (local resource statement of form 5), for «Объёмы работ»
+      var works = S.volumes ? S.volumes.parseWorkbook(wb) : [];
       self.postMessage({
-        ok: true, id: msg.id, name: msg.name, objects: objects,
+        ok: true, id: msg.id, name: msg.name, objects: objects, works: works,
         sheetCount: wb.sheets.length, ms: Date.now() - t0
       });
     } catch (err) {

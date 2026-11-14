@@ -31,6 +31,7 @@ node test/smeta-header.cjs                            # oddiy varaq: shakli bo'y
 node test/export-formulas.cjs                         # eksport qayta o'qiladi, formulalari hisoblanadi: ИТОГО = qatorlar yig'indisi (uch turda)
 node test/worker-parity.cjs                           # sahifadagi worker o'quvchi qaytargan narsani aynan qaytaradi
 node test/compare.cjs; node test/e2e-compare.mjs      # «Сравнение версий» va «Наш ответ (Excel)»: qaytgan smetani birinchisi va jadvalimiz bilan solishtirish
+node test/volumes.cjs; node test/e2e-volumes.mjs      # «Объёмы работ»: 5-shakl ishlari, yangi hajm → resurs miqdori, javobning «объем» varag'i, Таблица №1
 node test/e2e-compare-keep.mjs                        # ... va ish maydonida: yuklangan fayllar qayta yuklashdan keyin qaytadi
 node test/browser.mjs [a.xlsx b.xlsx]                 # haqiqiy brauzerda (bitta-fayl rejim); faylsiz — o'ylab topilgan smetada
 node test/price-book.mjs                              # «Книга цен»: saqlash, qayta yuklash, jadval ko'rinishidagi narxlar ro'yxati
@@ -156,6 +157,11 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   **oldingi** arizalardan (o'z sanasidan avvalgi, shu viloyat). Uch usul (spravochnik, tayanch, model) bir xil test
   qismida o'lchanadi; eng yaxshisidan bir punkt ichidagilarning eng soddasi tanlanadi; test qismi hech narsani
   tanlamaydi. Model egasi sonlarni ko'rib rozi bo'lmaguncha ish sahifasida ishlatilmaydi.
+* **Hajmlar va miqdorlar** (`src/lib/volumes.js`, `src/ui/volumes.js`, v2.15.0): ishlar 5-shakl vedomostidan
+  (`01_ЛРВ`) o'qiladi; ekspertning qarori — `app.vol` (ish kaliti → loyiha hajmi, izoh) va `app.qtys` (resurs
+  kaliti → jami miqdor), ish maydonida saqlanadi. Yangi hajm resursni faqat bir birlikka × (yangi − eski) ga
+  siljitadi. **Narxlar, tejash va Таблица №2 miqdorga tegmaydi** — miqdor faqat «Таблица №1 (объёмы)» varag'iga
+  chiqadi, u esa faqat biror narsa belgilanganda qo'shiladi (aks holda hujjat avvalgidek).
 * Raqamlar hech qachon yo'qolmaydi: `АНКЕР М5` ≠ `АНКЕР М8`, `4.1.1` ≠ `4.11`;
   ikki raqam orasidagi ajratgich o'chirilmaydi.
 * **Xavfsizlik bo'limi hozircha o'chirilgan (egasining qarori, 2026-10-24).**

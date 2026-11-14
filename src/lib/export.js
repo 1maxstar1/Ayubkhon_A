@@ -120,6 +120,24 @@
     }
   }
 
+  /* ------------------------------------------------ «Сопоставительная таблица №1» (work volumes) */
+  function volStyle(kind, c) {
+    if (c > 6) return { fmt: 'General' };
+    var fmt = c === 4 || c === 5 ? '#,##0.0####' : c === 1 ? '#,##0' : 'General';
+    switch (kind) {
+      case 'vstamp': return { font: FN, h: 'left', v: 'top', wrap: true };
+      case 'vtitle': return { font: F11B, h: 'center', v: 'center' };
+      case 'vintro': return { font: F, h: 'center', v: 'center', wrap: true };
+      case 'vheader': case 'vnum':
+        return { font: F, fill: CYAN, border: ALL, h: 'center', v: 'center', wrap: true };
+      case 'vsection': return { font: F, fill: CYAN, border: ALL, h: c === 2 ? 'left' : 'center', v: 'center', wrap: true };
+      case 'vitem':
+        if (c === 2 || c === 6) return { border: ALL, h: 'left', v: 'center', wrap: true };
+        return { fmt: fmt, border: ALL, h: 'center', v: 'center' };
+      default: return { fmt: 'General' };
+    }
+  }
+
   /* --------------------------------------------------------------- build */
 
   function toSheet(styles, name, rows, lastCol, styleOf, extra) {
@@ -223,6 +241,12 @@
         ]
       }));
     });
+
+    // the volumes the expert remarked on (S.volumes.table): a sheet only when there is something on it
+    if (opts.volumes && opts.volumes.count) {
+      sheets.push(toSheet(styles, uniqueName(sheets, 'Таблица №1 (объёмы)'), opts.volumes.rows, 6, volStyle, {
+        cols: opts.volumes.cols, merges: opts.volumes.merges, printCentered: true, pageSetup: { scale: 85, orientation: 'portrait' } }));
+    }
 
     if (opts.contents !== false) {
       var idx = S.report.contents(model, opts);

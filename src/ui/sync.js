@@ -68,6 +68,7 @@
       document.addEventListener('ws:close', function () { Sync.exportsList = []; });
       document.addEventListener('notes:change', function () { Sync.touch(); });
       document.addEventListener('checked:change', function () { if (!Sync.loading) Sync.touch(); });
+      document.addEventListener('volumes:change', function () { if (!Sync.loading) Sync.touch(); });
       // the document of an application is named after it: its number and its contractor (E19)
       var baseOf = S.App.prototype.exportBase;
       S.App.prototype.exportBase = function () {
@@ -160,7 +161,7 @@
       this.savedOnOpen = w.updated || '';      // the server's own clock: corrections are compared with it
       this.corrReady = false; this.merged = false;
       var app = A();
-      app.projects = []; app.prices = {}; app.pct = {}; app.notes = {}; app.checked = {}; app.looseBook = null; app.spareBook = null; app.queue = [];
+      app.projects = []; app.prices = {}; app.pct = {}; app.notes = {}; app.checked = {}; app.vol = {}; app.qtys = {}; app.looseBook = null; app.spareBook = null; app.queue = [];
       this.refused = ''; this.cutSaid = 0;
       app.rebuild(); app.renderSide();
       this.renderBox();
@@ -307,7 +308,11 @@
       $('reportMode').value = st.mode || 'changed';
       app.looseBook = st.looseBook || null;
       app.spareBook = st.book || null;
+      // the volumes and the quantities, before the model is built: the quantities follow them
+      app.vol = st.vol && typeof st.vol === 'object' ? Object.assign({}, st.vol) : {};
+      app.qtys = st.qtys && typeof st.qtys === 'object' && st.keys === KEYS ? Object.assign({}, st.qtys) : {};
       app.rebuild(); app.renderSide();
+      if (st.qtys && typeof st.qtys === 'object' && st.keys !== KEYS) { app.qtys = this.reindex(st.qtys).map; app.rebuild(); }
       // `prices2` is this version's keying; `prices` is the previous one's, kept
       // so a workspace saved here can still be opened by the older page.
       var saved = (st.keys === KEYS && st.prices2) ? st.prices2 : st.prices;
@@ -665,6 +670,9 @@
         pct: Object.keys(prices).filter(function (k) { return app.pct && app.pct[k]; }),
         notes: app.notes && Object.keys(app.notes).length ? app.notes : undefined,
         checked: app.checked && Object.keys(app.checked).length ? app.checked : undefined,
+        // the volumes of the works and the quantities the expert decided (src/ui/volumes.js)
+        vol: app.vol && Object.keys(app.vol).length ? app.vol : undefined,
+        qtys: app.qtys && Object.keys(app.qtys).length ? app.qtys : undefined,
         looseBook: app.looseBook || null,
         book: app.spareBook || null,
         compare: { old: this.cmp.old || null, new: this.cmp.new || null, reply: this.cmp.reply || null, base: this.cmp.base || '' },
@@ -1220,7 +1228,7 @@
         self.thaw();
         S.hashSet('ws', '');
         self.loading = true;
-        app.projects = []; app.prices = {}; app.pct = {}; app.notes = {}; app.checked = {}; app.looseBook = null; app.spareBook = null; app.queue = [];
+        app.projects = []; app.prices = {}; app.pct = {}; app.notes = {}; app.checked = {}; app.vol = {}; app.qtys = {}; app.looseBook = null; app.spareBook = null; app.queue = [];
         app.resetOpts();
         $('reportMode').value = 'changed';
         app.rebuild(); app.renderSide();

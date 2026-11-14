@@ -27,6 +27,8 @@
     this.pct = {};           // resource key -> 1 when its price was set by «Применить %» (and may be set by it again)
     this.checked = {};       // resource key -> 1: the expert marked it «проверено» (E14)
     this.notes = {};         // resource key -> the expert's own note for the document (E17, behind opts.resNotes)
+    this.vol = {};           // work key -> { v: the volume by the project | null, note } (src/ui/volumes.js)
+    this.qtys = {};          // resource key -> the expert's total quantity, set by hand in «Проверка цен»
     this.spareBook = null;   // price-book lines for a resource key no estimate has yet; see loadPriceBook()
     this.opts = Object.assign({}, DEFAULTS, loadOpts());
     this.seq = 0;
@@ -108,6 +110,7 @@
         S.hashSet('tab', t.dataset.pane === 'prices' ? '' : t.dataset.pane);
         if (t.dataset.pane === 'sheet') self.sheetList.refresh();
         if (t.dataset.pane === 'report') self.buildReportPreview();
+        if (t.dataset.pane === 'volumes' && S.Volumes) S.Volumes.render();
       });
     });
 
@@ -491,7 +494,8 @@
       } else {
         try {
           var wb = S.readXlsx(new Uint8Array(buf));
-          self.onParsed(file.name, { ok: true, objects: S.smeta.parseWorkbook(wb, file.name), sheetCount: wb.sheets.length }, slot);
+          self.onParsed(file.name, { ok: true, objects: S.smeta.parseWorkbook(wb, file.name),
+            works: S.volumes ? S.volumes.parseWorkbook(wb) : [], sheetCount: wb.sheets.length }, slot);
         } catch (err) {
           self.onParsed(file.name, { ok: false, error: String(err.message || err) }, slot);
         }
@@ -547,6 +551,7 @@
           title: title,
           intro: introFrom(title),
           objects: res.objects,
+          works: res.works || [],    // the works of form 5 and their volumes, when the file has that statement
           enabled: true,
           open: true
         };
@@ -693,6 +698,8 @@
       }
       document.getElementById('export').disabled = !this.model.rows.length;
     }
+    // the quantities by the expert: from the volumes of the works, or set by hand (src/ui/volumes.js)
+    if (S.Volumes) S.Volumes.applyQty(this);
     this.indexRanges();
     this.sheetRows = this.model ? this.model.rows : [];
     // The search box keeps its text across a rebuild, so it has to keep its
@@ -709,6 +716,7 @@
     // and 634.
     if (document.getElementById('pane-report').classList.contains('on')) this.buildReportPreview();
     if (this.compare_ui) this.compare_ui.refresh();
+    if (S.Volumes) S.Volumes.refresh();
     this.ledger();
     this._buildMs = Math.round(performance.now() - t0);
     document.getElementById('sheetCount').textContent =
@@ -1112,6 +1120,8 @@
       try {
         var t0 = performance.now();
         var opts = self.reportOpts();
+        // «Сопоставительная таблица №1»: the volumes remarked on and the quantities changed (none — no sheet)
+        opts.volumes = S.Volumes ? S.Volumes.table() : null;
         var bytes = S.buildWorkbook(self.model, opts);
         download(bytes, fileName(self));
         // the same count the preview shows, over every project of the file

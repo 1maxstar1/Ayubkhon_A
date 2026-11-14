@@ -260,9 +260,17 @@
     reader.onerror = function () { app.toast('Не удалось прочитать файл', true); end(); };
     reader.onload = function () {
       if (gen !== self.gen) return;
-      var parsed;
-      try { parsed = S.reply.parse(S.readXlsx(new Uint8Array(reader.result))); }
+      var parsed, wb;
+      try { wb = S.readXlsx(new Uint8Array(reader.result)); parsed = S.reply.parse(wb); }
       catch (e) { app.toast(file.name + ': ' + (e.message || e), true); end(); return; }
+      // the «объем» sheet beside the prices: the volumes of the works go onto the same project (src/ui/volumes.js)
+      var proj = b !== 'file' ? app.projects[+String(b).slice(1)] : null;
+      var vol = proj && S.Volumes ? S.Volumes.readReply(wb, proj) : null;
+      if (!parsed.entries.length && vol && vol.rows) {
+        if (!back) { S.Volumes.applyReply(vol); app.toast('Наш ответ: ' + S.Volumes.replyText(vol), !vol.found); }
+        end();
+        return;
+      }
       if (!parsed.entries.length) {
         app.toast(file.name + ': не найдена таблица с колонками «Наименование» и «Рыночная цена» ' +
           '(или «Bozor ma\'lumotlariga ko\'ra»)', true);
@@ -270,17 +278,18 @@
         return;
       }
       var m = S.reply.match(parsed.entries, objects);
-      self.reply = { base: b, name: file.name, entries: parsed.entries, unread: parsed.unread, match: m };
+      self.reply = { base: b, name: file.name, entries: parsed.entries, unread: parsed.unread, match: m, vol: vol };
       var n = Object.keys(m.prices).length;
       self.reply.applied = b !== 'file' ? n : 0;
       if (back) { back(); return; }
       chose('reply', file);
       if (b !== 'file' && n) app.setPrices(m.prices);
+      if (vol) S.Volumes.applyReply(vol);
       app.toast('Наш ответ: строк ' + parsed.entries.length + ', найдено в смете ' + m.found.length +
         (m.missing.length ? ', не найдено ' + m.missing.length : '') +
         (m.ambiguous.length ? ', не применено ' + m.ambiguous.length : '') +
         (parsed.unread.length ? ', цена не прочитана ' + parsed.unread.length : '') +
-        (b !== 'file' ? ' · цен проекта обновлено: ' + n : ''));
+        (b !== 'file' ? ' · цен проекта обновлено: ' + n : '') + (vol ? ' · ' + S.Volumes.replyText(vol) : ''));
       self.run();
     };
     reader.readAsArrayBuffer(file);
@@ -429,6 +438,9 @@
           ', найдено в смете ' + m.found.length + (rp.applied ? ', цен проекта обновлено: ' + rp.applied : '') +
           (twice ? ', повторов (та же позиция сметы ещё раз): ' + twice : '') +
           (m.missing.length ? ', <b>не найдено ' + m.missing.length + '</b> — список ниже' : '') + '.<br>' +
+          (rp.vol && S.Volumes ? 'Лист «объем»: ' + S.esc(S.Volumes.replyText(rp.vol)) + ' — вкладка «Объёмы работ».' +
+            (rp.vol.missing.length ? ' Нет в смете: ' + rp.vol.missing.slice(0, 10).map(function (e) { return '«' + S.esc(e.name) + '»'; }).join(', ') +
+              (rp.vol.missing.length > 10 ? ' …' : '') + '.' : '') + '<br>' : '') +
           'Исправленная смета не обязательна. Если её нет — проверьте цены на вкладке «Проверка цен» и нажмите «✓ Завершить»: ' +
           'цены этой заявки будут запомнены.' + replyNotes(rp) + '</div>';
       }

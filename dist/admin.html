@@ -601,6 +601,21 @@ body.compact main:not(.narrow){grid-template-columns:232px 1fr}
 .finbox .fin-counts{margin:0 0 6px}
 .finbox .fin-note{margin:0 0 10px;color:var(--mute);font-size:12px}
 .finbox .fin-opt{display:block;margin:6px 0}
+
+/* «Объёмы работ» (src/ui/volumes.js) and the quantity by the expert in «Проверка цен» */
+.vtbl{border-collapse:collapse;width:100%;font-size:13px}
+.vtbl th{position:sticky;top:0;background:var(--sf2);font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--rule);z-index:1}
+.vtbl td{padding:4px 8px;border-bottom:1px solid var(--rule);vertical-align:middle}
+.vtbl td.num{text-align:right;white-space:nowrap}.vtbl td.mid{text-align:center;white-space:nowrap}
+.vtbl tr.vsec td{background:#e8f6f6;font-weight:600}
+.vtbl tr.on td{background:#fff8e1}
+.vtbl .vin{width:90px;text-align:right;font:inherit;padding:2px 4px}
+.vtbl .vin.bad{outline:2px solid #c62828}
+.vtbl .vnote{width:calc(100% - 110px);min-width:120px;font:inherit;padding:2px 4px}
+.vtbl .vjust{white-space:nowrap;margin-right:6px;font-size:12px}
+.qe{border:0;background:none;cursor:pointer;font:inherit;color:inherit;padding:0;text-align:right;width:100%}
+.qe:hover{text-decoration:underline dotted}
+.qe.on{color:#b45309;font-weight:600}.qe.on s{color:var(--mute);font-weight:400}
 </style>
 </head>
 <body class="admin">

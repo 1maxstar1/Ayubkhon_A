@@ -17,20 +17,22 @@ import { startServer } from './server.mjs';
 const require = createRequire(import.meta.url);
 const { load } = require('./load.cjs');
 const S = load('fflate', 'normalize', 'match', 'sections', 'util', 'formula', 'xlsx-read', 'xlsx-write', 'smeta', 'assemble');
-const { book, xlsx, replyBook } = require('./compare-books.cjs');
+const { book, xlsx, replyBook, bookWithWorks } = require('./compare-books.cjs');
 
 const dir = mkdtempSync(join(tmpdir(), 'cmpk-'));
 const f1 = join(dir, 'Тест_v1.xlsx'), f2 = join(dir, 'Тест_v2.xlsx'), f3 = join(dir, 'Наш_ответ.xlsx');
 writeFileSync(f1, xlsx(S, book(1)));
 writeFileSync(f2, xlsx(S, book(2)));
 writeFileSync(f3, xlsx(S, replyBook()));
+const f4 = join(dir, 'Тест_объёмы.xlsx');
+writeFileSync(f4, xlsx(S, bookWithWorks()));
 
 const pb = await startServer({ port: 8141, registry: true, build: true });
 const { api, su } = pb;
 let fail = 0;
 const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) fail++; };
 
-const rows = pb.rows().slice(0, 3);
+const rows = pb.rows().slice(0, 4);
 await api('/api/registry/import', { method: 'POST', body: JSON.stringify({ rows }) }, su);
 
 const browser = await chromium.launch(launchOpts);
@@ -220,6 +222,29 @@ try {
   check(memRows.length > 0 && acc.length >= 1 && memRows.find((r) => r.accepted).name === 'ТЕСТОВЫЙ КРАН 10 Т' &&
     JSON.stringify(acc) === JSON.stringify(memRows.filter((r) => r.kind === 'corrected' && fixedKeys.includes(r.res_key)).map((r) => r.res_key).sort()),
     `«Исправлено» of the comparison marks the remembered corrected prices as accepted (${acc.length} of ${fixedKeys.length} fixed, ${memRows.length} remembered)`);
+
+  // «Объёмы работ»: the volumes and the quantities set by hand are kept with the application (src/ui/volumes.js)
+  await page.click('#wsList');
+  await page.waitForSelector('#screen-list:not([hidden])');
+  await openApp(rows[3].number);
+  await page.setInputFiles('#pick', f4);
+  await page.waitForFunction(() => app.model && app.model.rows.length > 0 && S.Sync.ws.files.length === 1 && !S.Sync.loading, null, T);
+  await page.evaluate(() => {
+    const w = S.Volumes.works().find((x) => x.name === 'ТЕСТОВАЯ КЛАДКА СТЕН'), c = app.model.resources.find((x) => x.name === 'ТЕСТОВЫЙ КРАН 10 Т');
+    app.vol[w.key] = { v: 1.5, note: 'по рабочему проекту' };
+    app.qtys[c.key] = 3;
+    app.rebuild();
+  });
+  await saved();
+  await reload();
+  await page.waitForFunction(() => app.model && app.model.rows.length > 0 && !S.Sync.loading, null, T);
+  const q = await page.evaluate(() => {
+    const by = (n) => app.model.resources.find((x) => x.name === n);
+    return { vol: Object.values(app.vol), labour: by('ЗАТРАТЫ ТРУДА РАБОЧИХ-СТРОИТЕЛЕЙ').qty2, crane: by('ТЕСТОВЫЙ КРАН 10 Т').qty2, works: S.Volumes.works().length };
+  });
+  check(q.works === 2 && q.vol.length === 1 && q.vol[0].v === 1.5 && q.vol[0].note === 'по рабочему проекту',
+    'after a reload the works are read again and the volume decided is back (' + JSON.stringify(q.vol) + ')');
+  check(Math.abs(q.labour - 8) < 1e-9 && q.crane === 3, 'and the quantities follow it, with the one set by hand (' + q.labour + ', ' + q.crane + ')');
 
   check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' / ') : ''));
 } catch (e) {

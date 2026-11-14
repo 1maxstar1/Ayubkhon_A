@@ -3,7 +3,7 @@
 Holati: **0–3-bosqichlar bajarildi; egasining qarori bilan (2026-11-13) yo'nalish o'zgardi — «Модель цен»
 (narx modeli), 1-qadami v2.14.0 da.** Relizlar v2.11.0 – v2.14.0 ro'yxatsiz (egasi sinagach `--list`). Egasi hozir
 eski ishlarini kiritmoqda (~50 ariza: smeta + «Наш ответ (Excel)» + «✓ Завершить»); tugatgach «done» deydi va admin
-sahifasidagi sonlarni yuboradi. **Keyingi qadam (v2.15.0, 2-qadam):** modelni saqlash (`ml_models` kolleksiyasi),
+sahifasidagi sonlarni yuboradi. **Keyingi qadam (2-qadam, v2.16.0 dan oldin emas — v2.15.0 hajmlarga berildi):** modelni saqlash (`ml_models` kolleksiyasi),
 ish sahifasida «вероятно завышено → предлагаемая цена X» va «Применить все предложения» — faqat egasi 1-qadam
 sonlarini ko'rib rozi bo'lgach yoqiladi (darvoza 2).
 

@@ -175,9 +175,43 @@ fayllar kompyuterdan chiqmaydi.
      narx aynan shu; faylda yo'q resursga tegilmaydi. Solishtirishda zamechaniye — aynan
      shu fayldagi qatorlar; smetada topilmaganlari ro'yxat bo'lib ko'rsatiladi. Xuddi shu
      fayl «Книга цен» orqali yuklansa ham narxlar shu tartibda qo'yiladi.
+     Javob faylida narxlar yonida **«объем» varag'i** bo'lsa (v2.15.0; `Наименование работ и
+     затрат · Ед.изм. · Объемы работ (по локальной ресурсной смете · по рабочему проекту) ·
+     Примечание`), uning qatorlari o'sha loyihaning ishlariga ham qo'yiladi — pastdagi
+     «Объёмы работ» bo'limiga qarang. Faqat «объем» varag'idan iborat fayl ham qabul qilinadi.
    * **«Скачать сравнение»** — uch varaqli `.xlsx` («По ресурсам», «По
      строкам» — «По нашему замечанию: да/нет» ustuni bilan, «Итоги листов»),
      xuddi shu ranglar bilan.
+
+---
+
+## Объёмы работ — ishlar hajmi va resurslar miqdori (v2.15.0)
+
+Ekspert narxdan tashqari **hajmlarni** ham tekshiradi (egasining talabi, 2026-11-14).
+
+* **Ishlar** smetaning 5-shakl lokal resurs vedomostidan olinadi (`01_ЛРВ` kabi varaq:
+  `N п.п. · Шифр · Наименование работ и затрат · Единица измерения · Количество (на ед.
+  измерения · по проектным данным)`). Har bir ish — raqami, nomi, birligi, smeta hajmi va
+  bo'limi bilan; ostidagi `1.1`, `1.2` … qatorlar — shu ishning resurslari (bir birlikka va
+  jami). Vedomost yo'q smetada vkladka buni aytadi — resurs miqdorini baribir qo'lda
+  o'zgartirish mumkin (pastda).
+* **«Объёмы работ»** vkladkasi: har bir ish yonida «Объём по проекту» (yangi son — ishchi
+  loyihadagi hajm), «обосновать» belgisi (= «Необходимо обосновать объем в проекте») va
+  o'z izohi. Yangi hajm o'sha ish resurslarining miqdorini **bir birlikka × (yangi − eski)**
+  ga o'zgartiradi; boshqa ishlarga tegmaydi.
+* **«Проверка цен»** da «Общее кол-во» ustiga bosilsa — resursning ekspertiza bo'yicha jami
+  miqdori yoziladi (bo'sh — smetadagidek). O'zgargan miqdor `<s>smetadagi</s> yangi` bo'lib
+  ko'rinadi; «Изменено количество» filtri ularni yig'adi.
+* **Narxlar va Таблица №2 o'zgarmaydi** — tejash narx bo'yicha hisoblanadi, Таблица №2
+  smeta miqdorlari bilan qoladi.
+* **Hujjat:** biror narsa belgilangan bo'lsa, eksportga **«Таблица №1 (объёмы)»** varag'i
+  qo'shiladi — «СОПОСТАВИТЕЛЬНАЯ ТАБЛИЦА №1»: faqat izoh yoki loyiha hajmi bor ishlar,
+  bo'limlar bo'yicha (`№ · Наименование работ и затрат · Ед.изм. · по локальной ресурсной
+  смете · по рабочему проекту · Примечание`), keyin «Количество ресурсов» ostida qo'lda
+  o'zgartirilgan resurslar. Hech narsa belgilanmagan bo'lsa — hujjat avvalgidek.
+* Server rejimida hajmlar va miqdorlar ish maydoni bilan saqlanadi (sahifa qayta
+  yuklansa ham qaytadi). Ishning kaliti — fayl, nomi, birligi, shifri va hajmi: o'sha fayl
+  qayta o'qilsa, qarorlar o'z joyiga qaytadi.
 
 ---
 
@@ -307,6 +341,7 @@ src/
     report.js         TAQQOSLASH JADVALI №2 (uch rejim) + Mundarija
     export.js         uslublar va tayyor kitob
     compare.js, reply.js   «Сравнение версий», «Наш ответ (Excel)»
+    volumes.js        5-shakl vedomost ishlari, javobning «объем» varag'i, Сопоставительная таблица №1
     registry-parse.js      arizalar reyestrini o'qish
     refs/             справочные цены: paket, qidiruv, taklif (faqat o'lchov bilan o'zgaradi)
     uzex.js           UZEX kotirovkalari: moslash, birlik, QQSsiz narx
@@ -314,6 +349,7 @@ src/
   ui/
     grid.js           virtual jadval
     prices.js         «Проверка цен»
+    volumes.js        «Объёмы работ»: hajmlar, izohlar, resurs miqdori (ekspertiza bo'yicha)
     app.js            ulanish, xabarlar, narxlar kitobi
     sync.js           ish maydoni: saqlash, tuzatishlar, ikki vkladka, yopilgan vkladka
     hints.js, refs.js, uzex.js   takliflar: oldingi loyihalar, справочник, birja

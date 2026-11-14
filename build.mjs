@@ -36,9 +36,11 @@ const SCRIPTS = [
   'src/lib/export.js',
   'src/lib/compare.js',
   'src/lib/reply.js',
+  'src/lib/volumes.js',
   'src/ui/grid.js',
   'src/ui/prices.js',
   'src/ui/compare.js',
+  'src/ui/volumes.js',
   'src/ui/app.js',
 ];
 const REST = SCRIPTS.slice(CORE.length);
@@ -51,6 +53,7 @@ const WORKER_LIBS = [
   'src/lib/xlsx-read.js',
   'src/lib/smeta.js',
   'src/lib/assemble.js',
+  'src/lib/volumes.js',      // the works of form 5 (01_ЛРВ) beside the resources
 ];
 
 // Server mode adds the PocketBase client in front and the sign-in / registry /

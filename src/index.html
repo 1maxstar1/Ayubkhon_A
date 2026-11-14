@@ -54,6 +54,7 @@
       <button class="tab on" data-pane="prices">Проверка цен</button>
       <button class="tab" data-pane="sheet">Сводная таблица</button>
       <button class="tab" data-pane="report">Вид отчёта</button>
+      <button class="tab" data-pane="volumes" title="Объёмы работ из локальной ресурсной ведомости (форма 5) и замечания к ним — «Сопоставительная таблица №1» документа">Объёмы работ</button>
       <button class="tab" data-pane="compare" title="Что отправитель исправил после нашей таблицы">Сравнение версий</button>
       <button class="tab" data-pane="settings">Настройки документа</button>
       <button class="link" id="compactBtn" style="margin-left:auto">Компактно</button>
@@ -71,6 +72,7 @@
           <option value="wrongsec">Не тот раздел</option>
           <option value="unchecked">Не проверенные</option>
           <option value="checked">Проверенные</option>
+          <option value="qty">Изменено количество</option>
         </select>
         <select id="secFilter" title="По разделу сметы; строки без раздела — в «Прочие»" hidden>
           <option value="all">Все разделы</option>
@@ -118,6 +120,19 @@
         <button type="button" class="btn" id="reportNoteBtn">Изменить порог</button></div>
       <div class="thead" id="reportHead"></div>
       <div class="vscroll" id="reportScroll"><div class="vspace"><div class="vbody"></div></div></div>
+    </div>
+
+    <div class="pane" id="pane-volumes">
+      <div class="toolbar">
+        <input type="search" id="volQ" placeholder="Поиск по названию работы…" spellcheck="false">
+        <select id="volFilter">
+          <option value="all">Все работы</option>
+          <option value="marked">С замечанием</option>
+        </select>
+        <div class="grow"></div>
+        <span class="count" id="volCount"></span>
+      </div>
+      <div class="cmp-scroll" id="volBody"></div>
     </div>
 
     <div class="pane" id="pane-compare">

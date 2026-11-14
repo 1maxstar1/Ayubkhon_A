@@ -108,6 +108,18 @@
     return '';
   }
 
+  /**
+   * «Общее кол-во»: a click sets the quantity by the expert (src/ui/volumes.js); a changed one shows the estimate's
+   * struck through beside it. Table №2 is about prices and keeps the estimate's quantities.
+   */
+  function qtyBtn(r) {
+    var on = r.qty2 != null && Math.abs(r.qty2 - r.qty) > 1e-9;
+    if (!S.Volumes) return S.qty(r.qty);
+    return '<button class="qe' + (on ? ' on' : '') + '" data-qe="' + S.esc(r.key) + '" title="' +
+      (on ? 'Количество по экспертизе; по смете ' + S.qty(r.qty) + '. Нажмите, чтобы изменить' : 'Нажмите, чтобы указать количество по экспертизе') + '">' +
+      (on ? '<s>' + S.qty(r.qty) + '</s> ' + S.qty(r.qty2) : S.qty(r.qty)) + '</button>';
+  }
+
   /** «✎»: the expert's own note on the resource, for the document's «Eslatma» column — only with the setting on (E17). */
   function noteBtn(app, r) {
     if (!app.opts.resNotes) return '';
@@ -191,6 +203,8 @@
     scroll.addEventListener('click', function (e) {
       var ck = e.target.closest ? e.target.closest('.ck') : null;
       if (ck) { self.app.setChecked([ck.dataset.ck], !self.app.checked[ck.dataset.ck]); return; }
+      var qe = e.target.closest ? e.target.closest('.qe') : null;
+      if (qe) { if (S.Volumes) S.Volumes.editQty(qe.dataset.qe); return; }
       var nb = e.target.closest ? e.target.closest('.nt') : null;
       if (nb) {
         var key = nb.dataset.nt, was = self.app.notes[key] || '';
@@ -352,6 +366,7 @@
         case 'wrongsec': return !!secWarn(r);
         case 'unchecked': return !app.checked[r.key];
         case 'checked': return !!app.checked[r.key];
+        case 'qty': return r.qty2 != null && Math.abs(r.qty2 - r.qty) > 1e-9;
         default: return true;
       }
     });
@@ -425,7 +440,7 @@
         multi + hint + sec + noteBtn(this.app, r) + '</div>' +
         cell(COLS[2], S.esc(r.unit)) +
         cell(COLS[3], r.count) +
-        cell(COLS[4], S.qty(r.qty)) +
+        cell(COLS[4], qtyBtn(r)) +
         '<div class="c num' + mc.cls + '" style="' + width(COLS[5]) + '">' + mc.html + S.price(r.price) + '</div>' +
         '<div class="c num' + (uz ? ' uzc' : '') + '" style="' + width(COLS[6]) + '">' + uz +
         '<input class="pin' + (changed ? ' edited' : '') + (uzOnly ? ' uz' : uz ? ' src' : '') + '" data-key="' + S.esc(r.key) + '" data-i="' + i +

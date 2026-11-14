@@ -99,6 +99,9 @@ FILE['ml-metrics'] = 'src/lib/ml/metrics.js';
 FILE['ml-dataset'] = 'src/lib/ml/dataset.js';
 FILE['ml-pricedata'] = 'src/lib/ml/pricedata.js';
 FILE['ml-pricemodel'] = 'src/lib/ml/pricemodel.js';
+// work volumes (Сопоставительная таблица №1)
+FILE.volumes = 'src/lib/volumes.js';
+ORDER.push('volumes');
 const ML = ['ml-features', 'ml-metrics', 'ml-dataset', 'ml-pricedata', 'ml-pricemodel'];
 ORDER.push(...ML);
 

@@ -19,6 +19,14 @@
  *   1 | 2 | 3 | 4 | 5 | 6 | 7
  *   ТРУДОВЫЕ РЕСУРСЫ / СТРОИТЕЛЬНЫЕ МАШИНЫ … in the name column, numbered items,
  *   «В Т.Ч. …» lines, ИТОГО lines, ИТОГО ПРЯМЫЕ ЗАТРАТЫ
+ *
+ * and the statement of required resources («ВЕДОМОСТЬ ПОТРЕБНЫХ РЕСУРСОВ»), one per object sheet:
+ *
+ *   N п/п | Шифр (обоснование) | Код АВС | Наименование ресурса | Единица измерения | Сметная потребность | Сметная стоимость, СУМ
+ *                                                                                                          | в текущем уровне
+ *                                                                                                          | единицы | всего
+ *   bands (Затраты труда, Строительные машины и механизмы, Строительные материалы…, Перевозка…) in the first
+ *   column, items numbered «1.», «2.» …, «Итого по …» in the name column
  */
 (function (S) {
   'use strict';
@@ -71,6 +79,10 @@
    * Cyrillic name.
    */
   var LETTER = /[A-Za-z\u00C0-\u024F\u0400-\u04FF]/;
+  /** «1.», «12.» — how the statement of required resources numbers its items. */
+  var NUMBERED = /^\s*\d+\.\s*$/;
+  /** A line priced in sums («СУМ»): a money line of the statement (5 % of the materials…), not a resource. */
+  function money(cell) { return /^СУМ$/.test(up(txt(cell))); }
 
   /**
    * The header row at r and the six meaningful columns, or null.
@@ -99,6 +111,8 @@
       else if (u.indexOf('ЕД') === 0 && u.indexOf('ИЗМ') > 0) { L = L || {}; L.unit = c; }
       else if (u.indexOf('КОЛ-ВО') >= 0 || u.indexOf('КОЛВО') >= 0 || u.indexOf('КОЛИЧЕСТВО') === 0 ||
                (folded && u.indexOf('КОЛ ВО') >= 0)) { L = L || {}; L.qty = c; }
+      // «Сметная потребность» (the key splits the hyphenated «потреб-ность»): the statement of required resources
+      else if (/^СМЕТНАЯ ПОТРЕБ/.test(u)) { L = L || {}; L.qty = c; L.need = true; }
       else if (u.indexOf('ЦЕНА') >= 0) { L = L || {}; if (!L.price) L.price = c; }
       else if (u.indexOf('СУММА') >= 0) { L = L || {}; if (!L.sum) L.sum = c; }
       else if (u.indexOf('ШИФР') === 0) { L = L || {}; L.code = c; }
@@ -111,8 +125,18 @@
         if (!L.price && s.indexOf('НА ЕДИНИЦУ') === 0) L.price = k;
         else if (!L.sum && (s === 'ОБЩАЯ' || s === 'ВСЕГО')) L.sum = k;
       }
-      if (!L.price || !L.sum) return null;
       L.subRow = r + 1;
+      // the statement of required resources: «в текущем уровне» first, then «единицы | всего»
+      if (L.need && (!L.price || !L.sum)) {
+        var sub2 = rows[r + 2] || [];
+        for (var k2 = 1; k2 < sub2.length; k2++) {
+          var s2 = up(txt(sub2[k2]));
+          if (!L.price && (s2 === 'ЕДИНИЦЫ' || s2.indexOf('НА ЕДИНИЦУ') === 0)) L.price = k2;
+          else if (!L.sum && (s2 === 'ВСЕГО' || s2 === 'ОБЩАЯ')) L.sum = k2;
+        }
+        L.subRow = r + 2;
+      }
+      if (!L.price || !L.sum) return null;
     }
     // «№ п/п» folds to «П П», so with a code column in between the number
     // column is found by its raw «№», never guessed as the one left of the name.
@@ -280,8 +304,10 @@
       // numbered lines only: «В Т.Ч. ЗАТРАТЫ ТРУДА МАШИНИСТОВ» and the closing
       // «ЗАТРАТЫ ТРУДА РАБОЧИХ» carry a quantity but are not resources.
       else if (L.code && !noTxt && nm && qty == null && isSection(nm)) { kind = 'section'; section = sectionOf(nm); sections++; }
-      else if (nm && LETTER.test(nm) && qty != null && (!L.code || S.num(noCell && noCell.v) != null)) { kind = 'item'; items++; }
+      else if (L.need && nm && LETTER.test(nm) && qty != null && !money(cells[L.unit]) && (S.num(noCell && noCell.v) != null || NUMBERED.test(noTxt) || price != null)) { kind = 'item'; items++; }
+      else if (!L.need && nm && LETTER.test(nm) && qty != null && (!L.code || S.num(noCell && noCell.v) != null)) { kind = 'item'; items++; }
       else if (nm) kind = 'extra';
+      else if (noTxt && L.need) { kind = 'section'; section = sectionOf(noTxt); }
       else if (noTxt) kind = 'section';
       else kind = 'blank';
 

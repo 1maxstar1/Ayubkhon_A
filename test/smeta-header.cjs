@@ -111,5 +111,48 @@ const noHead = one({ sheets: [sheet('УЛ1', [...TOP, [], [], ...body])] });
 check(noHead.length === 1 && JSON.stringify(shape(noHead[0]).filter((r) => r[2] !== '2')) === JSON.stringify(shape(withHead[0]).filter((r) => r[2] !== '2')),
   'the header row changes nothing in how a sheet that reads by its shape is read');
 
+/* 7 — the statement of required resources («ВЕДОМОСТЬ ПОТРЕБНЫХ РЕСУРСОВ»): «Сметная потребность» is the quantity,
+   «Сметная стоимость» splits two rows down into «единицы | всего»; bands in the first column, items «1.», «2.» */
+const ved = (name) => sheet(name, [
+  ['Наименование стройки -', null, null, 'ТЕСТОВАЯ СТРОЙКА'], [], ['ВЕДОМОСТЬ ПОТРЕБНЫХ РЕСУРСОВ №'], [],
+  ['N п/п', 'Шифр (обоснование)', 'Код АВС', 'Наименование ресурса', 'Единица измерения', 'Сметная потреб-ность', 'Сметная стоимость, СУМ'],
+  [null, null, null, null, null, null, 'в текущем уровне'],
+  [null, null, null, null, null, null, 'единицы', 'всего'],
+  [1, 2, 3, 4, 5, 6, 7, 8],
+  ['Ресурсы по нормам ШНК'],
+  ['Затраты труда'],
+  ['1.', null, 1, 'ЗАТРАТЫ ТРУДА РАБОЧИХ-СТРОИТЕЛЕЙ', 'чел.-ч', 10, 17, '=G11*F11'],
+  [null, null, null, 'Итого по трудовым ресурсам', 'СУМ', null, null, '=SUM(H11)'],
+  ['Строительные машины и механизмы'],
+  ['1.', null, 97, 'КАТОК ТЕСТОВЫЙ 10 Т', 'маш.-ч', 3, 19, '=G14*F14'],
+  ['2.', null, 98, 'ЭКСКАВАТОР ТЕСТОВЫЙ 0,65 М3', 'маш.-ч', 2, 23, '=G15*F15'],
+  [null, null, null, 'Итого по строительным машинам', 'СУМ', null, null, '=SUM(H14:H15)'],
+  ['Строительные материалы, изделия и детали'],
+  ['1.', null, 6076, 'ЩЕБЕНЬ ТЕСТОВЫЙ', 'м3', 4, 29, '=G18*F18'],
+  [null, null, null, 'Итого по материальным ресурсам', 'СУМ', null, null, '=SUM(H18)'],
+  ['Перевозка строительные материалы'],
+  [1, null, 4, 'ЩЕБЕНЬ ТЕСТОВЫЙ - 19 КМ', 'тн/км', 76, 3, '=G21*F21'],
+  [null, null, 4, 'АНКЕР ТЕСТОВЫЙ - 53 КМ', 'тн/км', 53, 3, '=G22*F22'],
+  [4, null, null, 'Перевозка материалов 5% от стоимости материалов', 'СУМ', 116, 0.05, '=G23*F23'],
+  [null, null, null, 'Итого прямой затрат:', 'СУМ', null, null, '=H12+H16+H19']]);
+const vb = S.smeta.parseWorkbook({ sheets: [ved('1'), ved('2')] }, 'v.xlsx');
+const vItems = (o) => o.rows.filter((r) => r.kind === 'item');
+check(vb.length === 2 && vb.every((o) => vItems(o).length === 6) && vb[0].layout.qty === 6 && vb[0].layout.price === 7 && vb[0].layout.sum === 8 && vb[0].layout.name === 4,
+  'the statement of required resources is read on every object sheet: quantity, unit price and total from «Сметная потребность» and «единицы | всего»');
+const by = {}; vItems(vb[0]).forEach((r) => { by[r.section] = (by[r.section] || 0) + 1; });
+check(JSON.stringify(by) === JSON.stringify({ labor: 1, machines: 2, materials: 1, other: 2 }) && vItems(vb[0]).every((r) => r.qty > 0 && r.price > 0 && r.unit),
+  'its bands in the first column give the sections; the haulage lines, numbered or not, are resources of their own (' + JSON.stringify(by) + ')');
+check(vb[0].rows.find((r) => r.r === 23).kind === 'extra' && vb[0].rows.filter((r) => r.kind === 'total').length === 4 && vb[0].rows.find((r) => r.r === 5).kind === 'header' &&
+  vb[0].rows.find((r) => r.r === 7).kind === 'header' && vb[0].rows.find((r) => r.r === 8).kind === 'numbering',
+  'a line priced in sums (5 % of the materials) is not a resource; «Итого» lines are totals; the header and its numbering stay out');
+const vm = S.assemble([{ name: 'v', file: 'v.xlsx', objects: vb, enabled: true }], {});
+check(vm.resources.length === 6 && vm.resources.find((r) => r.name === 'КАТОК ТЕСТОВЫЙ 10 Т').qty === 6, 'the two object sheets assemble into one list: each resource once, its quantities added');
+// the same header under a form-5 statement («Количество на ед. измерения | по проектным данным») is not taken for one
+const form5 = one({ sheets: [sheet('1-1', [['ЛОКАЛЬНАЯ РЕСУРСНАЯ ВЕДОМОСТЬ'], [],
+  ['N п.п.', 'Шифр номера нормативов и коды ресурсов', 'Наименование работ и затрат', 'Единица измерения', 'Количество'],
+  [null, null, null, null, 'на. ед. измерения', 'по проектным данным'], [1, 2, 3, 4, 5, 6],
+  [1, 'Е0101', 'РАЗРАБОТКА ГРУНТА ТЕСТОВАЯ', '1000М3', 17], ['1.1', 1, 'ЗАТРАТЫ ТРУДА РАБОЧИХ-СТРОИТЕЛЕЙ', 'ЧЕЛ.-Ч', 4.69, 81, 17, 1377]])] });
+check(form5.length === 0, 'the works-and-resources statement of form 5 (its prices come from the other sheet) is still left out');
+
 console.log(fail ? '\nFAILED: ' + fail : '\nall passed');
 process.exit(fail ? 1 : 0);

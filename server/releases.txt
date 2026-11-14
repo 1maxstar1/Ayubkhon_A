@@ -30,3 +30,4 @@ v2.10.2 ae308c26a7b5cbc0836ef0c5d613c26988aecf5c Korib chiqish tuzatishlari: ser
 v2.10.3 696fd2b2157aff23072bd4daa4b99ffef68e5c79 Spravochnik: QQS bilan yozilgan hujjat aytiladi
 v2.14.0 ef626b21e1d3520af2e22dee536ae3e804d0c66b Narx modeli: olchov (admin Sobrat i izmerit), ish sahifasi ozgarmagan
 v2.14.1 71d9bc7e55a414b26cff59f3b49e6bd51d91e00e Vedomost potrebnyh resursov oqiladi
+v2.14.2 0b71b8dc854982ef1a730f75c988a0fc7f0d4656 TRANSPORT varagi oqiladi

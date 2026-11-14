@@ -170,13 +170,14 @@
     },
 
     /**
-     * «Наш ответ (Excel)»: the «объем» sheet of a reply against the works of that project — read, not applied.
+     * «Наш ответ (Excel)»: the «объем» sheet of a reply against the works of every project in — read, not applied.
+     * Table №1 is written from the works of all of them (table()), so a reply of two files finds the works of both.
      * → { rows, found, missing: [entry], changed, set } or null (no such sheet).
      */
-    readReply: function (wb, project) {
+    readReply: function (wb) {
       var rp = V.parseReply(wb);
       if (!rp) return null;
-      var m = V.match(rp.entries, project && project.works ? V.list(project.works, project.file) : []);
+      var m = V.match(rp.entries, this.works());
       return { rows: rp.entries.length, found: m.found.length, missing: m.missing, set: m.set,
         changed: Object.keys(m.set).filter(function (k) { return m.set[k].v != null; }).length };
     },

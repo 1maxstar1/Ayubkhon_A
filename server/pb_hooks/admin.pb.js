@@ -264,8 +264,11 @@ routerAdd("POST", "/api/admin/reset", (e) => {
     }
     counts[name] = gone;
   }
-  // what was kept of the formats of the estimates (docs/format-reja.md), the files that could not be read among it
-  try {
+  // what was kept of the formats of the estimates (docs/format-reja.md), the files that could not be read among it.
+  // A database from before this collection has nothing to remove; a delete that fails fails the reset, as above.
+  let hasFormats = true;
+  try { $app.findCollectionByNameOrId("smeta_files"); } catch (_) { hasFormats = false; }
+  if (hasFormats) {
     let gone = 0;
     for (let round = 0; round < 2e4; round++) {
       const rows = $app.findRecordsByFilter("smeta_files", "id != ''", "", PAGE, 0, {});
@@ -274,7 +277,7 @@ routerAdd("POST", "/api/admin/reset", (e) => {
       gone += rows.length;
     }
     counts.smeta_files = gone;
-  } catch (_) { /* a database from before this collection */ }
+  }
   // The bulk tables hold no files: one statement each.
   for (const table of ["applications", "contragents"]) {
     const n = arrayOf(new DynamicModel({ c: 0 }));

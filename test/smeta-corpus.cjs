@@ -30,7 +30,9 @@ if (!KIT || !fs.existsSync(path.join(KIT, 'files'))) {
   process.exit(77);
 }
 
-const S = load(load.PIPELINE);
+const S = load(load.PIPELINE, 'ml-layout');
+// the arithmetic and the threshold the program itself uses (src/lib/ml/layout.js): one place for both
+const LAY = S.ml.layout;
 const sha = (x) => crypto.createHash('sha256').update(x).digest('hex');
 
 /** How one workbook is read: the counts, the arithmetic and the fingerprint of the whole reading. */
@@ -38,19 +40,10 @@ function reading(bytes) {
   let objs;
   try { objs = S.smeta.parseWorkbook(S.readXlsx(new Uint8Array(bytes)), 'x.xlsx'); }
   catch (e) { return { error: String(e && e.message || e).slice(0, 80), objects: 0, items: 0, checked: 0, agree: 0, fp: 'error' }; }
-  let items = 0, checked = 0, agree = 0;
-  const slim = objs.map((o) => {
-    o.rows.forEach((r) => {
-      if (r.kind !== 'item') return;
-      items++;
-      if (r.qty == null || r.price == null || r.sum == null) return;
-      checked++;
-      if (Math.abs(r.sum - r.qty * r.price) <= Math.max(0.51, Math.abs(r.sum) * 0.001)) agree++;
-    });
-    return { n: o.name, t: o.title, s: o.subtitle, L: o.layout, mc: o.maxCol,
-      rows: o.rows.map((r) => [r.r, r.kind, r.section, r.no, r.nm, r.unit, r.qty, r.price, r.sum]) };
-  });
-  return { objects: objs.length, items, checked, agree, fp: sha(JSON.stringify(slim)).slice(0, 16) };
+  const ck = LAY.check(objs);
+  const slim = objs.map((o) => ({ n: o.name, t: o.title, s: o.subtitle, L: o.layout, mc: o.maxCol,
+    rows: o.rows.map((r) => [r.r, r.kind, r.section, r.no, r.nm, r.unit, r.qty, r.price, r.sum]) }));
+  return { objects: objs.length, items: ck.items, checked: ck.rows, agree: ck.ok, fp: sha(JSON.stringify(slim)).slice(0, 16) };
 }
 
 const dir = path.join(KIT, 'files'), goldenPath = path.join(KIT, 'golden.json');
@@ -65,7 +58,7 @@ for (const n of names) {
   r.sha = sha(bytes).slice(0, 16);
   now[n] = r;
   const pct = r.checked ? Math.round(r.agree / r.checked * 1000) / 10 : null;
-  const state = !r.items ? 'NONE' : (pct != null && pct < 90) ? 'DOUBT' : 'FULL';
+  const state = !r.items ? 'NONE' : (r.checked && r.agree / r.checked < LAY.DOUBT) ? 'DOUBT' : 'FULL';
   if (state === 'NONE') none++; else if (state === 'DOUBT') doubt++; else full++;
   const was = golden.files[n];
   let mark = '';

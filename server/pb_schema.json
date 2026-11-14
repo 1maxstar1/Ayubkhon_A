@@ -1339,6 +1339,10 @@
           "max": 1
         },
         {
+          "name": "doubt",
+          "type": "bool"
+        },
+        {
           "name": "signature",
           "type": "text",
           "max": 32
@@ -1364,13 +1368,7 @@
           "type": "file",
           "maxSelect": 1,
           "maxSize": 31457280,
-          "mimeTypes": [
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "application/vnd.ms-excel.sheet.macroenabled.12",
-            "application/vnd.ms-excel",
-            "application/zip",
-            "application/octet-stream"
-          ],
+          "mimeTypes": [],
           "protected": true
         },
         {
@@ -1387,7 +1385,8 @@
       ],
       "indexes": [
         "CREATE UNIQUE INDEX idx_smeta_files_hash ON smeta_files (hash)",
-        "CREATE INDEX idx_smeta_files_read ON smeta_files (is_read)"
+        "CREATE INDEX idx_smeta_files_read ON smeta_files (is_read)",
+        "CREATE INDEX idx_smeta_files_doubt ON smeta_files (doubt)"
       ],
       "listRule": "@request.auth.id != \"\"",
       "viewRule": "@request.auth.id != \"\"",

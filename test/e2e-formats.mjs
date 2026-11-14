@@ -3,15 +3,15 @@
  * a real server. All files are invented (test/compare-books.cjs).
  *
  *   - a file the rules read: its record has the sample with the labels, no file kept, the uploader's name on it;
- *   - a file with no resource sheet, and one that cannot be opened: recorded as not read, kept whole;
+ *   - a file with no resource sheet, one that cannot be opened, and an HTML table saved as .xls: recorded as not read,
+ *     kept whole (a file of any type is kept), and the page says so once it is kept;
  *   - a file read with sums that do not agree: read, and kept to be looked at;
  *   - no letter of an estimate is in any sample;
- *   - the same file again — after a reload, from a browser that forgot — is not recorded twice, and a reload asks the
- *     server nothing about the files it already sent;
+ *   - the same files again after a reload are not recorded twice: one question to the server for the whole batch;
  *   - the counts are the admin's; a record's owner and hash cannot be rewritten;
  *   - the admin page: the counts, «До обучения модели: N из 100», the files to look at with «Скачать», «Проверить
- *     снова» (a file that reads now gets its sample), «Убрать»;
- *   - the admin's «Стереть» takes the records too, and a browser that remembers sending them sends them again.
+ *     снова» (in a worker, with a time limit; a file that reads now gets its sample), «Убрать»;
+ *   - the admin's «Стереть» takes the records too, and the same file uploaded afterwards is recorded again.
  *
  *   node test/e2e-formats.mjs
  */
@@ -45,6 +45,7 @@ const fDoubt = put('Тест_суммы.xlsx', xlsx(S, { sheets: [sheet('РЕС�
 ])] }));
 const fJunk = put('Тест_сломан.xlsx', Buffer.from([80, 75, 3, 4, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]));
 const fLater = put('Тест_потом.xlsx', xlsx(S, book(2)));       // «a file the rules were taught to read since»
+const fHtml = put('Тест_html.xls', Buffer.from('<html><body><table><tr><td>Наименование</td><td>Цена</td></tr><tr><td>нечто</td><td>5</td></tr></table></body></html>'));
 
 const pb = await startServer({ port: 8168, registry: true, build: true });
 const { api, su } = pb;
@@ -106,7 +107,7 @@ try {
   let r = await byHash(fRead);
   check(r && r.is_read === true && r.name === fRead.name && r.size === fRead.bytes.length && r.objects === 2 && r.items === 13 && r.checked === 13 && r.score === 1,
     'it says how the file was read: 2 estimates, 13 lines, every sum agreeing');
-  check(r && r.by === me && r.ws === ws && r.file === '' && /^v\d/.test(r.app_version) && r.version === 1 && /^[0-9a-f]{16}$/.test(r.signature),
+  check(r && r.by === me && r.ws === ws && r.file === '' && r.doubt === false && /^v\d/.test(r.app_version) && r.version === 1 && /^[0-9a-f]{16}$/.test(r.signature),
     'whose it is, in which application, by which version — and the file itself is not kept');
   check(r && r.sample && r.sample.sheets.length === 1 && r.sample.sheets[0].b.length === 2 && r.sample.sheets[0].b[0].L.name === 3 && /i/.test(r.sample.sheets[0].k),
     'its sample carries what the rules read: the blocks, their columns, the kind of every row');
@@ -117,18 +118,25 @@ try {
   r = await byHash(fNone);
   check(r && r.is_read === false && r.reason === 'no-sheets' && r.file !== '' && r.sample && r.sample.sheets.length === 1 && !r.sample.sheets[0].b,
     'not read, kept whole, its sample without labels');
+  await page.waitForFunction(() => /не прочитан и сохранён для разработчика/.test(document.getElementById('toast').textContent), null, T);
+  check(true, 'and the page says it is kept — once it is');
   await page.setInputFiles('#pick', fJunk.path);
   check(await until(async () => !!(await byHash(fJunk))), 'a file that cannot be opened leaves a record');
   r = await byHash(fJunk);
   check(r && r.is_read === false && /^error: /.test(r.reason) && r.file !== '' && !r.sample, 'not read, with the reader\'s error, kept whole');
+  await page.setInputFiles('#pick', fHtml.path);
+  check(await until(async () => !!(await byHash(fHtml))), 'an HTML table saved as .xls leaves a record');
+  r = await byHash(fHtml);
+  check(r && r.is_read === false && r.file !== '', 'and is kept whole, whatever its type');
   await page.setInputFiles('#pick', fDoubt.path);
   await page.waitForFunction(() => app.projects.length === 2, null, T);
   check(await until(async () => !!(await byHash(fDoubt))), 'a file read with sums that do not agree leaves a record');
   r = await byHash(fDoubt);
-  check(r && r.is_read === true && r.items === 3 && r.checked === 3 && Math.abs(r.score - 0.3333) < 1e-9 && r.file !== '', 'read, one sum of three agreeing — and kept to be looked at');
+  check(r && r.is_read === true && r.items === 3 && r.checked === 3 && Math.abs(r.score - 0.3333) < 1e-9 && r.doubt === true && r.file !== '',
+    'read, one sum of three agreeing — marked and kept to be looked at');
   await idle();
   const all = await records();
-  check(all.length === 4 && !/[Ѐ-ӿ]/.test(JSON.stringify(all.map((x) => x.sample))), 'four records; no letter of an estimate in any sample');
+  check(all.length === 5 && !/[Ѐ-ӿ]/.test(JSON.stringify(all.map((x) => x.sample))), 'five records; no letter of an estimate in any sample');
   check(!errors.length, 'recording raised nothing on the page' + (errors.length ? ': ' + errors.join(' | ') : ''));
 
   /* the same files again */
@@ -138,15 +146,8 @@ try {
   await page.waitForSelector('#wsBox:not([hidden])', T);
   await page.waitForFunction(() => app.projects.length === 2 && !S.Sync.loading, null, T);
   await idle();
-  check((await records()).length === 4 && calls.length === 0, 'after a reload the stored files are read again and nothing is asked of the server about them (' + calls.join(',') + ')');
-  await page.evaluate(() => { localStorage.removeItem('taq-formats-sent'); });
-  await page.reload();
-  await page.waitForSelector('#wsBox:not([hidden])', T);
-  await page.waitForFunction(() => app.projects.length === 2 && !S.Sync.loading, null, T);
-  await page.waitForFunction(() => Object.keys(S.Formats.sent).length === 2, null, T);
-  await idle();
-  check((await records()).length === 4 && calls.length === 2 && calls.every((m) => m === 'GET'),
-    'a browser that forgot asks whether each file is known, and records nothing twice (' + calls.join(',') + ')');
+  check((await records()).length === 5 && calls.join(',') === 'GET',
+    'after a reload the stored files are read again; one question to the server for both, nothing recorded twice (' + calls.join(',') + ')');
 
   /* whose the counts and the records are */
   const mine = await page.evaluate(() => S.pb.authStore.token);
@@ -158,7 +159,7 @@ try {
   check(r && r.by === me && r.items === 14, 'a later reading may change what was read, never whose file it is or which file');
   await api('/api/collections/smeta_files/records/' + one.id, { method: 'PATCH', body: JSON.stringify({ items: 13 }) }, su);
   const del = await fetch(pb.base + '/api/collections/smeta_files/records/' + one.id, { method: 'DELETE', headers: { Authorization: mine } });
-  check(del.status >= 400 && (await records()).length === 4, 'and an expert cannot remove a record');
+  check(del.status >= 400 && (await records()).length === 5, 'and an expert cannot remove a record');
 
   /* «a file the rules were taught to read since»: recorded as not read, with its file */
   const fd = new FormData();
@@ -178,13 +179,13 @@ try {
   await signIn(admin, 'boss@example.com', '#adminMain:not([hidden])');
   await admin.waitForFunction(() => !document.getElementById('fmtTable').hidden && !document.getElementById('fmtList').hidden, null, T);
   const cell = (k) => admin.evaluate((key) => { const tr = document.querySelector('#fmtTable tr[data-k="' + key + '"]'); return tr ? tr.lastElementChild.textContent : null; }, k);
-  const want = { files: '5', read: '2', doubt: '1', unread: '3', formats: '2', lines: '16', kept: '4' };
+  const want = { files: '6', read: '2', doubt: '1', unread: '4', formats: '2', lines: '16', kept: '5' };
   const got = {};
   for (const k of Object.keys(want)) got[k] = await cell(k);
   check(JSON.stringify(got) === JSON.stringify(want), 'the admin page counts them (' + JSON.stringify(got) + ')');
   check(/До обучения модели: 2 из 100 файлов/.test(await admin.textContent('#fmtGoal')), 'and says how far the first training is');
   const listed = await admin.$$eval('#fmtList tbody tr', (t) => t.map((x) => x.cells[0].textContent + ' → ' + x.cells[2].textContent));
-  check(listed.length === 4 && listed.some((l) => /Тест_не_смета\.xlsx → Не прочитан: листы ресурсов не найдены/.test(l)) &&
+  check(listed.length === 5 && listed.some((l) => /Тест_не_смета\.xlsx → Не прочитан: листы ресурсов не найдены/.test(l)) &&
     listed.some((l) => /Тест_сломан\.xlsx → Не прочитан: /.test(l)) && listed.some((l) => /Тест_суммы\.xlsx → Прочитан, но кол-во × цена = сумма только в 33 % строк/.test(l)) &&
     !listed.some((l) => /Тест_читается/.test(l)), 'the files to look at are listed, each with what is wrong; a file read cleanly is not');
   const row = (name) => '#fmtList tbody tr:has-text("' + name + '")';
@@ -192,6 +193,13 @@ try {
   const saved = join(dir, 'got.xlsx');
   await dl.saveAs(saved);
   check(dl.suggestedFilename() === fNone.name && sha(readFileSync(saved)) === fNone.hash, '«Скачать» gives the file back, byte for byte, under its own name');
+  // a file the worker does not finish within the time: given up, the worker replaced, nothing changed
+  await admin.evaluate(() => { S.FormatsAdmin.limit = 1; });
+  await admin.click(row(fNone.name) + ' button[data-act=again]');
+  await admin.waitForFunction(() => /не прочитан за 0 с/.test(document.getElementById('fmtStat').textContent), null, T);
+  check((await byHash(fNone)).is_read === false && await admin.evaluate(() => !document.querySelector('#fmtList button[data-act=again]').disabled),
+    '«Проверить снова» past its time gives up and says so; the page stays usable');
+  await admin.evaluate(() => { S.FormatsAdmin.limit = 90 * 1000; });
   await admin.click(row(fNone.name) + ' button[data-act=again]');
   await admin.waitForFunction(() => /по-прежнему не читается/.test(document.getElementById('fmtStat').textContent), null, T);
   check((await byHash(fNone)).is_read === false, '«Проверить снова» on a file that still has no resource sheet: said, nothing changed');
@@ -202,7 +210,7 @@ try {
     'a file the rules read now gets its counts and its sample; whose it is stays');
   check(r.signature === (await byHash(fRead)).signature, 'and it is the format of the other file of that form');
   await admin.waitForFunction(() => /До обучения модели: 3 из 100 файлов/.test(document.getElementById('fmtGoal').textContent), null, T);
-  check(await cell('read') === '3' && await cell('unread') === '2', 'the counts and the distance to the training follow at once');
+  check(await cell('read') === '3' && await cell('unread') === '3', 'the counts and the distance to the training follow at once');
   check(/Теперь читается \(строк ресурсов: 13\)/.test(await admin.textContent(row(fLater.name) + ' .st')), 'the list says to upload it to the application again');
   await admin.click(row(fLater.name) + ' button[data-act=drop]');
   check(await until(async () => { const x = await byHash(fLater); return x && x.file === ''; }), '«Убрать» on a read file removes the kept file');
@@ -211,20 +219,32 @@ try {
   await admin.waitForFunction((n) => !document.querySelector('#fmtList tbody').textContent.includes(n), fLater.name, T);
   await admin.click(row(fJunk.name) + ' button[data-act=drop]');
   check(await until(async () => !(await byHash(fJunk))), '«Убрать» on an unread file removes its record');
-  await admin.waitForFunction(() => document.querySelectorAll('#fmtList tbody tr').length === 2, null, T)
+  await admin.waitForFunction(() => document.querySelectorAll('#fmtList tbody tr').length === 3, null, T)
     .catch(async (e) => { console.log('list: ' + await admin.$$eval('#fmtList tbody tr', (t) => t.map((x) => x.cells[0].textContent + ' → ' + x.cells[2].textContent).join(' | ')) + ' · stat: ' + await admin.textContent('#fmtStat')); throw e; });
   await admin.click('#fmtRecheckAll');
-  await admin.waitForFunction(() => /Проверено файлов: 2 · теперь читаются: 0\./.test(document.getElementById('fmtStat').textContent), null, T);
-  check(await cell('files') === '4' && await cell('read') === '3' && await cell('unread') === '1' && await cell('kept') === '2',
+  await admin.waitForFunction(() => /Проверено файлов: 3 · теперь читаются: 0\./.test(document.getElementById('fmtStat').textContent), null, T);
+  check(await cell('files') === '5' && await cell('read') === '3' && await cell('unread') === '2' && await cell('kept') === '3',
     '«Проверить все снова» goes through the kept files; the counts follow (' + await cell('files') + ' / ' + await cell('read') + ' / ' + await cell('unread') + ')');
-  check(/formats\.files = 4/.test(await admin.evaluate(() => S.FormatsAdmin.text())) && !/[Ѐ-ӿ]/.test(await admin.evaluate(() => S.FormatsAdmin.text())),
+  check(/formats\.files = 5/.test(await admin.evaluate(() => S.FormatsAdmin.text())) && !/[Ѐ-ӿ]/.test(await admin.evaluate(() => S.FormatsAdmin.text())),
     '«Скопировать числа» gives the counts and nothing else');
 
   /* «Стереть» */
   const wiped = await api('/api/admin/reset', { method: 'POST', body: JSON.stringify({ confirm: 'СТЕРЕТЬ' }) }, su);
-  check(wiped.cleared && wiped.cleared.smeta_files === 4 && (await records()).length === 0, 'the admin\'s «Стереть» removes the records and the kept files');
-  await page.evaluate(() => { S.Formats.checked = false; return S.Formats.verify(); });
-  check(await page.evaluate(() => Object.keys(S.Formats.sent).length) === 0, 'and a browser that remembers sending them will send them again');
+  check(wiped.cleared && wiped.cleared.smeta_files === 5 && (await records()).length === 0, 'the admin\'s «Стереть» removes the records and the kept files');
+  // the same file uploaded again afterwards, by the same page, in a new application: recorded again
+  await api('/api/registry/import', { method: 'POST', body: JSON.stringify({ rows }) }, su);
+  await page.goto(pb.base + '/');
+  await page.waitForSelector('#screen-list:not([hidden])', T);
+  await page.fill('#appQ', rows[1].number);
+  await page.waitForFunction((n) => { const tr = document.querySelectorAll('#appTable tbody tr'); return tr.length === 1 && tr[0].textContent.includes(n); }, rows[1].number);
+  await page.click('#appTable tbody tr button[data-act=open]');
+  await page.waitForSelector('#screen-region:not([hidden])');
+  await page.selectOption('#regionSel', 'fargona');
+  await page.click('#regionForm button[type=submit]');
+  await page.waitForSelector('#wsBox:not([hidden])');
+  await page.setInputFiles('#pick', fRead.path);
+  await page.waitForFunction(() => app.model && app.model.rows.length > 0, null, T);
+  check(await until(async () => !!(await byHash(fRead))), 'after «Стереть» the same file uploaded again is recorded again');
 
   check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' / ') : ''));
 } catch (e) {

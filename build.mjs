@@ -54,8 +54,11 @@ const WORKER_LIBS = [
   'src/lib/smeta.js',
   'src/lib/assemble.js',
   'src/lib/volumes.js',      // the works of form 5 (01_ЛРВ) beside the resources
-  'src/lib/ml/layout.js',    // what the file looks like, for the page that keeps such records (docs/format-reja.md)
 ];
+// The server pages' worker also says which file a file is and what it looks like (docs/format-reja.md): the hash is
+// the package validator's pure-JS SHA-256. The single-file page records nothing and carries no reference-price code.
+const SERVER_WORKER_LIBS = [...WORKER_LIBS, 'src/lib/refs/package.js', 'src/lib/ml/layout.js'];
+const workerSrc = (server) => (server ? SERVER_WORKER_LIBS : WORKER_LIBS).map(read).join('\n;\n') + '\n;\n' + read('src/worker.js');
 
 // Server mode adds the PocketBase client in front and the sign-in / registry /
 // sync screens behind; files that a later phase has not written yet are skipped.
@@ -133,14 +136,13 @@ function refsWorkerSrc() {
 
 function page(scripts, server) {
   const css = read('src/app.css');
-  const workerSrc = WORKER_LIBS.map(read).join('\n;\n') + '\n;\n' + read('src/worker.js');
   const js = scripts.map(read).join('\n;\n');
   const refs = server ? refsWorkerSrc() : null;
   return read('src/index.html')
     .replace('/*__VERSION__*/', () => VERSION)
     .replace('/*__CSS__*/', () => css)
     .replace('<!--__SCREENS__-->', () => (server && existsSync(join(root, 'src/screens.html')) ? read('src/screens.html') : ''))
-    .replace('/*__WORKER__*/', () => JSON.stringify(workerSrc))
+    .replace('/*__WORKER__*/', () => JSON.stringify(workerSrc(server)))
     // the single-file page carries no reference-price code at all, not even the empty slot
     .replace(/<script>window\.__REFS_WORKER_SRC__ = \/\*__REFS_WORKER__\*\/;<\/script>\n?/, () =>
       (refs ? '<script>window.__REFS_WORKER_SRC__ = ' + JSON.stringify(refs) + ';</script>\n' : ''))
@@ -180,13 +182,15 @@ function build() {
         const refs = refsWorkerSrc();
         return refs ? '<script>window.__REFS_WORKER_SRC__ = ' + JSON.stringify(refs) + ';</script>\n' : '';
       })
+      // «Распознавание форматов смет» reads a kept file again in the server page's own worker, never on the page
+      .replace('/*__WORKER__*/', () => JSON.stringify(workerSrc(true)))
       // the reference-price importer checks a package in the browser before it uploads it: fflate when the browser
       // has no DecompressionStream, the package format and its validator, and the Russian document labels
       .replace('/*__JS__*/', () => ['src/vendor/pocketbase.umd.js', 'src/vendor/xlsx.full.min.js', 'src/vendor/fflate.umd.js',
-        'src/lib/normalize.js', 'src/lib/match.js', 'src/lib/sections.js', 'src/lib/util.js', 'src/lib/pb.js', 'src/lib/regions.js', 'src/lib/registry-parse.js',
+        'src/lib/normalize.js', 'src/lib/match.js', 'src/lib/util.js', 'src/lib/pb.js', 'src/lib/regions.js', 'src/lib/registry-parse.js',
         'src/lib/refs/package.js', 'src/lib/refs/view.js',
-        // «Распознавание форматов смет» reads a kept file again with today's rules: the reader itself
-        'src/lib/formula.js', 'src/lib/xlsx-read.js', 'src/lib/smeta.js', 'src/lib/ml/layout.js',
+        // «Распознавание форматов смет»: the threshold and the version of the samples (the reading is in the worker)
+        'src/lib/ml/layout.js',
         'src/ui/auth.js', 'src/ui/apps-admin.js', 'src/ui/admin.js', 'src/ui/refs-admin.js', 'src/ui/uzex-admin.js', 'src/ui/learning-admin.js', 'src/ui/dataset-admin.js',
         'src/ui/formats-admin.js', 'src/ui/version.js']
         .filter((p) => existsSync(join(root, p))).map(read).join('\n;\n'));

@@ -14,6 +14,11 @@
   S.pb.autoCancellation(false);
 
   S.me = function () { return S.pb.authStore.record; };
+  /** The version the page shows in its title («v2.16.1»): what the records the page writes are made by. */
+  S.appVersion = function () {
+    var v = typeof document !== 'undefined' && document.querySelector('.ver');
+    return v ? String(v.textContent || '').trim().slice(0, 20) : '';
+  };
   S.isAdmin = function () {
     var me = S.me();
     return !!(S.pb.authStore.isSuperuser || (me && me.role === 'admin'));

@@ -250,8 +250,8 @@ module.exports = {
 
   /**
    * GET /api/formats/stats — counts only (admin): the estimates whose format has been recorded (smeta_files,
-   * docs/format-reja.md). `doubt`: read, but under nine tenths of the lines have quantity × price = sum. `target`:
-   * how many read files the first training waits for.
+   * docs/format-reja.md). `doubt`: read, with sums that do not agree — as the page judged it when it wrote the record
+   * (S.ml.layout.DOUBT: the threshold lives in one place). `target`: how many read files the first training waits for.
    */
   formats(e) {
     require(`${__hooks}/lib/admin.js`).requireAdmin(e);
@@ -266,7 +266,7 @@ module.exports = {
         files: one(T),
         read: one(T + " WHERE is_read = TRUE"),
         unread: one(T + " WHERE is_read = FALSE"),
-        doubt: one(T + " WHERE is_read = TRUE AND checked > 0 AND score < 0.9"),
+        doubt: one(T + " WHERE is_read = TRUE AND doubt = TRUE"),
         kept: one(T + " WHERE file != ''"),
         formats: one("SELECT COUNT(DISTINCT signature) AS n FROM smeta_files WHERE is_read = TRUE AND signature != ''"),
         formats_unread: one("SELECT COUNT(DISTINCT signature) AS n FROM smeta_files WHERE is_read = FALSE AND signature != ''"),

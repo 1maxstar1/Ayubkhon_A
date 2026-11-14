@@ -18,7 +18,7 @@ const require = createRequire(import.meta.url);
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const { load } = require('./load.cjs');
 const S = load('fflate', 'normalize', 'match', 'sections', 'util', 'formula', 'xlsx-read', 'xlsx-write', 'smeta', 'assemble');
-const { book, xlsx, bookWithWorks, volReplyBook } = require('./compare-books.cjs');
+const { book, xlsx, sheet, bookWithWorks, volReplyBook } = require('./compare-books.cjs');
 
 let fail = 0;
 const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) fail++; };
@@ -31,6 +31,16 @@ writeFileSync(fw, xlsx(S, bookWithWorks()));
 writeFileSync(fp, xlsx(S, book(1)));
 writeFileSync(fr, xlsx(S, volReplyBook()));
 writeFileSync(fv, xlsx(S, volReplyBook(true)));
+// a second estimate of the application, its own works (a reply of the two files names works of both)
+const second = bookWithWorks();
+second.sheets[1].rows.forEach((cells) => (cells || []).forEach((c) => { if (c && c.v === 'ТЕСТОВАЯ КЛАДКА СТЕН') c.v = 'ТЕСТОВАЯ ШТУКАТУРКА СТЕН'; }));
+const fw2 = join(dir, 'Тест_второй.xlsx'), fr2 = join(dir, 'Ответ_два.xlsx');
+writeFileSync(fw2, xlsx(S, second));
+writeFileSync(fr2, xlsx(S, { sheets: [sheet('объем', [
+  ['№ п/п', 'Наименование работ и затрат', 'Ед.изм.', 'Объемы работ', null, 'Примечание'],
+  [null, null, null, 'по локальной ресурсной смете', 'по рабочему проекту'],
+  [1, 'ТЕСТОВАЯ ШТУКАТУРКА СТЕН', 'М3', 2, 1.25, 'по рабочему проекту']
+])] }));
 
 const browser = await chromium.launch(launchOpts);
 const page = await browser.newPage({ viewport: { width: 1500, height: 950 }, acceptDownloads: true });
@@ -139,6 +149,17 @@ try {
   await page.setInputFiles('#cmpReplyFile', fv);
   await page.waitForFunction(() => Object.keys(app.vol).length === 2, null, { timeout: 30 * 1000 });
   check(await page.evaluate(() => !app.compare_ui.reply), 'a reply of volumes only sets the volumes and asks nothing of the comparison');
+
+  // two estimates in the application, «Было» the first: a reply line about a work of the second still finds it
+  await page.goto('file://' + join(root, 'dist/smeta-taqqoslash.html'));
+  await page.setInputFiles('#pick', [fw, fw2]);
+  await page.waitForFunction(() => window.app && app.projects.length === 2 && app.pending === 0, null, { timeout: 30 * 1000 });
+  await page.click('.tab[data-pane="compare"]');
+  check(await page.inputValue('#cmpOld') === 'p0', '«Было» is the first estimate');
+  await page.setInputFiles('#cmpReplyFile', fr2);
+  await page.waitForFunction(() => Object.keys(app.vol).length === 1, null, { timeout: 30 * 1000 });
+  const two = await page.evaluate(() => { const k = Object.keys(app.vol)[0]; return { k, v: app.vol[k].v }; });
+  check(/^Тест_второй\.xlsx/.test(two.k) && near(two.v, 1.25), 'a work of the second estimate is found by a reply read against the first (' + two.k.slice(0, 20) + ')');
 
   check(!errors.length, 'no errors on the page' + (errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''));
 } catch (e) {

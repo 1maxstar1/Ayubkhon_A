@@ -93,10 +93,11 @@ check(wDirect.length === 1 && wDirect[0].works.length === 2, 'the parser reads t
   check(msg && msg.objects && msg.objects.length === 2, page + ': and the resource sheets as before (' + (msg && msg.objects && msg.objects.length) + ')');
 });
 
-// what the file looks like (docs/format-reja.md): only when the page asks for it, and then exactly what the library
-// gives — for a file that is read, one with no resource sheet, and one that cannot be opened
-const Sl = load(load.PIPELINE, 'volumes', 'ml-layout');
-const describe = (b) => {
+// the reading answers alone; which file it is and what it looks like (docs/format-reja.md) are separate questions,
+// asked of a worker of its own by src/ui/formats.js and by the admin page — never on the way of a reading. Only the
+// server pages' worker can answer them (the single-file page records nothing and carries no reference-price code).
+const Sl = load(load.PIPELINE, 'volumes', 'refs-package', 'ml-layout');
+const describeHere = (b) => {
   let wb = null, objs = null;
   try { wb = Sl.readXlsx(new Uint8Array(b)); objs = Sl.smeta.parseWorkbook(wb, 'f.xlsx'); } catch (e) { wb = null; objs = null; }
   return JSON.parse(JSON.stringify(Sl.ml.layout.describe(new Uint8Array(b), wb, objs)));
@@ -104,19 +105,43 @@ const describe = (b) => {
 const noSheet = books.xlsx(Sl, { sheets: [books.sheet('Лист1', [['Просто таблица'], ['А', 1], ['Б', 2]])] });
 const junk = new Uint8Array([80, 75, 3, 4, 1, 2, 3, 4, 5, 6, 7, 8]);
 ['smeta-taqqoslash.html', 'index.html'].forEach((page) => {
-  const src = workerSource(page);
-  const plain = throughWorker(src, 'f.xlsx', bytes);
-  check(plain && plain.ok && !('fmt' in plain), page + ': not asked — the answer carries no description of the file');
-  const asked = throughWorker(src, 'f.xlsx', bytes, { fmt: true });
-  check(asked && asked.ok && JSON.stringify(asked.fmt) === JSON.stringify(describe(bytes)) && asked.fmt.read === true && asked.fmt.sample.sheets[0].b.length === 2,
-    page + ': asked — the description of a read file is the library\'s, with its labels');
-  check(JSON.stringify(asked.objects) === JSON.stringify(plain.objects), page + ': and the reading itself is the same either way');
-  const none = throughWorker(src, 'n.xlsx', noSheet, { fmt: true });
-  check(none && none.ok && none.objects.length === 0 && JSON.stringify(none.fmt) === JSON.stringify(describe(noSheet)) && none.fmt.read === false && !!none.fmt.sample,
-    page + ': a file with no resource sheet is described too');
-  const broken = throughWorker(src, 'j.xlsx', junk, { fmt: true });
-  check(broken && broken.ok === false && broken.fmt && broken.fmt.sample === null && broken.fmt.hash === describe(junk).hash,
-    page + ': a file that cannot be opened is answered with its error and its hash');
+  const plain = throughWorker(workerSource(page), 'f.xlsx', bytes);
+  check(plain && plain.ok && Object.keys(plain).sort().join() === 'id,ms,name,objects,ok,sheetCount,works',
+    page + ': a reading answers with the reading only (' + Object.keys(plain).sort().join() + ')');
+});
+const src = workerSource('index.html');
+const asked = throughWorker(src, 'f.xlsx', bytes, { cmd: 'describe' });
+check(asked && asked.id === 7 && JSON.stringify(asked.fmt) === JSON.stringify(describeHere(bytes)) && asked.fmt.read === true &&
+  asked.fmt.sample.sheets[0].b.length === 2 && asked.error === '', 'index.html: «describe» answers with the library\'s description, labels and all');
+const none = throughWorker(src, 'n.xlsx', noSheet, { cmd: 'describe' });
+check(none && JSON.stringify(none.fmt) === JSON.stringify(describeHere(noSheet)) && none.fmt.read === false && !!none.fmt.sample,
+  'index.html: a file with no resource sheet is described too');
+const broken = throughWorker(src, 'j.xlsx', junk, { cmd: 'describe' });
+check(broken && broken.fmt && broken.fmt.sample === null && broken.fmt.hash === describeHere(junk).hash && broken.error !== '',
+  'index.html: a file that cannot be opened is described by its hash, with the reason it could not be opened');
+const hashed = throughWorker(src, 'f.xlsx', bytes, { cmd: 'hash' });
+check(hashed && hashed.hash === require('crypto').createHash('sha256').update(Buffer.from(bytes)).digest('hex') && hashed.size === bytes.length,
+  'index.html: «hash» answers with the file\'s SHA-256 and size');
+const single = throughWorker(workerSource('smeta-taqqoslash.html'), 'f.xlsx', bytes, { cmd: 'describe' });
+check(single && single.fmt === null && single.error !== '', 'the single-file page\'s worker cannot describe (and is never asked to)');
+
+// the works of form 5 are an add-on: a sheet they cannot take costs the works, never the estimate's resources
+['smeta-taqqoslash.html', 'index.html'].forEach((page) => {
+  const posted = [];
+  const ctx = vm.createContext({
+    console, Date, Math, JSON, String, Number, Boolean, Array, Object, RegExp, Error, isNaN, isFinite,
+    parseFloat, parseInt, Uint8Array, Int8Array, Int32Array, Uint16Array, Uint32Array, Float64Array, DataView,
+    ArrayBuffer, Map, Set, Symbol, Promise, Intl, TextDecoder, TextEncoder, setTimeout, clearTimeout
+  });
+  ctx.self = ctx;
+  ctx.postMessage = (m) => posted.push(JSON.parse(JSON.stringify(m)));
+  vm.runInContext(workerSource(page), ctx, { filename: 'worker' });
+  ctx.S.volumes.parseWorkbook = () => { throw new Error('a form 5 sheet nobody foresaw'); };
+  const copy = new Uint8Array(wBytes);
+  ctx.onmessage({ data: { cmd: 'parse', id: 9, name: 'w.xlsx', buffer: copy.buffer } });
+  const m = posted[0];
+  check(m && m.ok === true && m.objects.length === 2 && Array.isArray(m.works) && m.works.length === 0,
+    page + ': a form 5 the reader cannot take leaves the estimate read, without its works');
 });
 
 console.log(fail ? '\nFAILED: ' + fail : '\nall passed');

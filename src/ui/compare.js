@@ -263,9 +263,9 @@
       var parsed, wb;
       try { wb = S.readXlsx(new Uint8Array(reader.result)); parsed = S.reply.parse(wb); }
       catch (e) { app.toast(file.name + ': ' + (e.message || e), true); end(); return; }
-      // the «объем» sheet beside the prices: the volumes of the works go onto the same project (src/ui/volumes.js)
-      var proj = b !== 'file' ? app.projects[+String(b).slice(1)] : null;
-      var vol = proj && S.Volumes ? S.Volumes.readReply(wb, proj) : null;
+      // the «объем» sheet beside the prices: the volumes go onto the works of the projects in (src/ui/volumes.js) —
+      // not when the first version is an outside file: the reply is then about that file
+      var vol = b !== 'file' && S.Volumes ? S.Volumes.readReply(wb) : null;
       if (!parsed.entries.length && vol && vol.rows) {
         if (!back) { S.Volumes.applyReply(vol); app.toast('Наш ответ: ' + S.Volumes.replyText(vol), !vol.found); }
         end();

@@ -4,19 +4,23 @@
  * read with sums that do not agree. Such a file is kept whole: «Скачать» hands it over to be sent to whoever
  * maintains the program, «Проверить снова» reads it again with the rules of this version, «Убрать» takes it off the
  * list (an unread file — with its record; a read one — only the file, its sample stays to learn from).
+ *
+ * A kept file is read again in a worker (the server page's own, src/worker.js `describe`), never on the page: such a
+ * file may be one the page gave up on after its time; past the same time here the worker is replaced and the file
+ * said to be unreadable still.
  */
 (function (S) {
   'use strict';
   if (!S.pb) return;
   function $(id) { return document.getElementById(id); }
 
-  var DOUBT = 0.9, LIST_MAX = 200;
+  var LIST_MAX = 200;
   function when(d) { var x = new Date(String(d || '').replace(' ', 'T')); return isNaN(x) ? '' : x.toLocaleDateString('ru-RU'); }
-  function version() { var v = document.querySelector('.ver'); return v ? String(v.textContent || '').trim().slice(0, 20) : ''; }
-  function doubt(r) { return r.is_read && r.checked > 0 && r.score < DOUBT; }
 
   var A = {
     data: null, list: [], busy: false,
+    limit: 90 * 1000,                // as long as the working page gives a reading
+    worker: null, seq: 0,
 
     rows: function (d) {
       return [
@@ -37,7 +41,7 @@
         var why = r.reason === 'no-sheets' || !r.reason ? 'листы ресурсов не найдены' : String(r.reason).replace(/^error:\s*/, '');
         return '<b>Не прочитан</b>: ' + S.esc(why);
       }
-      if (doubt(r)) return 'Прочитан, но кол-во × цена = сумма только в ' + Math.round(r.score * 100) + ' % строк (' + r.checked + ' проверено)';
+      if (r.doubt) return 'Прочитан, но кол-во × цена = сумма только в ' + Math.round((r.score || 0) * 100) + ' % строк (' + r.checked + ' проверено)';
       return 'Теперь читается (строк ресурсов: ' + (r.items || 0) + '). Загрузите его в заявку ещё раз.';
     },
 
@@ -76,7 +80,7 @@
       var self = this;
       return S.pb.collection('smeta_files').getList(1, LIST_MAX, {
         filter: 'is_read = false || file != ""', sort: '-created', requestKey: null,
-        fields: 'id,collectionId,collectionName,hash,name,size,created,is_read,reason,score,checked,items,file'
+        fields: 'id,collectionId,collectionName,hash,name,size,created,is_read,reason,score,checked,doubt,items,file'
       }).then(function (res) {
         self.list = res.items || [];
         self.renderList(res.totalItems || 0);
@@ -120,23 +124,48 @@
       });
     },
 
+    /** The file read by the worker: { fmt, error }. Past `limit` the worker is replaced and the promise rejects. */
+    describe: function (bytes, name) {
+      var self = this;
+      return new Promise(function (ok, bad) {
+        if (!self.worker) {
+          if (!window.__WORKER_SRC__) { bad(new Error('эта страница не умеет читать сметы — обновите программу')); return; }
+          try { self.worker = new Worker(URL.createObjectURL(new Blob([window.__WORKER_SRC__], { type: 'text/javascript' }))); }
+          catch (e) { bad(new Error('браузер не дал прочитать файл в фоне')); return; }
+        }
+        var w = self.worker, id = ++self.seq, timer;
+        var done = function (e) {
+          if (!e.data || e.data.id !== id) return;
+          clearTimeout(timer); w.removeEventListener('message', done);
+          ok(e.data);
+        };
+        timer = setTimeout(function () {
+          w.removeEventListener('message', done);
+          try { w.terminate(); } catch (e) { /* gone */ }
+          if (self.worker === w) self.worker = null;
+          bad(new Error('не прочитан за ' + Math.round(self.limit / 1000) + ' с — файл слишком велик или повреждён'));
+        }, self.limit);
+        w.addEventListener('message', done);
+        var buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+        w.postMessage({ cmd: 'describe', id: id, name: name, buffer: buf }, [buf]);
+      });
+    },
+
     /** Read a kept file with the rules of this version; a file that reads now gets its sample and its counts. → text */
     again: function (r) {
       var self = this;
-      if (!S.smeta || !S.readXlsx || !S.ml || !S.ml.layout) return Promise.reject(new Error('эта страница не умеет читать сметы — обновите программу'));
-      return this.bytes(r).then(function (bytes) {
-        var wb = null, objects = [], err = '';
-        try { wb = S.readXlsx(bytes); objects = S.smeta.parseWorkbook(wb, r.name || 'smeta.xlsx'); }
-        catch (e) { err = String(e && e.message || e).slice(0, 200); }
-        var fmt = S.ml.layout.describe(bytes, err ? null : wb, objects);
-        var read = objects.length > 0;
+      return this.bytes(r).then(function (bytes) { return self.describe(bytes, r.name || 'smeta.xlsx'); }).then(function (got) {
+        var fmt = got.fmt, err = got.error || '';
+        var read = !!(fmt && fmt.read && fmt.sample);
         if (!read && !r.is_read) return 'по-прежнему не читается' + (err ? ': ' + err : '');
+        if (!fmt) throw new Error(err || 'файл не описан');
         var body = { is_read: read, reason: read ? '' : (err ? 'error: ' + err : 'no-sheets'), objects: fmt.objects, items: fmt.items, checked: fmt.checked,
-          score: fmt.score == null ? 0 : fmt.score, signature: fmt.signature, version: fmt.v, app_version: version() };
+          score: fmt.score == null ? 0 : fmt.score, doubt: !!fmt.doubt, signature: fmt.signature, version: fmt.v,
+          app_version: S.appVersion ? S.appVersion() : '' };
         if (fmt.sample) body.sample = fmt.sample;
         return S.pb.collection('smeta_files').update(r.id, body, { requestKey: null }).then(function (saved) {
-          Object.assign(r, { is_read: saved.is_read, reason: saved.reason, score: saved.score, checked: saved.checked, items: saved.items });
-          return read ? (doubt(r) ? 'прочитан, суммы сходятся не везде' : 'теперь читается') : 'по-прежнему не читается';
+          Object.assign(r, { is_read: saved.is_read, reason: saved.reason, score: saved.score, checked: saved.checked, doubt: saved.doubt, items: saved.items });
+          return read ? (r.doubt ? 'прочитан, суммы сходятся не везде' : 'теперь читается') : 'по-прежнему не читается';
         });
       });
     },

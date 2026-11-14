@@ -28,17 +28,22 @@ Keyinroq (hozir emas): «Разметка листа» — hech kim o'qiy olmaga
 
 Bitta yozuv (`smeta_files`) — bitta fayl:
 
-* `hash` — fayl baytlarining SHA-256 i (yagona; takror yuklangan fayl ikki marta yozilmaydi). Worker'da hisoblanadi —
-  `crypto.subtle` oddiy http manzilda yo'q, shuning uchun o'z kodimiz (`S.ml.layout.sha256`).
+* `hash` — fayl baytlarining SHA-256 i (yagona; takror yuklangan fayl ikki marta yozilmaydi). `src/ui/formats.js` ning
+  **o'z worker'ida** hisoblanadi — fayllarni o'qiydigan worker'da emas; `crypto.subtle` oddiy http manzilda yo'q, shuning
+  uchun spravochnik paketi tekshiruvchisining JS kodi (`S.refs.pkg.sha256`, `S.ml.layout.sha256` shuni chaqiradi).
 * `name`, `size`, `ws` (qaysi ish maydonida), `by` (kim yuklagan — server o'zi qo'yadi), `app_version`.
 * `is_read`, `reason` (`no-sheets` yoki `error: …`), `objects`, `items`.
-* `checked`, `score` — uchala soni bor qatorlar va ulardan kol-vo × narx = summa bo'lganlari ulushi.
+* `checked`, `score` — uchala soni bor qatorlar va ulardan kol-vo × narx = summa bo'lganlari ulushi (`S.ml.layout.agree`:
+  butun yozilgan summa o'z yaxlitlashicha — yarim so'mgacha, kasrli summa — mingdan birigacha farq qilishi mumkin).
+* `doubt` — «o'qilgan, lekin summalar mos emas» (`score` < `S.ml.layout.DOUBT` = 0,9). Chegara bitta joyda: sahifa,
+  admin sanog'i va himoya testi shuni ishlatadi.
 * `signature` — format imzosi: sarlavha qatorlari (belgilar bilan) va ustunlar o'rni. Bir formatdagi fayllar bir xil
   imzo oladi (nechta ko'cha yoki varaq bo'lishidan qat'i nazar).
 * `sample`, `version` — **format namunasi** (pastda). Sxema o'zgarsa `VERSION` ko'tariladi va fayl qayta kelganda
   yozuv yangilanadi.
-* `file` — **faylning o'zi, faqat o'qilmagan yoki summalari mos kelmagan (< 90 %) bo'lsa**: egasi uni admin sahifasidan
-  yuklab olib dasturchiga yuboradi; qoida qo'shilgach «Проверить снова».
+* `file` — **faylning o'zi, faqat o'qilmagan yoki summalari mos kelmagan bo'lsa** (har qanday turdagi fayl — eski .xls,
+  .xls deb saqlangan HTML jadval ham; 30 MB gacha; fayl qabul qilinmasa, yozuv faylsiz qoladi): egasi uni admin
+  sahifasidan yuklab olib dasturchiga yuboradi; qoida qo'shilgach «Проверить снова».
 
 ### Namuna — nom va narxsiz
 
@@ -57,10 +62,15 @@ Varaq nomi, fayl nomi (namunaning ichida), resurs nomlari, narxlar va summalar n
 
 ### Ishga xalaqit bermaydi
 
-Yozuv fayl o'qilgandan keyin, fonda, bittadan yuboriladi; xato — faqat konsolga bir qator. Brauzer yuborgan
-xeshlarini eslab qoladi (`localStorage`), shuning uchun ish maydoni qayta ochilganda serverga so'rov ketmaydi.
-Server tozalangan bo'lsa (admin «Стереть») brauzer buni sezadi va qayta yuboradi. Bitta-fayl sahifada
-(`smeta-taqqoslash.html`) hech narsa yig'ilmaydi — unda server yo'q.
+* Fayl xeshi va namunasi `src/ui/formats.js` ning **o'z worker'ida** hisoblanadi: sahifa fayllarni o'qiydigan worker
+  faqat o'qiydi, uning javobi v2.15 dagidek. Namuna 90 soniyada tayyor bo'lmasa — tashlab yuboriladi, worker almashtiriladi.
+* Bir to'da fayl o'qilgach, yozuvlar fonda, bittadan yuboriladi; xato — faqat konsolga bir qator.
+* Server qaysi fayllarni bilishini har bir to'da uchun **bitta so'rov** bilan so'raladi (ish maydoni ochilganda — uning
+  hamma fayllari uchun bitta so'rov); brauzer hech narsani eslab qolmaydi — server tozalansa (admin «Стереть») yoki
+  boshqa baza bo'lsa, yozuvlar yana yoziladi.
+* «Файл сохранён» xabari fayl haqiqatan saqlangandan keyin chiqadi.
+* Admin sahifasidagi «Проверить снова» ham faylni worker'da, 90 soniya chegarasi bilan o'qiydi.
+* Bitta-fayl sahifada (`smeta-taqqoslash.html`) hech narsa yig'ilmaydi — unda server yo'q.
 
 ## Maxfiylik
 

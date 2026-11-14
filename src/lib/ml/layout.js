@@ -13,7 +13,9 @@
  *   .        empty                             0…9  a whole number, by its number of digits − 1 (capped at 9)
  *   a…j      a number with a fraction (by the digits of its whole part)
  *   A…J      a whole number, by a formula      K…T  a number with a fraction, by a formula
- *   x  y     text with letters: short, long (over 24 characters)       z  text without letters («1.1», «-»)
+ *   x  y     text with letters: short, long (over 24 characters)
+ *   z        text without letters that is not a number («—», «4.1.1»); a number written as text («12», «1.1»,
+ *            «1 234,5») is coded as a number
  *   w        a formula that gives no number    u    a unit of measure («м3», «100 шт», «маш.-ч»)
  *   words a header is made of:
  *   #  №, N п/п      @  наименование     %  ед. изм.      *  кол-во, количество     $  цена, на единицу
@@ -30,10 +32,16 @@
  *                                            h header · n numbering · e extra · b blank · . outside); b: the blocks
  *                                            [{ from, to, L: { no, name, unit, qty, price, sum, code, headerRow, … } }]
  *   S.ml.layout.signature(sample)          → 16 hex: files of one format share it (headers and column places)
- *   S.ml.layout.check(objects)             → { items, rows, ok, score, totals, totalsOk } — quantity × price = sum
- *   S.ml.layout.sha256(bytes)              → hex — which file this is (crypto.subtle is absent on plain-http pages)
- *   S.ml.layout.describe(bytes, wb, objects) → { v, hash, size, read, objects, items, checked, score, signature, sample }
- *                                            checked: the lines that have all three numbers; score: of them, agreeing
+ *   S.ml.layout.check(objects)             → { items, rows, ok, score } — rows: the lines with all three numbers; ok:
+ *                                            of them, quantity × price = sum (S.ml.layout.agree); score: ok / rows
+ *   S.ml.layout.agree(a, b)                → a is b, give or take how b was rounded: a sum printed whole may be off by
+ *                                            half a sum; one with a fraction, by a thousandth of itself (or 0.005)
+ *   S.ml.layout.DOUBT                      a read file whose score is under this is «read, sums do not agree»: kept whole
+ *                                            and listed to be looked at (one threshold for the page, the admin and tests)
+ *   S.ml.layout.doubtful(fmt)              → that, for a description
+ *   S.ml.layout.sha256(bytes)              → hex — which file this is: S.refs.pkg.sha256 (src/lib/refs/package.js, pure
+ *                                            JS: crypto.subtle is absent on plain-http pages), loaded beside this file
+ *   S.ml.layout.describe(bytes, wb, objects) → { v, hash, size, read, objects, items, checked, score, doubt, signature, sample }
  *
  * Changing what a sample holds raises VERSION: the samples kept so far are then made again from their files.
  * Pure — no page, no server, no clock.
@@ -44,6 +52,7 @@ var S = (typeof S !== 'undefined' && S) || {};
   var ML = S.ml = S.ml || {};
 
   var VERSION = 1;
+  var DOUBT = 0.9;
   var MAX_SHEETS = 12, MAX_ROWS = 600, MAX_COLS = 30, MAX_NUMS = 10, TOP_REL = 6;
   var LETTER = /[A-Za-zЀ-ӿ]/;
 
@@ -55,18 +64,18 @@ var S = (typeof S !== 'undefined' && S) || {};
     'ELEMENT OPORA SKVAZHINA PROLET STYK PRIBOR USTROISTVO SOEDINENIE KONTSEVAYA GOLOVKA').split(' ').forEach(function (u) { UNITS[u] = 1; });
 
   function tail(key) { return String(key || '').replace(/^\d+/, ''); }
-  function isUnit(t) {
+  /** `u`: the text's name key, computed once by code(). */
+  function isUnit(t, u) {
     if (t.length > 24 || !S.matchUnitKey) return false;
     if (UNITS[tail(S.matchUnitKey(t))]) return true;
     // «1000 М3 ГРУНТА», «100М2 ПЛОЩАДИ»: the unit and what it is of
-    var words = S.nameKey(t).split(' ').filter(function (w) { return w && !/^\d+$/.test(w); });
+    var words = u.split(' ').filter(function (w) { return w && !/^\d+$/.test(w); });
     return words.length > 1 && words.length <= 3 && !!UNITS[tail(S.matchUnitKey(words[0]))];
   }
 
-  /** A word a header (or a total, a section) is made of → its character, or ''. */
-  function headCode(t) {
+  /** A word a header (or a total, a section) is made of → its character, or ''. `u`: the text's name key. */
+  function headCode(t, u) {
     if (t.length > 120) return '';
-    var u = S.nameKey(t);
     if (!u) return /^\s*№/.test(t) ? '#' : '';
     if (/^\s*№/.test(t) || /^N( П П)?$/.test(u) || u === 'П П') return '#';
     if (u.indexOf('НАИМЕНОВАНИЕ') === 0) return '@';
@@ -114,7 +123,8 @@ var S = (typeof S !== 'undefined' && S) || {};
       var n = S.num(t);
       return n != null ? numCode(n, f) : 'z';
     }
-    return headCode(t) || (isUnit(t) ? 'u' : (t.length > 24 ? 'y' : 'x'));
+    var u = t.length > 120 ? '' : S.nameKey(t);
+    return headCode(t, u) || (isUnit(t, u) ? 'u' : (t.length > 24 ? 'y' : 'x'));
   }
 
   /* ------------------------------------------------------------------ a sheet */
@@ -129,7 +139,15 @@ var S = (typeof S !== 'undefined' && S) || {};
     return out;
   }
 
-  function about(a, b) { return Math.abs(a - b) <= Math.max(0.51, Math.abs(b) * 0.001); }
+  /**
+   * a is b, give or take how b was rounded. A sum printed as a whole number may be off by half a sum (the estimate's
+   * own rounding, as assemble.js counts it); one printed with a fraction, by a thousandth of itself or half a tiyin.
+   * A flat half for every number made 0.3 × 0.5 «agree» with 0.6.
+   */
+  function agree(a, b) {
+    var whole = Math.abs(b - Math.round(b)) < 1e-9;
+    return Math.abs(a - b) <= (whole ? 0.51 : Math.max(0.005, Math.abs(b) * 0.001));
+  }
 
   /** Which columns multiply into which: the trace quantity × price = sum leaves, whatever the columns are called. */
   function relations(sheet) {
@@ -144,7 +162,7 @@ var S = (typeof S !== 'undefined' && S) || {};
         for (var j = i + 1; j < nums.length; j++) {
           var p = nums[i][1] * nums[j][1];
           for (var k = 0; k < nums.length; k++) {
-            if (k === i || k === j || !about(p, nums[k][1])) continue;
+            if (k === i || k === j || !agree(p, nums[k][1])) continue;
             var key = nums[i][0] + ',' + nums[j][0] + ',' + nums[k][0];
             count[key] = (count[key] || 0) + 1;
             found.push(key);
@@ -241,89 +259,42 @@ var S = (typeof S !== 'undefined' && S) || {};
 
   /* ------------------------------------------------------------------ does the reading add up */
   function check(objects) {
-    var out = { items: 0, rows: 0, ok: 0, score: null, totals: 0, totalsOk: 0 };
+    var out = { items: 0, rows: 0, ok: 0, score: null };
     (objects || []).forEach(function (o) {
-      var band = 0, all = 0;
       (o.rows || []).forEach(function (r) {
-        if (r.kind === 'section') { band = 0; return; }
-        if (r.kind === 'item') {
-          out.items++;
-          var line = r.sum != null ? r.sum : (r.qty != null && r.price != null ? r.qty * r.price : 0);
-          band += line; all += line;
-          if (r.qty == null || r.price == null || r.sum == null) return;
-          out.rows++;
-          if (about(r.qty * r.price, r.sum)) out.ok++;
-          return;
-        }
-        // a total that directly closes its band, or the object so far: counted apart, it does not enter the score
-        if (r.kind === 'total' && r.sum != null && /^\s*ИТОГО/i.test(r.nm || '')) {
-          out.totals++;
-          if (about(band, r.sum) || about(all, r.sum)) out.totalsOk++;
-        }
+        if (r.kind !== 'item') return;
+        out.items++;
+        if (r.qty == null || r.price == null || r.sum == null) return;
+        out.rows++;
+        if (agree(r.qty * r.price, r.sum)) out.ok++;
       });
     });
     if (out.rows) out.score = Math.round(out.ok / out.rows * 1e4) / 1e4;
     return out;
   }
 
-  /* ------------------------------------------------------------------ which file */
-  var K = [];
-  (function () {
-    var n = 2, i = 0;
-    while (i < 64) {
-      var prime = true;
-      for (var d = 2; d * d <= n; d++) if (n % d === 0) { prime = false; break; }
-      if (prime) { var c = Math.pow(n, 1 / 3); K[i++] = ((c - Math.floor(c)) * 4294967296) >>> 0; }
-      n++;
-    }
-  })();
+  function doubtful(fmt) { return !!(fmt && fmt.read && fmt.checked > 0 && fmt.score != null && fmt.score < DOUBT); }
 
+  /* ------------------------------------------------------------------ which file */
   function sha256(bytes) {
-    var H = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
-    var len = bytes.length, total = ((len + 9 + 63) >> 6) << 6, w = new Int32Array(64), block = new Uint8Array(64);
-    for (var off = 0; off < total; off += 64) {
-      for (var q = 0; q < 64; q++) {
-        var at = off + q;
-        block[q] = at < len ? bytes[at] : at === len ? 0x80 : 0;
-      }
-      if (off + 64 === total) {
-        var hi = Math.floor(len / 536870912), lo = (len << 3) >>> 0;
-        block[56] = hi >>> 24; block[57] = hi >>> 16; block[58] = hi >>> 8; block[59] = hi;
-        block[60] = lo >>> 24; block[61] = lo >>> 16; block[62] = lo >>> 8; block[63] = lo;
-      }
-      for (var t = 0; t < 16; t++) w[t] = (block[t * 4] << 24) | (block[t * 4 + 1] << 16) | (block[t * 4 + 2] << 8) | block[t * 4 + 3];
-      for (t = 16; t < 64; t++) {
-        var x = w[t - 15], y = w[t - 2];
-        var s0 = ((x >>> 7) | (x << 25)) ^ ((x >>> 18) | (x << 14)) ^ (x >>> 3);
-        var s1 = ((y >>> 17) | (y << 15)) ^ ((y >>> 19) | (y << 13)) ^ (y >>> 10);
-        w[t] = (w[t - 16] + s0 + w[t - 7] + s1) | 0;
-      }
-      var a = H[0], b = H[1], c = H[2], d = H[3], e = H[4], f = H[5], g = H[6], h = H[7];
-      for (t = 0; t < 64; t++) {
-        var S1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7));
-        var t1 = (h + S1 + ((e & f) ^ (~e & g)) + K[t] + w[t]) | 0;
-        var S0 = ((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10));
-        var t2 = (S0 + ((a & b) ^ (a & c) ^ (b & c))) | 0;
-        h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
-      }
-      H[0] = (H[0] + a) | 0; H[1] = (H[1] + b) | 0; H[2] = (H[2] + c) | 0; H[3] = (H[3] + d) | 0;
-      H[4] = (H[4] + e) | 0; H[5] = (H[5] + f) | 0; H[6] = (H[6] + g) | 0; H[7] = (H[7] + h) | 0;
-    }
-    return H.map(function (v) { return ('0000000' + (v >>> 0).toString(16)).slice(-8); }).join('');
+    if (!S.refs || !S.refs.pkg || !S.refs.pkg.sha256) throw new Error('layout.js: src/lib/refs/package.js is not loaded');
+    return S.refs.pkg.sha256(bytes);
   }
 
   /** Everything kept about one file: which file, how it was read, and its sample. `wb` null: it could not be opened. */
   function describe(bytes, wb, objects) {
     var objs = objects || [], out = { v: VERSION, hash: sha256(bytes), size: bytes.length, read: objs.length > 0,
-      objects: objs.length, items: 0, checked: 0, score: null, signature: '', sample: null };
+      objects: objs.length, items: 0, checked: 0, score: null, doubt: false, signature: '', sample: null };
     if (!wb) return out;
     var ck = check(objs);
     out.items = ck.items; out.checked = ck.rows; out.score = ck.score;
+    out.doubt = doubtful(out);
     out.sample = sample(wb, objs);
     out.signature = signature(out.sample);
     return out;
   }
 
-  ML.layout = { VERSION: VERSION, MAX_SHEETS: MAX_SHEETS, MAX_ROWS: MAX_ROWS, MAX_COLS: MAX_COLS,
-    code: code, grid: grid, relations: relations, sample: sample, signature: signature, check: check, sha256: sha256, describe: describe };
+  ML.layout = { VERSION: VERSION, DOUBT: DOUBT, MAX_SHEETS: MAX_SHEETS, MAX_ROWS: MAX_ROWS, MAX_COLS: MAX_COLS,
+    code: code, grid: grid, relations: relations, sample: sample, signature: signature, check: check, agree: agree,
+    doubtful: doubtful, sha256: sha256, describe: describe };
 })(S);

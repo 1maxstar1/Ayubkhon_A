@@ -8,8 +8,9 @@
  *   - **no name and no price of the estimate is in the sample** — it is what leaves the page to be learnt from;
  *   - two files of one format share a signature, whatever they say and however many sheets they have; another
  *     layout has another; a file the rules did not read still has one;
- *   - the arithmetic check counts the lines whose sum is their quantity × price;
- *   - the hash is SHA-256 (the file's identity on the server).
+ *   - the arithmetic check counts the lines whose sum is their quantity × price — a whole sum may be off by its own
+ *     rounding, a fractional one may not be off by a flat half (0.3 × 0.5 is not 0.6);
+ *   - the hash is SHA-256 (the file's identity on the server), the reference package validator's own.
  *
  * Names and numbers are invented.
  *
@@ -20,7 +21,7 @@ const crypto = require('crypto');
 const { load } = require('./load.cjs');
 const books = require('./compare-books.cjs');
 
-const S = load(load.PIPELINE, 'volumes', 'ml-layout');
+const S = load(load.PIPELINE, 'volumes', 'refs-package', 'ml-layout');
 const L = S.ml.layout;
 
 let fail = 0;
@@ -37,7 +38,8 @@ check(C(7) === '0' && C(42) === '1' && C(123456) === '5' && C(0) === '0', 'a who
 check(C(0.25) === 'a' && C(12.5) === 'b' && C(98765.4) === 'e', 'a number with a fraction, by the digits of its whole part');
 check(C(300, 'E5*F5') === 'C' && C(12.5, 'SUM(A1:A3)') === 'L', 'a number a formula gives');
 check(C('12') === '1' && C('1 234,5') === 'd' && C('1.1') === 'a', 'a number written as text is a number');
-check(C('ТЕСТОВЫЙ КРАН') === 'x' && C('ТЕСТОВЫЙ КРАН НА ГУСЕНИЧНОМ ХОДУ 25 Т') === 'y' && C('—') === 'z', 'text: short, long, without letters');
+check(C('ТЕСТОВЫЙ КРАН') === 'x' && C('ТЕСТОВЫЙ КРАН НА ГУСЕНИЧНОМ ХОДУ 25 Т') === 'y' && C('—') === 'z' && C('4.1.1') === 'z',
+  'text: short, long, without letters and not a number');
 check(['М3', 'м2', 'ШТ', 'шт.', 'ЧЕЛ.-Ч', 'маш.-ч', 'Т', 'ТН', '100 М2', '1000М3', 'т/км', 'компл.', '1000 М3 ГРУНТА'].every((u) => C(u) === 'u'),
   'a unit of measure, with its multiplier and what it is of');
 check(C('№ п/п') === '#' && C('N п.п.') === '#' && C('Наименование ресурсов') === '@' && C('Ед. изм.') === '%' && C('Единица измерения') === '%',
@@ -122,20 +124,29 @@ check(!junk.read && junk.sample === null && junk.signature === '' && junk.size =
 
 /* ------------------------------------------------------------------ the arithmetic */
 const ck = L.check(p.objects);
-check(ck.items === 3 && ck.rows === 3 && ck.ok === 3 && ck.score === 1, 'every line agrees: quantity × price = sum');
-check(ck.totals === 1 && ck.totalsOk === 1, 'and the band total is the sum of its lines');
+check(ck.items === 3 && ck.rows === 3 && ck.ok === 3 && ck.score === 1 && !('totals' in ck), 'every line agrees: quantity × price = sum');
 const bad = JSON.parse(JSON.stringify(priv));
 bad.sheets[0].rows[5][6].v = 5;                 // one sum typed over
 const pb = read(bad);
 const ckb = L.check(pb.objects);
-check(ckb.rows === 3 && ckb.ok === 2 && Math.abs(ckb.score - 0.6667) < 1e-9 && ckb.totalsOk === 0, 'a sum typed over is counted (' + ckb.ok + ' of ' + ckb.rows + ')');
+check(ckb.rows === 3 && ckb.ok === 2 && Math.abs(ckb.score - 0.6667) < 1e-9, 'a sum typed over is counted (' + ckb.ok + ' of ' + ckb.rows + ')');
 check(L.check([]).score === null, 'nothing read — nothing to score');
+check(L.agree(14.6, 15) && L.agree(1524.6, 1525) && !L.agree(14.4, 15.5), 'a sum printed whole may be off by its own rounding, no more');
+check(!L.agree(0.15, 0.6) && L.agree(0.1500004, 0.15) && L.agree(1234.5673, 1234.57) && !L.agree(1230.0, 1234.57),
+  'a sum printed with a fraction may not be off by a flat half (0.3 × 0.5 is not 0.6)');
+const small = L.check([{ rows: [{ kind: 'item', qty: 0.3, price: 0.5, sum: 0.6 }, { kind: 'item', qty: 2, price: 7.3, sum: 14.6 }] }]);
+check(small.rows === 2 && small.ok === 1 && small.score === 0.5, 'small numbers that do not multiply are not counted as agreeing');
+check(L.relations({ rows: [null, [null, { v: 0.5 }, { v: 0.3 }, { v: 0.2 }]] }).rel.length === 0, 'and leave no trace of a × b = c');
+check(L.DOUBT === 0.9 && L.doubtful({ read: true, checked: 3, score: 0.5 }) && !L.doubtful({ read: true, checked: 0, score: null }) &&
+  !L.doubtful({ read: false, checked: 3, score: 0.1 }) && !L.doubtful({ read: true, checked: 3, score: 0.95 }), 'one threshold: «read, sums do not agree»');
+check(dp.doubt === false && L.describe(new Uint8Array(books.xlsx(S, bad)), pb.wb, pb.objects).doubt === true, 'the description says it');
 
 /* ------------------------------------------------------------------ the hash */
 const sha = (x) => crypto.createHash('sha256').update(x).digest('hex');
 const samples = [new Uint8Array(0), new Uint8Array([97, 98, 99]), new Uint8Array(55).fill(7), new Uint8Array(56).fill(7), new Uint8Array(64).fill(1),
   new Uint8Array(books.xlsx(S, books.book(1)))];
 check(samples.every((x) => L.sha256(x) === sha(x)), 'SHA-256, as node computes it (empty, short, at the padding edges, a workbook)');
+check(L.sha256 !== S.refs.pkg.sha256 && L.sha256(samples[1]) === S.refs.pkg.sha256(samples[1]), 'the package validator\'s own, not a copy of it');
 check(dp.hash === sha(Buffer.from(books.xlsx(S, priv))) && dp.size === books.xlsx(S, priv).length, 'the description carries the file\'s hash and size');
 
 /* ------------------------------------------------------------------ limits */

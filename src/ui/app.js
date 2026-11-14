@@ -490,18 +490,17 @@
         worker.addEventListener('message', onMsg);
         self.jobs.push(job);
         self.watchWorker();
-        // `fmt`: the page that keeps a record of every file's format asks for it (src/ui/formats.js)
-        worker.postMessage({ cmd: 'parse', id: id, name: file.name, buffer: buf, fmt: !!S.Formats }, [buf]);
+        worker.postMessage({ cmd: 'parse', id: id, name: file.name, buffer: buf }, [buf]);
       } else {
-        var bytes = new Uint8Array(buf), wb = null, res;
+        var res;
         try {
-          wb = S.readXlsx(bytes);
-          res = { ok: true, objects: S.smeta.parseWorkbook(wb, file.name),
-            works: S.volumes ? S.volumes.parseWorkbook(wb) : [], sheetCount: wb.sheets.length };
+          var wb = S.readXlsx(new Uint8Array(buf)), works = [];
+          // the works of form 5 are an add-on: a sheet they cannot take costs the works, never the estimate
+          try { works = S.volumes ? S.volumes.parseWorkbook(wb) : []; } catch (e2) { works = []; }
+          res = { ok: true, objects: S.smeta.parseWorkbook(wb, file.name), works: works, sheetCount: wb.sheets.length };
         } catch (err) {
           res = { ok: false, error: String(err.message || err) };
         }
-        if (S.Formats) { try { res.fmt = S.ml.layout.describe(bytes, res.ok ? wb : null, res.objects || null); } catch (e2) { /* never in the way */ } }
         self.onParsed(file.name, res, slot);
       }
     };
@@ -540,17 +539,14 @@
   App.prototype.onParsed = function (name, res, slot) {
     this.pending--;
     var entry = this.queue && this.queue[slot];
-    // read or not, the file leaves a record of its format (server page; in the background, never in the way)
+    // read or not, the file leaves a record of its format (server page; in the background, in a worker of its own)
     if (S.Formats) S.Formats.take(entry && entry.file, name, res);
     if (!res.ok) {
       this.toast(name + ': ' + res.error, true);
     } else if (!res.objects.length) {
       this.toast(name + ': листы ресурсов не найдены. На листе нужна строка заголовков «НАИМЕНОВАНИЕ · КОЛ-ВО · ' +
         'ЦЕНА · СУММА» или хотя бы один из разделов «ЗАТРАТЫ ТРУДА / МАШИНЫ / МАТЕРИАЛЫ / ' +
-        'ОБОРУДОВАНИЕ».' +
-        // the server page keeps such a file for whoever maintains the program (src/ui/formats.js)
-        (S.Formats && res.fmt ? ' Если это смета — файл сохранён: страница администратора → «Обучение» → «Распознавание форматов смет» → ' +
-          '«Скачать», и отправьте его разработчику.' : ''), true);
+        'ОБОРУДОВАНИЕ».', true);
     } else {
       var title = res.objects[0].title || name.replace(/\.[^.]+$/, '');
       if (entry) {

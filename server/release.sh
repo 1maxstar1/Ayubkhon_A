@@ -196,7 +196,7 @@ fi
 # Tests a release may go without: what only the owner's files or kit can run. Anything else skipped — the
 # Windows launcher without PowerShell, every browser test without playwright — refuses the release: the Windows
 # laptop installs what is listed by itself.
-SKIP_OK="hints refs-measure refs-parity e2e-fullregistry"
+SKIP_OK="hints refs-measure refs-parity e2e-fullregistry smeta-corpus"
 # and every other test test/all.sh lists must be in the results as OK: a test missing from them (renamed, dropped,
 # never reached) refuses the release as surely as a skipped one
 REQUIRED=$(listed_tests | tr '\n' ' ')

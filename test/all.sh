@@ -107,6 +107,8 @@ run pb-err           node test/pb-err.cjs
 run ui-language      node test/ui-language.cjs
 run smeta-form4a     node test/smeta-form4a.cjs
 run smeta-header     node test/smeta-header.cjs
+# the reader against every estimate the owner has sent (private: $SMETA_KIT; without it — SKIP)
+run smeta-corpus     node test/smeta-corpus.cjs
 run compare          node test/compare.cjs
 run export-formulas  node test/export-formulas.cjs
 run worker-parity    node test/worker-parity.cjs

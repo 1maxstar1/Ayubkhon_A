@@ -28,6 +28,7 @@ node build.mjs --serve                                # ... va server/pb_public 
 node test/pipeline.cjs a.xlsx b.xlsx --out out.xlsx   # brauzersiz tekshiruv
 node test/smeta-form4a.cjs                            # 4А shakli (АВС-4): bir varaqda ko'p lokal smeta
 node test/smeta-header.cjs                            # oddiy varaq: shakli bo'yicha o'qilmasa — sarlavhasi bo'yicha
+SMETA_KIT=<kit> node test/smeta-corpus.cjs [--record]  # o'quvchi egasi yuborgan barcha smetalarda: qoida o'zgarsa, qolganlari avvalgidek o'qilishi shart (maxfiy, repoda emas)
 node test/export-formulas.cjs                         # eksport qayta o'qiladi, formulalari hisoblanadi: ИТОГО = qatorlar yig'indisi (uch turda)
 node test/worker-parity.cjs                           # sahifadagi worker o'quvchi qaytargan narsani aynan qaytaradi
 node test/compare.cjs; node test/e2e-compare.mjs      # «Сравнение версий» va «Наш ответ (Excel)»: qaytgan smetani birinchisi va jadvalimiz bilan solishtirish

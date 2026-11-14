@@ -398,7 +398,8 @@ shuning uchun to'plam istalgan kompyuterda va GitHub'da to'liq yuradi. Faqat
 egasining kompyuterida qoladiganlari jadvalda SKIP deb, sababi bilan ko'rinadi:
 `hints` (o'xshash nomlarni narx bo'yicha o'lchaydi — haqiqiy smeta kerak),
 `refs-parity`/`refs-measure` (maxfiy to'plam, `REFS_KIT`), `e2e-fullregistry`
-(to'liq reyestr).
+(to'liq reyestr), `smeta-corpus` (egasi yuborgan barcha smetalar, `SMETA_KIT` —
+o'quvchi qoidasi o'zgarganda qolgan fayllar avvalgidek o'qilishini isbotlaydi).
 
 Har bir push'da shu to'plam GitHub Actions'da o'zi ishlaydi (repo → «Actions»
 vkladkasi → «tests»). Qizil belgi — biror test yiqilgan; qaysi biri ekanini

@@ -154,5 +154,25 @@ const form5 = one({ sheets: [sheet('1-1', [['ЛОКАЛЬНАЯ РЕСУРСНА
   [1, 'Е0101', 'РАЗРАБОТКА ГРУНТА ТЕСТОВАЯ', '1000М3', 17], ['1.1', 1, 'ЗАТРАТЫ ТРУДА РАБОЧИХ-СТРОИТЕЛЕЙ', 'ЧЕЛ.-Ч', 4.69, 81, 17, 1377]])] });
 check(form5.length === 0, 'the works-and-resources statement of form 5 (its prices come from the other sheet) is still left out');
 
+/* 8 — the haulage sheet: one line per material; each is «Транспортировка <материал> <N> км» in т/км */
+const haul = sheet('ТРАНСПОРТ', [['Транспортные расходы на перевозимые грузы'], ['ТЕСТОВАЯ СТРОЙКА'], [],
+  ['№ П/П', 'Наменование  материалов', 'Единица  измерения', 'Коли-чество', 'Удель- ный  вес', 'Общая  тонна', 'Автотранспортная  км', 'тн/км', 'Стоимость за  один тн/км', 'Всего'],
+  [null, null, null, null, 'тн'],
+  [1, 2, 3, 4, 6, 7, 9, 10, 11, 12],
+  [1, 'ЩЕБЕНЬ ТЕСТОВЫЙ', 'т', 40, 1, 40, 19, 760, 3, 2280],
+  [2, 'ПЕСОК ТЕСТОВЫЙ', 'м3', 10, 1.6, 16, 2.5, 40, 5, 200],
+  [3, 'На остальные материалы 3% от стоимости материалов', null, null, null, null, null, null, null, 75],
+  [null, 'ИТОГО', null, null, null, null, null, null, null, 2555]]);
+const hb = one({ sheets: [haul] });
+const hi = hb.length ? hb[0].rows.filter((r) => r.kind === 'item') : [];
+check(hb.length === 1 && hi.length === 2 && hi[0].nm === 'Транспортировка ЩЕБЕНЬ ТЕСТОВЫЙ 19 км' && hi[1].nm === 'Транспортировка ПЕСОК ТЕСТОВЫЙ 2,5 км' &&
+  hi.every((r) => r.unit === 'т/км') && hi[0].qty === 760 && hi[0].price === 3 && hi[1].qty === 40 && hi[1].price === 5,
+  'the haulage sheet: each material is «Транспортировка <материал> <N> км» in т/км, its т·км the quantity and the price of one т·км the price');
+check(hb.length === 1 && hb[0].rows.find((r) => r.r === 9).kind === 'extra' && hb[0].rows.find((r) => r.r === 10).kind === 'total' &&
+  hb[0].rows.find((r) => r.r === 6).kind === 'numbering' && hi.every((r) => !r.cells[4] && !r.cells[7] && r.cells[2].v === r.nm),
+  '… the 3 % line is not a resource, ИТОГО is a total; the material\'s own quantity and km are not copied into the table');
+const hm = S.assemble([{ name: 'h', file: 'h.xlsx', objects: hb, enabled: true }], {});
+check(hm.resources.length === 2 && hm.resources.some((r) => r.name === 'Транспортировка ЩЕБЕНЬ ТЕСТОВЫЙ 19 км' && r.qty === 760), 'the two haulage lines assemble as two resources');
+
 console.log(fail ? '\nFAILED: ' + fail : '\nall passed');
 process.exit(fail ? 1 : 0);

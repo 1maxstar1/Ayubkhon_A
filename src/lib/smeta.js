@@ -27,6 +27,12 @@
  *                                                                                                          | единицы | всего
  *   bands (Затраты труда, Строительные машины и механизмы, Строительные материалы…, Перевозка…) in the first
  *   column, items numbered «1.», «2.» …, «Итого по …» in the name column
+ *
+ * and the haulage sheet («Транспортные расходы на перевозимые грузы»), one line per material:
+ *
+ *   № п/п | Наименование материалов | Единица измерения | Количество | Удельный вес | Общая тонна | … км | тн/км |
+ *   Стоимость за один тн/км | Всего
+ *   each line is the resource «Транспортировка <материал> <N> км» in т/км — as the expert's replies name it
  */
 (function (S) {
   'use strict';
@@ -377,6 +383,83 @@
   }
 
   /**
+   * The haulage sheet: material, unit, quantity, density, tonnes, the distance in km, the т·км, the price of one т·км
+   * and the sum. Each material's line is a resource of its own — «Транспортировка <материал> <N> км», т/км, its
+   * т·км as the quantity — named the way the expert's replies name it, so that a reply's haulage price lands on it.
+   * Only a sheet no other reading took comes here (it used to be left out), and only by its header: a material
+   * name, a km column, a т·км column, a price of one т·км and a sum.
+   * The row keeps only the columns the comparison table has (№, name, unit, т·км, price, sum): the material's own
+   * quantity, density, tonnes and km stand where the table's own columns are and are not copied.
+   */
+  function transportSheet(sheet) {
+    var rows = sheet.rows, H = null, r;
+    for (r = 1; r < Math.min(rows.length, 20) && !H; r++) {
+      var cells = rows[r];
+      if (!cells) continue;
+      var h = {};
+      for (var c = 1; c < cells.length; c++) {
+        var raw = txt(cells[c]), u = up(raw);
+        if (!u && !/^\s*№/.test(raw)) continue;
+        if (/^НА?И?МЕНОВАНИЕ МАТЕРИАЛ/.test(u)) h.name = c;
+        else if (/^ЕД/.test(u) && u.indexOf('ИЗМ') > 0) h.unit = c;
+        else if (/^СТОИМОСТЬ ЗА/.test(u)) h.price = c;           // «Стоимость за один тн/км» — before the km test
+        else if (/^(ТН|Т) КМ$/.test(u)) h.tkm = c;
+        else if (/(^| )КМ$/.test(u)) h.km = c;
+        else if (u === 'ВСЕГО' || u.indexOf('СУММА') === 0) h.sum = c;
+        else if (/^\s*№/.test(raw) || /^N П П$/.test(u)) h.no = c;
+      }
+      if (h.name && h.km && h.tkm && h.price && h.sum) { H = h; H.headerRow = r; }
+    }
+    if (!H) return null;
+    var L = { no: H.no || 1, name: H.name, unit: H.unit || H.name + 1, qty: H.tkm, price: H.price, sum: H.sum,
+      headerRow: H.headerRow, subRow: 0, numRow: 0, lastCol: H.sum, transport: true };
+    var keep = [L.no, L.name, L.unit, L.qty, L.price, L.sum];
+    function slim(cells, over) {
+      var out = [];
+      keep.forEach(function (c) { if (cells && cells[c]) out[c] = cells[c]; });
+      Object.keys(over || {}).forEach(function (c) { out[c] = over[c]; });
+      return out;
+    }
+    function km(v) { return Math.round(v) === v ? String(v) : String(+v.toFixed(3)).replace('.', ','); }
+    var title = '', subtitle = '';
+    for (r = 1; r < L.headerRow; r++) {
+      var t = '';
+      for (var c0 = 1; c0 <= L.lastCol && rows[r]; c0++) { t = txt(rows[r][c0]); if (t) break; }
+      if (!t) continue;
+      if (!title) title = t; else if (!subtitle) subtitle = t;
+    }
+    var out = [], items = 0, last = lastContentRow(rows);
+    for (r = L.headerRow; r <= last; r++) {
+      var cs = rows[r] || [];
+      var name = txt(cs[L.name]).replace(/\s+/g, ' ').trim();
+      var noCell = cs[L.no], noTxt = txt(noCell);
+      var tkm = S.num(cs[L.qty] && cs[L.qty].v), price = S.num(cs[L.price] && cs[L.price].v), sum = S.num(cs[L.sum] && cs[L.sum].v);
+      var dist = S.num(cs[H.km] && cs[H.km].v);
+      var row = { r: r, kind: 'blank', section: 'other', sub: false, no: S.num(noCell && noCell.v), noTxt: noTxt, nm: name, unit: txt(cs[L.unit]),
+        qty: tkm, price: price, sum: sum, cells: slim(cs) };
+      if (r === L.headerRow) row.kind = 'header';
+      else if (!L.numRow && S.num(cs[L.name] && cs[L.name].v) != null) {
+        // the sheet numbers its own twelve columns; the table it lands in has six
+        row.kind = 'numbering'; L.numRow = r;
+        row.cells = []; keep.forEach(function (c, i) { row.cells[c] = { v: i + 1 }; });
+      }
+      else if (r < (L.numRow || 0)) { row.kind = 'header'; row.sub = true; if (!L.subRow) L.subRow = r; }
+      else if (isTotal(name) || isTotal(noTxt)) row.kind = 'total';
+      else if (name && LETTER.test(name) && tkm != null && tkm > 0 && price != null && dist != null && dist > 0) {
+        row.kind = 'item'; items++;
+        row.nm = 'Транспортировка ' + name + ' ' + km(dist) + ' км';
+        row.unit = 'т/км';
+        row.cells = slim(cs, (function () { var o = {}; o[L.name] = { v: row.nm }; o[L.unit] = { v: row.unit }; return o; })());
+      } else if (name) row.kind = 'extra';
+      out.push(row);
+    }
+    // the header's own second line («тн» under «Удельный вес») sits before the numbering
+    out.forEach(function (x) { if (x.r > L.headerRow && L.numRow && x.r < L.numRow && x.kind === 'blank') { x.kind = 'header'; x.sub = true; if (!L.subRow) L.subRow = x.r; } });
+    if (!items) return null;
+    return { name: sheet.name, title: title, subtitle: subtitle || sheet.name, layout: L, rows: out, items: items, sections: 0, maxCol: L.sum };
+  }
+
+  /**
    * Every resource object on one sheet. Usually one; a form 4А export stacks
    * many local estimates on a single sheet, each with its own title block and
    * header, and each becomes an object of its own («РА · 1», «РА · 2» …) that
@@ -391,6 +474,7 @@
     if (!L || !L.code) {
       var one = L ? parseRange(sheet, L, L.headerRow || firstBodyRow(rows, L), lastContentRow(rows), null) : null;
       if (!one) one = byHeader(sheet);
+      if (!one) one = transportSheet(sheet);
       return one ? [one] : [];
     }
     var heads = headerRows(rows, L);

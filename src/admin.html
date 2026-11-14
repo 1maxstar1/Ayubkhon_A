@@ -103,6 +103,21 @@
     <div class="stat" id="dsStat"></div>
     <div class="stat" id="dsGoldStat"></div>
     <table class="tbl" id="dsTable" hidden><thead><tr><th>Что</th><th>Значение</th></tr></thead><tbody></tbody></table>
+
+    <h3>Распознавание форматов смет</h3>
+    <p class="lead">Сметы приходят в разных форматах. Сейчас их читают правила программы. Каждая смета, загруженная в заявку, оставляет здесь
+      «образец формата»: где на листе заголовок, какой столбец что значит, как идут строки — <b>без названий и без цен</b>. Когда наберётся
+      100 прочитанных файлов, на этих образцах начнёт обучаться модель, которая сможет разобрать смету незнакомого формата. Файл, который
+      программа не прочитала (или прочитала с суммами, которые не сходятся), хранится здесь целиком: скачайте его и отправьте разработчику —
+      он научит программу такому формату; после обновления нажмите «Проверить снова».</p>
+    <button class="btn" type="button" id="fmtRefresh"><span class="ic">↻</span> Обновить</button>
+    <button class="btn" type="button" id="fmtCopy" title="Скопировать эти числа текстом — в них нет ни названий, ни цен">Скопировать числа</button>
+    <button class="btn" type="button" id="fmtRecheckAll" hidden title="Прочитать сохранённые файлы ещё раз — правилами этой версии программы">Проверить все снова</button>
+    <div class="progress" id="fmtGoal" hidden><div class="bar-fill" style="width:0%"></div><span></span></div>
+    <div class="stat" id="fmtStat"></div>
+    <table class="tbl" id="fmtTable" hidden><thead><tr><th>Что</th><th>Сколько</th></tr></thead><tbody></tbody></table>
+    <h3 id="fmtListHead" hidden>Файлы, которые нужно посмотреть</h3>
+    <table class="tbl" id="fmtList" hidden><thead><tr><th>Файл</th><th>Загружен</th><th>Что с ним</th><th></th></tr></thead><tbody></tbody></table>
   </section>
 
   <section class="panel">

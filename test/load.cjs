@@ -102,6 +102,9 @@ FILE['ml-pricemodel'] = 'src/lib/ml/pricemodel.js';
 // work volumes (Сопоставительная таблица №1)
 FILE.volumes = 'src/lib/volumes.js';
 ORDER.push('volumes');
+// what a smeta file looks like, without what it says (docs/format-reja.md)
+FILE['ml-layout'] = 'src/lib/ml/layout.js';
+ORDER.push('ml-layout');
 const ML = ['ml-features', 'ml-metrics', 'ml-dataset', 'ml-pricedata', 'ml-pricemodel'];
 ORDER.push(...ML);
 

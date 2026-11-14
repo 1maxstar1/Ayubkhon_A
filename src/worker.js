@@ -6,24 +6,38 @@
 (function () {
   'use strict';
 
+  /**
+   * What the file looks like, for the page that keeps such records (docs/format-reja.md): asked for with `fmt`, and
+   * never in the way of the reading — a fault here leaves the answer without it.
+   */
+  function describe(msg, bytes, wb, objects) {
+    if (!msg.fmt || !S.ml || !S.ml.layout) return null;
+    try { return S.ml.layout.describe(bytes, wb, objects); } catch (e) { return null; }
+  }
+
   self.onmessage = function (e) {
     var msg = e.data;
     if (msg.cmd !== 'parse') return;
+    var bytes = new Uint8Array(msg.buffer), fmt;
     try {
       var t0 = Date.now();
-      var wb = S.readXlsx(new Uint8Array(msg.buffer));
+      var wb = S.readXlsx(bytes);
       // The objects go back as the parser made them. They used to be copied field by field here, and a field
       // the parser gained later (`equipTitle`) was never added to the copy: the rule that rests on it worked
       // in every test and not in the page. test/worker-parity.cjs holds the two together.
       var objects = S.smeta.parseWorkbook(wb, msg.name);
       // the works and their volumes (local resource statement of form 5), for «Объёмы работ»
       var works = S.volumes ? S.volumes.parseWorkbook(wb) : [];
-      self.postMessage({
-        ok: true, id: msg.id, name: msg.name, objects: objects, works: works,
-        sheetCount: wb.sheets.length, ms: Date.now() - t0
-      });
+      var out = { ok: true, id: msg.id, name: msg.name, objects: objects, works: works, sheetCount: wb.sheets.length };
+      fmt = describe(msg, bytes, wb, objects);
+      if (fmt) out.fmt = fmt;
+      out.ms = Date.now() - t0;
+      self.postMessage(out);
     } catch (err) {
-      self.postMessage({ ok: false, id: msg.id, name: msg.name, error: String(err && err.message || err) });
+      var bad = { ok: false, id: msg.id, name: msg.name, error: String(err && err.message || err) };
+      fmt = describe(msg, bytes, null, null);
+      if (fmt) bad.fmt = fmt;
+      self.postMessage(bad);
     }
   };
 })();

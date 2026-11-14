@@ -4,6 +4,7 @@
 //   POST /api/memory/finish     the prices of a finished application (price_memory); a second finish replaces
 //   POST /api/memory/accepted   which corrected prices the contractor took («Сравнение версий»)
 //   GET  /api/learning/stats    counts only, for the admin page
+//   GET  /api/formats/stats     counts only: the formats of the estimates gathered so far (docs/format-reja.md)
 //
 // Handlers run in isolated VMs, so the work itself lives in a module.
 routerAdd("POST", "/api/journal/events", (e) => {
@@ -20,4 +21,8 @@ routerAdd("POST", "/api/memory/accepted", (e) => {
 
 routerAdd("GET", "/api/learning/stats", (e) => {
   return require(`${__hooks}/lib/learning.js`).stats(e);
+}, $apis.requireAuth());
+
+routerAdd("GET", "/api/formats/stats", (e) => {
+  return require(`${__hooks}/lib/learning.js`).formats(e);
 }, $apis.requireAuth());

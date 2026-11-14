@@ -342,6 +342,7 @@ src/
     export.js         uslublar va tayyor kitob
     compare.js, reply.js   «Сравнение версий», «Наш ответ (Excel)»
     volumes.js        5-shakl vedomost ishlari, javobning «объем» varag'i, Сопоставительная таблица №1
+    ml/layout.js      smeta fayli «qanday ko'rinadi» — nom va narxsiz format namunasi, imzo, arifmetika, xesh
     registry-parse.js      arizalar reyestrini o'qish
     refs/             справочные цены: paket, qidiruv, taklif (faqat o'lchov bilan o'zgaradi)
     uzex.js           UZEX kotirovkalari: moslash, birlik, QQSsiz narx
@@ -350,6 +351,7 @@ src/
     grid.js           virtual jadval
     prices.js         «Проверка цен»
     volumes.js        «Объёмы работ»: hajmlar, izohlar, resurs miqdori (ekspertiza bo'yicha)
+    formats.js, formats-admin.js  har bir yuklangan smetadan format yozuvi; admin «Распознавание форматов смет»
     app.js            ulanish, xabarlar, narxlar kitobi
     sync.js           ish maydoni: saqlash, tuzatishlar, ikki vkladka, yopilgan vkladka
     hints.js, refs.js, uzex.js   takliflar: oldingi loyihalar, справочник, birja
@@ -731,6 +733,24 @@ yozib boriladi; ekran, takliflar va narxlar bundan **o'zgarmaydi**:
 
 Yozish faqat server yo'llari orqali (`server/pb_hooks/learning.pb.js`); jurnal yozilmay qolsa ish to'xtamaydi.
 Test: `node test/learning.mjs`.
+
+### Smeta formatlarini tanishni o'rganish (v2.16.0)
+
+Smetalar turli dasturlardan, turli ko'rinishda keladi. Hozir ularni **qoidalar** o'qiydi; o'qilmagan fayl
+dasturchiga yuboriladi va yangi qoida qo'shiladi. Shu bilan birga dastur o'zi o'rganishi uchun ma'lumot yig'adi
+(to'liq reja — `docs/format-reja.md`):
+
+* Arizaga loyiha sifatida yuklangan **har bir smeta** — o'qilgani ham, o'qilmagani ham — `smeta_files` ga yoziladi:
+  qaysi fayl (xesh), qanday o'qilgani (nechta varaq, nechta qator, kol-vo × narx = summa nechtasida to'g'ri) va
+  **format namunasi**: varaqdagi har bir katak bitta belgi bilan (son, matn, birlik, sarlavha so'zi) hamda qoidalar
+  o'qigan joylashuv. Namunada **nom ham, narx ham yo'q**.
+* O'qilmagan (yoki summalari mos kelmagan) fayl serverda to'liq saqlanadi.
+* Admin → «Обучение» → **«Распознавание форматов смет»**: sonlar, «До обучения модели: N из 100 файлов», va ko'rib
+  chiqiladigan fayllar ro'yxati — **«Скачать»** (dasturchiga yuborish uchun), **«Проверить снова»** (dastur
+  yangilangach yangi qoidalar bilan qayta o'qish), **«Убрать»**.
+* Bu ishga xalaqit bermaydi: yozuv fonda yuboriladi, xato bo'lsa ish davom etadi.
+* 100 ta o'qilgan fayl yig'ilgach model o'qitiladi va qoidalar o'qiy olmagan faylni tanishga urinadi — bu keyingi
+  versiyalarda; model qoidalar o'qigan faylga tegmaydi, o'qigani esa arifmetika bilan tekshiriladi.
 
 ### Lokal sinov (bir buyruq)
 

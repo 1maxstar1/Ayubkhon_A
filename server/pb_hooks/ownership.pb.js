@@ -21,11 +21,11 @@
 
 onRecordCreateRequest((e) => {
   require(`${__hooks}/lib/ownership.js`).stamp(e, "create");
-}, "workspaces", "corrections", "exports");
+}, "workspaces", "corrections", "exports", "smeta_files");
 
 onRecordUpdateRequest((e) => {
   require(`${__hooks}/lib/ownership.js`).stamp(e, "update");
-}, "workspaces", "corrections", "exports");
+}, "workspaces", "corrections", "exports", "smeta_files");
 
 // The region of a workspace is the region its price corrections are hints for: changed alone through the records
 // API, the two would part. It is changed only by the admin route, which moves both (admin.pb.js).

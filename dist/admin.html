@@ -715,6 +715,21 @@ body.compact main:not(.narrow){grid-template-columns:232px 1fr}
     <div class="stat" id="dsStat"></div>
     <div class="stat" id="dsGoldStat"></div>
     <table class="tbl" id="dsTable" hidden><thead><tr><th>Что</th><th>Значение</th></tr></thead><tbody></tbody></table>
+
+    <h3>Распознавание форматов смет</h3>
+    <p class="lead">Сметы приходят в разных форматах. Сейчас их читают правила программы. Каждая смета, загруженная в заявку, оставляет здесь
+      «образец формата»: где на листе заголовок, какой столбец что значит, как идут строки — <b>без названий и без цен</b>. Когда наберётся
+      100 прочитанных файлов, на этих образцах начнёт обучаться модель, которая сможет разобрать смету незнакомого формата. Файл, который
+      программа не прочитала (или прочитала с суммами, которые не сходятся), хранится здесь целиком: скачайте его и отправьте разработчику —
+      он научит программу такому формату; после обновления нажмите «Проверить снова».</p>
+    <button class="btn" type="button" id="fmtRefresh"><span class="ic">↻</span> Обновить</button>
+    <button class="btn" type="button" id="fmtCopy" title="Скопировать эти числа текстом — в них нет ни названий, ни цен">Скопировать числа</button>
+    <button class="btn" type="button" id="fmtRecheckAll" hidden title="Прочитать сохранённые файлы ещё раз — правилами этой версии программы">Проверить все снова</button>
+    <div class="progress" id="fmtGoal" hidden><div class="bar-fill" style="width:0%"></div><span></span></div>
+    <div class="stat" id="fmtStat"></div>
+    <table class="tbl" id="fmtTable" hidden><thead><tr><th>Что</th><th>Сколько</th></tr></thead><tbody></tbody></table>
+    <h3 id="fmtListHead" hidden>Файлы, которые нужно посмотреть</h3>
+    <table class="tbl" id="fmtList" hidden><thead><tr><th>Файл</th><th>Загружен</th><th>Что с ним</th><th></th></tr></thead><tbody></tbody></table>
   </section>
 
   <section class="panel">
@@ -1527,6 +1542,250 @@ if (typeof self !== 'undefined') self.S = S;
   S.similarity = similarity;
   S.idfOf = idfOf;
   S.bestMatches = bestMatches;
+})(S);
+
+;
+/*
+ * Which band of the estimate a resource belongs to, read from its own name.
+ *
+ * A smeta is written in bands — ЗАТРАТЫ ТРУДА, СТРОИТЕЛЬНЫЕ МАШИНЫ И
+ * МЕХАНИЗМЫ, СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ, ОБОРУДОВАНИЕ — and the
+ * parser takes each row's section from the band it sits under. That works
+ * until a sheet has no bands, or a row sits under the wrong one, and then
+ * nothing notices. Reading the name gives a second, independent opinion:
+ * «БУЛЬДОЗЕРЫ … 96 КВТ» is a machine wherever it was typed.
+ *
+ * Two kinds of evidence, in this order of force:
+ *
+ *   the unit    Машино-час is a machine and человеко-час is labour, near
+ *               enough always. Nothing else in the estimate is priced by
+ *               either, so the unit alone settles those two bands.
+ *   the words   Stems, matched against the name after it has been
+ *               transliterated into one alphabet (S.tokens), so a name typed
+ *               in Latin, in Cyrillic or in both is read the same way. Stems
+ *               are prefixes: EKSKAVATOR covers ЭКСКАВАТОР, ЭКСКАВАТОРЫ,
+ *               EKSKAVATORLAR.
+ *
+ * The answer always comes with a confidence, and «unknown» is a real answer.
+ * Nothing here rewrites what the workbook says — it only lets the program say
+ * that a row looks out of place.
+ */
+(function (S) {
+  'use strict';
+
+  /*
+   * Units that settle the matter by themselves, and settle it outright: an
+   * estimate hires a machine by the machine-hour and a worker by the man-hour,
+   * and nothing else in the book is priced in either. Keys are matchUnitKey
+   * form.
+   *
+   * They used to be worth six points and could be outvoted by the name. That
+   * is how «МАШИНЫ ДЛЯ ОЧИСТКИ И ГРУНТОВКИ ТРУБ ДИАМЕТРОМ 600-800ММ», priced
+   * in МАШ-Ч, came out a material: ГРУНТОВКА is a primer sold by the kilogram
+   * and the word appears twice over in that name. Measured on the labelled
+   * corpus, deciding by the unit is right 402 times out of 402 for МАШ-Ч and
+   * 5 of 5 for ЧЕЛ-Ч, and it removes the last mislabelled rows of both
+   * workbooks: held out, 824 right and 1 wrong became 825 and 0.
+   */
+  var BY_UNIT = {
+    CHELCH: 'labor',        // чел.-ч, ЧЕЛ-Ч, киши-соат
+    CHASCH: 'labor',
+    MASHCH: 'machines',     // маш.-ч, МАШ-Ч
+    MASHINOCH: 'machines'
+  };
+
+  /* Units that lean, without deciding: no machine is sold by the cubic metre. */
+  var UNIT_LEAN = {
+    M3: 'materials', M2: 'materials', KG: 'materials', T: 'materials',
+    M: 'materials', L: 'materials', TN: 'materials'
+  };
+
+  /*
+   * The words themselves. Weight 3 names the thing outright («ЭКСКАВАТОР»),
+   * 2 is strong but shared with a neighbour, 1 is a nudge. Every stem is a
+   * prefix of a transliterated token; the comment gives the Russian it stands
+   * for, because that is how it will be read on the sheet.
+   */
+  var LEX = {
+    labor: [
+      ['ZATRATITRUDA', 3], ['TRUDOZATRAT', 3],           // затраты труда, трудозатраты
+      ['RABOCHIXSTROITEL', 3],                            // рабочих-строителей
+      ['MEHNAT', 3], ['ISHCHI', 2],                       // uz: mehnat, ishchilar
+      ['SREDNIYRAZRYAD', 2]                               // средний разряд работ
+    ],
+    machines: [
+      ['EKSKAVATOR', 3], ['BULDOZER', 3], ['AVTOGREYDER', 3], ['GREYDER', 3],
+      ['AVTOGUDRONATOR', 3], ['AVTOPOGRUZCHIK', 3], ['POGRUZCHIK', 3],
+      ['SAMOSVAL', 3], ['AVTOMOBIL', 2], ['TRAKTOR', 3], ['TRUBOUKLADCHIK', 3],
+      ['KATOK', 3], ['KATKI', 3], ['KRAN', 3], ['AVTOKRAN', 3],
+      ['KOMPRESSOR', 3], ['VIBRATOR', 3], ['LEBEDK', 3], ['DOMKRAT', 3],
+      ['BETONOMESHALK', 3], ['BETONOUKLADCHIK', 3], ['ASFALTOUKLADCHIK', 3],
+      ['ASFALTOBETONOUKLADCHIK', 3], ['PEREDVIZHN', 2], ['SAMOXODN', 3],
+      ['PRITSEPN', 2], ['GUSENICHN', 3], ['PNEVMOKOLESN', 3],
+      ['AGREGAT', 2], ['STANOK', 2], ['STANKI', 2],
+      ['MASHIN', 2], ['MEXANIZM', 2], ['AVTOVISHK', 3], ['GIDROMOLOT', 3],
+      ['PERFORATOR', 2], ['TRAMBOVK', 2], ['DREL', 2], ['SVAROCHN', 2],
+      ['SVERLIL', 2], ['SHLIFOVAL', 2], ['GRUZOPODEMNOST', 2],
+      ['BUROV', 2], ['BURENI', 2], ['SMESITEL', 1],
+      // makes and models: a proper noun in an estimate is a machine
+      ['KOMATSU', 3], ['BOMAG', 3], ['DYNAPAC', 3], ['HAMM', 3], ['VOLVO', 3],
+      ['HITACHI', 3], ['LIEBHER', 3], ['ATLAS', 2], ['CATERPILLAR', 3], ['SHANTUI', 3]
+    ],
+    materials: [
+      ['STAL', 3], ['STALN', 3], ['ARMATUR', 3], ['ARMATURN', 3],
+      ['TRUB', 3], ['BETON', 3], ['RASTVOR', 3], ['TSEMENT', 3], ['SEMENT', 3],
+      ['SHEBEN', 3], ['PESOK', 3], ['GRUNT', 3], ['GRAVI', 3], ['SHGPS', 3],
+      ['KIRPICH', 3], ['BRUSCHATK', 3], ['PLITK', 2], ['BORDYUR', 3],
+      ['KABEL', 3], ['PROVOD', 2], ['PROVOLOK', 3], ['ELEKTROD', 3],
+      ['BOLT', 3], ['GAYK', 3], ['SHAYB', 3], ['GVOZD', 3], ['ANKER', 2],
+      ['DOSK', 3], ['BRUS', 3], ['PILOMATERIAL', 3], ['FANER', 3],
+      ['POLIETILEN', 3], ['PLASTMASS', 3], ['REZINOV', 3], ['BITUM', 3],
+      ['MASTIK', 3], ['KRASK', 3], ['EMAL', 2], ['GRUNTOVK', 2],
+      ['RASTVORITEL', 3], ['LENT', 2], ['SETK', 2], ['UGOLOK', 3],
+      ['SHVELLER', 3], ['LIST', 2], ['MUFT', 2], ['TROYNIK', 2],
+      ['UGOLNIK', 2], ['ZAGLUSHK', 2], ['FLANETS', 2], ['SEDLO', 2],
+      ['SMES', 2], ['ASFALTOBETON', 3],
+      // fuel is bought by the tonne, however much it says "automobile" on it
+      ['BENZIN', 3], ['DIZEL', 3], ['SOLYARK', 3], ['KEROSIN', 3], ['MAZUT', 3], ['MASLO', 2],
+      // fittings that carry a machine's name: a ball valve is not a crane
+      ['KRANSHAROV', 4], ['KRANSHAR', 4], ['SHAROV', 4], ['KOVER', 3],
+      ['ZADVIZHK', 3], ['VENTIL', 2], ['XOMUT', 3],
+      ['TROS', 3], ['KANAT', 3], ['SKOB', 2], ['DYUBEL', 3], ['SAMOREZ', 3],
+      ['STOYK', 2], ['OPOR', 2], ['KRONSHTEYN', 2], ['TKAN', 3], ['MESHOK', 2],
+      ['SHLIFKRUG', 3], ['KRUGOTREZ', 3], ['SHLANG', 3], ['RUKAV', 2],
+      // planting stock: a landscaping estimate buys trees by the piece
+      ['SAZHENETS', 3], ['DEREVO', 2], ['KUST', 2], ['GAZON', 3], ['SEMEN', 2],
+      ['KASHTAN', 3], ['LIPA', 3], ['DUB', 3], ['KLYON', 3], ['SIREN', 3],
+      ['CHINOR', 3], ['TERAK', 3], ['TUY', 3], ['ELKA', 3], ['SOSN', 3],
+      ['BERESKLET', 3], ['SHAMSHOD', 3], ['ROZ', 2], ['TYULPAN', 3],
+      ['KOMOM', 2], ['KLASSA', 1], ['DIAM', 1], ['TOLSH', 1],
+      ['SECH', 1], ['RAZMEROM', 1], ['DLINOY', 1], ['SHIRINOY', 1]
+    ],
+    equipment: [
+      ['DOROZHNIYZNAK', 3], ['ZNAK', 2],                  // дорожный знак
+      ['SVETOFOR', 3], ['SVETILNIK', 3], ['PROZHEKTOR', 3],
+      ['SCHETCHIK', 3], ['TRANSFORMATOR', 3], ['SHKAF', 3], ['SHITOK', 3],
+      ['YASHIK', 2], ['VIKLYUCHATEL', 3], ['RAZEDINITEL', 3],
+      ['PREDOXRANITEL', 2], ['KONTAKTOR', 3], ['RELE', 2],
+      ['URN', 2], ['SKAMEYK', 2], ['NASOS', 2], ['VENTILYATOR', 2],
+      ['KOTEL', 2], ['LIFT', 2], ['KAMER', 1], ['USKUNA', 2], ['JIHOZ', 2]
+    ]
+  };
+
+  var CLASSES = ['labor', 'machines', 'materials', 'equipment'];
+
+  /* Stems bucketed by their first three characters, so a name is read in one
+     pass over its own tokens instead of over the whole lexicon. */
+  var INDEX = null;
+  function index() {
+    if (INDEX) return INDEX;
+    INDEX = {};
+    for (var c = 0; c < CLASSES.length; c++) {
+      var cls = CLASSES[c], list = LEX[cls];
+      for (var i = 0; i < list.length; i++) {
+        var head = list[i][0].slice(0, 3);
+        (INDEX[head] = INDEX[head] || []).push([list[i][0], list[i][1], cls]);
+      }
+    }
+    return INDEX;
+  }
+
+  /**
+   * What section a resource looks like it belongs to.
+   *
+   * Returns { section, confidence, evidence } — section '' when nothing in the
+   * name or the unit says anything, confidence 0..1 as the winner's share of
+   * all the evidence found, evidence the stems and units that decided it.
+   */
+  function classify(name, unit) {
+    var score = { labor: 0, machines: 0, materials: 0, equipment: 0 };
+    var evidence = [];
+
+    var uk = S.matchUnitKey(unit || '');
+    if (uk && BY_UNIT[uk]) {
+      return { section: BY_UNIT[uk], confidence: 1, evidence: [uk] };
+    } else if (uk && UNIT_LEAN[uk]) {
+      score[UNIT_LEAN[uk]] += 1;
+      evidence.push(uk);
+    }
+
+    var idx = index();
+    var toks = S.tokens(name);
+    // A two-word signal is read as one token too: «ЗАТРАТЫ ТРУДА» is not
+    // «ЗАТРАТЫ» plus «ТРУДА», and a road sign is not any old sign.
+    var joined = toks.join('');
+    var seen = {};
+    for (var t = 0; t < toks.length; t++) {
+      var tok = toks[t];
+      var bucket = idx[tok.slice(0, 3)];
+      if (bucket) hit(bucket, tok);
+    }
+    var jb = idx[joined.slice(0, 3)];
+    if (jb) hit(jb, joined);
+
+    function hit(bucket, text) {
+      for (var i = 0; i < bucket.length; i++) {
+        var stem = bucket[i][0];
+        if (text.indexOf(stem) !== 0) continue;
+        if (seen[stem]) continue;
+        seen[stem] = 1;
+        score[bucket[i][2]] += bucket[i][1];
+        evidence.push(stem);
+      }
+    }
+
+    var best = '', bestN = 0, total = 0;
+    for (var c = 0; c < CLASSES.length; c++) {
+      var v = score[CLASSES[c]];
+      total += v;
+      if (v > bestN) { bestN = v; best = CLASSES[c]; }
+    }
+    if (!bestN) return { section: '', confidence: 0, evidence: [] };
+    return {
+      section: best,
+      confidence: Math.round((bestN / total) * 100) / 100,
+      evidence: evidence
+    };
+  }
+
+  /**
+   * Equipment and materials are one band for the purpose of an accusation.
+   * The workbooks themselves do not agree where the line runs — a street lamp
+   * is «оборудование» in one and «материалы» in the next — so a program has no
+   * business calling either of them wrong.
+   */
+  function band(section) { return section === 'equipment' ? 'materials' : section; }
+
+  /**
+   * Rows whose declared band disagrees with what their name says, worst first.
+   * `resources` are the assembled records ({name, unit, section}); only a
+   * confident disagreement is reported, because the workbook is usually right.
+   *
+   * On the three real workbooks this is right 99% of the time it speaks, and
+   * says nothing about one row in ten.
+   */
+  function disagreements(resources, min) {
+    var floor = min === undefined ? 0.75 : min;
+    var out = [];
+    for (var i = 0; i < resources.length; i++) {
+      var r = resources[i];
+      if (!r.section || r.section === 'other') continue;
+      var g = classify(r.name, r.unit);
+      if (!g.section || band(g.section) === band(r.section)) continue;
+      if (g.confidence < floor) continue;
+      out.push({ resource: r, declared: r.section, guessed: g.section, confidence: g.confidence, evidence: g.evidence });
+    }
+    out.sort(function (a, b) { return b.confidence - a.confidence; });
+    return out;
+  }
+
+  S.sections = {
+    classify: classify,
+    disagreements: disagreements,
+    band: band,
+    CLASSES: CLASSES,
+    LEX: LEX
+  };
 })(S);
 
 ;
@@ -2873,6 +3132,1320 @@ var S = (typeof S !== 'undefined' && S) || {};
   R.view = view;
   R.viewParts = { money: money, ruDate: ruDate, sourceLabel: sourceLabel, regionName: regionName, ageText: ageText,
     issuerText: issuerText, docNoText: docNoText, label: label, per: per };
+})(S);
+
+;
+/*
+ * Formula translation.
+ *
+ * Rows are copied out of the source smeta sheets into the assembled sheet at a
+ * different row and one (or four) columns to the right, and then mirrored again
+ * into the market-price columns. Excel does this transparently on paste; here we
+ * do it explicitly so the exported workbook keeps live, correct formulas instead
+ * of frozen numbers.
+ */
+(function (S) {
+  'use strict';
+
+  // A1 / $A$1 references, but not the inside of a quoted string and not a
+  // sheet-qualified name we would rather leave alone.
+  var REF = /(\$?)([A-Z]{1,3})(\$?)([0-9]{1,7})/g;
+  var STR = /"(?:[^"]|"")*"/g;
+
+  /**
+   * @param {string} f          formula text, with or without a leading "="
+   * @param {function} mapCol   1-based source column -> 1-based target column
+   * @param {number} rowDelta   added to every relative row reference
+   */
+  function translate(f, mapCol, rowDelta) {
+    if (typeof f !== 'string' || !f) return f;
+    var lead = f.charAt(0) === '=' ? '=' : '';
+    var body = lead ? f.slice(1) : f;
+
+    // Protect string literals so "A1" inside text is never rewritten.
+    var lits = [];
+    body = body.replace(STR, function (m) { lits.push(m); return '\u0001' + (lits.length - 1) + '\u0001'; });
+
+    body = body.replace(REF, function (m, d1, letters, d2, digits, off, whole) {
+      // Skip things like Sheet!A1 handled elsewhere, and function-ish tokens
+      // (LOG10 -> "G10" would otherwise match) by checking the preceding char.
+      var prev = off > 0 ? whole.charAt(off - 1) : '';
+      if (/[A-Za-z0-9_.!$]/.test(prev)) return m;
+      // LOG10( / ATAN2( are function names, not references; so is Sheet1!A1's name.
+      var next = whole.charAt(off + m.length);
+      if (next === '(' || next === '!') return m;
+      var c = S.colIndex(letters);
+      if (c > 16384) return m;
+      var nc = mapCol(c);
+      var nr = d2 ? +digits : +digits + rowDelta;
+      if (nr < 1) nr = 1;
+      return d1 + S.col(nc) + d2 + nr;
+    });
+
+    body = body.replace(/\u0001(\d+)\u0001/g, function (m, i) { return lits[+i]; });
+    return lead + body;
+  }
+
+  /**
+   * Like translate(), but rows move individually (a sort, or dropped lines)
+   * rather than by a constant offset.
+   * @param {function(number):?number} mapRow  null/undefined -> reference is dead
+   * @returns {?string} null when the formula referenced a row that no longer exists
+   */
+  function translateMap(f, mapCol, mapRow) {
+    if (typeof f !== 'string' || !f) return f;
+    var lead = f.charAt(0) === '=' ? '=' : '';
+    var body = lead ? f.slice(1) : f;
+    var lits = [];
+    body = body.replace(STR, function (m) { lits.push(m); return '\u0001' + (lits.length - 1) + '\u0001'; });
+    var dead = false;
+    body = body.replace(REF, function (m, d1, letters, d2, digits, off, whole) {
+      var prev = off > 0 ? whole.charAt(off - 1) : '';
+      if (/[A-Za-z0-9_.!$]/.test(prev)) return m;
+      // LOG10( / ATAN2( are function names, not references; so is Sheet1!A1's name.
+      var next = whole.charAt(off + m.length);
+      if (next === '(' || next === '!') return m;
+      var c = S.colIndex(letters);
+      if (c > 16384) return m;
+      var nr = mapRow(+digits);
+      if (!nr) { dead = true; return m; }
+      return d1 + S.col(mapCol(c)) + d2 + nr;
+    });
+    if (dead) return null;
+    body = body.replace(/\u0001(\d+)\u0001/g, function (m, i) { return lits[+i]; });
+    return lead + body;
+  }
+
+  /** Build a mapCol function from an explicit {sourceCol: targetCol} table. */
+  function tableMap(table, fallback) {
+    return function (c) {
+      var t = table[c];
+      return t === undefined ? (fallback ? fallback(c) : c) : t;
+    };
+  }
+
+  /*
+   * Which of an estimate's formulas may go into the document alive.
+   *
+   * A formula of the estimate is copied into the comparison table as a formula — that is the point of the
+   * table. But the estimate comes from outside and the table is signed and sent on, and a formula can do more
+   * than add: =SUM(G8:G15)+0*LEN(WEBSERVICE("http://…")) is a total that also calls an address when the
+   * document is opened, and can put any cell of the workbook into that address. So a formula is carried alive
+   * only when every function in it is one of those below — arithmetic, rounding, conditions, counting and
+   * look-ups inside the sheet: what an estimate's totals and overheads are made of. Anything else is written
+   * as the number the estimate itself shows for it, and counted, so that it is never done silently.
+   *
+   * A list of what is allowed, not of what is forbidden: a function added to Excel next year is not on it.
+   */
+  var SAFE = {};
+  ('SUM SUMIF SUMIFS SUMPRODUCT PRODUCT QUOTIENT MOD POWER SQRT ABS SIGN EXP LN LOG LOG10 PI ' +
+   'ROUND ROUNDUP ROUNDDOWN INT TRUNC CEILING FLOOR MROUND EVEN ODD CEILING.MATH FLOOR.MATH ' +
+   'MIN MAX AVERAGE MEDIAN LARGE SMALL COUNT COUNTA COUNTBLANK COUNTIF COUNTIFS SUBTOTAL ' +
+   'IF IFS IFERROR IFNA AND OR NOT XOR TRUE FALSE ISBLANK ISNUMBER ISTEXT ISERROR ISERR ISNA N VALUE ' +
+   'VLOOKUP HLOOKUP LOOKUP INDEX MATCH CHOOSE ' +
+   'CONCATENATE CONCAT LEFT RIGHT MID LEN TRIM UPPER LOWER TEXT FIXED').split(' ').forEach(function (n) { SAFE[n] = true; });
+  var CALL = /([A-Za-z_\u0400-\u04FF][A-Za-z0-9_.\u0400-\u04FF]*)\s*\(/g;
+
+  /**
+   * The functions of `f` that are not on the list (upper case, each once); an empty list means the formula may
+   * be carried alive. A link to another workbook («[1]Лист1!A1») or a DDE channel («cmd|…») counts as one too.
+   */
+  function unsafe(f) {
+    if (typeof f !== 'string' || !f) return [];
+    var body = f.replace(STR, '""'), out = {}, m;
+    CALL.lastIndex = 0;
+    while ((m = CALL.exec(body))) {
+      var name = m[1].toUpperCase().replace(/^_XLFN\.(_XLWS\.)?/, '');
+      if (!SAFE[name]) out[name] = true;
+    }
+    if (body.indexOf('[') >= 0) out['[…]'] = true;
+    if (body.indexOf('|') >= 0) out['|'] = true;
+    return Object.keys(out);
+  }
+
+  S.formula = { translate: translate, translateMap: translateMap, tableMap: tableMap, unsafe: unsafe };
+})(S);
+
+;
+/*
+ * Minimal, fast .xlsx reader.
+ *
+ * Only what this tool needs: sheet names, cell values, cached formula results
+ * and formula text. Scanner-based rather than DOM-based, because the real
+ * workbooks here run to tens of thousands of cells and DOMParser on a 20 MB
+ * sheet is exactly where the old build stalled.
+ */
+(function (S) {
+  'use strict';
+
+  function decodeText(buf) {
+    return new TextDecoder('utf-8').decode(buf);
+  }
+
+  var ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+  function unesc(s) {
+    if (s.indexOf('&') < 0) return s;
+    return s.replace(/&(#x?[0-9a-fA-F]+|[a-z]+);/g, function (m, e) {
+      if (e.charAt(0) === '#') {
+        var code = e.charAt(1) === 'x' || e.charAt(1) === 'X'
+          ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+        // past the last code point there is no character: String.fromCodePoint throws, and one such reference
+        // in one cell made the whole workbook unreadable
+        return code >= 0 && code <= 0x10FFFF ? String.fromCodePoint(code) : m;
+      }
+      return ENT[e] !== undefined ? ENT[e] : m;
+    });
+  }
+
+  /*
+   * Walking the elements of one name.
+   *
+   * These used to be regular expressions of the shape <row…>([\s\S]*?)</row>. On an opening tag that is never
+   * closed such an expression reads to the end of the text, gives up, and starts again at the next opening tag:
+   * the work grows with the square of the file. A sheet of eighty thousand unclosed <row> tags — two kilobytes
+   * zipped — kept the reader busy for a quarter of a minute, and each doubling four times as long. A file is
+   * read by whoever receives it, so that is a way to stop somebody's work with an e-mail.
+   *
+   * each() goes through the text once: the closing tag is looked for from where the opening one ended, and if
+   * there is none, nothing after it can be a whole element either, so it stops. On a well-formed sheet it finds
+   * exactly what the expressions found.
+   *
+   *   each(xml, 'row', fn)   fn(attributeText, innerText) for <row …>…</row>, fn(attributeText, undefined) for <row …/>
+   *   first(xml, 'v')        the inner text of the first <v …>…</v>, or null
+   */
+  function nameEnds(xml, at) {
+    var c = xml.charCodeAt(at);       // «<c » and «<c>» are a cell; «<col» and «<cols» are not
+    return c === 32 || c === 62 || c === 47 || c === 9 || c === 10 || c === 13;
+  }
+  function each(xml, name, fn) {
+    var open = '<' + name, close = '</' + name + '>', pos = 0;
+    for (;;) {
+      var a = xml.indexOf(open, pos);
+      if (a < 0) return;
+      var nameEnd = a + open.length;
+      if (!nameEnds(xml, nameEnd)) { pos = nameEnd; continue; }
+      var gt = xml.indexOf('>', nameEnd);
+      if (gt < 0) return;
+      if (xml.charCodeAt(gt - 1) === 47) { fn(xml.slice(nameEnd, gt - 1), undefined); pos = gt + 1; continue; }
+      var z = xml.indexOf(close, gt + 1);
+      if (z < 0) return;
+      fn(xml.slice(nameEnd, gt), xml.slice(gt + 1, z));
+      pos = z + close.length;
+    }
+  }
+  function first(xml, name) {
+    var open = '<' + name, pos = 0;
+    for (;;) {
+      var a = xml.indexOf(open, pos);
+      if (a < 0) return null;
+      var nameEnd = a + open.length;
+      if (!nameEnds(xml, nameEnd)) { pos = nameEnd; continue; }
+      var gt = xml.indexOf('>', nameEnd);
+      if (gt < 0) return null;
+      var z = xml.indexOf('</' + name + '>', gt + 1);
+      return z < 0 ? null : xml.slice(gt + 1, z);
+    }
+  }
+  /** `xml` without its <name …>…</name> elements. */
+  function without(xml, name) {
+    var open = '<' + name, close = '</' + name + '>', out = '', pos = 0;
+    for (;;) {
+      var a = xml.indexOf(open, pos);
+      if (a < 0) return out + xml.slice(pos);
+      var z = xml.indexOf(close, a);
+      if (z < 0) return out + xml.slice(pos);
+      out += xml.slice(pos, a);
+      pos = z + close.length;
+    }
+  }
+
+  /** Concatenated <t> runs of one <si>, honouring xml:space and skipping <rPh>. */
+  function siText(xml) {
+    var out = '';
+    // Phonetic hints (<rPh>) must not leak into the string.
+    var body = xml.indexOf('<rPh') < 0 ? xml : without(xml, 'rPh');
+    each(body, 't', function (attr, inner) { if (inner !== undefined) out += unesc(inner); });
+    return out;
+  }
+
+  function sharedStrings(xml) {
+    var out = [];
+    if (!xml) return out;
+    each(xml, 'si', function (attr, inner) { out.push(inner === undefined ? '' : siText(inner)); });
+    return out;
+  }
+
+  var ATTR = /([a-zA-Z:]+)="([^"]*)"/g;
+  function attrs(tag) {
+    var o = {}, m;
+    ATTR.lastIndex = 0;
+    while ((m = ATTR.exec(tag))) o[m[1]] = m[2];
+    return o;
+  }
+
+  function refCol(ref) {
+    var n = 0;
+    for (var i = 0; i < ref.length; i++) {
+      var c = ref.charCodeAt(i);
+      if (c < 65 || c > 90) break;
+      n = n * 26 + (c - 64);
+    }
+    return n;
+  }
+
+  /**
+   * Parse one worksheet.
+   * @returns {{rows: Array<Array<?{v:*,f:?string}>>, maxCol:number, cols:Array, merges:Array<string>}}
+   */
+  /* A row and column number are read straight out of the file and used as array
+     indices, so they are the one thing in a workbook that can hurt the reader
+     before anybody looks at it: «r="900000000"» costs a billion empty slots,
+     and a seven-letter column reference eight billion. These are the limits
+     Excel itself works to, so no honest file is turned away by them. */
+  var MAX_ROW = 1048576;
+  var MAX_COL = 16384;
+
+  function parseSheet(xml, sst, name) {
+    var rows = [], maxCol = 0;
+
+    var dim = /<dimension ref="([^"]*)"/.exec(xml);
+    void dim; // informational only; real bounds come from the cells we see
+
+    each(xml, 'row', function (rowAttr, inner) {
+      var ra = attrs(rowAttr);
+      var r = +ra.r;
+      if (!r || r > MAX_ROW) return;
+      if (!inner) return;
+      var cells = rows[r] || (rows[r] = []);
+      each(inner, 'c', function (cellAttr, cellBody) {
+        var ca = attrs(cellAttr);
+        var body = cellBody || '';
+        var ci = ca.r ? refCol(ca.r) : 0;
+        if (!ci || ci > MAX_COL) return;
+        if (ci > maxCol) maxCol = ci;
+
+        var f = null;
+        if (body.indexOf('<f') >= 0) {
+          var ft = first(body, 'f');
+          if (ft !== null) f = '=' + unesc(ft);
+        }
+
+        var v = null;
+        var t = ca.t;
+        if (t === 'inlineStr') {
+          v = siText(body);
+        } else {
+          var raw = first(body, 'v');
+          if (raw !== null) {
+            if (t === 's') {
+              // a name that points at a string the file does not have would come out as an empty cell — refused
+              var si = +raw;
+              if (!(si >= 0 && si < sst.length)) throw new Error(BROKEN + 'лист «' + name + '» ссылается на отсутствующую строку.');
+              v = sst[si];
+            }
+            else if (t === 'str' || t === 'e') v = unesc(raw);
+            else if (t === 'b') v = raw === '1';
+            else { v = +raw; if (!isFinite(v)) v = unesc(raw); }
+          }
+        }
+        if (v === null && f === null) return;
+        cells[ci] = f ? { v: v, f: f } : { v: v };
+      });
+    });
+
+    var cols = [];
+    var colsBlock = /<cols>([\s\S]*?)<\/cols>/.exec(xml);
+    if (colsBlock) {
+      var cre = /<col([^>]*)\/>/g, cmm;
+      while ((cmm = cre.exec(colsBlock[1]))) {
+        var a = attrs(cmm[1]);
+        cols.push({ min: +a.min, max: +a.max, width: +a.width, hidden: a.hidden === '1' });
+      }
+    }
+
+    var merges = [];
+    var mergeBlock = /<mergeCells[^>]*>([\s\S]*?)<\/mergeCells>/.exec(xml);
+    if (mergeBlock) {
+      var mre = /<mergeCell ref="([^"]*)"/g, mmm;
+      while ((mmm = mre.exec(mergeBlock[1]))) merges.push(mmm[1]);
+    }
+
+    return { rows: rows, maxCol: maxCol, cols: cols, merges: merges };
+  }
+
+  /**
+   * @param {Uint8Array} bytes  raw .xlsx
+   * @returns {{sheets: Array<{name:string, rows:Array, maxCol:number, cols:Array, merges:Array}>}}
+   */
+  /*
+   * A sheet is small in the file and can be anything unpacked: four hundred megabytes of spaces zip to four
+   * hundred kilobytes, and unpacking them took more memory than a browser tab is given. The size a part will
+   * have is written in the archive, so it is asked before anything is unpacked. An estimate's sheet is a few
+   * megabytes; these limits are far above any real one.
+   */
+  var MAX_PART_MB = 120, MAX_ALL_MB = 360;
+
+  /*
+   * A file that is damaged is refused in words, never half read. The part reader looks for tags, not for a
+   * well-formed document, so a sheet cut off in the middle used to give the rows before the cut and say nothing:
+   * an estimate with half its resources, and in server mode it was stored like that. Each part therefore has to
+   * end where its root element ends, every sheet the workbook lists has to be in the archive, and every shared
+   * string a cell points at has to exist. Chart, dialog and macro sheets are not read and are not asked for.
+   */
+  var BROKEN = 'Файл повреждён: ';
+  var AGAIN = ' Откройте его в Excel и сохраните заново.';
+  var SHEET_PART = /^xl\/worksheets\/[^/]+\.xml$/i;
+  var END = {};
+  /** Does `xml` end where its root element <root> ends (prefixed or not, closed or self-closing)? Only the tail is looked at. */
+  function ends(xml, root) {
+    var re = END[root] || (END[root] = new RegExp('(</(\\w+:)?' + root + '>|<(\\w+:)?' + root + '\\b[^<>]*/>)$'));
+    var z = xml.length;
+    while (z > 0) {
+      var c = xml.charCodeAt(z - 1);
+      if (c === 32 || c === 9 || c === 10 || c === 13 || c === 0) z--; else break;
+    }
+    return re.test(xml.slice(Math.max(0, z - 2048), z));
+  }
+
+  function read(bytes) {
+    var MB = 1024 * 1024, all = 0, tooBig = '', zipped;
+    try {
+      zipped = fflate.unzipSync(bytes, {
+        filter: function (f) {
+          var n = f.name;
+          var wanted = /^xl\/(workbook\.xml|_rels\/workbook\.xml\.rels|sharedStrings\.xml)$/i.test(n) || SHEET_PART.test(n);
+          if (!wanted || tooBig) return false;
+          all += f.originalSize || 0;
+          if (f.originalSize > MAX_PART_MB * MB || all > MAX_ALL_MB * MB) { tooBig = n; return false; }
+          return true;
+        }
+      });
+    } catch (e) {
+      // «D0 CF 11 E0» opens an OLE compound file: an Excel 97–2003 book, or an .xlsx Excel has put a password on
+      if (bytes && bytes[0] === 0xD0 && bytes[1] === 0xCF && bytes[2] === 0x11 && bytes[3] === 0xE0) {
+        throw new Error('Это книга Excel старого формата (.xls) или защищённая паролем. Откройте её в Excel и ' +
+          'сохраните как «Книга Excel (.xlsx)» без пароля.');
+      }
+      throw new Error('Файл повреждён или это не книга Excel: архив не открывается.' + AGAIN);
+    }
+    // part names inside a package are not case-sensitive
+    var files = {};
+    for (var zn in zipped) files[zn.toLowerCase()] = zipped[zn];
+    if (tooBig) {
+      throw new Error('Файл слишком велик в распакованном виде (' + tooBig.replace(/^.*\//, '') + ' — больше ' +
+        MAX_PART_MB + ' МБ, или все листы вместе больше ' + MAX_ALL_MB + ' МБ). Такую книгу программа не читает.');
+    }
+
+    var wbXml = files['xl/workbook.xml'];
+    if (!wbXml) throw new Error('Это не книга Excel: в архиве нет описания книги (xl/workbook.xml).');
+    wbXml = decodeText(wbXml);
+    if (!ends(wbXml, 'workbook')) throw new Error(BROKEN + 'описание книги обрывается на середине.' + AGAIN);
+
+    var rels = {};
+    var relRaw = files['xl/_rels/workbook.xml.rels'];
+    if (!relRaw && /<(\w+:)?sheet\b/.test(wbXml)) throw new Error(BROKEN + 'нет описания листов.' + AGAIN);
+    if (relRaw) {
+      var relXml = decodeText(relRaw);
+      var rre = /<Relationship([^>]*)\/>/g, rm2;
+      while ((rm2 = rre.exec(relXml))) {
+        var a = attrs(rm2[1]);
+        rels[a.Id] = a.Target.replace(/^\/?xl\//, '').replace(/^\.\//, '');
+      }
+    }
+
+    var sstXml = files['xl/sharedstrings.xml'] ? decodeText(files['xl/sharedstrings.xml']) : null;
+    if (sstXml !== null && !ends(sstXml, 'sst')) throw new Error(BROKEN + 'таблица строк обрывается на середине.' + AGAIN);
+    var sst = sharedStrings(sstXml);
+
+    var sheets = [];
+    var sre = /<sheet([^>]*)\/>/g, sm;
+    while ((sm = sre.exec(wbXml))) {
+      var sa = attrs(sm[1]);
+      var name = unesc(sa.name || '');
+      var target = rels[sa['r:id']] || rels[sa['id']];
+      var key = target ? 'xl/' + target : null;
+      var raw = key && files[key.toLowerCase()];
+      if (!raw) {
+        // a worksheet the workbook lists and the archive does not have; anything else (a chart sheet) is not read
+        if (key && SHEET_PART.test(key)) throw new Error(BROKEN + 'лист «' + name + '» отсутствует.' + AGAIN);
+        continue;
+      }
+      var sheetXml = decodeText(raw);
+      if (!ends(sheetXml, 'worksheet')) throw new Error(BROKEN + 'лист «' + name + '» обрывается на середине.' + AGAIN);
+      var parsed = parseSheet(sheetXml, sst, name);
+      parsed.name = name;
+      parsed.hidden = sa.state === 'hidden' || sa.state === 'veryHidden';
+      sheets.push(parsed);
+    }
+    return { sheets: sheets };
+  }
+
+  S.readXlsx = read;
+})(S);
+
+;
+/*
+ * Recognises the "resource sheet" layout used by the smeta workbooks and turns
+ * each such sheet into a list of typed rows, keeping the raw cells so the
+ * assembler can copy them (formulas included) without losing anything.
+ *
+ * Expected layout, located by its header text rather than by fixed columns:
+ *
+ *   row 1   project title
+ *   row 2   object / street title
+ *   row 4   N п/п | НАИМЕНОВАНИЕ | ЕД. ИЗМ. | КОЛ-ВО | ЦЕНА ЗА ЕД. | СУММА (сум)
+ *   row 5   1 | 2 | 3 | 4 | 5 | 6
+ *   row 6+  ЗАТРАТЫ ТРУДА / СТРОИТЕЛЬНЫЕ МАШИНЫ … sections, items, ИТОГО lines
+ *
+ * and the local resource estimate of form 4А (АВС-4), many of them stacked on
+ * one sheet, each under its own title block:
+ *
+ *   № п/п | Шифр ресурсов | Наименование | Единица измерения | Количество единиц | Сметная стоимость
+ *                                                                                | на единицу | общая
+ *   1 | 2 | 3 | 4 | 5 | 6 | 7
+ *   ТРУДОВЫЕ РЕСУРСЫ / СТРОИТЕЛЬНЫЕ МАШИНЫ … in the name column, numbered items,
+ *   «В Т.Ч. …» lines, ИТОГО lines, ИТОГО ПРЯМЫЕ ЗАТРАТЫ
+ *
+ * and the statement of required resources («ВЕДОМОСТЬ ПОТРЕБНЫХ РЕСУРСОВ»), one per object sheet:
+ *
+ *   N п/п | Шифр (обоснование) | Код АВС | Наименование ресурса | Единица измерения | Сметная потребность | Сметная стоимость, СУМ
+ *                                                                                                          | в текущем уровне
+ *                                                                                                          | единицы | всего
+ *   bands (Затраты труда, Строительные машины и механизмы, Строительные материалы…, Перевозка…) in the first
+ *   column, items numbered «1.», «2.» …, «Итого по …» in the name column
+ *
+ * and the haulage sheet («Транспортные расходы на перевозимые грузы»), one line per material:
+ *
+ *   № п/п | Наименование материалов | Единица измерения | Количество | Удельный вес | Общая тонна | … км | тн/км |
+ *   Стоимость за один тн/км | Всего
+ *   each line is the resource «Транспортировка <материал> <N> км» in т/км — as the expert's replies name it
+ */
+(function (S) {
+  'use strict';
+
+  var SECTIONS = [
+    'ЗАТРАТЫ ТРУДА',
+    'СТРОИТЕЛЬНЫЕ МАШИНЫ И МЕХАНИЗМЫ',
+    'СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ',
+    'ОБОРУДОВАНИЕ'
+  ];
+
+  function txt(cell) {
+    if (!cell) return '';
+    var v = cell.v;
+    return typeof v === 'string' ? v : (v == null ? '' : String(v));
+  }
+  function up(s) { return S.nameKey(s); }
+
+  function isTotal(t) {
+    var u = up(t);
+    return u.indexOf('ИТОГО') === 0 || u.indexOf('ВСЕГО') === 0;
+  }
+  // The four bands, as they are actually written in the wild: Russian, and
+  // Uzbek in both alphabets.
+  var LABOR = /^(ЗАТРАТЫ ТРУДА|ТРУДОЗАТРАТЫ|ТРУДОВЫЕ РЕСУРСЫ|МЕҲНАТ|MEHNAT|ISHCHILAR)/;
+  var MACH = /^((СТРОИТЕЛЬНЫЕ )?МАШИНЫ|МЕХАНИЗМЫ|(ҚУРИЛИШ )?МАШИНА|МЕХАНИЗМ|(QURILISH )?MASHINA|MEXANIZM)/;
+  var MAT = /^((СТРОИТЕЛЬНЫЕ )?МАТЕРИАЛЫ|(ҚУРИЛИШ )?МАТЕРИАЛ|(QURILISH )?MATERIAL)/;
+  var EQUIP = /^(ОБОРУДОВАНИ|УСКУНА|ЖИҲОЗ|ЖИХОЗ|USKUNA|JIHOZ|ASBOB)/;
+  // A band that names equipment anywhere in its title is an equipment band
+  // too: «ТЕХНОЛОГИЧЕСКОЕ ОБОРУДОВАНИЕ», «ИНЖЕНЕРНОЕ ОБОРУДОВАНИЕ», «… JIHOZLAR».
+  var EQUIP_WORD = /(^|\s)(ОБОРУДОВАНИЕ|ЖИҲОЗ\S*|ЖИХОЗ\S*|JIHOZ\S*)(\s|$)/;
+
+  function isSection(t) {
+    var u = up(t);
+    for (var i = 0; i < SECTIONS.length; i++) if (u === SECTIONS[i]) return true;
+    return LABOR.test(u) || MACH.test(u) || MAT.test(u) || EQUIP.test(u) || EQUIP_WORD.test(u);
+  }
+  function sectionOf(t) {
+    var u = up(t);
+    if (LABOR.test(u)) return 'labor';
+    if (MACH.test(u)) return 'machines';
+    if (MAT.test(u)) return 'materials';
+    if (EQUIP.test(u) || EQUIP_WORD.test(u)) return 'equipment';
+    return 'other';
+  }
+
+  /**
+   * A resource line needs a name, not just a number in the name column.
+   * Spelled out rather than \W, which is ASCII-only and would reject every
+   * Cyrillic name.
+   */
+  var LETTER = /[A-Za-z\u00C0-\u024F\u0400-\u04FF]/;
+  /** A band of haulage — «ПЕРЕВОЗКА», «Транспортировка…», «Доставка…» — and a name that already says it. */
+  var HAUL = /^(ПЕРЕВОЗК|ТРАНСПОРТ|ДОСТАВК|ТАШИШ|TASHISH)/;
+  /** «1.», «12.» — how the statement of required resources numbers its items. */
+  var NUMBERED = /^\s*\d+\.\s*$/;
+  /** A line priced in sums («СУМ»): a money line of the statement (5 % of the materials…), not a resource. */
+  function money(cell) { return /^СУМ$/.test(up(txt(cell))); }
+
+  /**
+   * The header row at r and the six meaningful columns, or null.
+   *
+   * Two spellings of the header are known. The resource sheets: НАИМЕНОВАНИЕ ·
+   * КОЛ-ВО · ЦЕНА · СУММА on one row. The local resource estimate of form 4А
+   * (АВС-4): «Шифр ресурсов» between № and the name, «Количество единиц», and
+   * «Сметная стоимость» split on the next row into «на единицу» and «общая».
+   *
+   * `folded` also accepts the header as the name key leaves it. The key folds the hyphen of «КОЛ-ВО» and the
+   * slash of «N п/п» to spaces, so the two tests below that spell them with their punctuation have never
+   * matched, and an ordinary resource sheet has always been read by the shape of its lines (inferLayout).
+   * That reading stays as it is — see byHeader() for when the header is asked instead.
+   */
+  function layoutAt(rows, r, folded) {
+    var cells = rows[r];
+    if (!cells) return null;
+    var L = null, noRaw = 0;
+    for (var c = 1; c < cells.length; c++) {
+      var raw = txt(cells[c]);
+      var u = up(raw);
+      if (!u) continue;
+      if (!noRaw && /^\s*№/.test(raw)) noRaw = c;
+      if (u.indexOf('НАИМЕНОВАНИЕ') >= 0) { L = L || {}; L.name = c; }
+      else if (/^N\s*П\/П$|^№/.test(u) || u === 'N П/П' || (folded && u === 'N П П')) { L = L || {}; L.no = c; }
+      else if (u.indexOf('ЕД') === 0 && u.indexOf('ИЗМ') > 0) { L = L || {}; L.unit = c; }
+      else if (u.indexOf('КОЛ-ВО') >= 0 || u.indexOf('КОЛВО') >= 0 || u.indexOf('КОЛИЧЕСТВО') === 0 ||
+               (folded && u.indexOf('КОЛ ВО') >= 0)) { L = L || {}; L.qty = c; }
+      // «Сметная потребность» (the key splits the hyphenated «потреб-ность»): the statement of required resources
+      else if (/^СМЕТНАЯ ПОТРЕБ/.test(u)) { L = L || {}; L.qty = c; L.need = true; }
+      else if (u.indexOf('ЦЕНА') >= 0) { L = L || {}; if (!L.price) L.price = c; }
+      else if (u.indexOf('СУММА') >= 0) { L = L || {}; if (!L.sum) L.sum = c; }
+      else if (u.indexOf('ШИФР') === 0) { L = L || {}; L.code = c; }
+    }
+    if (!L || !L.name || !L.qty) return null;
+    if (!L.price || !L.sum) {
+      var sub = rows[r + 1] || [];
+      for (var k = 1; k < sub.length; k++) {
+        var s = up(txt(sub[k]));
+        if (!L.price && s.indexOf('НА ЕДИНИЦУ') === 0) L.price = k;
+        else if (!L.sum && (s === 'ОБЩАЯ' || s === 'ВСЕГО')) L.sum = k;
+      }
+      L.subRow = r + 1;
+      // the statement of required resources: «в текущем уровне» first, then «единицы | всего»
+      if (L.need && (!L.price || !L.sum)) {
+        var sub2 = rows[r + 2] || [];
+        for (var k2 = 1; k2 < sub2.length; k2++) {
+          var s2 = up(txt(sub2[k2]));
+          if (!L.price && (s2 === 'ЕДИНИЦЫ' || s2.indexOf('НА ЕДИНИЦУ') === 0)) L.price = k2;
+          else if (!L.sum && (s2 === 'ВСЕГО' || s2 === 'ОБЩАЯ')) L.sum = k2;
+        }
+        L.subRow = r + 2;
+      }
+      if (!L.price || !L.sum) return null;
+    }
+    // «№ п/п» folds to «П П», so with a code column in between the number
+    // column is found by its raw «№», never guessed as the one left of the name.
+    if (L.code && !L.no) L.no = noRaw && noRaw !== L.code ? noRaw : (L.code - 1 || 1);
+    if (!L.no) L.no = L.name - 1 || 1;
+    if (!L.unit) L.unit = L.name + 1;
+    L.headerRow = r;
+    // The "1 2 3 4 5 6" row directly beneath the header, when present.
+    var nr = (L.subRow || r) + 1, nxt = rows[nr];
+    L.numRow = nxt && S.num(nxt[L.name] && nxt[L.name].v) != null ? nr : 0;
+    L.lastCol = Math.max(L.sum, L.price, L.qty, L.unit, L.name, L.no);
+    return L;
+  }
+
+  /** Locate the header row and the six meaningful columns. */
+  function findLayout(rows, folded) {
+    for (var r = 1; r < Math.min(rows.length, 40); r++) {
+      var L = layoutAt(rows, r, folded);
+      if (L) return L;
+    }
+    return null;
+  }
+
+  /** Every row of the sheet that repeats the header found first. */
+  function headerRows(rows, L) {
+    var out = [];
+    for (var r = L.headerRow; r < rows.length; r++) {
+      var M = rows[r] && layoutAt(rows, r);
+      if (M && M.name === L.name && M.qty === L.qty) out.push(r);
+    }
+    return out;
+  }
+
+  /**
+   * Some object sheets (the "ПЕРЕВОЗКА" ones) carry no header band at all — they
+   * open straight on a section title. Infer the six columns from the shape of
+   * the first item line instead.
+   */
+  function inferLayout(rows) {
+    for (var r = 1; r < Math.min(rows.length, 60); r++) {
+      var cells = rows[r];
+      if (!cells) continue;
+      for (var c = 1; c < cells.length - 4; c++) {
+        if (S.num(cells[c] && cells[c].v) == null) continue;
+        var nm = txt(cells[c + 1]), un = txt(cells[c + 2]);
+        if (nm.length < 4 || !un || un.length > 12) continue;
+        if (S.num(cells[c + 3] && cells[c + 3].v) == null) continue;
+        var priced = cells[c + 4] && (S.num(cells[c + 4].v) != null || cells[c + 4].f);
+        var summed = cells[c + 5] && (S.num(cells[c + 5].v) != null || cells[c + 5].f);
+        if (!priced || !summed) continue;
+        return {
+          no: c, name: c + 1, unit: c + 2, qty: c + 3, price: c + 4, sum: c + 5,
+          headerRow: 0, numRow: 0, lastCol: c + 5, guessed: true
+        };
+      }
+    }
+    return null;
+  }
+
+  function firstBodyRow(rows, L) {
+    for (var r = 1; r < rows.length; r++) {
+      var cells = rows[r];
+      if (!cells) continue;
+      var noTxt = txt(cells[L.no]);
+      if (noTxt && isSection(noTxt)) return r;
+      if (txt(cells[L.name]) && S.num(cells[L.qty] && cells[L.qty].v) != null) return r;
+    }
+    return 1;
+  }
+
+  function lastContentRow(rows) {
+    for (var r = rows.length - 1; r > 0; r--) {
+      var cells = rows[r];
+      if (!cells) continue;
+      for (var c = 1; c < cells.length; c++) {
+        var cell = cells[c];
+        if (cell && (cell.v != null || cell.f != null)) return r;
+      }
+    }
+    return 0;
+  }
+
+  /** The last ИТОГО / ВСЕГО line in rows a..b, or 0. */
+  function lastTotalRow(rows, L, a, b) {
+    for (var r = b; r >= a; r--) {
+      var cells = rows[r];
+      if (cells && (isTotal(txt(cells[L.name])) || isTotal(txt(cells[L.no])))) return r;
+    }
+    return 0;
+  }
+
+  /** The text after the first filled cell of a row: «Наименование объекта - | ПАССАЖИРСКИЙ ЛИФТ». */
+  function labelled(cells) {
+    var first = 0;
+    for (var c = 1; c < cells.length; c++) {
+      var t = txt(cells[c]).replace(/^\s+|\s+$/g, '');
+      if (!t) continue;
+      if (!first) { first = c; continue; }
+      return t;
+    }
+    return '';
+  }
+
+  /**
+   * The title block above one local estimate of form 4А: the construction
+   * («Наименование стройки»), the estimate number («ЛОКАЛЬНЫЙ РЕСУРСНЫЙ СМЕТНЫЙ
+   * РАСЧЕТ | № 06-05-01»), the works («на | ОБЩЕСТРОИТЕЛЬНЫЕ РАБОТЫ») and the
+   * object («Наименование объекта»).
+   */
+  function blockMeta(rows, a, b) {
+    var m = { stroika: '', number: '', work: '', object: '' };
+    for (var r = a; r <= b; r++) {
+      var cells = rows[r];
+      if (!cells) continue;
+      var head = '';
+      for (var c = 1; c < cells.length && !head; c++) head = up(txt(cells[c]));
+      if (!head) continue;
+      if (head.indexOf('НАИМЕНОВАНИЕ СТРОЙКИ') === 0) m.stroika = labelled(cells);
+      else if (head.indexOf('НАИМЕНОВАНИЕ ОБ') === 0) m.object = labelled(cells);
+      else if (head.indexOf('ЛОКАЛЬНЫЙ') === 0) m.number = labelled(cells);
+      else if (head === 'НА') m.work = labelled(cells);
+    }
+    return m;
+  }
+
+  /**
+   * @returns {?{name, title, subtitle, layout, rows: Array<Row>, maxCol:number}}
+   *   Row = {r, kind, section, no, nm, unit, qty, price, sum, cells}
+   */
+  function parseRange(sheet, L, start, last, meta) {
+    if (last <= start) return null;
+
+    var title = '', subtitle = '';
+    if (meta) {
+      title = meta.stroika;
+      var obj = meta.object && meta.object.length > 3 && meta.object !== meta.work ? meta.object : '';
+      subtitle = [meta.number, meta.work, obj].filter(function (t) { return t; }).join(' — ');
+    } else {
+      for (var r0 = 1; r0 < start; r0++) {
+        var cs = sheet.rows[r0];
+        if (!cs) continue;
+        var t = '';
+        for (var c0 = 1; c0 <= L.lastCol; c0++) { t = txt(cs[c0]); if (t) break; }
+        if (!t) continue;
+        if (!title) title = t; else if (!subtitle) subtitle = t;
+      }
+    }
+
+    var out = [], section = '', band = '', items = 0, sections = 0, wide = L.lastCol;
+    for (var r = start; r <= last; r++) {
+      var cells = sheet.rows[r] || [];
+      var nm = txt(cells[L.name]);
+      var noCell = cells[L.no];
+      var noTxt = txt(noCell);
+      var qty = S.num(cells[L.qty] && cells[L.qty].v);
+      var price = S.num(cells[L.price] && cells[L.price].v);
+      var sum = S.num(cells[L.sum] && cells[L.sum].v);
+      var kind;
+
+      if (r === L.headerRow || r === L.subRow) kind = 'header';
+      else if (r === L.numRow) kind = 'numbering';
+      else if (isTotal(noTxt) || isTotal(nm)) kind = 'total';
+      else if (noTxt && isSection(noTxt) && qty == null) { kind = 'section'; section = sectionOf(noTxt); sections++; }
+      // Form 4А writes its bands in the name column, and its resources are the
+      // numbered lines only: «В Т.Ч. ЗАТРАТЫ ТРУДА МАШИНИСТОВ» and the closing
+      // «ЗАТРАТЫ ТРУДА РАБОЧИХ» carry a quantity but are not resources.
+      else if (L.code && !noTxt && nm && qty == null && isSection(nm)) { kind = 'section'; section = sectionOf(nm); sections++; }
+      else if (L.need && nm && LETTER.test(nm) && qty != null && !money(cells[L.unit]) && (S.num(noCell && noCell.v) != null || NUMBERED.test(noTxt) || price != null)) { kind = 'item'; items++; }
+      else if (!L.need && nm && LETTER.test(nm) && qty != null && (!L.code || S.num(noCell && noCell.v) != null)) { kind = 'item'; items++; }
+      else if (nm) kind = 'extra';
+      else if (noTxt && L.need) { kind = 'section'; section = sectionOf(noTxt); }
+      else if (noTxt) kind = 'section';
+      else kind = 'blank';
+
+      if (kind === 'section') band = noTxt || nm;
+      // a line under «ПЕРЕВОЗКА» is the haulage of a material, not the material: the same name under
+      // «Строительные материалы» is another resource with another price (the owner, 2026-11-14)
+      if (kind === 'item' && HAUL.test(up(band)) && !HAUL.test(up(nm))) nm = (nm === nm.toUpperCase() ? 'ПЕРЕВОЗКА ' : 'Перевозка ') + nm;
+      for (var w = cells.length - 1; w > wide; w--) {
+        if (cells[w] && (cells[w].v != null || cells[w].f != null)) { wide = w; break; }
+      }
+
+      out.push({
+        r: r, kind: kind, section: section, sub: r === L.subRow,
+        no: S.num(noCell && noCell.v), noTxt: noTxt,
+        nm: nm, unit: txt(cells[L.unit]),
+        qty: qty, price: price, sum: sum,
+        cells: cells
+      });
+    }
+    // A sheet with a proper header row (НАИМЕНОВАНИЕ + КОЛ-ВО + ЦЕНА + СУММА)
+    // is a resource sheet, section bands or not. When the layout had to be
+    // guessed, at least one band is required — that is what keeps the summary
+    // ("свод") sheets out, since they carry no header of their own.
+    if (!items || (L.guessed && !sections)) return null;
+
+    return {
+      name: sheet.name, title: title, subtitle: subtitle || sheet.name,
+      layout: L, rows: out, items: items, sections: sections,
+      maxCol: Math.min(wide, L.sum + 8)
+    };
+  }
+
+  /**
+   * A sheet that names its own columns — N п/п · НАИМЕНОВАНИЕ · ЕД. ИЗМ. · КОЛ-ВО · ЦЕНА · СУММА — and still
+   * could not be read by the shape of its lines: its bands are written in the name column, or it has none, or
+   * a column stands between the six. Such a sheet was refused with «листы ресурсов не найдены», and the advice
+   * under that message is to add the very header it already had.
+   *
+   * The header gives the columns; the rows are then read exactly as on every other ordinary sheet (from the
+   * first line of the table, the header itself left out), so the document looks the same whichever way a
+   * sheet was recognised. A sheet the shape reading accepts never comes here: every document made so far was
+   * read that way and must come out as it did.
+   *
+   * Only an estimate's header counts: one quantity, one price, one sum. A table with «Кол-во было | Кол-во
+   * стало» or with a smeta price and a market price side by side — the program's own comparison and its own
+   * document among them — is somebody's report about an estimate, not an estimate.
+   */
+  function byHeader(sheet) {
+    var rows = sheet.rows;
+    var H = findLayout(rows, true);
+    if (!H || H.code) return null;
+    var head = rows[H.headerRow], qtys = 0, prices = 0, sums = 0;
+    for (var c = 1; c < head.length; c++) {
+      var u = up(txt(head[c]));
+      if (u.indexOf('КОЛ ВО') >= 0 || u.indexOf('КОЛИЧЕСТВО') === 0) qtys++;
+      else if (u.indexOf('ЦЕНА') >= 0) prices++;
+      else if (u.indexOf('СУММА') >= 0) sums++;
+    }
+    if (qtys !== 1 || prices !== 1 || sums !== 1) return null;
+    var first = (H.subRow || H.headerRow) + 1;
+    H.headerRow = 0; H.subRow = 0; H.numRow = 0;
+    for (var r = first; r < rows.length; r++) {
+      var cells = rows[r];
+      if (!cells) continue;
+      var noTxt = txt(cells[H.no]);
+      if ((noTxt && isSection(noTxt)) || (txt(cells[H.name]) && S.num(cells[H.qty] && cells[H.qty].v) != null)) {
+        return parseRange(sheet, H, r, lastContentRow(rows), null);
+      }
+    }
+    return null;
+  }
+
+  /**
+   * The haulage sheet: material, unit, quantity, density, tonnes, the distance in km, the т·км, the price of one т·км
+   * and the sum. Each material's line is a resource of its own — «Транспортировка <материал> <N> км», т/км, its
+   * т·км as the quantity — named the way the expert's replies name it, so that a reply's haulage price lands on it.
+   * Only a sheet no other reading took comes here (it used to be left out), and only by its header: a material
+   * name, a km column, a т·км column, a price of one т·км and a sum.
+   * The row keeps only the columns the comparison table has (№, name, unit, т·км, price, sum): the material's own
+   * quantity, density, tonnes and km stand where the table's own columns are and are not copied.
+   */
+  function transportSheet(sheet) {
+    var rows = sheet.rows, H = null, r;
+    for (r = 1; r < Math.min(rows.length, 20) && !H; r++) {
+      var cells = rows[r];
+      if (!cells) continue;
+      var h = {};
+      for (var c = 1; c < cells.length; c++) {
+        var raw = txt(cells[c]), u = up(raw);
+        if (!u && !/^\s*№/.test(raw)) continue;
+        if (/^НА?И?МЕНОВАНИЕ МАТЕРИАЛ/.test(u)) h.name = c;
+        else if (/^ЕД/.test(u) && u.indexOf('ИЗМ') > 0) h.unit = c;
+        else if (/^СТОИМОСТЬ ЗА/.test(u)) h.price = c;           // «Стоимость за один тн/км» — before the km test
+        else if (/^(ТН|Т) КМ$/.test(u)) h.tkm = c;
+        else if (/(^| )КМ$/.test(u)) h.km = c;
+        else if (u === 'ВСЕГО' || u.indexOf('СУММА') === 0) h.sum = c;
+        else if (/^\s*№/.test(raw) || /^N П П$/.test(u)) h.no = c;
+      }
+      if (h.name && h.km && h.tkm && h.price && h.sum) { H = h; H.headerRow = r; }
+    }
+    if (!H) return null;
+    var L = { no: H.no || 1, name: H.name, unit: H.unit || H.name + 1, qty: H.tkm, price: H.price, sum: H.sum,
+      headerRow: H.headerRow, subRow: 0, numRow: 0, lastCol: H.sum, transport: true };
+    var keep = [L.no, L.name, L.unit, L.qty, L.price, L.sum];
+    function slim(cells, over) {
+      var out = [];
+      keep.forEach(function (c) { if (cells && cells[c]) out[c] = cells[c]; });
+      Object.keys(over || {}).forEach(function (c) { out[c] = over[c]; });
+      return out;
+    }
+    function km(v) { return Math.round(v) === v ? String(v) : String(+v.toFixed(3)).replace('.', ','); }
+    var title = '', subtitle = '';
+    for (r = 1; r < L.headerRow; r++) {
+      var t = '';
+      for (var c0 = 1; c0 <= L.lastCol && rows[r]; c0++) { t = txt(rows[r][c0]); if (t) break; }
+      if (!t) continue;
+      if (!title) title = t; else if (!subtitle) subtitle = t;
+    }
+    var out = [], items = 0, last = lastContentRow(rows);
+    for (r = L.headerRow; r <= last; r++) {
+      var cs = rows[r] || [];
+      var name = txt(cs[L.name]).replace(/\s+/g, ' ').trim();
+      var noCell = cs[L.no], noTxt = txt(noCell);
+      var tkm = S.num(cs[L.qty] && cs[L.qty].v), price = S.num(cs[L.price] && cs[L.price].v), sum = S.num(cs[L.sum] && cs[L.sum].v);
+      var dist = S.num(cs[H.km] && cs[H.km].v);
+      var row = { r: r, kind: 'blank', section: 'other', sub: false, no: S.num(noCell && noCell.v), noTxt: noTxt, nm: name, unit: txt(cs[L.unit]),
+        qty: tkm, price: price, sum: sum, cells: slim(cs) };
+      if (r === L.headerRow) row.kind = 'header';
+      else if (!L.numRow && S.num(cs[L.name] && cs[L.name].v) != null) {
+        // the sheet numbers its own twelve columns; the table it lands in has six
+        row.kind = 'numbering'; L.numRow = r;
+        row.cells = []; keep.forEach(function (c, i) { row.cells[c] = { v: i + 1 }; });
+      }
+      else if (r < (L.numRow || 0)) { row.kind = 'header'; row.sub = true; if (!L.subRow) L.subRow = r; }
+      else if (isTotal(name) || isTotal(noTxt)) row.kind = 'total';
+      else if (name && LETTER.test(name) && tkm != null && tkm > 0 && price != null && dist != null && dist > 0) {
+        row.kind = 'item'; items++;
+        row.nm = 'Транспортировка ' + name + ' ' + km(dist) + ' км';
+        row.unit = 'т/км';
+        row.cells = slim(cs, (function () { var o = {}; o[L.name] = { v: row.nm }; o[L.unit] = { v: row.unit }; return o; })());
+      } else if (name) row.kind = 'extra';
+      out.push(row);
+    }
+    // the header's own second line («тн» under «Удельный вес») sits before the numbering
+    out.forEach(function (x) { if (x.r > L.headerRow && L.numRow && x.r < L.numRow && x.kind === 'blank') { x.kind = 'header'; x.sub = true; if (!L.subRow) L.subRow = x.r; } });
+    if (!items) return null;
+    return { name: sheet.name, title: title, subtitle: subtitle || sheet.name, layout: L, rows: out, items: items, sections: 0, maxCol: L.sum };
+  }
+
+  /**
+   * Every resource object on one sheet. Usually one; a form 4А export stacks
+   * many local estimates on a single sheet, each with its own title block and
+   * header, and each becomes an object of its own («РА · 1», «РА · 2» …) that
+   * ends at its last ИТОГО line, so the «СОСТАВИЛ» signature and the next
+   * estimate's title block stay out.
+   */
+  function parseSheetObjects(sheet) {
+    var rows = sheet.rows;
+    var L = findLayout(rows) || inferLayout(rows);
+    // Only form 4А is split: an ordinary resource sheet that repeats its header
+    // on every printed page stays one object, as it always was.
+    if (!L || !L.code) {
+      var one = L ? parseRange(sheet, L, L.headerRow || firstBodyRow(rows, L), lastContentRow(rows), null) : null;
+      if (!one) one = byHeader(sheet);
+      if (!one) one = transportSheet(sheet);
+      return one ? [one] : [];
+    }
+    var heads = headerRows(rows, L);
+    var out = [], last = lastContentRow(rows), prevEnd = 0, stroika = '';
+    for (var i = 0; i < heads.length; i++) {
+      var Li = layoutAt(rows, heads[i]);
+      var limit = i + 1 < heads.length ? heads[i + 1] - 1 : last;
+      var end = lastTotalRow(rows, Li, heads[i], limit) || limit;
+      var meta = blockMeta(rows, prevEnd + 1, heads[i] - 1);
+      if (!stroika) stroika = meta.stroika;
+      var o = parseRange(sheet, Li, heads[i], end, meta);
+      // a local estimate «на ТЕХНОЛОГИЧЕСКОЕ ОБОРУДОВАНИЕ»: every line of it counts as equipment for the report's note
+      if (o) o.equipTitle = EQUIP_WORD.test(up(meta.work)) || EQUIP.test(up(meta.work));
+      prevEnd = end;
+      if (o) out.push(o);
+    }
+    out.forEach(function (o, k) {
+      if (!o.title) o.title = stroika;
+      if (out.length > 1) o.name = sheet.name + ' · ' + (k + 1);
+      if (o.subtitle === sheet.name) o.subtitle = o.name;
+    });
+    return out;
+  }
+
+  /** The first resource object of a sheet, or null. */
+  function parseSheet(sheet) {
+    return parseSheetObjects(sheet)[0] || null;
+  }
+
+  /** Every resource object of a workbook, in file order. */
+  function parseWorkbook(wb, fileName) {
+    var objects = [];
+    for (var i = 0; i < wb.sheets.length; i++) {
+      var sh = wb.sheets[i];
+      if (sh.hidden) continue;
+      var list = parseSheetObjects(sh);
+      for (var k = 0; k < list.length; k++) {
+        list[k].file = fileName; list[k].index = i;
+        objects.push(list[k]);
+      }
+    }
+    return objects;
+  }
+
+  S.smeta = {
+    parseSheet: parseSheet, parseWorkbook: parseWorkbook,
+    SECTIONS: SECTIONS, sectionOf: sectionOf
+  };
+})(S);
+
+;
+/*
+ * What a smeta file looks like, without what it says (docs/format-reja.md) — the data the program keeps so that it
+ * can learn to read formats nobody has written a rule for.
+ *
+ * Estimates come from many programs and in many layouts. The rules (src/lib/smeta.js) read the ones they know; a
+ * file they refuse is answered with a new rule. Every file uploaded as a project leaves a *sample* of its layout,
+ * and for a file the rules read, the sample carries the answer — where the header stands, which column is which,
+ * what kind of line each row is. Enough such samples train a model that proposes a layout for a file the rules
+ * cannot read.
+ *
+ * A sample holds no name and no price. A cell is one character — what kind of thing stands there:
+ *
+ *   .        empty                             0…9  a whole number, by its number of digits − 1 (capped at 9)
+ *   a…j      a number with a fraction (by the digits of its whole part)
+ *   A…J      a whole number, by a formula      K…T  a number with a fraction, by a formula
+ *   x  y     text with letters: short, long (over 24 characters)       z  text without letters («1.1», «-»)
+ *   w        a formula that gives no number    u    a unit of measure («м3», «100 шт», «маш.-ч»)
+ *   words a header is made of:
+ *   #  №, N п/п      @  наименование     %  ед. изм.      *  кол-во, количество     $  цена, на единицу
+ *   +  сумма, всего, общая, стоимость    &  шифр, код     =  итого …, всего по …     !  раздел …
+ *   ^  a band («трудовые ресурсы», «машины и механизмы», «материалы», «оборудование»)
+ *   ~  примечание    :  сум
+ *
+ *   S.ml.layout.code(cell)                 → that character
+ *   S.ml.layout.grid(sheet)                → [row string…] — rows 1…600, columns 1…30, trailing empties cut
+ *   S.ml.layout.relations(sheet)           → { rel: [[a, b, c, n]…], rows } — the column triples with a × b = c, how
+ *                                            many rows hold each (the six most frequent), and per row which of them
+ *   S.ml.layout.sample(wb, objects)        → { v, total, sheets: [{ i, rows, cols, g, rel, rr, k, b }] }
+ *                                            k: per row, what the rules read it as (i item · s section · t total ·
+ *                                            h header · n numbering · e extra · b blank · . outside); b: the blocks
+ *                                            [{ from, to, L: { no, name, unit, qty, price, sum, code, headerRow, … } }]
+ *   S.ml.layout.signature(sample)          → 16 hex: files of one format share it (headers and column places)
+ *   S.ml.layout.check(objects)             → { items, rows, ok, score, totals, totalsOk } — quantity × price = sum
+ *   S.ml.layout.sha256(bytes)              → hex — which file this is (crypto.subtle is absent on plain-http pages)
+ *   S.ml.layout.describe(bytes, wb, objects) → { v, hash, size, read, objects, items, checked, score, signature, sample }
+ *                                            checked: the lines that have all three numbers; score: of them, agreeing
+ *
+ * Changing what a sample holds raises VERSION: the samples kept so far are then made again from their files.
+ * Pure — no page, no server, no clock.
+ */
+var S = (typeof S !== 'undefined' && S) || {};
+(function (S) {
+  'use strict';
+  var ML = S.ml = S.ml || {};
+
+  var VERSION = 1;
+  var MAX_SHEETS = 12, MAX_ROWS = 600, MAX_COLS = 30, MAX_NUMS = 10, TOP_REL = 6;
+  var LETTER = /[A-Za-zЀ-ӿ]/;
+
+  /* ------------------------------------------------------------------ a cell */
+  // units by their matching key (S.matchUnitKey: «ТН» and «Т» are one, «компл.» is «KT»), the number in front left out
+  var UNITS = {};
+  ('T KG G GR TS M M2 M3 KM SM MM DM L ML SHT KT CHELCH MASHCH CHELCHAS MASHCHAS CHELDN MASHSM TKM TNKM GA PARA UPAK RULON ' +
+    'LIST MESTO BALLON KVT KVTCH CHAS CH SUTKI MES SMENA EKZ BUHTA PACH BANKA FLAKON YASHIK MESHOK UZEL TOCHKA SEKTSIYA ' +
+    'ELEMENT OPORA SKVAZHINA PROLET STYK PRIBOR USTROISTVO SOEDINENIE KONTSEVAYA GOLOVKA').split(' ').forEach(function (u) { UNITS[u] = 1; });
+
+  function tail(key) { return String(key || '').replace(/^\d+/, ''); }
+  function isUnit(t) {
+    if (t.length > 24 || !S.matchUnitKey) return false;
+    if (UNITS[tail(S.matchUnitKey(t))]) return true;
+    // «1000 М3 ГРУНТА», «100М2 ПЛОЩАДИ»: the unit and what it is of
+    var words = S.nameKey(t).split(' ').filter(function (w) { return w && !/^\d+$/.test(w); });
+    return words.length > 1 && words.length <= 3 && !!UNITS[tail(S.matchUnitKey(words[0]))];
+  }
+
+  /** A word a header (or a total, a section) is made of → its character, or ''. */
+  function headCode(t) {
+    if (t.length > 120) return '';
+    var u = S.nameKey(t);
+    if (!u) return /^\s*№/.test(t) ? '#' : '';
+    if (/^\s*№/.test(t) || /^N( П П)?$/.test(u) || u === 'П П') return '#';
+    if (u.indexOf('НАИМЕНОВАНИЕ') === 0) return '@';
+    if ((/^ЕД/.test(u) && u.indexOf('ИЗМ') > 0)) return '%';
+    if (u.indexOf('КОЛ ВО') === 0 || u.indexOf('КОЛВО') === 0 || u.indexOf('КОЛИЧЕСТВО') === 0 || /^СМЕТНАЯ ПОТРЕБ/.test(u)) return '*';
+    if (u.indexOf('ЦЕНА') === 0 || u.indexOf('НА ЕДИНИЦУ') === 0 || u === 'ЕДИНИЦЫ' || u.indexOf('СТОИМОСТЬ ЗА') === 0 ||
+        u.indexOf('СМЕТНАЯ ЦЕНА') === 0) return '$';
+    if (u.indexOf('СУММА') === 0 || u === 'ВСЕГО' || u === 'ОБЩАЯ' || u.indexOf('ОБЩАЯ СТОИМОСТЬ') === 0 ||
+        u.indexOf('СМЕТНАЯ СТОИМОСТЬ') === 0 || u === 'СТОИМОСТЬ') return '+';
+    if (u.indexOf('ШИФР') === 0 || /^КОД( |$)/.test(u) || u.indexOf('ОБОСНОВАНИЕ') === 0) return '&';
+    if (/^(ИТОГО|ВСЕГО)( |$)/.test(u)) return '=';
+    if (/^РАЗДЕЛ( |$)/.test(u)) return '!';
+    if (u.indexOf('ПРИМЕЧАНИЕ') === 0) return '~';
+    if (u === 'СУМ') return ':';
+    if (t.length <= 70 && S.smeta && S.smeta.sectionOf && S.smeta.sectionOf(t) !== 'other') return '^';
+    return '';
+  }
+
+  function numCode(v, formula) {
+    var a = Math.floor(Math.abs(v));
+    var b = a < 1 ? 0 : Math.min(9, Math.floor(Math.log(a) / Math.LN10 + 1e-9));
+    var whole = Math.abs(v - Math.round(v)) < 1e-9;
+    return String.fromCharCode((formula ? (whole ? 65 : 75) : (whole ? 48 : 97)) + b);
+  }
+
+  function numOf(cell) {
+    if (!cell || cell.v == null || cell.v === '') return null;
+    if (typeof cell.v === 'number') return isFinite(cell.v) ? cell.v : null;
+    if (typeof cell.v !== 'string') return null;
+    var t = cell.v.trim();
+    if (!t || LETTER.test(t)) return null;
+    return S.num(t);
+  }
+
+  function code(cell) {
+    if (!cell) return '.';
+    var v = cell.v, f = cell.f != null && cell.f !== '';
+    if (v == null || v === '') return f ? 'w' : '.';
+    if (typeof v === 'number') return isFinite(v) ? numCode(v, f) : 'z';
+    if (typeof v !== 'string') return 'z';
+    var t = v.trim();
+    if (!t) return f ? 'w' : '.';
+    if (!LETTER.test(t)) {
+      if (/^\s*№/.test(t)) return '#';
+      var n = S.num(t);
+      return n != null ? numCode(n, f) : 'z';
+    }
+    return headCode(t) || (isUnit(t) ? 'u' : (t.length > 24 ? 'y' : 'x'));
+  }
+
+  /* ------------------------------------------------------------------ a sheet */
+  function grid(sheet) {
+    var rows = sheet.rows || [], out = [], last = Math.min(rows.length - 1, MAX_ROWS);
+    for (var r = 1; r <= last; r++) {
+      var cells = rows[r] || [], s = '', n = Math.min(cells.length - 1, MAX_COLS);
+      for (var c = 1; c <= n; c++) s += code(cells[c]);
+      out.push(s.replace(/\.+$/, ''));
+    }
+    while (out.length && !out[out.length - 1]) out.pop();
+    return out;
+  }
+
+  function about(a, b) { return Math.abs(a - b) <= Math.max(0.51, Math.abs(b) * 0.001); }
+
+  /** Which columns multiply into which: the trace quantity × price = sum leaves, whatever the columns are called. */
+  function relations(sheet) {
+    var rows = sheet.rows || [], last = Math.min(rows.length - 1, MAX_ROWS), count = {}, per = [];
+    for (var r = 1; r <= last; r++) {
+      var cells = rows[r] || [], nums = [], n = Math.min(cells.length - 1, MAX_COLS), found = [];
+      for (var c = 1; c <= n && nums.length < MAX_NUMS; c++) {
+        var v = numOf(cells[c]);
+        if (v != null && v !== 0) nums.push([c, v]);
+      }
+      for (var i = 0; i < nums.length; i++) {
+        for (var j = i + 1; j < nums.length; j++) {
+          var p = nums[i][1] * nums[j][1];
+          for (var k = 0; k < nums.length; k++) {
+            if (k === i || k === j || !about(p, nums[k][1])) continue;
+            var key = nums[i][0] + ',' + nums[j][0] + ',' + nums[k][0];
+            count[key] = (count[key] || 0) + 1;
+            found.push(key);
+          }
+        }
+      }
+      per.push(found);
+    }
+    var top = Object.keys(count).sort(function (a, b) { return count[b] - count[a] || (a < b ? -1 : 1); }).slice(0, TOP_REL);
+    var place = {};
+    top.forEach(function (k, i) { place[k] = i; });
+    var mask = per.map(function (found) {
+      var best = -1;
+      found.forEach(function (k) { if (place[k] != null && (best < 0 || place[k] < best)) best = place[k]; });
+      return best < 0 ? '.' : String(best);
+    }).join('').replace(/\.+$/, '');
+    return { rel: top.map(function (k) { return k.split(',').map(Number).concat(count[k]); }), rows: mask };
+  }
+
+  var KIND = { item: 'i', section: 's', total: 't', header: 'h', numbering: 'n', extra: 'e', blank: 'b' };
+  var ROLES = ['no', 'name', 'unit', 'qty', 'price', 'sum', 'code', 'headerRow', 'subRow', 'numRow'];
+  var FLAGS = ['need', 'transport', 'guessed'];
+
+  /** What the rules read on one sheet: the blocks with their layout, and the kind of every row. */
+  function labels(objs, height) {
+    var kinds = [], blocks = [];
+    for (var r = 0; r < height; r++) kinds.push('.');
+    objs.forEach(function (o) {
+      var L = o.layout || {}, slim = {}, from = 0, to = 0;
+      ROLES.forEach(function (k) { if (L[k]) slim[k] = L[k]; });
+      FLAGS.forEach(function (k) { if (L[k]) slim[k] = 1; });
+      (o.rows || []).forEach(function (row) {
+        if (!from || row.r < from) from = row.r;
+        if (row.r > to) to = row.r;
+        if (row.r >= 1 && row.r <= height) kinds[row.r - 1] = KIND[row.kind] || 'e';
+      });
+      blocks.push({ from: from, to: to, L: slim });
+    });
+    return { k: kinds.join('').replace(/\.+$/, ''), b: blocks };
+  }
+
+  /** The sample of a workbook: its visible sheets (those the rules read first), each as characters. */
+  function sample(wb, objects) {
+    var sheets = (wb && wb.sheets) || [], byIndex = {}, order = [], visible = 0;
+    (objects || []).forEach(function (o) { (byIndex[o.index] = byIndex[o.index] || []).push(o); });
+    sheets.forEach(function (sh, i) { if (!sh.hidden) { visible++; if (byIndex[i]) order.push(i); } });
+    sheets.forEach(function (sh, i) { if (!sh.hidden && !byIndex[i]) order.push(i); });
+    var out = order.slice(0, MAX_SHEETS).map(function (i) {
+      var sh = sheets[i], g = grid(sh), rel = relations(sh);
+      var one = { i: i, rows: Math.max(0, (sh.rows || []).length - 1), cols: sh.maxCol || 0, g: g, rel: rel.rel, rr: rel.rows };
+      if (byIndex[i]) { var lab = labels(byIndex[i], g.length); one.k = lab.k; one.b = lab.b; }
+      return one;
+    });
+    return { v: VERSION, total: visible, sheets: out };
+  }
+
+  /* ------------------------------------------------------------------ which format */
+  function fnv(str, seed) {
+    var h = seed >>> 0;
+    for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    return ('0000000' + h.toString(16)).slice(-8);
+  }
+
+  var HEADISH = /[#@%*$+&]/g;
+
+  /**
+   * Files of one format share a signature: for a sheet the rules read — its header rows as characters and the places
+   * of its columns; for one they did not — the first row that looks like a header. Counts of sheets and rows do not
+   * enter it: ten streets in one file and one street in another are the same format.
+   */
+  function signature(smp) {
+    var parts = {};
+    ((smp && smp.sheets) || []).forEach(function (sh) {
+      if (sh.b && sh.b.length) {
+        sh.b.forEach(function (b) {
+          var L = b.L || {};
+          var cols = ['no', 'name', 'unit', 'qty', 'price', 'sum', 'code'].map(function (k) { return L[k] || 0; }).join('.');
+          var head = (L.headerRow ? sh.g[L.headerRow - 1] || '' : '') + '/' + (L.subRow ? sh.g[L.subRow - 1] || '' : '');
+          parts['R' + FLAGS.map(function (k) { return L[k] ? 1 : 0; }).join('') + '|' + cols + '|' + head] = 1;
+        });
+        return;
+      }
+      for (var r = 0; r < Math.min(sh.g.length, 40); r++) {
+        var m = sh.g[r].match(HEADISH);
+        if (m && m.length >= 3) { parts['U|' + sh.g[r]] = 1; return; }
+      }
+    });
+    var keys = Object.keys(parts).sort();
+    // only what the rules read tells the format of a read file: the other sheets of the workbook vary freely
+    var read = keys.filter(function (k) { return k.charAt(0) === 'R'; });
+    var s = (read.length ? read : keys).join(';') || 'none';
+    return fnv(s, 2166136261) + fnv(s, 3339675911);
+  }
+
+  /* ------------------------------------------------------------------ does the reading add up */
+  function check(objects) {
+    var out = { items: 0, rows: 0, ok: 0, score: null, totals: 0, totalsOk: 0 };
+    (objects || []).forEach(function (o) {
+      var band = 0, all = 0;
+      (o.rows || []).forEach(function (r) {
+        if (r.kind === 'section') { band = 0; return; }
+        if (r.kind === 'item') {
+          out.items++;
+          var line = r.sum != null ? r.sum : (r.qty != null && r.price != null ? r.qty * r.price : 0);
+          band += line; all += line;
+          if (r.qty == null || r.price == null || r.sum == null) return;
+          out.rows++;
+          if (about(r.qty * r.price, r.sum)) out.ok++;
+          return;
+        }
+        // a total that directly closes its band, or the object so far: counted apart, it does not enter the score
+        if (r.kind === 'total' && r.sum != null && /^\s*ИТОГО/i.test(r.nm || '')) {
+          out.totals++;
+          if (about(band, r.sum) || about(all, r.sum)) out.totalsOk++;
+        }
+      });
+    });
+    if (out.rows) out.score = Math.round(out.ok / out.rows * 1e4) / 1e4;
+    return out;
+  }
+
+  /* ------------------------------------------------------------------ which file */
+  var K = [];
+  (function () {
+    var n = 2, i = 0;
+    while (i < 64) {
+      var prime = true;
+      for (var d = 2; d * d <= n; d++) if (n % d === 0) { prime = false; break; }
+      if (prime) { var c = Math.pow(n, 1 / 3); K[i++] = ((c - Math.floor(c)) * 4294967296) >>> 0; }
+      n++;
+    }
+  })();
+
+  function sha256(bytes) {
+    var H = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+    var len = bytes.length, total = ((len + 9 + 63) >> 6) << 6, w = new Int32Array(64), block = new Uint8Array(64);
+    for (var off = 0; off < total; off += 64) {
+      for (var q = 0; q < 64; q++) {
+        var at = off + q;
+        block[q] = at < len ? bytes[at] : at === len ? 0x80 : 0;
+      }
+      if (off + 64 === total) {
+        var hi = Math.floor(len / 536870912), lo = (len << 3) >>> 0;
+        block[56] = hi >>> 24; block[57] = hi >>> 16; block[58] = hi >>> 8; block[59] = hi;
+        block[60] = lo >>> 24; block[61] = lo >>> 16; block[62] = lo >>> 8; block[63] = lo;
+      }
+      for (var t = 0; t < 16; t++) w[t] = (block[t * 4] << 24) | (block[t * 4 + 1] << 16) | (block[t * 4 + 2] << 8) | block[t * 4 + 3];
+      for (t = 16; t < 64; t++) {
+        var x = w[t - 15], y = w[t - 2];
+        var s0 = ((x >>> 7) | (x << 25)) ^ ((x >>> 18) | (x << 14)) ^ (x >>> 3);
+        var s1 = ((y >>> 17) | (y << 15)) ^ ((y >>> 19) | (y << 13)) ^ (y >>> 10);
+        w[t] = (w[t - 16] + s0 + w[t - 7] + s1) | 0;
+      }
+      var a = H[0], b = H[1], c = H[2], d = H[3], e = H[4], f = H[5], g = H[6], h = H[7];
+      for (t = 0; t < 64; t++) {
+        var S1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7));
+        var t1 = (h + S1 + ((e & f) ^ (~e & g)) + K[t] + w[t]) | 0;
+        var S0 = ((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10));
+        var t2 = (S0 + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+        h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+      }
+      H[0] = (H[0] + a) | 0; H[1] = (H[1] + b) | 0; H[2] = (H[2] + c) | 0; H[3] = (H[3] + d) | 0;
+      H[4] = (H[4] + e) | 0; H[5] = (H[5] + f) | 0; H[6] = (H[6] + g) | 0; H[7] = (H[7] + h) | 0;
+    }
+    return H.map(function (v) { return ('0000000' + (v >>> 0).toString(16)).slice(-8); }).join('');
+  }
+
+  /** Everything kept about one file: which file, how it was read, and its sample. `wb` null: it could not be opened. */
+  function describe(bytes, wb, objects) {
+    var objs = objects || [], out = { v: VERSION, hash: sha256(bytes), size: bytes.length, read: objs.length > 0,
+      objects: objs.length, items: 0, checked: 0, score: null, signature: '', sample: null };
+    if (!wb) return out;
+    var ck = check(objs);
+    out.items = ck.items; out.checked = ck.rows; out.score = ck.score;
+    out.sample = sample(wb, objs);
+    out.signature = signature(out.sample);
+    return out;
+  }
+
+  ML.layout = { VERSION: VERSION, MAX_SHEETS: MAX_SHEETS, MAX_ROWS: MAX_ROWS, MAX_COLS: MAX_COLS,
+    code: code, grid: grid, relations: relations, sample: sample, signature: signature, check: check, sha256: sha256, describe: describe };
 })(S);
 
 ;
@@ -4599,6 +6172,225 @@ var S = (typeof S !== 'undefined' && S) || {};
   S.DatasetAdmin = D;
   document.addEventListener('DOMContentLoaded', function () { D.init(); });
   if (document.readyState !== 'loading') D.init();
+})(S);
+
+;
+/*
+ * Admin page: «Распознавание форматов смет» (docs/format-reja.md) — what has been gathered about the formats of the
+ * estimates, as counts; how far the first training is; and the files to look at: those the program did not read, or
+ * read with sums that do not agree. Such a file is kept whole: «Скачать» hands it over to be sent to whoever
+ * maintains the program, «Проверить снова» reads it again with the rules of this version, «Убрать» takes it off the
+ * list (an unread file — with its record; a read one — only the file, its sample stays to learn from).
+ */
+(function (S) {
+  'use strict';
+  if (!S.pb) return;
+  function $(id) { return document.getElementById(id); }
+
+  var DOUBT = 0.9, LIST_MAX = 200;
+  function when(d) { var x = new Date(String(d || '').replace(' ', 'T')); return isNaN(x) ? '' : x.toLocaleDateString('ru-RU'); }
+  function version() { var v = document.querySelector('.ver'); return v ? String(v.textContent || '').trim().slice(0, 20) : ''; }
+  function doubt(r) { return r.is_read && r.checked > 0 && r.score < DOUBT; }
+
+  var A = {
+    data: null, list: [], busy: false,
+
+    rows: function (d) {
+      return [
+        ['Смет, формат которых записан', d.files, 'files'],
+        ['— прочитаны правилами программы', d.read, 'read'],
+        ['— — из них: суммы сходятся не во всех строках (кол-во × цена ≠ сумма)', d.doubt, 'doubt'],
+        ['— не прочитаны', d.unread, 'unread'],
+        ['Разных форматов среди прочитанных', d.formats, 'formats'],
+        ['Разных форматов среди непрочитанных', d.formats_unread, 'formats_unread'],
+        ['Строк ресурсов в прочитанных сметах', d.lines, 'lines'],
+        ['Файлов хранится целиком (чтобы отправить разработчику)', d.kept, 'kept']
+      ];
+    },
+
+    /** What is wrong with a kept file, in words. */
+    state: function (r) {
+      if (!r.is_read) {
+        var why = r.reason === 'no-sheets' || !r.reason ? 'листы ресурсов не найдены' : String(r.reason).replace(/^error:\s*/, '');
+        return '<b>Не прочитан</b>: ' + S.esc(why);
+      }
+      if (doubt(r)) return 'Прочитан, но кол-во × цена = сумма только в ' + Math.round(r.score * 100) + ' % строк (' + r.checked + ' проверено)';
+      return 'Теперь читается (строк ресурсов: ' + (r.items || 0) + '). Загрузите его в заявку ещё раз.';
+    },
+
+    /** The table of counts and how far the first training is. */
+    counts: function (d) {
+      this.data = d;
+      $('fmtTable').hidden = false;
+      $('fmtTable').querySelector('tbody').innerHTML = this.rows(d).map(function (r) {
+        return '<tr data-k="' + r[2] + '"><td>' + S.esc(r[0]) + '</td><td class="num">' + (r[1] || 0) + '</td></tr>';
+      }).join('');
+      var goal = $('fmtGoal'), n = d.read || 0, t = d.target || 100;
+      goal.hidden = false;
+      goal.querySelector('.bar-fill').style.width = Math.min(100, Math.round(n / t * 100)) + '%';
+      goal.querySelector('span').textContent = n < t
+        ? 'До обучения модели: ' + n + ' из ' + t + ' файлов'
+        : 'Файлов для обучения достаточно: ' + n + ' из ' + t + '. Обучение модели появится с обновлением программы.';
+    },
+
+    /** The counts and the list, from the server. `said`: what to leave in the status line afterwards. */
+    load: function (said) {
+      var self = this;
+      if (!$('fmtTable') || !S.isAdmin()) return Promise.resolve();
+      return S.pb.send('/api/formats/stats', { method: 'GET', requestKey: null }).then(function (d) {
+        $('fmtStat').textContent = d.missing ? 'Сервер ещё не обновлён полностью — раздел заработает после обновления.' : '';
+        self.counts(d);
+        return self.loadList();
+      }).then(function () {
+        if (said) $('fmtStat').textContent = said;
+      }).catch(function (e) {
+        // a server from before this section: said, not an error to act on
+        $('fmtStat').textContent = e && e.status === 404 ? 'Сервер ещё не обновлён — раздел появится после обновления.' : S.pbErr(e);
+      });
+    },
+
+    loadList: function () {
+      var self = this;
+      return S.pb.collection('smeta_files').getList(1, LIST_MAX, {
+        filter: 'is_read = false || file != ""', sort: '-created', requestKey: null,
+        fields: 'id,collectionId,collectionName,hash,name,size,created,is_read,reason,score,checked,items,file'
+      }).then(function (res) {
+        self.list = res.items || [];
+        self.renderList(res.totalItems || 0);
+      }).catch(function () { self.list = []; self.renderList(0); });
+    },
+
+    renderList: function (total) {
+      var list = this.list, has = list.length > 0;
+      $('fmtListHead').hidden = !has;
+      $('fmtList').hidden = !has;
+      $('fmtRecheckAll').hidden = !list.some(function (r) { return r.file; });
+      $('fmtListHead').textContent = 'Файлы, которые нужно посмотреть' + (total > list.length ? ' (первые ' + list.length + ' из ' + total + ')' : '');
+      $('fmtList').querySelector('tbody').innerHTML = list.map(function (r) {
+        return '<tr data-id="' + S.esc(r.id) + '"><td>' + S.esc(r.name || '(без имени)') + '</td><td>' + when(r.created) + '</td>' +
+          '<td class="st">' + A.state(r) + '</td><td class="act">' +
+          (r.file ? '<button class="btn sm" data-act="get" title="Скачать файл, чтобы отправить его разработчику">Скачать</button>' +
+            '<button class="btn sm" data-act="again" title="Прочитать файл ещё раз — правилами этой версии программы">Проверить снова</button>' : '') +
+          '<button class="btn sm" data-act="drop" title="' + (r.is_read ? 'Убрать сохранённый файл; образец формата остаётся' : 'Убрать файл и запись о нём') + '">Убрать</button>' +
+          '</td></tr>';
+      }).join('');
+    },
+
+    rec: function (id) { return this.list.filter(function (r) { return r.id === id; })[0] || null; },
+
+    bytes: function (r) {
+      return S.fileURL(r, r.file).then(function (url) { return fetch(url); }).then(function (res) {
+        if (!res.ok) throw new Error('файл не получен с сервера (' + res.status + ')');
+        return res.arrayBuffer();
+      }).then(function (buf) { return new Uint8Array(buf); });
+    },
+
+    /** The file under the name it was uploaded with (the server keeps it under a name of its own). */
+    download: function (r) {
+      return this.bytes(r).then(function (bytes) {
+        var url = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = r.name || r.file;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 60 * 1000);
+      });
+    },
+
+    /** Read a kept file with the rules of this version; a file that reads now gets its sample and its counts. → text */
+    again: function (r) {
+      var self = this;
+      if (!S.smeta || !S.readXlsx || !S.ml || !S.ml.layout) return Promise.reject(new Error('эта страница не умеет читать сметы — обновите программу'));
+      return this.bytes(r).then(function (bytes) {
+        var wb = null, objects = [], err = '';
+        try { wb = S.readXlsx(bytes); objects = S.smeta.parseWorkbook(wb, r.name || 'smeta.xlsx'); }
+        catch (e) { err = String(e && e.message || e).slice(0, 200); }
+        var fmt = S.ml.layout.describe(bytes, err ? null : wb, objects);
+        var read = objects.length > 0;
+        if (!read && !r.is_read) return 'по-прежнему не читается' + (err ? ': ' + err : '');
+        var body = { is_read: read, reason: read ? '' : (err ? 'error: ' + err : 'no-sheets'), objects: fmt.objects, items: fmt.items, checked: fmt.checked,
+          score: fmt.score == null ? 0 : fmt.score, signature: fmt.signature, version: fmt.v, app_version: version() };
+        if (fmt.sample) body.sample = fmt.sample;
+        return S.pb.collection('smeta_files').update(r.id, body, { requestKey: null }).then(function (saved) {
+          Object.assign(r, { is_read: saved.is_read, reason: saved.reason, score: saved.score, checked: saved.checked, items: saved.items });
+          return read ? (doubt(r) ? 'прочитан, суммы сходятся не везде' : 'теперь читается') : 'по-прежнему не читается';
+        });
+      });
+    },
+
+    drop: function (r) {
+      var col = S.pb.collection('smeta_files');
+      return r.is_read ? col.update(r.id, { file: null }, { requestKey: null }) : col.delete(r.id, { requestKey: null });
+    },
+
+    againAll: function () {
+      var self = this, todo = this.list.filter(function (r) { return r.file; }), i = 0, now = 0;
+      if (this.busy || !todo.length) return;
+      this.busy = true;
+      var step = function () {
+        if (i >= todo.length) {
+          self.busy = false;
+          self.load('Проверено файлов: ' + todo.length + ' · теперь читаются: ' + now + '.');
+          return;
+        }
+        var r = todo[i++], was = r.is_read;
+        $('fmtStat').textContent = 'Проверка ' + i + ' из ' + todo.length + ': ' + (r.name || '') + '…';
+        self.again(r).then(function () { if (!was && r.is_read) now++; }, function () { /* said per file when asked one by one */ })
+          .then(function () { setTimeout(step, 30); });      // the page stays alive between files
+      };
+      step();
+    },
+
+    text: function () {
+      if (!this.data) return '';
+      return this.rows(this.data).map(function (r) { return 'formats.' + r[2] + ' = ' + (r[1] || 0); }).join('\n');
+    },
+
+    init: function () {
+      var self = this;
+      if (this.inited || !$('fmtTable')) return;
+      this.inited = true;
+      $('fmtRefresh').addEventListener('click', function () { self.load(); });
+      $('fmtRecheckAll').addEventListener('click', function () { self.againAll(); });
+      $('fmtCopy').addEventListener('click', function () {
+        var t = self.text();
+        var done = function () { $('fmtStat').textContent = 'Скопировано: ' + t.split('\n').length + ' строк чисел.'; };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, function () { window.prompt('Скопируйте:', t); });
+        else window.prompt('Скопируйте:', t);
+      });
+      $('fmtList').addEventListener('click', function (e) {
+        var b = e.target.closest ? e.target.closest('button[data-act]') : null;
+        var tr = b && b.closest('tr[data-id]'), r = tr && self.rec(tr.dataset.id);
+        if (!r || self.busy) return;
+        var cell = tr.querySelector('.st'), act = b.dataset.act;
+        var fail = function (er) { $('fmtStat').textContent = (r.name || '') + ': ' + (er && er.status ? S.pbErr(er) : (er && er.message || er)); };
+        if (act === 'get') { self.download(r).catch(fail); return; }
+        if (act === 'again') {
+          b.disabled = true;
+          var was = r.is_read;
+          self.again(r).then(function (said) {
+            var line = (r.name || '') + ': ' + said + '.';
+            $('fmtStat').textContent = line;
+            cell.innerHTML = self.state(r);
+            // the counts follow a file that reads now; the row stays where it is, with what to do next
+            if (r.is_read !== was) return S.pb.send('/api/formats/stats', { method: 'GET', requestKey: null }).then(function (d) { self.counts(d); });
+          }).catch(fail).then(function () { b.disabled = false; });
+          return;
+        }
+        if (act === 'drop') {
+          if (!window.confirm(r.is_read ? 'Убрать сохранённый файл «' + (r.name || '') + '»? Образец формата останется.'
+            : 'Убрать файл «' + (r.name || '') + '» и запись о нём?')) return;
+          self.drop(r).then(function () { self.load(); }, fail);
+        }
+      });
+      document.addEventListener('auth:signedin', function () { self.load(); });
+      if (S.pb.authStore.isValid) this.load();
+    }
+  };
+
+  S.FormatsAdmin = A;
+  document.addEventListener('DOMContentLoaded', function () { A.init(); });
+  if (document.readyState !== 'loading') A.init();
 })(S);
 
 ;

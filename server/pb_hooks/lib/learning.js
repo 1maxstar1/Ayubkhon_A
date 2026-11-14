@@ -247,4 +247,35 @@ module.exports = {
       corrections: one("SELECT COUNT(*) AS n FROM corrections"),
     });
   },
+
+  /**
+   * GET /api/formats/stats — counts only (admin): the estimates whose format has been recorded (smeta_files,
+   * docs/format-reja.md). `doubt`: read, but under nine tenths of the lines have quantity × price = sum. `target`:
+   * how many read files the first training waits for.
+   */
+  formats(e) {
+    require(`${__hooks}/lib/admin.js`).requireAdmin(e);
+    function one(sql) {
+      const rows = arrayOf(new DynamicModel({ n: 0 }));
+      $app.db().newQuery(sql).all(rows);
+      return rows.length ? rows[0].n : 0;
+    }
+    const T = "SELECT COUNT(*) AS n FROM smeta_files";
+    try {
+      return e.json(200, {
+        files: one(T),
+        read: one(T + " WHERE is_read = TRUE"),
+        unread: one(T + " WHERE is_read = FALSE"),
+        doubt: one(T + " WHERE is_read = TRUE AND checked > 0 AND score < 0.9"),
+        kept: one(T + " WHERE file != ''"),
+        formats: one("SELECT COUNT(DISTINCT signature) AS n FROM smeta_files WHERE is_read = TRUE AND signature != ''"),
+        formats_unread: one("SELECT COUNT(DISTINCT signature) AS n FROM smeta_files WHERE is_read = FALSE AND signature != ''"),
+        lines: one("SELECT COALESCE(SUM(items), 0) AS n FROM smeta_files WHERE is_read = TRUE"),
+        target: 100,
+      });
+    } catch (_) {
+      // a database from before this collection: nothing gathered yet
+      return e.json(200, { files: 0, read: 0, unread: 0, doubt: 0, kept: 0, formats: 0, formats_unread: 0, lines: 0, target: 100, missing: true });
+    }
+  },
 };

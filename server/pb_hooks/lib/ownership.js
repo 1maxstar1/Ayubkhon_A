@@ -6,6 +6,9 @@ const STAMP = {
   workspaces: { create: ["opened_by", "updated_by"], update: ["updated_by"] },
   corrections: { create: ["by"], update: ["by"] },
   exports: { create: ["by"], update: [] },
+  // what a smeta file looks like (docs/format-reja.md): whoever uploaded it first; a later, better reading of the
+  // same file changes neither whose it is nor which file it is
+  smeta_files: { create: ["by"], update: [], keep: ["by", "hash"] },
 };
 
 module.exports = {
@@ -22,6 +25,10 @@ module.exports = {
       if (rule) {
         const fields = rule[phase];
         for (let i = 0; i < fields.length; i++) e.record.set(fields[i], auth.id);
+        if (phase === "update" && rule.keep) {
+          const was = e.record.original();
+          for (let i = 0; i < rule.keep.length; i++) e.record.set(rule.keep[i], was.get(rule.keep[i]));
+        }
       }
     }
     e.next();

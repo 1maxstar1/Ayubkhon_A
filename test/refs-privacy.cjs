@@ -18,7 +18,8 @@
  *   C  dist equals a fresh build of src (build.mjs has no clock or random input), and src/vendor is unchanged.
  * Always: no tracked package or data file (*.json.gz, *.jsonl, refs-*.json), and no dataset or trained model of the
  * learning work (by name: .ndjson, .model.json, .dataset.json, and .json or .csv files named ranker…, dataset…,
- * suggest_events…, price_memory… or ml_models…; or any .json holding journal rows or model weights); no 12-hex token
+ * suggest_events…, price_memory…, ml_models…, smeta_files…, layout-sample… or golden… — the last three are the
+ * formats of the owner's estimates, docs/format-reja.md; or any .json holding journal rows or model weights); no 12-hex token
  * (a source id) in A or B;
  * every number of five or more digits in test/refs-fixture.cjs is one of its declared synthetic prices.
  * With REFS_KIT (the package): in A, B and H no source id, document number, issuer or plant string (≥ 6 chars), none
@@ -135,7 +136,7 @@ for (const f of git('ls-files').split('\n')) {
   // What the program learns from, and what it learns (docs/ai-reja.md), is made of the owner's prices and decisions:
   // a dataset or a trained model is never a file of the repository — by its name, or by what a .json file holds
   // (the rows of the journal or of the memory; the weights of a model with their feature schema).
-  if (/\.ndjson$|\.(model|dataset)\.json$|(^|\/)(ranker|dataset|suggest_events|price_memory|ml_models)[^/]*\.(json|csv)$/i.test(f)) hit('tracked-learning-file', f);
+  if (/\.ndjson$|\.(model|dataset)\.json$|(^|\/)(ranker|dataset|suggest_events|price_memory|ml_models|smeta_files|layout-samples?|golden)[^/]*\.(json|csv)$/i.test(f)) hit('tracked-learning-file', f);
   else if (/\.json$/.test(f) && !/(^|\/)(package(-lock)?\.json|pb_schema\.json)$/.test(f) && !/^src\/vendor\//.test(f)) {
     let t = '';
     try { t = fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch (e) { t = ''; }

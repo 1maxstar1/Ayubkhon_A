@@ -12,6 +12,8 @@ Versiyalar, orqaga qaytish va NLP jadvallarini o'lchov bilan o'zgartirish —
 bajarilgani boshida yozilgan), `docs/ai-model.md` — shuning oddiy tildagi tavsifi. `docs/audit-4-reja.md` — butun dastur bo'yicha **bosqichma-bosqich bajarilayotgan
 reja**: topilmalar, ustuvorlik tartibi va egasi hal qiladigan savollar; 1–5-bosqichlar
 bajarilgan (v2.9.2 – v2.10.0: yashil to'plam va CI, qulaylik va QQS), 6–7 navbatda — har bir band yonida holati yozilgan.
+`docs/format-reja.md` — smeta formatlarini tanishni o'rganish rejasi (himoya testi, har bir yuklangan smetadan format
+namunasi yig'ish, 100 fayldan keyin model, AI faqat qoidalar o'qiy olmagan faylda); qaysi qadam bajarilgani boshida yozilgan.
 
 ## Muloqot tili
 
@@ -53,6 +55,7 @@ node test/learning.mjs                                # o'rganish uchun yozuvlar
 node test/memory.cjs; node test/e2e-memory.mjs        # xotira ishlatilishi: «пам.» tartibi, «ранее принято» chegarasi (mustaqil arizalar, yosh), kalit
 node test/ml.cjs; node test/e2e-dataset.mjs           # o'rganish: belgilar (smeta narxisiz), metrikalar, dataset va bugungi qoidalar o'lchovi; admin «Набор для обучения»
 node test/ml-price.cjs                                # narx modeli: dalillar (oldingi arizalar, spravochnik), yo'qotish va gradient, qaror, sintetik ekspert
+node test/ml-layout.cjs; node test/e2e-formats.mjs    # format namunasi (nom va narxsiz), imzo, arifmetika, xesh; `smeta_files` ga yozish va admin «Распознавание форматов смет»
 sh server/release.sh X.Y.Z "izoh" --row matn.md --unlisted; sh server/release.sh --list X.Y.Z   # egasi avval sinaydigan reliz: ro'yxatsiz chiqarish, sinalgach ro'yxatga qo'shish
 node test/num.cjs; node test/xlsx-guard.cjs           # son qat'iy o'qiladi («1,234.50» — ha, yonida so'z bo'lsa — yo'q); begona .xlsx o'quvchini osib qo'ymaydi
 node test/normalize.cjs; node test/sections.cjs; node test/regions.cjs   # NLP o'lchovlari
@@ -163,6 +166,14 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   kaliti → jami miqdor), ish maydonida saqlanadi. Yangi hajm resursni faqat bir birlikka × (yangi − eski) ga
   siljitadi. **Narxlar, tejash va Таблица №2 miqdorga tegmaydi** — miqdor faqat «Таблица №1 (объёмы)» varag'iga
   chiqadi, u esa faqat biror narsa belgilanganda qo'shiladi (aks holda hujjat avvalgidek).
+* **Smeta formatlari** (`docs/format-reja.md`, v2.16.0): fayllarni **qoidalar** o'qiydi (`src/lib/smeta.js`); qoida
+  o'zgarsa `SMETA_KIT=<kit> node test/smeta-corpus.cjs` qolgan fayllar avvalgidek o'qilishini isbotlashi shart (keyin
+  ko'rib chiqib `--record`). Loyiha sifatida yuklangan har bir smeta `smeta_files` ga yoziladi (`src/ui/formats.js`):
+  xesh, qanday o'qilgani, va **nom-narxsiz** format namunasi (`src/lib/ml/layout.js`; sxema o'zgarsa `VERSION`
+  ko'tariladi); fayl o'zi faqat o'qilmagan yoki summalari mos kelmagan bo'lsa saqlanadi. Yozish hech qachon ishni
+  to'xtatmaydi. Egasining smetalari, namunalar, `golden.json` va vaznlar repoga tushmaydi. Model (keyingi qadamlar)
+  qoidalar o'qigan faylga **tegmaydi**: faqat hech narsa o'qilmaganda taklif qiladi, o'qigani arifmetika bilan
+  tekshiriladi va «проверьте» deb ko'rsatiladi.
 * Raqamlar hech qachon yo'qolmaydi: `АНКЕР М5` ≠ `АНКЕР М8`, `4.1.1` ≠ `4.11`;
   ikki raqam orasidagi ajratgich o'chirilmaydi.
 * **Xavfsizlik bo'limi hozircha o'chirilgan (egasining qarori, 2026-10-24).**

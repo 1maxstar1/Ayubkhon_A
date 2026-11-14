@@ -54,6 +54,7 @@ const WORKER_LIBS = [
   'src/lib/smeta.js',
   'src/lib/assemble.js',
   'src/lib/volumes.js',      // the works of form 5 (01_ЛРВ) beside the resources
+  'src/lib/ml/layout.js',    // what the file looks like, for the page that keeps such records (docs/format-reja.md)
 ];
 
 // Server mode adds the PocketBase client in front and the sign-in / registry /
@@ -85,6 +86,9 @@ const SERVER_SCRIPTS = [
   'src/lib/memory.js',
   'src/ui/memory.js',
   'src/ui/journal.js',
+  // learning to read new formats (docs/format-reja.md): every smeta uploaded as a project leaves a sample of its layout
+  'src/lib/ml/layout.js',
+  'src/ui/formats.js',
 ].filter((p) => existsSync(join(root, p)));
 
 // The reference-price worker of the server page (src/refs-worker.js): the whole-country pool, the family parsers and
@@ -179,9 +183,12 @@ function build() {
       // the reference-price importer checks a package in the browser before it uploads it: fflate when the browser
       // has no DecompressionStream, the package format and its validator, and the Russian document labels
       .replace('/*__JS__*/', () => ['src/vendor/pocketbase.umd.js', 'src/vendor/xlsx.full.min.js', 'src/vendor/fflate.umd.js',
-        'src/lib/normalize.js', 'src/lib/match.js', 'src/lib/util.js', 'src/lib/pb.js', 'src/lib/regions.js', 'src/lib/registry-parse.js',
+        'src/lib/normalize.js', 'src/lib/match.js', 'src/lib/sections.js', 'src/lib/util.js', 'src/lib/pb.js', 'src/lib/regions.js', 'src/lib/registry-parse.js',
         'src/lib/refs/package.js', 'src/lib/refs/view.js',
-        'src/ui/auth.js', 'src/ui/apps-admin.js', 'src/ui/admin.js', 'src/ui/refs-admin.js', 'src/ui/uzex-admin.js', 'src/ui/learning-admin.js', 'src/ui/dataset-admin.js', 'src/ui/version.js']
+        // «Распознавание форматов смет» reads a kept file again with today's rules: the reader itself
+        'src/lib/formula.js', 'src/lib/xlsx-read.js', 'src/lib/smeta.js', 'src/lib/ml/layout.js',
+        'src/ui/auth.js', 'src/ui/apps-admin.js', 'src/ui/admin.js', 'src/ui/refs-admin.js', 'src/ui/uzex-admin.js', 'src/ui/learning-admin.js', 'src/ui/dataset-admin.js',
+        'src/ui/formats-admin.js', 'src/ui/version.js']
         .filter((p) => existsSync(join(root, p))).map(read).join('\n;\n'));
     emit('admin.html', admin);
   }

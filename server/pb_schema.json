@@ -1267,6 +1267,133 @@
       "createRule": null,
       "updateRule": null,
       "deleteRule": null
+    },
+    {
+      "id": "c_smeta_files__",
+      "name": "smeta_files",
+      "type": "base",
+      "fields": [
+        {
+          "name": "hash",
+          "type": "text",
+          "required": true,
+          "min": 64,
+          "max": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "max": 300
+        },
+        {
+          "name": "size",
+          "type": "number",
+          "onlyInt": true,
+          "min": 0
+        },
+        {
+          "name": "ws",
+          "type": "text",
+          "max": 20
+        },
+        {
+          "name": "by",
+          "type": "relation",
+          "collectionId": "_pb_users_auth_",
+          "maxSelect": 1,
+          "required": false,
+          "cascadeDelete": false
+        },
+        {
+          "name": "is_read",
+          "type": "bool"
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "max": 300
+        },
+        {
+          "name": "objects",
+          "type": "number",
+          "onlyInt": true,
+          "min": 0
+        },
+        {
+          "name": "items",
+          "type": "number",
+          "onlyInt": true,
+          "min": 0
+        },
+        {
+          "name": "checked",
+          "type": "number",
+          "onlyInt": true,
+          "min": 0
+        },
+        {
+          "name": "score",
+          "type": "number",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "signature",
+          "type": "text",
+          "max": 32
+        },
+        {
+          "name": "sample",
+          "type": "json",
+          "maxSize": 2097152
+        },
+        {
+          "name": "version",
+          "type": "number",
+          "onlyInt": true,
+          "min": 0
+        },
+        {
+          "name": "app_version",
+          "type": "text",
+          "max": 20
+        },
+        {
+          "name": "file",
+          "type": "file",
+          "maxSelect": 1,
+          "maxSize": 31457280,
+          "mimeTypes": [
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.ms-excel.sheet.macroenabled.12",
+            "application/vnd.ms-excel",
+            "application/zip",
+            "application/octet-stream"
+          ],
+          "protected": true
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "onCreate": true
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "onCreate": true,
+          "onUpdate": true
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_smeta_files_hash ON smeta_files (hash)",
+        "CREATE INDEX idx_smeta_files_read ON smeta_files (is_read)"
+      ],
+      "listRule": "@request.auth.id != \"\"",
+      "viewRule": "@request.auth.id != \"\"",
+      "createRule": "@request.auth.id != \"\"",
+      "updateRule": "@request.auth.id != \"\"",
+      "deleteRule": "@request.auth.role = \"admin\""
     }
   ],
   "deleteMissing": false

@@ -178,7 +178,7 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   qoidalar o'qigan faylga **tegmaydi**: faqat hech narsa o'qilmaganda taklif qiladi, o'qigani arifmetika bilan
   tekshiriladi va «проверьте» deb ko'rsatiladi.
   Eski Excel (.xls) fayllar (v2.16.3) SheetJS bilan o'qiladi (`src/lib/xlsx-read.js` `readOld`; SheetJS faqat fayllarni
-  o'qiydigan worker'da) — natija .xlsx bilan bir xil shaklda. Tashish varag'i («перевозка», `transportSheet`) xatolari
+  o'qiydigan worker'da) — natija .xlsx bilan bir xil shaklda; himoya testi (`smeta-corpus`) .xls ni ham o'qiydi. Tashish varag'i («перевозка», `transportSheet`) xatolari
   (`haulChecks`): tonnadagi material uchun solishtirma og'irlik 1 emas; «ВСЕГО» qatorlar yig'indisiga teng emas (qator
   tushib qolgan) — sahifa ogohlantiradi, smetaning o'zi o'zgartirilmaydi.
 * Raqamlar hech qachon yo'qolmaydi: `АНКЕР М5` ≠ `АНКЕР М8`, `4.1.1` ≠ `4.11`;

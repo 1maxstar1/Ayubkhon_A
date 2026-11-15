@@ -337,5 +337,22 @@ check(!ck2.some((c) => c.r === 8 && c.kind === 'weight'), 'a weight of 1,4 for a
 // the old haulage sheet of section 8 (all weights right, ИТОГО the sum of its lines with the 3 % line) says nothing
 check(!(hb[0].checks || []).some((c) => c.kind === 'weight'), 'a haulage sheet with right weights carries no weight remark');
 
+/* 18 — the haulage sheet of another estimating program: «Объем- ный вес», «Дальность возки км», «тон / км»,
+        «Стоимость грузоперевозок» as the sum, the weight in a merged two-column cell */
+const haul3 = sheet('Транспортны.', [['Транспортные расходы на перевозку строительных материалов'], ['ТЕСТОВЫЙ УЧАСТОК'], [], ['ТЕСТОВАЯ ЧАСТЬ'],
+  ['№ П/П', 'Наменование материалов', 'Единица измерения', 'Коли- чество', 'Объем- ный вес', null, 'Общая тонна', 'Дальность возки км', 'тон / км', 'Стоимость за один т/км', 'Стоимость грузоперевозок'],
+  [null, null, null, null, 'тон/м3'],
+  [1, 'ТЕСТОВЫЕ СМЕСИ', 'т', 100, 1, null, 100, 30, 3000, 2, 6000],
+  [2, 'ТЕСТОВЫЙ ЩЕБЕНЬ', 'м3', 10, 1.45, 1.45, 14.5, 10, 145, 3, 435],
+  [3, 'ТЕСТОВЫЕ ИЗДЕЛИЯ', 'т', 5, 2.4, 2.4, 12, 10, 120, 3, 360],
+  [null, 'ВСЕГО', null, null, null, null, null, null, null, null, 6795]]);
+const h3 = one({ sheets: [haul3] });
+const h3i = h3.length ? h3[0].rows.filter((r) => r.kind === 'item') : [];
+check(h3.length === 1 && h3[0].layout.transport && h3i.length === 3 && h3i[0].nm === 'Транспортировка ТЕСТОВЫЕ СМЕСИ 30 км' && h3i[0].qty === 3000 &&
+  h3i[0].price === 2 && h3i[0].sum === 6000, 'a haulage sheet with «Стоимость грузоперевозок» for its sum is read (' + h3i.map((r) => r.nm).join(' | ') + ')');
+const ck3 = (h3[0] && h3[0].checks) || [];
+check(ck3.length === 1 && ck3[0].kind === 'weight' && ck3[0].r === 9 && ck3[0].weight === 2.4,
+  '«Объем- ный вес» is the weight: 2,4 for a material in тонны is said, 1,45 for м3 is not, the ВСЕГО of all lines says nothing (' + ck3.map((c) => c.kind + ' r' + c.r).join(', ') + ')');
+
 console.log(fail ? '\nFAILED: ' + fail : '\nall passed');
 process.exit(fail ? 1 : 0);

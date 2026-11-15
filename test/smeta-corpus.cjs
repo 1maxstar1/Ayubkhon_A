@@ -4,7 +4,7 @@
  *
  * The files are the owner's and never enter the repository. They stand in a private folder:
  *
- *   $SMETA_KIT/files/*.xlsx      the estimates, read or refused
+ *   $SMETA_KIT/files/*.xlsx|xls  the estimates, read or refused (an Excel 97–2003 book through SheetJS, as the worker reads it)
  *   $SMETA_KIT/golden.json       how each was read when last recorded
  *
  *   SMETA_KIT=<kit> node test/smeta-corpus.cjs             compare with the record; a file read differently fails
@@ -30,7 +30,7 @@ if (!KIT || !fs.existsSync(path.join(KIT, 'files'))) {
   process.exit(77);
 }
 
-const S = load(load.PIPELINE, 'ml-layout');
+const S = load(load.PIPELINE, 'xlsx', 'ml-layout');
 // the arithmetic and the threshold the program itself uses (src/lib/ml/layout.js): one place for both
 const LAY = S.ml.layout;
 const sha = (x) => crypto.createHash('sha256').update(x).digest('hex');
@@ -47,7 +47,7 @@ function reading(bytes) {
 }
 
 const dir = path.join(KIT, 'files'), goldenPath = path.join(KIT, 'golden.json');
-const names = fs.readdirSync(dir).filter((n) => /\.(xlsx|xlsm)$/i.test(n)).sort();
+const names = fs.readdirSync(dir).filter((n) => /\.(xlsx|xlsm|xls)$/i.test(n)).sort();
 const golden = fs.existsSync(goldenPath) ? JSON.parse(fs.readFileSync(goldenPath, 'utf8')) : { files: {} };
 
 const now = {}, changed = [], fresh = [], lines = [];

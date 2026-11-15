@@ -455,9 +455,9 @@
         else if (/(^| )КМ$/.test(u)) h.km = c;
         // read for the checks below only: the material's own quantity, its specific weight, the tonnes
         else if (/^КОЛ(ИЧЕСТВ|И ЧЕСТВО|ВО$)/.test(u)) h.amount = c;
-        else if (/^УДЕЛЬ?НЫЙ ВЕС/.test(u)) h.weight = c;
+        else if (/^(УДЕЛЬ?НЫЙ|ОБ[ЪЬ]?ЕМ ?НЫЙ) ВЕС/.test(u)) h.weight = c;
         else if (/^(ОБЩ|ОБШ)(ИЙ|АЯ)? ?(ТОНН|ВЕС)/.test(u)) h.tons = c;
-        else if (u === 'ВСЕГО' || u.indexOf('СУММА') === 0) h.sum = c;
+        else if (u === 'ВСЕГО' || u.indexOf('СУММА') === 0 || /^СТОИМОСТЬ ГРУЗОПЕРЕВОЗ/.test(u)) h.sum = c;
         else if (/^\s*№/.test(raw) || /^N П П$/.test(u)) h.no = c;
       }
       if (h.name && h.km && h.tkm && h.price && h.sum) { H = h; H.headerRow = r; }

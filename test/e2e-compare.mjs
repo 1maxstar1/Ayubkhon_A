@@ -295,6 +295,24 @@ try {
       'two corrected files chosen together: the lighting\'s price change is found on the lighting, every sheet has its pair (' + JSON.stringify(r2) + ')');
   }
 
+  // a summary book loaded with the estimates («ОБЩИЙ ИТОГ»: one sheet copying both): switched off and said, so that no
+  // resource is counted twice
+  {
+    const { sheet, estimate, line } = require('./compare-books.cjs');
+    const fSum = join(dir, 'ОБЩИЙ_ИТОГ.xlsx');
+    const roadLines = book(1).sheets[0].rows.slice(1).map((cs) => (cs || []).slice(1).map((c) => (c ? c.v : null)));
+    const lamp = estimate('ТЕСТОВОЕ ОСВЕЩЕНИЕ', [[null, null, 'СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'], line(1, 'ТЕСТОВЫЙ РЕСУРС, КОТОРОГО НЕТ', 'ШТ', 10, 3)], { no: 3, direct: 30 });
+    writeFileSync(fSum, xlsx(S, { sheets: [sheet('свод', [['СВОДНЫЙ РАСЧЁТ'], ['ИТОГО', 1]]), sheet('Лист2', [...roadLines, ...lamp])] }));
+    await page.goto('file://' + join(root, 'dist/smeta-taqqoslash.html'));
+    await page.setInputFiles('#pick', [f1, join(dir, 'Тест_освещение.xlsx'), fSum]);
+    await page.waitForFunction(() => window.app && app.projects.length === 3 && app.model && app.pending <= 0, null, { timeout: 30 * 1000 });
+    await page.waitForTimeout(500);
+    const r3 = await page.evaluate(() => ({ on: app.projects.map((p) => p.file + ':' + (p.enabled !== false)), toast: document.getElementById('toast').textContent,
+      crane: app.model.resources.find((x) => x.name === 'ТЕСТОВЫЙ КРАН 10 Т').qty }));
+    check(r3.on.join(' ') === 'Тест_v1.xlsx:true Тест_освещение.xlsx:true ОБЩИЙ_ИТОГ.xlsx:false' && /ОБЩИЙ_ИТОГ\.xlsx» повторяет строки смет/.test(r3.toast) && r3.crane === 2,
+      'a summary book copying the estimates is switched off and said: every resource counted once (' + JSON.stringify(r3).slice(0, 300) + ')');
+  }
+
   check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' / ') : ''));
 } finally {
   await browser.close();

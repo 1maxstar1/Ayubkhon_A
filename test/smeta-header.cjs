@@ -407,5 +407,30 @@ const lm = S.assemble([{ name: 'l', file: 'l.xlsx', objects: lrs, enabled: true 
 const lmix = lm.rows.find((r) => r.kind === 'item' && /ПЕРЕВОЗКА ТЕСТОВОЙ СМЕСИ/.test(r.nm || r.name || ''));
 check(!!lmix, 'and the haulage line goes into the comparison table under its name');
 
+/* 20 — a haulage sheet with no т·км column: the header over two rows («Автомобил» above «Автотранспортная км | Стоимость
+        за один т/км | Итого»), «Удель- ный вес», the т·км the tonnes × the km; and a money line («На остальные материалы
+        3%») inside the «ИТОГО» is no missing line */
+const haul4 = sheet('Транспорт', [[' Транспортные расходы на перевозимые грузы'], ['ТЕСТОВАЯ ДОРОГА'],
+  ['№ П/П', 'Наименование материалов', 'Единица измерения', 'Коли-чество', 'Удель- ный вес', 'Общая тонна', 'Автомобил'],
+  [null, null, null, null, 'тон', null, 'Автотранспортная км', 'Стоимость за один т/км', 'Итого'],
+  [1, 2, 3, 4, 5, 6, 7, 8, 9],
+  [1, 'ТЕСТОВАЯ СМЕСЬ', 'т', 37, 1, 37, 23, 3, 2553],
+  [2, 'ТЕСТОВЫЙ БИТУМ', 'т', 2, 1, 2, 23, 3, 138],
+  [3, 'На остальные материалы 3% от стоимости материалов', null, null, null, null, null, null, 17],
+  [4, 'ИТОГО', null, null, null, null, null, null, 2708]]);
+const h4 = one({ sheets: [haul4] });
+const h4i = h4.length ? h4[0].rows.filter((r) => r.kind === 'item') : [];
+check(h4.length === 1 && h4[0].layout.transport && h4i.length === 2 && h4i[0].nm === 'Транспортировка ТЕСТОВАЯ СМЕСЬ 23 км' && h4i[0].unit === 'т/км' &&
+  h4i[0].qty === 851 && h4i[0].price === 3 && h4i[0].sum === 2553 && h4i[1].qty === 46,
+  'a haulage sheet without a т·км column is read: the т·км is the tonnes × the km (' + h4i.map((r) => r.nm + ' ' + r.qty + '×' + r.price + '=' + r.sum).join(' | ') + ')');
+check(h4i.every((r) => r.cells[h4[0].layout.qty].v === r.qty && r.cells[h4[0].layout.qty].f == null && r.cells[h4[0].layout.sum].f == null),
+  'the т·км and the sum go into the document as values: the sheet\'s formulas name the km and the tonnes, which are left out');
+check(!(h4[0].checks || []).length, 'the 3 % line is part of the «ИТОГО»: no line is said to be missing (' + JSON.stringify((h4[0].checks || []).map((c) => c.text)) + ')');
+// the same sheet whose «ИТОГО» (2 691) is the SUM of the two materials only: the 3 % line on the sheet is left out of it
+const haul5 = sheet('Транспорт', haul4.rows.slice(1).map((cs) => (cs || []).slice(1).map((c) => (c ? c.v : null))).map((l) => (l[1] === 'ИТОГО' ? [4, 'ИТОГО', null, null, null, null, null, null, 2691] : l)));
+const ck5 = (one({ sheets: [haul5] })[0] || {}).checks || [];
+check(ck5.length === 1 && ck5[0].kind === 'total' && ck5[0].total === 2691 && ck5[0].lines === 2708,
+  'an «ИТОГО» that leaves the 3 % line out is still said (' + ck5.map((c) => c.text).join('; ') + ')');
+
 console.log(fail ? '\nFAILED: ' + fail : '\nall passed');
 process.exit(fail ? 1 : 0);

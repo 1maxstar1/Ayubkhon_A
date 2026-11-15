@@ -499,10 +499,7 @@
    */
   function transportSheet(sheet) {
     var rows = sheet.rows, H = null, r;
-    for (r = 1; r < Math.min(rows.length, 20) && !H; r++) {
-      var cells = rows[r];
-      if (!cells) continue;
-      var h = {};
+    function headOf(cells, h) {
       for (var c = 1; c < cells.length; c++) {
         var raw = txt(cells[c]), u = up(raw);
         if (!u && !/^\s*№/.test(raw)) continue;
@@ -515,15 +512,30 @@
         else if (/(^| )КМ$/.test(u)) h.km = c;
         // read for the checks below only: the material's own quantity, its specific weight, the tonnes
         else if (/^КОЛ(ИЧЕСТВ|И ЧЕСТВО|ВО$)/.test(u)) h.amount = c;
-        else if (/^(УДЕЛЬ?НЫЙ|ОБ[ЪЬ]?ЕМ ?НЫЙ) ВЕС/.test(u)) h.weight = c;
+        else if (/^(УДЕЛЬ? ?НЫЙ|ОБ[ЪЬ]?ЕМ ?НЫЙ) ВЕС/.test(u)) h.weight = c;     // «Удельный», «Удель- ный», «Объем- ный»
         else if (/^(ОБЩ|ОБШ)(ИЙ|АЯ)? ?(ТОНН|ВЕС)/.test(u)) h.tons = c;
-        else if (u === 'ВСЕГО' || u.indexOf('СУММА') === 0 || /^СТОИМОСТЬ ГРУЗОПЕРЕВОЗ/.test(u)) h.sum = c;
+        else if (u === 'ВСЕГО' || u.indexOf('СУММА') === 0 || /^СТОИМОСТЬ ГРУЗОПЕРЕВОЗ/.test(u) || (u === 'ИТОГО' && !h.sum)) h.sum = c;
         else if (/^\s*№/.test(raw) || /^N П П$/.test(u)) h.no = c;
       }
-      if (h.name && h.km && h.tkm && h.price && h.sum) { H = h; H.headerRow = r; }
+      return h;
+    }
+    // the т·км is a column of its own, or — on a sheet without one — the tonnes × the km of the line
+    function whole(h) { return h.name && h.km && (h.tkm || h.tons) && h.price && h.sum; }
+    for (r = 1; r < Math.min(rows.length, 20) && !H; r++) {
+      if (!rows[r]) continue;
+      var h = headOf(rows[r], {});
+      // a header over two rows («Автомобил» above «Автотранспортная км | Стоимость за один т/км | Итого»): the row
+      // below fills in what the first one left out — never what it already named; a row below that is a whole header
+      // by itself is the header (the next turn of the loop takes it), as it always was
+      if (!whole(h) && rows[r + 1]) {
+        var h2 = headOf(rows[r + 1], {});
+        if (!whole(h2)) Object.keys(h2).forEach(function (k) { if (h[k] == null && Object.keys(h).every(function (j) { return h[j] !== h2[k]; })) h[k] = h2[k]; });
+      }
+      if (whole(h)) { H = h; H.headerRow = r; }
     }
     if (!H) return null;
-    var L = { no: H.no || 1, name: H.name, unit: H.unit || H.name + 1, qty: H.tkm, price: H.price, sum: H.sum,
+    var computed = !H.tkm;              // т·км = tonnes × km, written into the tonnes' place
+    var L = { no: H.no || 1, name: H.name, unit: H.unit || H.name + 1, qty: H.tkm || H.tons, price: H.price, sum: H.sum,
       headerRow: H.headerRow, subRow: 0, numRow: 0, lastCol: H.sum, transport: true };
     var keep = [L.no, L.name, L.unit, L.qty, L.price, L.sum];
     function slim(cells, over) {
@@ -547,6 +559,7 @@
       var noCell = cs[L.no], noTxt = txt(noCell);
       var tkm = S.num(cs[L.qty] && cs[L.qty].v), price = S.num(cs[L.price] && cs[L.price].v), sum = S.num(cs[L.sum] && cs[L.sum].v);
       var dist = S.num(cs[H.km] && cs[H.km].v);
+      if (computed) tkm = tkm != null && dist != null ? tkm * dist : null;
       var row = { r: r, kind: 'blank', section: 'other', sub: false, no: S.num(noCell && noCell.v), noTxt: noTxt, nm: name, unit: txt(cs[L.unit]),
         qty: tkm, price: price, sum: sum, cells: slim(cs) };
       if (r === L.headerRow) row.kind = 'header';
@@ -561,7 +574,12 @@
         row.kind = 'item'; items++;
         row.nm = 'Транспортировка ' + name + ' ' + km(dist) + ' км';
         row.unit = 'т/км';
-        row.cells = slim(cs, (function () { var o = {}; o[L.name] = { v: row.nm }; o[L.unit] = { v: row.unit }; return o; })());
+        row.cells = slim(cs, (function () {
+          var o = {}; o[L.name] = { v: row.nm }; o[L.unit] = { v: row.unit };
+          // computed т·км: the value, and the sum as the sheet has it (its formula names the km and tonnes, left out here)
+          if (computed) { o[L.qty] = { v: tkm }; o[L.sum] = { v: sum }; }
+          return o;
+        })());
       } else if (name) row.kind = 'extra';
       out.push(row);
     }
@@ -598,6 +616,9 @@
     });
     var tot = null;
     for (var i = out.length - 1; i >= 0 && !tot; i--) if (out[i].kind === 'total' && out[i].sum != null) tot = out[i];
+    // a money line above the total — «На остальные материалы 3% от стоимости материалов» — is in it by right: not haulage
+    // of a material (no т·км, no km), so not a resource, but its sum belongs to the «ИТОГО» all the same
+    if (tot) out.forEach(function (x) { if (x.kind === 'extra' && x.r < tot.r && x.sum != null) { lines += x.sum; } });
     if (tot && linesN) {
       var diff = lines - tot.sum;
       if (Math.abs(diff) > Math.max(1, Math.abs(lines) * 1e-6)) {

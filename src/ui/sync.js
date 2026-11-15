@@ -18,7 +18,7 @@
   var XLSX_RE = /\.xlsx?$|\.xlsm$/i;
   // what the server allows a workspace to hold (server/pb_schema.json, workspaces.files): known here so that it is
   // said in words before the server is asked, not read out of its refusal
-  var MAX_FILES = 30, MAX_MB = 60;
+  var MAX_FILES = 80, MAX_MB = 60;          // 80: fifteen estimates, their fifteen corrected files, the reply and the exports
   var UPLOAD_RETRY_MS = 15 * 1000;
   // Stamped into the saved state. 2 = resource keys built by the name key that
   // repairs half-switched keyboard layouts; anything older is lifted onto it

@@ -565,17 +565,40 @@
       this.toast(name + ': найдено листов объектов: ' + res.objects.length);
     }
     if (this.pending <= 0) {
-      var self = this;
+      var self = this, added = [];
       (this.queue || []).forEach(function (q) {
         if (!q.project) return;
         q.project.name = shortTab(q.project.file.replace(/\.[^.]+$/, ''), self.projects);
         self.projects.push(q.project);
+        added.push(q.project);
       });
       this.queue = [];
+      this.offCopies(added);
       this.busy(false);
       this.rebuild();
       this.renderSide();
     }
+  };
+
+  /**
+   * A file just loaded that copies other estimates of the application line by line (S.copiesOf — the «ОБЩИЙ ИТОГ» book
+   * with every estimate on one sheet), or estimates that such a file already loaded copies: the copy is switched off,
+   * so that no resource is counted twice, and the person is told — the checkbox puts it back. Not while a workspace is
+   * being brought back: there the saved state says what is on.
+   */
+  App.prototype.offCopies = function (added) {
+    if (!added.length || (S.Sync && S.Sync.loading) || !S.copiesOf) return;
+    var self = this, said = [];
+    S.copiesOf(this.projects).forEach(function (c) {
+      var p = self.projects[c.i], of = c.of.map(function (j) { return self.projects[j]; });
+      if (p.enabled === false || p.copyNoted) return;
+      if (added.indexOf(p) < 0 && !of.some(function (q) { return added.indexOf(q) >= 0; })) return;
+      p.enabled = false; p.copyNoted = true;
+      said.push('«' + p.file + '» повторяет строки смет: ' + of.map(function (q) { return q.file; }).slice(0, 4).join(', ') +
+        (of.length > 4 ? ' и ещё ' + (of.length - 4) : ''));
+    });
+    if (said.length) this.toast(said.join('; ') + ' — такой сводный файл выключен, чтобы ресурсы не считались дважды. ' +
+      'Если он нужен, включите его галочкой слева.', true);
   };
 
   /** A sheet tab name has to be short and unique; keep it human. */

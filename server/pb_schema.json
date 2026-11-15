@@ -320,7 +320,7 @@
         {
           "name": "files",
           "type": "file",
-          "maxSelect": 30,
+          "maxSelect": 80,
           "maxSize": 62914560,
           "mimeTypes": [
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

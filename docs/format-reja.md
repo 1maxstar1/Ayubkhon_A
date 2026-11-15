@@ -27,6 +27,8 @@ bir xil shaklga keltiriladi (`test/xls-read.cjs`). v2.16.4: «_ЛРС» varag'i 
 qatorlari kod ustunida) ham o'qiladi; himoya to'plamida 23 fayl (yangi 8 tasi — 3 ta ariza), hammasi to'liq o'qiladi.
 v2.16.5: miqdori bo'sh tashish qatorlari (summa 0) ham o'qiladi, «Перевозка материалов» bandi — «other»; himoya
 to'plamida 66679 (+2 qator) va beshta .xls (faqat jamidan keyingi pul qatorlarining bo'limi) ko'rib chiqilib qayta yozildi.
+Shu versiyada yana 4 ta ariza (67368, 67419, 67474, 67503): т·км ustunisiz «Транспорт» varag'i o'qiladi; himoya
+to'plami 49 faylga yetdi (26 tasi yangi), hammasi to'liq o'qiladi, eski 23 tasi avvalgidek.
 
 Keyinroq (hozir emas): «Разметка листа» — hech kim o'qiy olmagan faylda ustunlarni qo'lda ko'rsatish oynasi.
 

@@ -440,6 +440,44 @@
     });
   }
 
+  /**
+   * A file that repeats other estimates of the same application line by line — the «ОБЩИЙ ИТОГ» book whose visible
+   * sheet copies every estimate (name, unit, quantity and price of each line): loaded with them, every resource would
+   * be counted twice. A project is such a copy when at least two other projects stand in it nearly whole (three
+   * quarters of their lines each, the same quantity and price), and their lines are three quarters of its own.
+   * An estimate is never the copy of one other estimate: two versions of one file are for the person to choose.
+   *
+   * @returns {Array<{i: number, of: number[]}>}  the copies (index in `projects`) and the projects each repeats
+   */
+  function copiesOf(projects) {
+    var r3 = function (v) { return v == null ? '' : String(Math.round(v * 1000) / 1000); };
+    var bags = (projects || []).map(function (p) {
+      var b = {}, n = 0;
+      (p.objects || []).forEach(function (o) {
+        (o.rows || []).forEach(function (r) {
+          if (r.kind !== 'item') return;
+          var k = S.nameKey(r.nm || '') + '\u241f' + S.unitKey(r.unit || '') + '\u241f' + r3(r.qty) + '\u241f' + r3(r.price);
+          b[k] = (b[k] || 0) + 1; n++;
+        });
+      });
+      return { b: b, n: n };
+    });
+    var out = [];
+    bags.forEach(function (mine, i) {
+      if (mine.n < 10) return;
+      var of = [], lines = 0;
+      bags.forEach(function (other, j) {
+        if (i === j || !other.n) return;
+        var shared = 0;
+        for (var k in other.b) shared += Math.min(other.b[k], mine.b[k] || 0);
+        if (shared >= 0.75 * other.n) { of.push(j); lines += shared; }
+      });
+      if (of.length >= 2 && lines >= 0.75 * mine.n) out.push({ i: i, of: of });
+    });
+    return out;
+  }
+
+  S.copiesOf = copiesOf;
   S.assemble = assemble;
   S.applyPrices = applyPrices;
   S.spanStats = spanStats;

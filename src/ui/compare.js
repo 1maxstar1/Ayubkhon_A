@@ -30,7 +30,7 @@
   Compare.prototype.pickReply = function () { $('cmpReplyFile').click(); };
 
   /** The workspace slot of the i-th corrected file: «new», «new1», «new2» … (the version before knew only «new»). */
-  var NEW_MAX = 8;
+  var NEW_MAX = 40;                  // an application of fifteen estimates comes back as fifteen files
   function newSlot(i) { return i ? 'new' + i : 'new'; }
   S.Compare_newSlots = function () { var a = []; for (var i = 0; i < NEW_MAX; i++) a.push(newSlot(i)); return a; };
 
@@ -285,8 +285,9 @@
     // not — a market price is one per name and unit across the application anyway. An outside first version is the
     // reply's only estimate.
     var proj = app.projects[+String(b).slice(1)];
+    // (a project switched off — a summary file that copies the others — is not looked in: its lines are theirs)
     var objects = b === 'file' && this.oldFile ? this.oldFile.objects :
-      (proj ? app.projects.reduce(function (all, p) { return all.concat(p.objects || []); }, []) : null);
+      (proj ? app.projects.reduce(function (all, p) { return p.enabled === false && p !== proj ? all : all.concat(p.objects || []); }, []) : null);
     var end = function () { if (back) back(); };
     if (!objects) { app.toast('Сначала выберите первую версию сметы («Было»)', true); end(); return; }
     var reader = new FileReader();
@@ -356,15 +357,17 @@
    */
   Compare.prototype.wholeBase = function (b) {
     var app = this.app, v = $('cmpOld').value;
-    if (!b || v === 'file' || app.projects.length < 2) return b;
+    // the estimates that are on: a summary file switched off (it copies the others) would stand without a pair
+    var on = app.projects.filter(function (p) { return p.enabled !== false; });
+    if (!b || v === 'file' || on.length < 2) return b;
     var reply = this.reply && this.reply.base === v ? this.reply : null;
-    var projs = app.projects.map(function (p) { return Object.assign({}, p, { enabled: true }); });
+    var projs = on.map(function (p) { return Object.assign({}, p, { enabled: true }); });
     var model = S.assemble(projs, app.prices);
     var requested = reply ? reply.match.requested : S.compare.requested(model, app.reportOpts()), known = {};
     model.resources.forEach(function (r) {
       if (!requested[r.key] && Math.abs((r.market || 0) - (r.price || 0)) >= 1) known[r.key] = r.market;
     });
-    var sets = app.projects.map(function (p) { return { label: p.file || p.name, objects: p.objects || [] }; });
+    var sets = on.map(function (p) { return { label: p.file || p.name, objects: p.objects || [] }; });
     return { label: 'все сметы заявки (' + sets.length + '): ' + sets.map(function (x) { return x.label; }).join(' + '),
              objects: sets.reduce(function (all, x) { return all.concat(x.objects); }, []), requested: requested, known: known, sets: sets };
   };

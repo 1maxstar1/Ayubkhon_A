@@ -2,7 +2,7 @@
  * An estimate whose file did not reach the server.
  *
  * It is on screen the moment it is read, and in the workspace only when its file is stored. When the upload
- * failed — the link dropping for a second, the thirty-first file — the page said so once, in a message the
+ * failed — the link dropping for a second, the eighty-first file — the page said so once, in a message the
  * next message replaced, and went on showing a green «✓»: the estimate could be priced, and after a reload it
  * was not there.
  *
@@ -124,18 +124,18 @@ check(uploads === 0 && (await stored()).files.length === 1 && await page.evaluat
 
 /* 2 — the server refuses: the workspace is full (filled behind the page's back, so the page has to be told) */
 const fd = new FormData();
-for (let i = 0; i < 29; i++) {
+for (let i = 0; i < 79; i++) {
   const bytes = fflate.zipSync({ 'sheet.txt': new TextEncoder().encode(String(i).repeat(40)) });
   fd.append('files+', new Blob([bytes], { type: 'application/zip' }), 'fill' + i + '.xlsx');
 }
 const filled = await fetch(pb.base + '/api/collections/workspaces/records/' + wsId, { method: 'PATCH', headers: { Authorization: su }, body: fd });
-check(filled.ok && (await stored()).files.length === 30, 'the workspace holds thirty files');
+check(filled.ok && (await stored()).files.length === 80, 'the workspace holds eighty files');
 await page.setInputFiles('#pick', F2);
 await page.waitForFunction(() => app.projects.length === 2 && S.Sync.hasUnsaved(), null, { timeout: 30 * 1000 });
 await page.evaluate(() => S.Sync.q);
 await settled();
 l = await line();
-check(/second\.xlsx — не сохранён на сервере/.test(l) && await mark() === '!' && (await stored()).files.length === 30,
+check(/second\.xlsx — не сохранён на сервере/.test(l) && await mark() === '!' && (await stored()).files.length === 80,
   'a file the server refuses is held the same way (' + l.slice(0, 90) + '…)');
 // taking the project off the list ends the matter
 page.once('dialog', (d) => d.accept());
@@ -145,14 +145,14 @@ check(await line() === '' && await mark() === '✓' && await page.evaluate(() =>
 
 /* 3 — the same limit, known beforehand: said in words, and the server is not asked */
 await page.reload();
-await page.waitForFunction(() => window.app && app.projects.length === 1 && S.Sync.ws && (S.Sync.ws.files || []).length === 30, null, { timeout: 30 * 1000 });
+await page.waitForFunction(() => window.app && app.projects.length === 1 && S.Sync.ws && (S.Sync.ws.files || []).length === 80, null, { timeout: 30 * 1000 });
 uploads = 0;
 await page.setInputFiles('#pick', F3);
 await page.waitForFunction(() => app.projects.length === 2 && S.Sync.hasUnsaved(), null, { timeout: 30 * 1000 });
 await page.evaluate(() => S.Sync.q);
 await settled();
 l = await line();
-check(/third\.xlsx — не сохранён на сервере: в заявке уже 30 файлов — это предел/.test(l), 'the thirty-first file: the limit is said in words (' + l.slice(0, 80) + '…)');
+check(/third\.xlsx — не сохранён на сервере: в заявке уже 80 файлов — это предел/.test(l), 'the eighty-first file: the limit is said in words (' + l.slice(0, 80) + '…)');
 check(uploads === 0, 'without asking the server for a refusal (' + uploads + ' uploads sent)');
 
 /* 4 — leaving the application asks */

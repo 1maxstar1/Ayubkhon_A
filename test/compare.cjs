@@ -363,5 +363,25 @@ check(bigRm.prices[bigKey] === bigM && bigRm.requested[bigKey] && bigRm.requeste
   check(one.olds === olds[0].objects && one.news === news[1].objects && !one.olds[0].group, 'one file on each side is compared exactly as before: nothing is marked');
 }
 
+/* ------------------------------------------------ a summary file that copies the estimates of the application */
+{
+  const est = (rows) => S.smeta.parseWorkbook({ sheets: [sheet('РЕСУРС', [[null, null, null, null, null, 'Форма 4А АВС-4'],
+    ['Наименование стройки -', null, 'ТЕСТОВАЯ СТРОЙКА'], [], ...estimate('ТЕСТОВЫЕ РАБОТЫ', rows, { direct: 1 })])] }, 'x.xlsx');
+  const MAT = [null, null, 'СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'];
+  const roadRows = [MAT, ...[1, 2, 3, 4, 5, 6].map((i) => line(i, 'ТЕСТОВЫЙ ДОРОЖНЫЙ МАТЕРИАЛ ' + i, 'Т', i, 10 + i))];
+  const lampRows = [MAT, ...[1, 2, 3, 4, 5].map((i) => line(i, 'ТЕСТОВОЕ ИЗДЕЛИЕ ОСВЕЩЕНИЯ ' + i, 'ШТ', i, 20 + i))];
+  const proj = (file, objects) => ({ file, objects, enabled: true });
+  const road = proj('дорога.xlsx', est(roadRows)), lamp = proj('освещение.xlsx', est(lampRows));
+  // the «ОБЩИЙ ИТОГ» book: one visible sheet with both estimates on it, the haulage lines left out of the copy
+  const sum = proj('ОБЩИЙ ИТОГ.xlsx', est([...roadRows.slice(0, 6), ...lampRows]));
+  const cp = S.copiesOf([road, lamp, sum]);
+  check(cp.length === 1 && cp[0].i === 2 && cp[0].of.join() === '0,1', 'a summary book that repeats the estimates line by line is found as their copy (' + JSON.stringify(cp) + ')');
+  const twice = S.assemble([road, lamp, sum], {}), once = S.assemble([road, lamp, Object.assign({}, sum, { enabled: false })], {});
+  const q = (m) => m.resources.find((r) => r.name === 'ТЕСТОВОЕ ИЗДЕЛИЕ ОСВЕЩЕНИЯ 3').qty;
+  check(q(twice) === 6 && q(once) === 3, 'with it on, a resource is counted twice (' + q(twice) + '); switched off, once (' + q(once) + ')');
+  check(!S.copiesOf([road, lamp]).length && !S.copiesOf([road, proj('дорога-2.xlsx', est(roadRows))]).length,
+    'estimates of their own are no copies; nor is a second version of one estimate — one file is for the person to choose');
+}
+
 console.log(fail ? '\nFAILED: ' + fail : '\nall compare checks passed');
 process.exit(fail ? 1 : 0);

@@ -254,5 +254,58 @@ const pi = pg.flatMap((o) => o.rows.filter((r) => r.kind === 'item'));
 check(pg.length === 1 && pi.length === 2 && pi.map((r) => r.nm).join('|') === 'ЩЕБЕНЬ ТЕСТОВЫЙ|ПЕСОК ТЕСТОВЫЙ' && pi.every((r) => r.section === 'materials'),
   'form 4А: a header repeated on a new page does not split the estimate; no line is lost, the band runs on (' + pg.length + ' objects, ' + pi.length + ' lines)');
 
+/* 14 — a «№ …» column to the right of the sum is not the line number (v2.16.1 took it for one) */
+const cert = one({ sheets: [sheet('РЕСУРС', [
+  ['Ведомость ресурсов'],
+  ['N п/п', 'Наименование', 'Ед. изм.', 'Количество', 'Цена за ед.', 'Сумма', '№ сертификата'],
+  ['СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'],
+  [1, 'ЩЕБЕНЬ ТЕСТОВЫЙ', 'М3', 4, 17, 68, 'С-77'],
+  [2, 'ПЕСОК ТЕСТОВЫЙ', 'М3', 2, 5, 10, 'С-78'],
+  ['ИТОГО', null, 'СУМ', null, null, 78]
+])] });
+const ci = cert.length ? cert[0].rows.filter((r) => r.kind === 'item') : [];
+check(cert.length === 1 && cert[0].layout.no === 1 && ci.length === 2 && ci[0].no === 1 && ci[1].no === 2 &&
+  cert[0].rows.some((r) => r.kind === 'section') && cert[0].rows.some((r) => r.kind === 'total'),
+  'a «№ сертификата» column right of the sum: the № is still the first column, the band and the ИТОГО are read (№ column ' + (cert[0] && cert[0].layout.no) + ')');
+
+/* 15 — form 4А: two estimates whose titles are written whole in one cell, and two with nothing but a signature between */
+const HEAD4 = [
+  ['№ п/п', 'Шифр ресурсов', 'Наименование ресурсов, оборудования, конструкций, изделий и  деталей', 'Единица измерения', 'Количество единиц', 'Сметная стоимость'],
+  [null, null, null, null, null, 'на единицу', 'общая'],
+  [1, 2, 3, 4, 5, 6, 7]];
+const bodyOf = (code, nm, unit, q, p) => [
+  [null, null, 'СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'],
+  ['1', code, nm, unit, q, p, q * p],
+  [null, null, 'ИТОГО СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ', 'СУМ', null, null, q * p],
+  [null, null, 'ИТОГО ПРЯМЫЕ ЗАТРАТЫ', 'СУМ', null, null, q * p]];
+const signed = [[], [null, 'СОСТАВИЛ', null, 'ТЕСТОВ Т.Т.'], []];
+const oneCell = one({ sheets: [sheet('РА', [
+  ['Наименование стройки - ТЕСТОВАЯ СТРОЙКА'], [],
+  ['ЛОКАЛЬНЫЙ РЕСУРСНЫЙ СМЕТНЫЙ РАСЧЕТ № 01-01-01'], ['на ОБЩЕСТРОИТЕЛЬНЫЕ РАБОТЫ'], [],
+  ...HEAD4, ...bodyOf('С1', 'ТЕСТОВЫЙ АНКЕР М5', 'ШТ', 4, 17), ...signed,
+  ['ЛОКАЛЬНЫЙ РЕСУРСНЫЙ СМЕТНЫЙ РАСЧЕТ № 01-01-02'], ['на ДОРОЖНЫЕ РАБОТЫ'], [],
+  ...HEAD4, ...bodyOf('С2', 'ТЕСТОВЫЙ ЩЕБЕНЬ', 'М3', 2, 9), ...signed])] });
+const itemsOf = (o) => o.rows.filter((r) => r.kind === 'item').map((r) => r.nm).join('|');
+check(oneCell.length === 2 && itemsOf(oneCell[0]) === 'ТЕСТОВЫЙ АНКЕР М5' && itemsOf(oneCell[1]) === 'ТЕСТОВЫЙ ЩЕБЕНЬ' &&
+  !oneCell.some((o) => o.rows.some((r) => r.kind !== 'header' && /ЛОКАЛЬНЫЙ/.test(String(r.nm || '')))),
+  'form 4А: two estimates titled in one cell each stay two; no title line falls into the table (' + oneCell.length + ' objects)');
+const bare = one({ sheets: [sheet('РА', [
+  [null, null, ' ЛОКАЛЬНЫЙ   РЕСУРСНЫЙ   СМЕТНЫЙ   РАСЧЕТ', '№ 1'], [null, 'на', 'ТЕСТОВЫЕ РАБОТЫ'], [],
+  ...HEAD4, ...bodyOf('С1', 'ТЕСТОВЫЙ АНКЕР М5', 'ШТ', 4, 17), ...signed,
+  ...HEAD4, ...bodyOf('С2', 'ТЕСТОВЫЙ ЩЕБЕНЬ', 'М3', 2, 9), ...signed])] });
+check(bare.length === 2 && itemsOf(bare[0]) === 'ТЕСТОВЫЙ АНКЕР М5' && itemsOf(bare[1]) === 'ТЕСТОВЫЙ ЩЕБЕНЬ',
+  'form 4А: a header after «ИТОГО ПРЯМЫЕ ЗАТРАТЫ» opens another estimate even with no title above it (' + bare.length + ' objects)');
+
+/* 16 — a sheet read by its shape whose title begins «ТРАНСПОРТН…»: a street, not a haulage band */
+const street = one({ sheets: [sheet('УЛ', [
+  ['Тест'], ['ТРАНСПОРТНАЯ УЛИЦА'],
+  [1, 'ЩЕБЕНЬ ТЕСТОВЫЙ', 'М3', 4, 17, 68],
+  [],
+  ['СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'],
+  [1, 'ПЕСОК ТЕСТОВЫЙ', 'М3', 2, 5, 10]
+])] });
+const si = street.length ? street[0].rows.filter((r) => r.kind === 'item') : [];
+check(si.length === 2 && si[0].nm === 'ЩЕБЕНЬ ТЕСТОВЫЙ', 'a title «ТРАНСПОРТНАЯ УЛИЦА» above the first lines does not rename them as haulage (' + si.map((r) => r.nm).join(' | ') + ')');
+
 console.log(fail ? '\nFAILED: ' + fail : '\nall passed');
 process.exit(fail ? 1 : 0);

@@ -87,6 +87,9 @@
   var LETTER = /[A-Za-z\u00C0-\u024F\u0400-\u04FF]/;
   /** A band of haulage — «ПЕРЕВОЗКА», «Транспортировка…», «Доставка…» — and a name that already says it. */
   var HAUL = /^(ПЕРЕВОЗК|ТРАНСПОРТ|ДОСТАВК|ТАШИШ|TASHISH)/;
+  // the same above the first line of a sheet read by its shape, where the row may as well be the sheet's own title
+  // («ТРАНСПОРТНАЯ УЛИЦА»): only the words that can mean nothing but haulage
+  var HAUL_OPEN = /^(ПЕРЕВОЗК|ДОСТАВК|ТАШИШ|TASHISH|ТРАНСПОРТИРОВК|ТРАНСПОРТ\s*$|ТРАНСПОРТНЫЕ\s+(РАСХОД|УСЛУГ|ЗАТРАТ))/;
   /** «1.», «12.» — how the statement of required resources numbers its items. */
   var NUMBERED = /^\s*\d+\.\s*$/;
   /** A line priced in sums («СУМ»): a money line of the statement (5 % of the materials…), not a resource. */
@@ -149,7 +152,8 @@
     // «№ п/п» folds to «П П», so the number column is found by its raw «№» — with a code column in between, or any
     // other («Обоснование»): never guessed as the one left of the name when the header says where it is. A header
     // with «№» right before the name gives the same column as the guess did.
-    if (!L.no) L.no = noRaw && noRaw !== L.code ? noRaw : (L.code ? (L.code - 1 || 1) : (L.name - 1 || 1));
+    // a «№ …» header to the right of the name («№ сертификата», «№ позиции по смете») is not the line number
+    if (!L.no) L.no = noRaw && noRaw !== L.code && noRaw < L.name ? noRaw : (L.code ? (L.code - 1 || 1) : (L.name - 1 || 1));
     if (!L.unit) L.unit = L.name + 1;
     L.headerRow = r;
     // The "1 2 3 4 5 6" row directly beneath the header, when present.
@@ -277,6 +281,25 @@
   }
 
   /**
+   * Rows a..b stand between two headers of one sheet. The second header opens another estimate — not the next printed
+   * page of the same one — when a title line stands among them, also one written whole in a single cell («ЛОКАЛЬНЫЙ
+   * РЕСУРСНЫЙ СМЕТНЫЙ РАСЧЕТ № 01-01-02», «ЛОКАЛЬНАЯ СМЕТА № 2», «ВЕДОМОСТЬ …», «Наименование объекта - …»), or
+   * when the estimate above has already come to its last total («ИТОГО ПРЯМЫЕ ЗАТРАТЫ», «ВСЕГО …»).
+   */
+  var TITLE_LINE = /^(ЛОКАЛЬН|ВЕДОМОСТЬ|НАИМЕНОВАНИЕ ОБ|НАИМЕНОВАНИЕ СТРОЙКИ)/, LAST_TOTAL = /^(ИТОГО\s+ПРЯМ|ВСЕГО)/;
+  function startsAnew(rows, a, b) {
+    for (var r = a; r <= b; r++) {
+      var cells = rows[r];
+      if (!cells) continue;
+      for (var c = 1; c < cells.length; c++) {
+        var t = up(txt(cells[c]));
+        if (t && (TITLE_LINE.test(t) || LAST_TOTAL.test(t))) return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * @returns {?{name, title, subtitle, layout, rows: Array<Row>, maxCol:number}}
    *   Row = {r, kind, section, no, nm, unit, qty, price, sum, cells}
    */
@@ -306,7 +329,7 @@
       for (var u = start - 1; u >= 1; u--) {
         var above = sheet.rows[u] || [], t = txt(above[L.no]) || txt(above[L.name]);
         if (!t) { if (lastFilled(above)) break; continue; }
-        if (HAUL.test(up(t)) && !isSection(t)) band = t;
+        if (HAUL_OPEN.test(up(t)) && !isSection(t)) band = t;
         break;
       }
     }
@@ -506,7 +529,7 @@
     var heads = headerRows(rows, L).filter(function (h, i, all) {
       if (!i) return true;
       var m = blockMeta(rows, all[i - 1] + 1, h - 1);
-      return !!(m.number || m.work || m.object || m.stroika);
+      return !!(m.number || m.work || m.object || m.stroika) || startsAnew(rows, all[i - 1] + 1, h - 1);
     });
     var out = [], last = lastContentRow(rows), prevEnd = 0, stroika = '';
     for (var i = 0; i < heads.length; i++) {

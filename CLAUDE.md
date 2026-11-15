@@ -33,6 +33,7 @@ node test/smeta-header.cjs                            # oddiy varaq: shakli bo'y
 SMETA_KIT=<kit> node test/smeta-corpus.cjs [--record]  # o'quvchi egasi yuborgan barcha smetalarda: qoida o'zgarsa, qolganlari avvalgidek o'qilishi shart (maxfiy, repoda emas)
 node test/export-formulas.cjs                         # eksport qayta o'qiladi, formulalari hisoblanadi: ИТОГО = qatorlar yig'indisi (uch turda)
 node test/export-names.cjs                            # varaq nomlari («&», 31 belgi, \ / * ? : [ ], katta-kichik harf) va bitta qo'shimcha ustun yashirin
+node test/xls-read.cjs                                # eski Excel (.xls, 97–2003): worker'dagi SheetJS orqali, .xlsx bilan bir xil o'qiladi
 node test/worker-parity.cjs                           # sahifadagi worker o'quvchi qaytargan narsani aynan qaytaradi
 node test/compare.cjs; node test/e2e-compare.mjs      # «Сравнение версий» va «Наш ответ (Excel)»: qaytgan smetani birinchisi va jadvalimiz bilan solishtirish
 node test/volumes.cjs; node test/e2e-volumes.mjs      # «Объёмы работ»: 5-shakl ishlari, yangi hajm → resurs miqdori, javobning «объем» varag'i, Таблица №1
@@ -176,6 +177,10 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   to'xtatmaydi. Egasining smetalari, namunalar, `golden.json` va vaznlar repoga tushmaydi. Model (keyingi qadamlar)
   qoidalar o'qigan faylga **tegmaydi**: faqat hech narsa o'qilmaganda taklif qiladi, o'qigani arifmetika bilan
   tekshiriladi va «проверьте» deb ko'rsatiladi.
+  Eski Excel (.xls) fayllar (v2.16.3) SheetJS bilan o'qiladi (`src/lib/xlsx-read.js` `readOld`; SheetJS faqat fayllarni
+  o'qiydigan worker'da) — natija .xlsx bilan bir xil shaklda. Tashish varag'i («перевозка», `transportSheet`) xatolari
+  (`haulChecks`): tonnadagi material uchun solishtirma og'irlik 1 emas; «ВСЕГО» qatorlar yig'indisiga teng emas (qator
+  tushib qolgan) — sahifa ogohlantiradi, smetaning o'zi o'zgartirilmaydi.
 * Raqamlar hech qachon yo'qolmaydi: `АНКЕР М5` ≠ `АНКЕР М8`, `4.1.1` ≠ `4.11`;
   ikki raqam orasidagi ajratgich o'chirilmaydi.
 * **Xavfsizlik bo'limi hozircha o'chirilgan (egasining qarori, 2026-10-24).**

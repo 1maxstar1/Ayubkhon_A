@@ -93,6 +93,24 @@ check(wDirect.length === 1 && wDirect[0].works.length === 2, 'the parser reads t
   check(msg && msg.objects && msg.objects.length === 2, page + ': and the resource sheets as before (' + (msg && msg.objects && msg.objects.length) + ')');
 });
 
+// an Excel 97–2003 book (.xls): the worker carries SheetJS and reads it as the library with SheetJS does
+const Sx = load(load.PIPELINE, 'xlsx');
+const X = Sx.__XLSX;
+const xb = (() => {
+  const w = X.utils.book_new();
+  X.utils.book_append_sheet(w, X.utils.aoa_to_sheet([['ТЕСТОВАЯ СТРОЙКА'], ['ТЕСТОВАЯ УЛИЦА'], [],
+    ['N п/п', 'НАИМЕНОВАНИЕ', 'ЕД. ИЗМ.', 'КОЛ-ВО', 'ЦЕНА ЗА ЕД.', 'СУММА (сум)'], [1, 2, 3, 4, 5, 6],
+    ['СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'], [1, 'ЩЕБЕНЬ ТЕСТОВЫЙ', 'М3', 4, 17, 68], ['ИТОГО', null, 'СУМ', null, null, 68]]), 'Ресурсы');
+  return new Uint8Array(X.write(w, { type: 'array', bookType: 'biff8' }));
+})();
+const xDirect = JSON.parse(JSON.stringify(Sx.smeta.parseWorkbook(Sx.readXlsx(xb), 'x.xls')));
+check(xDirect.length === 1 && xDirect[0].rows.filter((r) => r.kind === 'item').length === 1, 'the library reads the test .xls');
+['smeta-taqqoslash.html', 'index.html'].forEach((page) => {
+  const msg = throughWorker(workerSource(page), 'x.xls', xb);
+  check(msg && msg.ok === true && JSON.stringify(msg.objects) === JSON.stringify(xDirect), page + ': the worker reads an .xls as the library does' +
+    (msg && !msg.ok ? ' — ' + msg.error : ''));
+});
+
 // the reading answers alone; which file it is and what it looks like (docs/format-reja.md) are separate questions,
 // asked of a worker of its own by src/ui/formats.js and by the admin page — never on the way of a reading. Only the
 // server pages' worker can answer them (the single-file page records nothing and carries no reference-price code).

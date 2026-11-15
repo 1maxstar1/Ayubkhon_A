@@ -697,6 +697,19 @@
           S.money(od.rows[0].calc) + '). В документе сумма считается как кол-во × цена.', true);
       }
       this._oddSaid = odKey;
+      // the haulage sheet's own mistakes (src/lib/smeta.js haulChecks): a specific weight other than 1 for a material in
+      // tonnes, a «ВСЕГО» that leaves a line out — said once for each such set, the estimate itself is not changed
+      var hc = [];
+      this.projects.forEach(function (p) {
+        if (p.enabled === false) return;
+        (p.objects || []).forEach(function (o) { (o.checks || []).forEach(function (c) { hc.push('«' + o.name + '»: ' + c.text); }); });
+      });
+      var hcKey = hc.join('\n');
+      if (hcKey && hcKey !== this._haulSaid) {
+        this.toast('Ошибки в расчёте перевозки (' + hc.length + '): ' + hc.slice(0, 3).join('; ') + (hc.length > 3 ? '; …' : '') +
+          '. В смете они оставлены как есть — укажите их подрядчику.', true);
+      }
+      this._haulSaid = hcKey;
       if (this.looseBook || this.spareBook) {
         this.spreadLooseBook();
         S.applyPrices(this.model, this.prices);

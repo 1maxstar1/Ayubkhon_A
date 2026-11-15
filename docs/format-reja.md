@@ -22,6 +22,9 @@ Smetadagi bitta son jimgina noto'g'ri o'qilsa, rasmiy hujjatga noto'g'ri narx tu
 | 3 | **O'qitish** (≥ 100 o'qilgan fayl): sarlavha qatori va ustun vazifalari modeli (`src/lib/ml/layout-model.js`, logistik regressiya), Web Worker'da; o'lchov — «formatni chetda qoldirib» (bir imzoli fayllar birga test qismiga tushadi); vaznlar serverda (`ml_models`), repoda emas; chetda qoldirilgan formatlarning ≥ 95 % i qoidalar bilan aynan bir xil o'qilsa — model o'zi yoqiladi; admin'da o'chirish mumkin. | navbatda |
 | 4 | **AI o'qishi**: qoidalar hech narsa o'qimagan faylda model joylashuv taklif qiladi → o'sha `parseRange` o'qiydi → arifmetika (≥ 95 %) → «Прочитано распознаванием (AI) — проверьте», «Верно / Неверно». «Верно» — keyingi o'qitish uchun belgi. | navbatda |
 
+Qoidalar bilan o'qiladigan fayl turlari: .xlsx, .xlsm va (v2.16.3 dan) eski .xls — u SheetJS bilan o'qiladi va .xlsx bilan
+bir xil shaklga keltiriladi (`test/xls-read.cjs`).
+
 Keyinroq (hozir emas): «Разметка листа» — hech kim o'qiy olmagan faylda ustunlarni qo'lda ko'rsatish oynasi.
 
 ## 2-qadam: nima yoziladi

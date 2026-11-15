@@ -112,6 +112,7 @@ run smeta-corpus     node test/smeta-corpus.cjs
 run compare          node test/compare.cjs
 run export-formulas  node test/export-formulas.cjs
 run export-names     node test/export-names.cjs
+run xls-read         node test/xls-read.cjs
 run worker-parity    node test/worker-parity.cjs
 run volumes          node test/volumes.cjs
 run ml-layout        node test/ml-layout.cjs

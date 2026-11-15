@@ -78,7 +78,9 @@ const priv = { sheets: [books.sheet('РЕСУРС', [
   [null, 'ИТОГО СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ', 'СУМ', null, null, 3.75 * 48563.26 + 2 * 91357.5 + 4 * 77123]
 ])] };
 const p = read(priv);
-const dp = L.describe(new Uint8Array(books.xlsx(S, priv)), p.wb, p.objects);
+// written once: the writer stamps the time, so a second writing a second later is another file with another hash
+const privBytes = books.xlsx(S, priv);
+const dp = L.describe(new Uint8Array(privBytes), p.wb, p.objects);
 const json = JSON.stringify(dp);
 check(p.objects.length === 1 && dp.read && dp.items === 3, 'an ordinary resource sheet, read by its header');
 check(!/[Ѐ-ӿ]/.test(json), 'the sample has no letter of the estimate in it');
@@ -147,7 +149,7 @@ const samples = [new Uint8Array(0), new Uint8Array([97, 98, 99]), new Uint8Array
   new Uint8Array(books.xlsx(S, books.book(1)))];
 check(samples.every((x) => L.sha256(x) === sha(x)), 'SHA-256, as node computes it (empty, short, at the padding edges, a workbook)');
 check(L.sha256 !== S.refs.pkg.sha256 && L.sha256(samples[1]) === S.refs.pkg.sha256(samples[1]), 'the package validator\'s own, not a copy of it');
-check(dp.hash === sha(Buffer.from(books.xlsx(S, priv))) && dp.size === books.xlsx(S, priv).length, 'the description carries the file\'s hash and size');
+check(dp.hash === sha(Buffer.from(privBytes)) && dp.size === privBytes.length, 'the description carries the file\'s hash and size');
 
 /* ------------------------------------------------------------------ limits */
 const many = { sheets: [] };

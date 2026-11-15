@@ -307,5 +307,35 @@ const street = one({ sheets: [sheet('УЛ', [
 const si = street.length ? street[0].rows.filter((r) => r.kind === 'item') : [];
 check(si.length === 2 && si[0].nm === 'ЩЕБЕНЬ ТЕСТОВЫЙ', 'a title «ТРАНСПОРТНАЯ УЛИЦА» above the first lines does not rename them as haulage (' + si.map((r) => r.nm).join(' | ') + ')');
 
+/* 17 — a haulage sheet written as «МАТЕРЯЛЫ | ЕД ИЗ | … | ТОН/КМ», with the two mistakes such a sheet is known to carry:
+        a material in tonnes with a specific weight of 2, and a «ВСЕГО» whose SUM stops a line short */
+const haul2 = sheet('перевозка', [['ТЕСТОВАЯ СТРОЙКА'], [], ['ТРАНСПОРТНЫЕ РАСХОДЫ НА ПЕРЕВОЗИМЫЕ ГРУЗЫ'], [],
+  ['№', 'МАТЕРЯЛЫ', 'ЕД ИЗ', 'КОЛИЧЕСТВА', 'УДЕЛНЫЙ ВЕС ТН', 'ОБШИЙ ТОННА', 'АВТОТРАНСПОРТ КМ', 'ТОН/КМ', 'СТОИМОСТЬ ЗА ОДИН ТН/КМ', 'ВСЕГО'],
+  [1, 'ТЕСТОВАЯ СМЕСЬ ПЛОТНАЯ', 'ТН', 100, 1, '=E6*D6', 20, '=G6*F6', 3, '=I6*H6'],
+  [2, 'ТЕСТОВАЯ СМЕСЬ ПОРИСТАЯ', 'ТН', 10, 2, '=E7*D7', 20, '=G7*F7', 3, '=I7*H7'],
+  [3, 'ТЕСТОВЫЙ ГРАВИЙ', 'М3', 50, 1.4, '=E8*D8', 5, '=G8*F8', 4, '=I8*H8'],
+  [null, 'ВСЕГО', null, null, null, null, null, null, null, '=SUM(J6:J7)'],
+  [], [null, 'ЗАКАЗЧИК', null, null, null, null, 'ПОДРЯДЧИК']]);
+// the values Excel saved with the formulas: F = D·E, H = F·G, J = H·I; the ВСЕГО leaves the gravel out
+const val = (r, c, v) => { haul2.rows[r][c].v = v; };
+val(6, 6, 100); val(6, 8, 2000); val(6, 10, 6000);
+val(7, 6, 20); val(7, 8, 400); val(7, 10, 1200);
+val(8, 6, 70); val(8, 8, 350); val(8, 10, 1400);
+val(9, 10, 7200);
+const h2 = one({ sheets: [haul2] });
+const h2i = h2.length ? h2[0].rows.filter((r) => r.kind === 'item') : [];
+check(h2.length === 1 && h2[0].layout.transport && h2i.length === 3 && h2i[1].nm === 'Транспортировка ТЕСТОВАЯ СМЕСЬ ПОРИСТАЯ 20 км' &&
+  h2i[1].qty === 400 && h2i[1].price === 3 && h2i[2].nm === 'Транспортировка ТЕСТОВЫЙ ГРАВИЙ 5 км',
+  'a haulage sheet headed «МАТЕРЯЛЫ | ЕД ИЗ | ТОН/КМ» is read as one: each material in т/км (' + h2i.map((r) => r.nm).join(' | ') + ')');
+const ck2 = (h2[0] && h2[0].checks) || [];
+const wck = ck2.find((c) => c.kind === 'weight'), tck = ck2.find((c) => c.kind === 'total');
+check(ck2.length === 2 && wck && wck.r === 7 && wck.weight === 2 && wck.tkmFixed === 200 && wck.sumFixed === 600 && /завышены в 2 раза/.test(wck.text),
+  'a material in tonnes with a specific weight of 2: said, with the т·км and the sum it should have (' + (wck && wck.text) + ')');
+check(tck && tck.total === 7200 && tck.lines === 8600 && tck.missing.join() === 'ТЕСТОВЫЙ ГРАВИЙ' && /не учтена строка «ТЕСТОВЫЙ ГРАВИЙ»/.test(tck.text),
+  'a «ВСЕГО» that leaves a line out: said, and which line (' + (tck && tck.text) + ')');
+check(!ck2.some((c) => c.r === 8 && c.kind === 'weight'), 'a weight of 1,4 for a material in м3 is no mistake');
+// the old haulage sheet of section 8 (all weights right, ИТОГО the sum of its lines with the 3 % line) says nothing
+check(!(hb[0].checks || []).some((c) => c.kind === 'weight'), 'a haulage sheet with right weights carries no weight remark');
+
 console.log(fail ? '\nFAILED: ' + fail : '\nall passed');
 process.exit(fail ? 1 : 0);

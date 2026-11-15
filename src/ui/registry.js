@@ -276,7 +276,7 @@
           self.cmpFor = self.items[+b.closest('tr').dataset.i];
           var inp = $('appCmpFile');
           if (!inp) {
-            inp = document.createElement('input'); inp.type = 'file'; inp.id = 'appCmpFile'; inp.accept = '.xlsx,.xlsm'; inp.hidden = true;
+            inp = document.createElement('input'); inp.type = 'file'; inp.id = 'appCmpFile'; inp.accept = '.xlsx,.xlsm,.xls'; inp.hidden = true;
             document.body.appendChild(inp);
             inp.addEventListener('change', function () {
               var f = inp.files && inp.files[0]; inp.value = '';

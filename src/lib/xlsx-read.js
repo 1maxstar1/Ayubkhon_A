@@ -254,6 +254,8 @@
     } catch (e) {
       // «D0 CF 11 E0» opens an OLE compound file: an Excel 97–2003 book, or an .xlsx Excel has put a password on
       if (bytes && bytes[0] === 0xD0 && bytes[1] === 0xCF && bytes[2] === 0x11 && bytes[3] === 0xE0) {
+        var old = readOld(bytes);
+        if (old) return old;
         throw new Error('Это книга Excel старого формата (.xls) или защищённая паролем. Откройте её в Excel и ' +
           'сохраните как «Книга Excel (.xlsx)» без пароля.');
       }
@@ -308,6 +310,50 @@
       parsed.hidden = sa.state === 'hidden' || sa.state === 'veryHidden';
       sheets.push(parsed);
     }
+    return { sheets: sheets };
+  }
+
+  /**
+   * An Excel 97–2003 book (.xls): read by SheetJS where it is loaded — the worker that reads the files carries it — into
+   * the shape an .xlsx gives: rows[r][c] = { v } or { v, f } (formula text with its «=», the value Excel saved with it),
+   * from 1, the sheet's columns, merged ranges and whether it is hidden. Without SheetJS (the page itself, when the
+   * browser has no worker), or for a book it cannot open (a password on an .xlsx), null: the old message stands.
+   * Only the cells that are there are walked, never the whole used range (an .xls may claim 65 536 × 256 of it).
+   */
+  var OLD_MAX_MB = 100;
+  function readOld(bytes) {
+    var X = typeof XLSX !== 'undefined' ? XLSX : null;
+    if (!X || !X.read || !X.utils || bytes.length > OLD_MAX_MB * 1024 * 1024) return null;
+    var wb;
+    try { wb = X.read(bytes, { type: 'array', cellFormula: true, cellHTML: false, cellDates: false, cellStyles: true, dense: false }); }
+    catch (e) { return null; }
+    var info = (wb.Workbook && wb.Workbook.Sheets) || [], sheets = [];
+    (wb.SheetNames || []).forEach(function (name, i) {
+      var ws = wb.Sheets[name];
+      if (!ws) return;
+      var rows = [], maxCol = 0, cols = [], merges = [];
+      Object.keys(ws).forEach(function (a) {
+        if (a.charAt(0) === '!') return;
+        var x = ws[a];
+        if (!x) return;
+        var at = X.utils.decode_cell(a), r = at.r + 1, c = at.c + 1;
+        if (!(r >= 1 && r <= MAX_ROW && c >= 1 && c <= MAX_COL)) return;
+        var v = x.v === undefined ? null : x.v;
+        if (x.t === 'e') v = x.w || '#ERROR';           // as an .xlsx gives an error: its text
+        else if (x.t === 'z') v = null;
+        else if (v instanceof Date) v = x.w || String(v);
+        var f = x.f ? '=' + x.f : null;
+        if ((v === null || v === '') && f === null) return;
+        (rows[r] || (rows[r] = []))[c] = f ? { v: v, f: f } : { v: v };
+        if (c > maxCol) maxCol = c;
+      });
+      (ws['!cols'] || []).forEach(function (col, j) {
+        if (col) cols.push({ min: j + 1, max: j + 1, width: +(col.wch || col.width || 0), hidden: !!col.hidden });
+      });
+      (ws['!merges'] || []).forEach(function (m) { merges.push(X.utils.encode_range(m)); });
+      var st = info[i] && info[i].Hidden;
+      sheets.push({ name: name, rows: rows, maxCol: maxCol, cols: cols, merges: merges, hidden: st === 1 || st === 2 || st === true });
+    });
     return { sheets: sheets };
   }
 

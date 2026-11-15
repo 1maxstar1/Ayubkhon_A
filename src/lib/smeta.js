@@ -446,11 +446,17 @@
       for (var c = 1; c < cells.length; c++) {
         var raw = txt(cells[c]), u = up(raw);
         if (!u && !/^\s*№/.test(raw)) continue;
-        if (/^НА?И?МЕНОВАНИЕ МАТЕРИАЛ/.test(u)) h.name = c;
+        // «Наименование материалов», or a bare «МАТЕРЯЛЫ» / «Материалы»; «ЕД ИЗ» as well as «Ед. изм.»; «ТОН/КМ» as well as «тн/км»
+        if (/^НА?И?МЕНОВАНИЕ МАТЕРИАЛ|^МАТЕР[ИЬ]?[АЯ]ЛЫ?$/.test(u)) h.name = c;
+        else if (/^ЕД( |$)/.test(u) && u.indexOf('ИЗ') > 0) h.unit = c;
         else if (/^ЕД/.test(u) && u.indexOf('ИЗМ') > 0) h.unit = c;
         else if (/^СТОИМОСТЬ ЗА/.test(u)) h.price = c;           // «Стоимость за один тн/км» — before the km test
-        else if (/^(ТН|Т) КМ$/.test(u)) h.tkm = c;
+        else if (/^(ТН|Т|ТОН|ТОНН) КМ$/.test(u)) h.tkm = c;
         else if (/(^| )КМ$/.test(u)) h.km = c;
+        // read for the checks below only: the material's own quantity, its specific weight, the tonnes
+        else if (/^КОЛ(ИЧЕСТВ|И ЧЕСТВО|ВО$)/.test(u)) h.amount = c;
+        else if (/^УДЕЛЬ?НЫЙ ВЕС/.test(u)) h.weight = c;
+        else if (/^(ОБЩ|ОБШ)(ИЙ|АЯ)? ?(ТОНН|ВЕС)/.test(u)) h.tons = c;
         else if (u === 'ВСЕГО' || u.indexOf('СУММА') === 0) h.sum = c;
         else if (/^\s*№/.test(raw) || /^N П П$/.test(u)) h.no = c;
       }
@@ -502,7 +508,47 @@
     // the header's own second line («тн» under «Удельный вес») sits before the numbering
     out.forEach(function (x) { if (x.r > L.headerRow && L.numRow && x.r < L.numRow && x.kind === 'blank') { x.kind = 'header'; x.sub = true; if (!L.subRow) L.subRow = x.r; } });
     if (!items) return null;
-    return { name: sheet.name, title: title, subtitle: subtitle || sheet.name, layout: L, rows: out, items: items, sections: 0, maxCol: L.sum };
+    return { name: sheet.name, title: title, subtitle: subtitle || sheet.name, layout: L, rows: out, items: items, sections: 0, maxCol: L.sum,
+      checks: haulChecks(rows, out, H) };
+  }
+
+  /**
+   * What a haulage sheet gets wrong, as the expert would point it out (nothing is changed — the estimate is read as it is):
+   *   weight  a material counted in tonnes carries a specific weight other than 1: its tonnes, its т·км and its sum
+   *           are that many times what they are («АСФАЛЬТОБЕТОННАЯ СМЕСЬ», ТН, weight 2);
+   *   total   the sheet's «ВСЕГО» is not the sum of its lines — a line left out of the SUM (SUM(J8:J12) above a line 13).
+   * Each: { kind, r, nm, unit, …, text } — `text` in the page's language, ready to show.
+   */
+  var TONNES = /^(Т|ТН|ТОН|ТОННА|ТОНН|ТОННЫ)$/;
+  function haulChecks(rows, out, H) {
+    var checks = [], lines = 0, linesN = 0, items = [];
+    function fmt(v) { return S.money ? S.money(v) : String(Math.round(v)); }
+    out.forEach(function (x) {
+      if (x.kind !== 'item') return;
+      var cs = rows[x.r] || [], name = txt(cs[H.name]).replace(/\s+/g, ' ').trim(), unit = txt(cs[H.unit]);
+      items.push({ r: x.r, nm: name, sum: x.sum });
+      if (x.sum != null) { lines += x.sum; linesN++; }
+      var w = H.weight ? S.num(cs[H.weight] && cs[H.weight].v) : null;
+      if (w != null && w > 0 && Math.abs(w - 1) > 1e-9 && TONNES.test(up(unit))) {
+        var fixedTkm = x.qty != null ? x.qty / w : null, fixedSum = x.sum != null ? x.sum / w : null;
+        checks.push({ kind: 'weight', r: x.r, nm: name, unit: unit, weight: w, tkm: x.qty, tkmFixed: fixedTkm, sum: x.sum, sumFixed: fixedSum,
+          text: '«' + name + '» (' + unit + '): удельный вес ' + String(w).replace('.', ',') + ', а для материала в тоннах он равен 1 — тонны, т·км и сумма ' +
+            'завышены в ' + String(+w.toFixed(3)).replace('.', ',') + ' раза' + (fixedSum != null ? ' (сумма ' + fmt(x.sum) + ' вместо ' + fmt(fixedSum) + ')' : '') });
+      }
+    });
+    var tot = null;
+    for (var i = out.length - 1; i >= 0 && !tot; i--) if (out[i].kind === 'total' && out[i].sum != null) tot = out[i];
+    if (tot && linesN) {
+      var diff = lines - tot.sum;
+      if (Math.abs(diff) > Math.max(1, Math.abs(lines) * 1e-6)) {
+        // the line (or lines) whose sum is the difference: the ones left out
+        var miss = items.filter(function (it) { return it.sum != null && Math.abs(it.sum - diff) <= Math.max(1, Math.abs(diff) * 1e-6); });
+        checks.push({ kind: 'total', r: tot.r, total: tot.sum, lines: lines, diff: diff, missing: miss.map(function (m) { return m.nm; }),
+          text: '«' + (tot.nm || 'ВСЕГО') + '» ' + fmt(tot.sum) + ' не равно сумме строк ' + fmt(lines) +
+            (miss.length ? ' — не учтена строка «' + miss[0].nm + '» (' + fmt(miss[0].sum) + ')' : ' (разница ' + fmt(diff) + ')') });
+      }
+    }
+    return checks;
   }
 
   /**

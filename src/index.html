@@ -16,7 +16,7 @@
   <div class="wsbox" id="wsBox" hidden></div>
   <div class="grow"></div>
   <label class="btn cyan file" title="Добавить файлы смет .xlsx">
-    <input type="file" id="pick" multiple accept=".xlsx,.xlsm">
+    <input type="file" id="pick" multiple accept=".xlsx,.xlsm,.xls">
     <span class="ic">＋</span> Файлы смет
   </label>
   <button class="btn" id="loadBook" title="Открыть сохранённую книгу цен (.json / .xlsx)">Книга цен</button>
@@ -139,11 +139,11 @@
       <div class="toolbar">
         <label class="count">Было</label>
         <select id="cmpOld" title="Первая версия: проект с вашими рыночными ценами (то, что мы отправили) или файл"></select>
-        <input type="file" id="cmpOldFile" accept=".xlsx,.xlsm" hidden>
+        <input type="file" id="cmpOldFile" accept=".xlsx,.xlsm,.xls" hidden>
         <button class="btn sm" id="cmpReplyBtn" title="Таблица, которую мы отправили (наш экспорт или PDF, переведённый в Excel): её цены ставятся в проект и считаются замечаниями">Наш ответ (Excel)</button>
         <input type="file" id="cmpReplyFile" accept=".xlsx,.xlsm" hidden>
         <button class="btn sm" id="cmpNewBtn" title="Смета, которую отправитель прислал после исправления">Загрузить исправленную смету</button>
-        <input type="file" id="cmpNewFile" accept=".xlsx,.xlsm" hidden>
+        <input type="file" id="cmpNewFile" accept=".xlsx,.xlsm,.xls" hidden>
         <span class="count where" id="cmpNewName"></span>
         <select id="cmpView">
           <option value="res">По ресурсам</option>

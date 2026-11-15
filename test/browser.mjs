@@ -14,7 +14,7 @@
 import { chromium } from 'playwright';
 import { launchOpts } from './chromium.mjs';
 import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -307,6 +307,35 @@ await page.waitForTimeout(300);
 await pctPress('-20');
 ps = await pctState(-20);
 check(Math.abs(ps.typed - typed) < 1e-9 && ps.off === 0, 'after «Сбросить» and «Отменить» the percentage prices are free for the next percentage, the typed one still is not');
+
+// an Excel 97–2003 book (.xls) with a haulage sheet that carries two known mistakes: the page reads it (the worker has
+// SheetJS) and says what is wrong with the haulage, once
+{
+  const Sx = load(load.PIPELINE, 'xlsx'), X = Sx.__XLSX, w = X.utils.book_new();
+  X.utils.book_append_sheet(w, X.utils.aoa_to_sheet([['ТЕСТОВАЯ СТРОЙКА'], ['ТЕСТОВАЯ УЛИЦА'], [],
+    ['N п/п', 'НАИМЕНОВАНИЕ', 'ЕД. ИЗМ.', 'КОЛ-ВО', 'ЦЕНА ЗА ЕД.', 'СУММА (сум)'], [1, 2, 3, 4, 5, 6],
+    ['СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'], [1, 'ТЕСТОВАЯ СМЕСЬ ПОРИСТАЯ', 'Т', 10, 50, 500], ['ИТОГО', null, 'СУМ', null, null, 500]]), 'vrmu');
+  X.utils.book_append_sheet(w, X.utils.aoa_to_sheet([['ТЕСТОВАЯ СТРОЙКА'], [], ['ТРАНСПОРТНЫЕ РАСХОДЫ НА ПЕРЕВОЗИМЫЕ ГРУЗЫ'], [],
+    ['№', 'МАТЕРЯЛЫ', 'ЕД ИЗ', 'КОЛИЧЕСТВА', 'УДЕЛНЫЙ ВЕС ТН', 'ОБШИЙ ТОННА', 'АВТОТРАНСПОРТ КМ', 'ТОН/КМ', 'СТОИМОСТЬ ЗА ОДИН ТН/КМ', 'ВСЕГО'],
+    [1, 'ТЕСТОВАЯ СМЕСЬ ПОРИСТАЯ', 'ТН', 10, 2, 20, 20, 400, 3, 1200],
+    [2, 'ТЕСТОВЫЙ ГРАВИЙ', 'М3', 50, 1.4, 70, 5, 350, 4, 1400],
+    [null, 'ВСЕГО', null, null, null, null, null, null, null, 1200]]), 'перевозка');
+  const fx = join(dir, 'Тест_старый.xls');
+  writeFileSync(fx, Buffer.from(X.write(w, { type: 'buffer', bookType: 'biff8' })));
+  const p2 = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  p2.on('pageerror', (e) => errors.push('xls page: ' + e.message));
+  await p2.goto(pathToFileURL(join(root, 'dist/smeta-taqqoslash.html')).href);
+  await p2.setInputFiles('#pick', fx);
+  await p2.waitForFunction(() => window.app && app.model && app.model.rows.length > 0, null, { timeout: 60 * 1000 });
+  await p2.waitForTimeout(500);
+  const got = await p2.evaluate(() => ({ objs: app.projects[0].objects.map((o) => o.name + ':' + o.rows.filter((r) => r.kind === 'item').length).join(','),
+    toasts: [...document.querySelectorAll('#toast .toast-item')].map((t) => t.textContent) }));
+  check(got.objs === 'vrmu:1,перевозка:2', 'an .xls is read in the page, its resource and haulage sheets (' + got.objs + ')');
+  const haulSaid = got.toasts.filter((t) => /Ошибки в расчёте перевозки \(2\)/.test(t));
+  check(haulSaid.length === 1 && /удельный вес 2/.test(haulSaid[0]) && /не учтена строка «ТЕСТОВЫЙ ГРАВИЙ»/.test(haulSaid[0]),
+    'the page says the haulage mistakes once: the weight of 2 for tonnes, the line the ВСЕГО leaves out');
+  await p2.close();
+}
 
 writeFileSync(join(root, 'test/browser-errors.txt'), errors.join('\n'));
 check(errors.length === 0, errors.length ? 'page errors:\n' + errors.slice(0, 12).join('\n') : 'no page errors');

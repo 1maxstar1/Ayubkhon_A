@@ -48,6 +48,8 @@ const REST = SCRIPTS.slice(CORE.length);
 // Files the worker needs; inlined again inside the worker blob so parsing runs
 // off the main thread without a second network/file fetch.
 const WORKER_LIBS = [
+  // SheetJS, for Excel 97–2003 books (.xls) only: src/lib/xlsx-read.js reads every .xlsx itself
+  'src/vendor/xlsx.full.min.js',
   ...CORE,
   'src/lib/formula.js',
   'src/lib/xlsx-read.js',

@@ -147,6 +147,18 @@
         }
         L.subRow = r + 2;
       }
+      // «Сметная стоимость» over two levels: «в базисном уровне | в текущем (прогнозном)», then «на ед. изм. | общая»
+      // under each — the prices are the current ones (the base columns of such a sheet are often «--»)
+      if (!L.price || !L.sum) {
+        var cur = 0, sub3 = rows[r + 2] || [], p3 = 0, s3c = 0;
+        for (var k4 = 1; k4 < sub.length && !cur; k4++) if (/^В ТЕКУЩ/.test(up(txt(sub[k4])))) cur = k4;
+        for (var k3 = cur || 1; k3 < sub3.length; k3++) {
+          var s3 = up(txt(sub3[k3]));
+          if (!p3 && (/^НА ЕД/.test(s3) || s3 === 'ЕДИНИЦЫ')) p3 = k3;
+          else if (p3 && !s3c && (s3 === 'ОБЩАЯ' || s3 === 'ВСЕГО')) s3c = k3;
+        }
+        if (p3 && s3c) { L.price = L.price || p3; L.sum = L.sum || s3c; L.subRow = r + 2; }
+      }
       if (!L.price || !L.sum) return null;
     }
     // «№ п/п» folds to «П П», so the number column is found by its raw «№» — with a code column in between, or any
@@ -241,9 +253,20 @@
   function lastTotalRow(rows, L, a, b) {
     for (var r = b; r >= a; r--) {
       var cells = rows[r];
-      if (cells && (isTotal(txt(cells[L.name])) || isTotal(txt(cells[L.no])))) return r;
+      // some programs write the totals in the code column («ИТОГО ПО СТРОИТЕЛЬНЫМ МАШИНАМ:» under «Шифр»)
+      if (cells && (isTotal(txt(cells[L.name])) || isTotal(txt(cells[L.no])) || (L.code && isTotal(txt(cells[L.code]))))) return r;
     }
     return 0;
+  }
+
+  /**
+   * The text of the code column when it is a name, not a code: a line the program wrote whole into «Шифр»
+   * («ПЕРЕВОЗКА АСФАЛЬТОБЕТОНА НА 80 КМ ПО А/Д», «ИТОГО ПО СТРОИТЕЛЬНЫМ МАШИНАМ:») while the name column stays empty.
+   * A code («С212-202», «000163», «Е2703-008-04») has no two words of letters.
+   */
+  function nameInCode(cell) {
+    var t = txt(cell).replace(/\s+/g, ' ').trim();
+    return t.length >= 10 && /[A-Za-zА-Яа-яЁё]{3,}[^A-Za-zА-Яа-яЁё]+[A-Za-zА-Яа-яЁё]{2,}/.test(t) ? t : '';
   }
 
   /** The text after the first filled cell of a row: «Наименование объекта - | ПАССАЖИРСКИЙ ЛИФТ». */
@@ -336,6 +359,12 @@
     for (var r = start; r <= last; r++) {
       var cells = sheet.rows[r] || [];
       var nm = txt(cells[L.name]);
+      // the name written into the code column (see nameInCode): read as the name, and carried into the name cell so
+      // that the document — which leaves the code column out — still says what the line is
+      if (!nm && L.code && r !== L.headerRow && r !== L.subRow) {
+        var inCode = nameInCode(cells[L.code]);
+        if (inCode) { nm = inCode; cells = cells.slice(); cells[L.name] = { v: inCode }; }
+      }
       var noCell = cells[L.no];
       var noTxt = txt(noCell);
       var qty = S.num(cells[L.qty] && cells[L.qty].v);

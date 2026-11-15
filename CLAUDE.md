@@ -180,7 +180,10 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   Eski Excel (.xls) fayllar (v2.16.3) SheetJS bilan o'qiladi (`src/lib/xlsx-read.js` `readOld`; SheetJS faqat fayllarni
   o'qiydigan worker'da) — natija .xlsx bilan bir xil shaklda; himoya testi (`smeta-corpus`) .xls ni ham o'qiydi. Tashish varag'i («перевозка», `transportSheet`) xatolari
   (`haulChecks`): tonnadagi material uchun solishtirma og'irlik 1 emas; «ВСЕГО» qatorlar yig'indisiga teng emas (qator
-  tushib qolgan) — sahifa ogohlantiradi, smetaning o'zi o'zgartirilmaydi.
+  tushib qolgan) — sahifa ogohlantiradi, smetaning o'zi o'zgartirilmaydi. Ikki qavatli «Сметная стоимость» sarlavhasi
+  («в базисном» — «--», «в текущем» — «на ед. / общая» bir qator pastda) joriy narxdan o'qiladi; kod ustunidagi «ИТОГО …»
+  jami hisoblanadi; nomi kod ustunida turgan qator («ПЕРЕВОЗКА … ТН/КМ») resurs bo'ladi (v2.16.4, `smeta-header` 19).
+  «Наш ответ» bitta jadval butun ariza uchun — u arizaning barcha smetalari bilan solishtiriladi.
 * Raqamlar hech qachon yo'qolmaydi: `АНКЕР М5` ≠ `АНКЕР М8`, `4.1.1` ≠ `4.11`;
   ikki raqam orasidagi ajratgich o'chirilmaydi.
 * **Xavfsizlik bo'limi hozircha o'chirilgan (egasining qarori, 2026-10-24).**

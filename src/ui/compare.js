@@ -252,8 +252,13 @@
     var self = this, app = this.app, gen = this.gen;
     back = back || null;      // brought back with the workspace: its prices are there already, as they were left
     var b = $('cmpOld').value;
+    // our reply is one table for the whole application: an application of several estimates (a road, its lighting, its
+    // irrigation …) has its lines spread over all of them, so they are looked for in every estimate of it, «Было» or
+    // not — a market price is one per name and unit across the application anyway. An outside first version is the
+    // reply's only estimate.
+    var proj = app.projects[+String(b).slice(1)];
     var objects = b === 'file' && this.oldFile ? this.oldFile.objects :
-      (app.projects[+String(b).slice(1)] || {}).objects;
+      (proj ? app.projects.reduce(function (all, p) { return all.concat(p.objects || []); }, []) : null);
     var end = function () { if (back) back(); };
     if (!objects) { app.toast('Сначала выберите первую версию сметы («Было»)', true); end(); return; }
     var reader = new FileReader();

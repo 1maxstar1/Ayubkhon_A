@@ -354,5 +354,50 @@ const ck3 = (h3[0] && h3[0].checks) || [];
 check(ck3.length === 1 && ck3[0].kind === 'weight' && ck3[0].r === 9 && ck3[0].weight === 2.4,
   '«Объем- ный вес» is the weight: 2,4 for a material in тонны is said, 1,45 for м3 is not, the ВСЕГО of all lines says nothing (' + ck3.map((c) => c.kind + ' r' + c.r).join(', ') + ')');
 
+/* 19 — a resource estimate of another program (the «_ЛРС» sheet): «Сметная стоимость» over two levels — «в базисном
+        уровне» (all «--») and «в текущем», each with «на ед. изм.» and «общая» a row lower; the totals («ИТОГО ПО …») in
+        the code column; the haulage lines with their names in the code column too, under «Перевозка материалов» (sums as cached values, as a saved file has them) */
+const lrs = one({ sheets: [sheet('_ЛРС', [['ТЕСТОВАЯ СТРОЙКА'], [], [null, '(наименование стройки)'], [], [null, 'ЛОКАЛЬНЫЙ РЕСУРСНЫЙ СМЕТНЫЙ РАСЧЕТ'], [],
+  ['Сметная стоимость', null, null, null, null, '--', 'ТЫС.СУМ.', '--', 'ТЫС.СУМ.'], [],
+  ['N п.п.', 'Шифр номера нормативов и коды ресурсов', 'Наименование работ и затрат', 'Единица измерения', 'Количество ', 'Сметная стоимость, сум'],
+  [null, null, null, null, null, 'в базисном уровне', null, 'в текущем (прогнозном)'],
+  [null, null, null, null, null, 'на.ед.изм.', 'общая', 'на.ед.изм.', 'общая'],
+  [1, 2, 3, 4, 5, 6, 7, 8, 9],
+  [null, null, 'ТРУДОВЫЕ РЕСУРСЫ'],
+  ['1', '1', 'ЗАТРАТЫ ТРУДА РАБОЧИХ-СТРОИТЕЛЕЙ', 'ЧЕЛ.-Ч', 10, '--', '--', 7, 70],
+  [null, 'ИТОГО ПО ТРУДОВЫМ РЕСУРСАМ:', null, 'СУМ', null, null, '--', null, 70],
+  [null, null, 'СТРОИТЕЛЬНЫЕ МАШИНЫ И МЕХАНИЗМЫ'],
+  [1, '97', 'ТЕСТОВЫЙ АВТОГРЕЙДЕР', 'МАШ.-Ч', 4, '--', '--', 11, 44],
+  [2, '108', 'ТЕСТОВЫЙ КАТОК 8 Т', 'МАШ.-Ч', 3, null, null, 13, 39],
+  [null, 'ИТОГО ПО СТРОИТЕЛЬНЫМ МАШИНАМ:', null, 'СУМ', null, null, '--', null, 83],
+  ['Перевозка материалов'],
+  [1, 'ПЕРЕВОЗКА ТЕСТОВОЙ СМЕСИ НА 30 КМ ПО А/Д', null, 'ТН/КМ', 100, null, null, 2, 200],
+  [2, 'ПЕРЕВОЗКА ТЕСТОВОГО ЩЕБНЯ НА 30 КМ ПО А/Д', null, 'ТН/КМ', 50, null, null, 3, 150],
+  [null, 'Итого по перевозке', null, 'СУМ', null, null, null, null, 350],
+  [null, null, 'МАТЕРИАЛЬНЫЕ РЕСУРСЫ'],
+  [1, '6076', 'ТЕСТОВАЯ СМЕСЬ ГОРЯЧАЯ', 'Т', 20, null, null, 17, 340],
+  [2, '9219', 'ВОДА', 'М3', 5, '--', '--', 0, 0],
+  [null, 'ИТОГО ПО СТРОИТЕЛЬНЫМ МАТЕРИАЛАМ:', null, 'СУМ', null, null, '--', null, 340],
+  [],
+  [null, 'ИТОГО ПРЯМЫЕ ЗАТРАТЫ', null, 'СУМ', null, null, '--', null, 690],
+  [null, 'ИТОГО ПО РЕСУРСНОМУ РАСЧЕТУ:', null, 'СУМ', null, null, '--', null, 843],
+  [], [null, 'СОСТАВИЛ', null, null, 'ТЕСТОВ Т.Т.']])] });
+const li = lrs.length ? lrs[0].rows.filter((r) => r.kind === 'item') : [];
+const lNames = li.map((r) => r.nm);
+check(lrs.length === 1 && li.length === 7, 'a «_ЛРС» sheet with «Сметная стоимость» over two levels is read: 7 resources (' + lNames.join(' | ') + ')');
+const grader = li.find((r) => r.nm === 'ТЕСТОВЫЙ АВТОГРЕЙДЕР');
+check(grader && grader.qty === 4 && grader.price === 11 && grader.sum === 44,
+  'the price and the sum are the current ones («в текущем»), not the base «--» (' + JSON.stringify(grader && [grader.qty, grader.price, grader.sum]) + ')');
+const mix = li.find((r) => /ПЕРЕВОЗКА ТЕСТОВОЙ СМЕСИ/.test(r.nm));
+check(mix && mix.unit && /ТН\/КМ/i.test(mix.unit) && mix.qty === 100 && mix.price === 2 && mix.sum === 200,
+  'a haulage line with its name in the code column is a resource: name, т/км, quantity, price (' + JSON.stringify(mix && [mix.nm, mix.unit, mix.qty, mix.price]) + ')');
+check(!lNames.some((n) => /ИТОГО|Итого/.test(n)) && lrs[0].rows.some((r) => r.kind === 'total'),
+  'the totals in the code column are totals, not resources');
+check(li.some((r) => r.nm === 'ТЕСТОВАЯ СМЕСЬ ГОРЯЧАЯ') && li.some((r) => r.nm === 'ВОДА'),
+  'the materials after «Итого по перевозке» are read: the estimate does not end at the first total in the code column');
+const lm = S.assemble([{ name: 'l', file: 'l.xlsx', objects: lrs, enabled: true }], {});
+const lmix = lm.rows.find((r) => r.kind === 'item' && /ПЕРЕВОЗКА ТЕСТОВОЙ СМЕСИ/.test(r.nm || r.name || ''));
+check(!!lmix, 'and the haulage line goes into the comparison table under its name');
+
 console.log(fail ? '\nFAILED: ' + fail : '\nall passed');
 process.exit(fail ? 1 : 0);

@@ -23,7 +23,8 @@ Smetadagi bitta son jimgina noto'g'ri o'qilsa, rasmiy hujjatga noto'g'ri narx tu
 | 4 | **AI o'qishi**: qoidalar hech narsa o'qimagan faylda model joylashuv taklif qiladi → o'sha `parseRange` o'qiydi → arifmetika (≥ 95 %) → «Прочитано распознаванием (AI) — проверьте», «Верно / Неверно». «Верно» — keyingi o'qitish uchun belgi. | navbatda |
 
 Qoidalar bilan o'qiladigan fayl turlari: .xlsx, .xlsm va (v2.16.3 dan) eski .xls — u SheetJS bilan o'qiladi va .xlsx bilan
-bir xil shaklga keltiriladi (`test/xls-read.cjs`).
+bir xil shaklga keltiriladi (`test/xls-read.cjs`). v2.16.4: «_ЛРС» varag'i (ikki qavatli narx sarlavhasi, jami va tashish
+qatorlari kod ustunida) ham o'qiladi; himoya to'plamida 23 fayl (yangi 8 tasi — 3 ta ariza), hammasi to'liq o'qiladi.
 
 Keyinroq (hozir emas): «Разметка листа» — hech kim o'qiy olmagan faylda ustunlarni qo'lda ko'rsatish oynasi.
 

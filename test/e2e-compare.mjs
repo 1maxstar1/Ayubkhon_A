@@ -255,6 +255,27 @@ try {
   check(await page.evaluate((f) => app.projects[app.projects.length - 1].file === f && app.worker !== window.__oldWorker && !document.getElementById('busy').classList.contains('on'), other),
     'the worker is replaced, the other file is read, and the page is not left «reading»');
 
+  // an application of two estimates (a road and its lighting): our reply is one table for both, and «Было» is the
+  // road — the line that only the lighting has is found there too, and priced
+  {
+    const { sheet } = require('./compare-books.cjs');
+    const f4 = join(dir, 'Тест_освещение.xlsx');
+    writeFileSync(f4, xlsx(S, { sheets: [sheet('Освещение', [['ТЕСТОВАЯ СТРОЙКА'], ['ТЕСТОВОЕ ОСВЕЩЕНИЕ'], [],
+      ['N п/п', 'НАИМЕНОВАНИЕ', 'ЕД. ИЗМ.', 'КОЛ-ВО', 'ЦЕНА ЗА ЕД.', 'СУММА (сум)'], [1, 2, 3, 4, 5, 6],
+      ['СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'], [1, 'ТЕСТОВЫЙ РЕСУРС, КОТОРОГО НЕТ', 'ШТ', 10, 3, 30], ['ИТОГО', null, 'СУМ', null, null, 30]])] }));
+    await page.goto('file://' + join(root, 'dist/smeta-taqqoslash.html'));
+    await page.setInputFiles('#pick', [f1, f4]);
+    await page.waitForFunction(() => window.app && app.projects.length === 2 && app.model && app.model.rows.length > 0, null, { timeout: 30 * 1000 });
+    await page.click('.tab[data-pane="compare"]');
+    check(await page.inputValue('#cmpOld') === 'p0', '(«Было» is the road)');
+    await page.setInputFiles('#cmpReplyFile', f3);
+    await page.waitForFunction(() => app.compare_ui.reply, null, { timeout: 30 * 1000 });
+    const done2 = await page.textContent('#cmpReplyDone').catch(() => '');
+    const lit = await page.evaluate(() => { const r = app.model.resources.find((x) => x.name === 'ТЕСТОВЫЙ РЕСУРС, КОТОРОГО НЕТ'); return r && r.market; });
+    check(/строк 7, найдено в смете 7/.test(done2) && !/не найдено/.test(done2) && lit === 2,
+      'a reply for an application of two estimates finds its lines in both, and prices the lighting\'s line too (' + lit + ')');
+  }
+
   check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' / ') : ''));
 } finally {
   await browser.close();

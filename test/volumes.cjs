@@ -107,6 +107,19 @@ check(m.set[a[0].key] && near(m.set[a[0].key].v, 0.3), 'reply: a new volume');
 check(m.set[a[1].key] && m.set[a[1].key].v == null && m.set[a[1].key].note === NOTE, 'reply: a remark alone');
 check(m.set[a[3].key] && !m.set[a[2].key] && m.set[a[3].key].v == null, 'reply: of two works of one name, the one of that volume; the same volume is no change');
 
+// a reply made from an earlier one: its «объем» sheet still names the earlier object, the prices name this one
+const titled = (obj) => ({ name: 'объем', rows: [null, [null, { v: ' объёмов работ рабочего проекта с локальной ресурсной ведомостью по объекту: ' + obj }], ...reply.sheets[1].rows.slice(1)] });
+const pricesBy = (line) => ({ name: 'цены', rows: [null, [null, { v: 'СРАВНИТЕЛЬНАЯ ТАБЛИЦА №2' }], [null, { v: line }], [], [null, { v: '№ п/п' }, { v: 'Наименование ресурса' }]] });
+check(S.volumes.titleObject(titled('«ТЕСТОВАЯ ДОРОГА 1-2 КМ»').rows) === '«ТЕСТОВАЯ ДОРОГА 1-2 КМ»' &&
+  S.volumes.titleObject(pricesBy('ТЕСТОВЫЙ МОСТ НА 7 КМ').rows) === 'ТЕСТОВЫЙ МОСТ НА 7 КМ' &&
+  S.volumes.titleObject(pricesBy('по итогам изучения ценовых параметров … по объекту: ТЕСТОВЫЙ МОСТ').rows) === 'ТЕСТОВЫЙ МОСТ',
+  'reply: the object a title names — after «по объекту:», or the line under «ТАБЛИЦА №2»');
+const foreign = S.volumes.parseReply({ sheets: [titled('«ТЕСТОВАЯ ДОРОГА 1-2 КМ»'), pricesBy('ТЕСТОВЫЙ МОСТ НА 7 КМ')] });
+const own2 = S.volumes.parseReply({ sheets: [titled('«ТЕСТОВЫЙ МОСТ НА 7 КМ»'), pricesBy('по итогам … по объекту: ТЕСТОВЫЙ МОСТ НА 7 КМ')] });
+const bare = S.volumes.parseReply({ sheets: [titled('«ТЕСТОВАЯ ДОРОГА 1-2 КМ»')] });
+check(foreign.other === true && own2.other === false && bare.other === false && foreign.entries.length === 4,
+  'reply: a «объем» sheet naming another object than the prices is told apart (the page then reads only the prices); the same object, or no prices sheet, is not');
+
 /* ------------------------------------------------------------------ quantities */
 const d = S.volumes.deltas(a, m.set);
 const labour = S.nameUnitKey('Затраты труда рабочих', 'чел.-ч'), exc = S.nameUnitKey('Экскаватор 0,5 м3', 'маш.-ч');

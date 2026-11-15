@@ -192,7 +192,10 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   `sync.js` `MAX_FILES` birga o'zgaradi). т·км ustuni yo'q tashish varag'i: т·км = tonna × km (ikki qatorli sarlavha),
   hujjatga qiymat bo'lib yoziladi; ИТОГО tekshiruvi undagi pul qatorini («3% от стоимости материалов») ham qo'shadi.
   Boshqa smetalarni qatorma-qator takrorlaydigan fayl («ОБЩИЙ ИТОГ», `S.copiesOf`) yuklanganda o'chiriladi va aytiladi —
-  ресурс ikki marta sanalmaydi; solishtirish va «Наш ответ» o'chirilgan loyihaga qaramaydi.
+  ресурс ikki marta sanalmaydi; solishtirish va «Наш ответ» o'chirilgan loyihaga qaramaydi. «Наш ответ» ning «объем»
+  varag'i boshqa obyektni nomlasa (sarlavhadagi «по объекту:» yoki «ТАБЛИЦА №2» ostidagi qator narx varag'inikidan farq
+  qiladi) va qatorlarining yarmidan ko'pi smetada yo'q bo'lsa — u o'qilmaydi, faqat narxlar olinadi va sahifa aytadi
+  (egasining qarori, 2026-11-15: ekspert eski javobni shablon qilib, «объем» varag'ini o'chirmay qoldiradi).
 * Raqamlar hech qachon yo'qolmaydi: `АНКЕР М5` ≠ `АНКЕР М8`, `4.1.1` ≠ `4.11`;
   ikki raqam orasidagi ajratgich o'chirilmaydi.
 * **Xavfsizlik bo'limi hozircha o'chirilgan (egasining qarori, 2026-10-24).**

@@ -501,7 +501,8 @@
           ', найдено в смете ' + m.found.length + (rp.applied ? ', цен проекта обновлено: ' + rp.applied : '') +
           (twice ? ', повторов (та же позиция сметы ещё раз): ' + twice : '') +
           (m.missing.length ? ', <b>не найдено ' + m.missing.length + '</b> — список ниже' : '') + '.<br>' +
-          (rp.vol && S.Volumes ? 'Лист «объем»: ' + S.esc(S.Volumes.replyText(rp.vol)) + ' — вкладка «Объёмы работ».' +
+          (rp.vol && rp.vol.foreign && S.Volumes ? 'Объёмы: ' + S.esc(S.Volumes.replyText(rp.vol)) + '.<br>' : '') +
+          (rp.vol && !rp.vol.foreign && S.Volumes ? 'Лист «объем»: ' + S.esc(S.Volumes.replyText(rp.vol)) + ' — вкладка «Объёмы работ».' +
             (rp.vol.missing.length ? ' Нет в смете: ' + rp.vol.missing.slice(0, 10).map(function (e) { return '«' + S.esc(e.name) + '»'; }).join(', ') +
               (rp.vol.missing.length > 10 ? ' …' : '') + '.' : '') + '<br>' : '') +
           'Исправленная смета не обязательна. Если её нет — проверьте цены на вкладке «Проверка цен» и нажмите «✓ Завершить»: ' +

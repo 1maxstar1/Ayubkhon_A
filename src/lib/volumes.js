@@ -188,6 +188,46 @@ var S = (typeof S !== 'undefined' && S) || {};
     return null;
   }
 
+  /**
+   * The object a sheet's title names: «… с локальной ресурсной ведомостью по объекту: «А373 …»», «по итогам изучения … по
+   * объекту: D008 …» — the text after «по объекту:» (or on the line below it), or '' when the title names none.
+   */
+  function titleObject(rows) {
+    var first = function (cells) { var t = ''; (cells || []).some(function (x) { t = txt(x).replace(/\s+/g, ' ').trim(); return !!t; }); return t; };
+    var r, u, name;
+    for (r = 1; r < Math.min(rows.length, 12); r++) {
+      var cells = rows[r] || [];
+      for (var c = 1; c < cells.length; c++) {
+        var m = /по\s+объект(?:у|ам)\s*:?([\s\S]*)$/i.exec(txt(cells[c]));
+        if (!m) continue;
+        name = m[1].replace(/\s+/g, ' ').trim();
+        for (u = r + 1; !name && u < Math.min(rows.length, r + 3); u++) name = first(rows[u]);
+        return name;
+      }
+    }
+    // no «по объекту:» — the line under «… ТАБЛИЦА №2» is the object itself («БЕКОБОД ТУМАНИГА 28 КМ …»)
+    for (r = 1; r < Math.min(rows.length, 12); r++) {
+      if (!/ТАБЛИЦА\s*№/i.test(first(rows[r]))) continue;
+      for (u = r + 1; u < Math.min(rows.length, r + 3); u++) {
+        name = first(rows[u]);
+        if (name && LETTER.test(name) && name.charAt(0) !== '(') return name;
+      }
+      return '';
+    }
+    return '';
+  }
+  /** Two titles name other objects: neither, without its quotes, is the other or a part of it. */
+  function otherObject(a, b) {
+    var ka = up(String(a).replace(/[«»"“”„']/g, ' ')), kb = up(String(b).replace(/[«»"“”„']/g, ' '));
+    return !!ka && !!kb && ka !== kb && ka.indexOf(kb) < 0 && kb.indexOf(ka) < 0;
+  }
+
+  /**
+   * The «объем» sheet of our reply. An expert who made the reply from an earlier one may leave its «объем» sheet in —
+   * the volumes of another object («А373 …») next to the prices of this one («D008 …»). `other` says the titles name
+   * two objects; whoever reads the reply against the works decides (src/ui/volumes.js readReply: titles apart and most
+   * lines not in the estimate — the sheet is not read, only the prices are; the owner, 2026-11-15).
+   */
   function parseReply(wb) {
     var sheets = wb.sheets || [];
     for (var i = 0; i < sheets.length; i++) {
@@ -205,7 +245,12 @@ var S = (typeof S !== 'undefined' && S) || {};
           project: H.project ? num(cells[H.project]) : null, note: H.note ? txt(cells[H.note]).replace(/\s+/g, ' ').trim() : '',
           sheet: sheets[i].name });
       }
-      if (entries.length) return { entries: entries, sheet: sheets[i].name };
+      if (entries.length) {
+        // the objects the titles name: this sheet's, and the one the other sheet (the prices) names
+        var mine = titleObject(rows), priced = '';
+        for (var j = 0; j < sheets.length && !priced; j++) if (j !== i) priced = titleObject(sheets[j].rows || []);
+        return { entries: entries, sheet: sheets[i].name, object: mine, priced: priced, other: otherObject(mine, priced) };
+      }
     }
     return null;
   }
@@ -292,5 +337,6 @@ var S = (typeof S !== 'undefined' && S) || {};
   }
 
   S.volumes = { NOTE: NOTE, table: table, parseSheet: parseSheet, parseWorkbook: parseWorkbook, list: list, parseReply: parseReply, match: match,
+    titleObject: titleObject, otherObject: otherObject,
     deltas: deltas, key: baseKey };
 })(S);

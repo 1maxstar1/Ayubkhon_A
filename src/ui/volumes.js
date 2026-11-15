@@ -20,6 +20,9 @@
  */
 (function (S) {
   'use strict';
+
+  /** An object's name, short enough for a line of text. */
+  function cut(t) { t = String(t || '').replace(/\s+/g, ' ').trim(); return '«' + (t.length > 60 ? t.slice(0, 60) + '…' : t).replace(/^«|»$/g, '') + '»'; }
   function $(id) { return document.getElementById(id); }
   var V = S.volumes;
 
@@ -228,6 +231,11 @@
       var rp = V.parseReply(wb);
       if (!rp) return null;
       var m = V.match(rp.entries, this.works());
+      // the «объем» sheet of another object, left in a reply made from an earlier one: its title names another object
+      // than the prices', and most of its lines are not in the estimate — only the prices are read (the owner, 2026-11-15)
+      if (rp.other && m.found.length * 2 < rp.entries.length) {
+        return { rows: 0, found: 0, missing: [], set: {}, changed: 0, foreign: { object: rp.object, priced: rp.priced, rows: rp.entries.length } };
+      }
       return { rows: rp.entries.length, found: m.found.length, missing: m.missing, set: m.set,
         changed: Object.keys(m.set).filter(function (k) { return m.set[k].v != null; }).length };
     },
@@ -242,6 +250,8 @@
     /** The reply's volumes in words, for the toast and «Наш ответ применён». */
     replyText: function (got) {
       if (!got) return '';
+      if (got.foreign) return 'лист «объем» относится к другому объекту (' + cut(got.foreign.object) + '), а цены — к ' + cut(got.foreign.priced) +
+        ': объёмы из него не взяты, прочитаны только цены';
       return 'объёмов работ: строк ' + got.rows + ', найдено ' + got.found + (got.changed ? ', с объёмом по проекту ' + got.changed : '') +
         (got.missing.length ? ', не найдено ' + got.missing.length : '');
     },

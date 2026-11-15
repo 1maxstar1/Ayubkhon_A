@@ -195,6 +195,27 @@ try {
   const two = await page.evaluate(() => { const k = Object.keys(app.vol)[0]; return { k, v: app.vol[k].v }; });
   check(/^Тест_второй\.xlsx/.test(two.k) && near(two.v, 1.25), 'a work of the second estimate is found by a reply read against the first (' + two.k.slice(0, 20) + ')');
 
+  // a reply made from an earlier one: its «объем» sheet is of another object (the title says so, and its works are not in
+  // this estimate) — only the prices are read, and the page says why
+  {
+    const vb = volReplyBook();
+    const volSheet = vb.sheets[1], prices = vb.sheets[0];
+    volSheet.rows = [null, [null, { v: ' объёмов работ рабочего проекта с локальной ресурсной ведомостью по объекту: «ТЕСТОВАЯ ЧУЖАЯ ДОРОГА»' }],
+      ...volSheet.rows.slice(1).map((cs) => (cs || []).map((c) => (c && c.v === 'ТЕСТОВАЯ КЛАДКА СТЕН' ? { v: 'ТЕСТОВАЯ ЧУЖАЯ РАБОТА 1' } :
+        c && c.v === 'ТЕСТОВЫЙ МОНТАЖ АНКЕРОВ' ? { v: 'ТЕСТОВАЯ ЧУЖАЯ РАБОТА 2' } : c)))];
+    prices.rows = [null, [null, { v: 'СРАВНИТЕЛЬНАЯ ТАБЛИЦА №2' }], [null, { v: 'по итогам изучения ценовых параметров ресурсов по объекту: ТЕСТОВЫЙ ОБЪЕКТ' }], ...prices.rows.slice(1)];
+    const ff = join(dir, 'Ответ_чужой_объем.xlsx');
+    writeFileSync(ff, xlsx(S, vb));
+    await open(fw);
+    await page.click('.tab[data-pane="compare"]');
+    await page.setInputFiles('#cmpReplyFile', ff);
+    await page.waitForFunction(() => app.compare_ui.reply, null, { timeout: 30 * 1000 });
+    const fx = await page.evaluate(() => ({ vol: Object.keys(app.vol || {}).length, m8: app.model.resources.find((x) => x.name === 'ТЕСТОВЫЙ АНКЕР М8').market,
+      done: (document.getElementById('cmpReplyDone') || {}).textContent || '' }));
+    check(fx.vol === 0 && fx.m8 === 16 && /относится к другому объекту \(«ТЕСТОВАЯ ЧУЖАЯ ДОРОГА»\)/.test(fx.done) && /прочитаны только цены/.test(fx.done),
+      'a «объем» sheet of another object left in the reply: its volumes are not taken, the prices are, and it is said (' + fx.done.slice(fx.done.indexOf('Объёмы'), fx.done.indexOf('Объёмы') + 140) + ')');
+  }
+
   check(!errors.length, 'no errors on the page' + (errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''));
 } catch (e) {
   check(false, 'the run: ' + (e && e.stack || e));

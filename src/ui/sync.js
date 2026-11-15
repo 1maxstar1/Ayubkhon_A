@@ -6,6 +6,9 @@
  */
 (function (S) {
   'use strict';
+
+  /** «new», «new1» … — the workspace slots of the corrected files (src/ui/compare.js). */
+  function newSlots() { return S.Compare_newSlots ? S.Compare_newSlots() : ['new']; }
   if (!S.pb) return;
 
   var SAVE_MS = 1500;
@@ -150,6 +153,8 @@
       this.files = (w.state && w.state.files) || {};
       var sc = (w.state && w.state.compare) || {};
       this.cmp = { old: sc.old || null, new: sc.new || null, reply: sc.reply || null, base: sc.base || '' };
+      // the other corrected files of an application of several estimates (the version before keeps only «new»)
+      newSlots().forEach(function (k) { if (k !== 'new' && sc[k]) this.cmp[k] = sc[k]; }, this);
       this.corr = {};
       this.unsaved = {};
       clearTimeout(this.ut);
@@ -513,7 +518,8 @@
     restoreCompare: function () {
       var self = this, app = A(), ws = this.ws, c = this.cmp, mine = this.seq;
       if (!ws || !app.compare_ui) return;
-      var slots = ['old', 'new', 'reply'].filter(function (k) { return c[k] && c[k].id && (ws.files || []).indexOf(c[k].id) >= 0; });
+      // «new1», «new2» …: the other corrected files of an application of several estimates
+      var slots = ['old', 'reply'].concat(newSlots()).filter(function (k) { return c[k] && c[k].id && (ws.files || []).indexOf(c[k].id) >= 0; });
       if (!slots.length) { if (c.base) app.compare_ui.restore({ base: c.base }, {}); return; }
       Promise.all(slots.map(function (k) {
         return S.fileURL(ws, c[k].id).then(function (u) { return fetch(u); }).then(function (r) {
@@ -675,7 +681,8 @@
         qtys: app.qtys && Object.keys(app.qtys).length ? app.qtys : undefined,
         looseBook: app.looseBook || null,
         book: app.spareBook || null,
-        compare: { old: this.cmp.old || null, new: this.cmp.new || null, reply: this.cmp.reply || null, base: this.cmp.base || '' },
+        compare: newSlots().reduce(function (c, k) { if (k !== 'new' && this.cmp[k]) c[k] = this.cmp[k]; return c; }.bind(this),
+          { old: this.cmp.old || null, new: this.cmp.new || null, reply: this.cmp.reply || null, base: this.cmp.base || '' }),
         opts: app.opts,
         mode: $('reportMode').value,
         keys: KEYS,

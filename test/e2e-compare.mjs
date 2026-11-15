@@ -276,6 +276,25 @@ try {
       'a reply for an application of two estimates finds its lines in both, and prices the lighting\'s line too (' + lit + ')');
   }
 
+  // … and its corrected files, the road's and the lighting's, chosen together in the other order: each with its own
+  {
+    const f5 = join(dir, 'Тест_освещение_испр.xlsx');
+    const { sheet } = require('./compare-books.cjs');
+    writeFileSync(f5, xlsx(S, { sheets: [sheet('Освещение', [['ТЕСТОВАЯ СТРОЙКА'], ['ТЕСТОВОЕ ОСВЕЩЕНИЕ'], [],
+      ['N п/п', 'НАИМЕНОВАНИЕ', 'ЕД. ИЗМ.', 'КОЛ-ВО', 'ЦЕНА ЗА ЕД.', 'СУММА (сум)'], [1, 2, 3, 4, 5, 6],
+      ['СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'], [1, 'ТЕСТОВЫЙ РЕСУРС, КОТОРОГО НЕТ', 'ШТ', 10, 2, 20], ['ИТОГО', null, 'СУМ', null, null, 20]])] }));
+    await page.setInputFiles('#cmpNewFile', [f5, f2]);
+    await page.waitForFunction(() => app.compare_ui.res && app.compare_ui.newFile && app.compare_ui.newFile.parts.length === 2, null, { timeout: 30 * 1000 });
+    const r2 = await page.evaluate(() => {
+      const res = app.compare_ui.res, rows = [].concat(...res.objects.map((o) => o.rows));
+      const lit = rows.find((r) => r.nm === 'ТЕСТОВЫЙ РЕСУРС, КОТОРОГО НЕТ');
+      return { name: document.getElementById('cmpNewName').textContent, only: res.objects.filter((o) => o.only).length,
+        objects: res.objects.map((o) => o.name), lit: lit && [lit.p1, lit.p2, lit.object], added: rows.filter((r) => r.st === 'added' || r.st === 'removed').length };
+    });
+    check(r2.name === 'Тест_освещение_испр.xlsx + Тест_v2.xlsx' && r2.only === 0 && r2.lit && r2.lit[0] === 3 && r2.lit[1] === 2 && /^Тест_освещение\.xlsx · /.test(r2.lit[2]),
+      'two corrected files chosen together: the lighting\'s price change is found on the lighting, every sheet has its pair (' + JSON.stringify(r2) + ')');
+  }
+
   check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' / ') : ''));
 } finally {
   await browser.close();

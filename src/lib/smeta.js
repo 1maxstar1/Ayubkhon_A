@@ -90,6 +90,8 @@
   // the same above the first line of a sheet read by its shape, where the row may as well be the sheet's own title
   // («ТРАНСПОРТНАЯ УЛИЦА»): only the words that can mean nothing but haulage
   var HAUL_OPEN = /^(ПЕРЕВОЗК|ДОСТАВК|ТАШИШ|TASHISH|ТРАНСПОРТИРОВК|ТРАНСПОРТ\s*$|ТРАНСПОРТНЫЕ\s+(РАСХОД|УСЛУГ|ЗАТРАТ))/;
+  /** The unit of haulage: «ТН/КМ», «т.км», «тонна км». */
+  var TKM = /^(ТН|Т|ТОН|ТОНН|ТОННА) ?КМ$/;
   /** «1.», «12.» — how the statement of required resources numbers its items. */
   var NUMBERED = /^\s*\d+\.\s*$/;
   /** A line priced in sums («СУМ»): a money line of the statement (5 % of the materials…), not a resource. */
@@ -295,12 +297,33 @@
       var head = '';
       for (var c = 1; c < cells.length && !head; c++) head = up(txt(cells[c]));
       if (!head) continue;
-      if (head.indexOf('НАИМЕНОВАНИЕ СТРОЙКИ') === 0) m.stroika = labelled(cells);
-      else if (head.indexOf('НАИМЕНОВАНИЕ ОБ') === 0) m.object = labelled(cells);
-      else if (head.indexOf('ЛОКАЛЬНЫЙ') === 0) m.number = labelled(cells);
-      else if (head === 'НА') m.work = labelled(cells);
+      if (head.indexOf('НАИМЕНОВАНИЕ СТРОЙКИ') === 0) m.stroika = filled(labelled(cells)) || (caption(cells) ? lineAbove(rows, r, a) : '');
+      else if (head.indexOf('НАИМЕНОВАНИЕ ОБ') === 0) m.object = filled(labelled(cells)) || (caption(cells) ? lineAbove(rows, r, a) : '');
+      else if (head.indexOf('ЛОКАЛЬНЫЙ') === 0) m.number = filled(labelled(cells));
+      else if (head === 'НА') m.work = filled(labelled(cells));
     }
     return m;
+  }
+
+  /** A label left blank on the form («на ,» — a comma where the works should be) says nothing. */
+  function filled(t) { return /[0-9A-Za-zА-Яа-яЁё]/.test(t) ? t : ''; }
+
+  /** «(наименование стройки)» — the caption printed under the line it names, not a label before it. */
+  function caption(cells) {
+    for (var c = 1; c < cells.length; c++) { var t = txt(cells[c]).trim(); if (t) return t.charAt(0) === '('; }
+    return false;
+  }
+
+  /** The nearest line above row r (not above row a) with words in it: the text a caption names. */
+  function lineAbove(rows, r, a) {
+    for (var u = r - 1; u >= a; u--) {
+      var cells = rows[u] || [];
+      for (var c = 1; c < cells.length; c++) {
+        var t = txt(cells[c]).replace(/\s+/g, ' ').trim();
+        if (LETTER.test(t) && t.charAt(0) !== '(' && !/^#[A-Z\/0]+[!?]?$/.test(t)) return t;   // not «#VALUE!»
+      }
+    }
+    return '';
   }
 
   /**
@@ -380,11 +403,19 @@
       // numbered lines only: «В Т.Ч. ЗАТРАТЫ ТРУДА МАШИНИСТОВ» and the closing
       // «ЗАТРАТЫ ТРУДА РАБОЧИХ» carry a quantity but are not resources.
       else if (L.code && !noTxt && nm && qty == null && isSection(nm)) { kind = 'section'; section = sectionOf(nm); sections++; }
+      // a т·км line under a haulage band with its price but its quantity left empty (and so its sum 0): a line of the
+      // estimate all the same — numbered or not — read with the quantity 0, so that nothing on the sheet goes unseen
+      else if (qty == null && !sum && price != null && nm && LETTER.test(nm) && HAUL.test(up(band)) && !isSection(band) && TKM.test(up(txt(cells[L.unit])))) { kind = 'item'; qty = 0; items++; }
       else if (L.need && nm && LETTER.test(nm) && qty != null && !money(cells[L.unit]) && (S.num(noCell && noCell.v) != null || NUMBERED.test(noTxt) || price != null)) { kind = 'item'; items++; }
       else if (!L.need && nm && LETTER.test(nm) && qty != null && (!L.code || S.num(noCell && noCell.v) != null)) { kind = 'item'; items++; }
       else if (nm) kind = 'extra';
       else if (noTxt && L.need) { kind = 'section'; section = sectionOf(noTxt); }
-      else if (noTxt) kind = 'section';
+      else if (noTxt) {
+        kind = 'section';
+        // «Перевозка материалов» in the number column: its lines are haulage, not the machines of the band above
+        // (the statement of required resources gives such a band «other» the same way — sectionOf)
+        if (HAUL.test(up(noTxt)) && !isSection(noTxt)) section = 'other';
+      }
       else kind = 'blank';
 
       if (kind === 'section') band = noTxt || nm;

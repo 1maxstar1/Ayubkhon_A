@@ -26,6 +26,8 @@ writeFileSync(f2, xlsx(S, book(2)));
 writeFileSync(f3, xlsx(S, replyBook()));
 const f4 = join(dir, 'Тест_объёмы.xlsx');
 writeFileSync(f4, xlsx(S, bookWithWorks()));
+const f5 = join(dir, 'Тест_объёмы_испр.xlsx');           // the corrected file of f4, unchanged
+writeFileSync(f5, xlsx(S, bookWithWorks()));
 
 const pb = await startServer({ port: 8141, registry: true, build: true });
 const { api, su } = pb;
@@ -251,6 +253,32 @@ try {
   check(q.works === 2 && q.vol.length === 1 && q.vol[0].v === 1.5 && q.vol[0].note === 'по рабочему проекту',
     'after a reload the works are read again and the volume decided is back (' + JSON.stringify(q.vol) + ')');
   check(Math.abs(q.labour - 8) < 1e-9 && q.crane === 3, 'and the quantities follow it, with the one set by hand (' + q.labour + ', ' + q.crane + ')');
+
+  // an application of two estimates: both corrected files chosen at once (in the other order), each compared with its
+  // own estimate, and both back after a reload
+  await page.setInputFiles('#pick', f1);
+  await page.waitForFunction(() => app.projects.length === 2 && !S.Sync.loading, null, T);
+  await page.click('.tab[data-pane="compare"]');
+  await page.setInputFiles('#cmpNewFile', [f2, f5]);
+  await page.waitForFunction(() => app.compare_ui.res && app.compare_ui.newFile && app.compare_ui.newFile.parts.length === 2, null, T);
+  const two = async () => page.evaluate(() => ({ name: document.getElementById('cmpNewName').textContent,
+    objects: app.compare_ui.res.objects.map((o) => o.name + (o.only ? ' [' + o.only + ']' : '')), label: app.compare_ui.labels.oldLabel }));
+  const t1 = await two();
+  check(t1.name === 'Тест_v2.xlsx + Тест_объёмы_испр.xlsx' && t1.objects.length >= 3 && t1.objects.every((n) => !/\[/.test(n)) && /все сметы заявки \(2\)/.test(t1.label),
+    'two corrected files at once: the first version is every estimate of the application, each sheet paired with its own (' + t1.objects.join(' | ') + ')');
+  await saved();
+  check(await page.evaluate(() => !!(S.Sync.cmp.new && S.Sync.cmp.new1)), 'the workspace keeps both corrected files');
+  await reload();
+  await page.waitForFunction(() => app.compare_ui.res && app.compare_ui.newFile && app.compare_ui.newFile.parts && app.compare_ui.newFile.parts.length === 2, null, T);
+  const t2 = await two();
+  check(JSON.stringify(t2) === JSON.stringify(t1), 'and after a reload both are back, compared the same way (' + t2.name + ')');
+  // one file again: the second one is let go
+  const nFiles = await page.evaluate(() => S.Sync.ws.files.length);
+  await page.setInputFiles('#cmpNewFile', f2);
+  await page.waitForFunction(() => app.compare_ui.newFile && app.compare_ui.newFile.parts.length === 1, null, T);
+  await saved();
+  check(await page.evaluate(() => !S.Sync.cmp.new1) && await page.evaluate(() => S.Sync.ws.files.length) === nFiles - 1,
+    'choosing one corrected file again removes the second from the server');
 
   check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' / ') : ''));
 } catch (e) {

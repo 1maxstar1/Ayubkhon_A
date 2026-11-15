@@ -183,7 +183,12 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   tushib qolgan) — sahifa ogohlantiradi, smetaning o'zi o'zgartirilmaydi. Ikki qavatli «Сметная стоимость» sarlavhasi
   («в базисном» — «--», «в текущем» — «на ед. / общая» bir qator pastda) joriy narxdan o'qiladi; kod ustunidagi «ИТОГО …»
   jami hisoblanadi; nomi kod ustunida turgan qator («ПЕРЕВОЗКА … ТН/КМ») resurs bo'ladi (v2.16.4, `smeta-header` 19).
-  «Наш ответ» bitta jadval butun ariza uchun — u arizaning barcha smetalari bilan solishtiriladi.
+  «Наш ответ» bitta jadval butun ariza uchun — u arizaning barcha smetalari bilan solishtiriladi. Raqam ustunidagi
+  «Перевозка материалов» bandi ostidagi qatorlar — «other» (mashinalar emas); miqdori bo'sh, summasi 0 bo'lgan т·км qatori
+  ham o'qiladi (miqdor 0) — varaqdagi hech narsa ko'rinmay qolmaydi; «(наименование стройки)» izohi — ustidagi qator nomi
+  (v2.16.5). «Стало» ga bir nechta tuzatilgan fayl birga beriladi (ariza smetalari): har biri o'z smetasiga umumiy qatorlari
+  bo'yicha juftlanadi (`S.compare.join`), bir xil nomli varaqlar («РЕСУРС») hech qachon almashmaydi; ish maydonida
+  `new`, `new1` … slotlarida saqlanadi.
 * Raqamlar hech qachon yo'qolmaydi: `АНКЕР М5` ≠ `АНКЕР М8`, `4.1.1` ≠ `4.11`;
   ikki raqam orasidagi ajratgich o'chirilmaydi.
 * **Xavfsizlik bo'limi hozircha o'chirilgan (egasining qarori, 2026-10-24).**

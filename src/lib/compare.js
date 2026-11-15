@@ -287,11 +287,15 @@
    */
   function pairObjects(olds, news) {
     var to = olds.map(function () { return -1; }), used = news.map(function () { return false; });
+    // the sheets of several files (see join): a sheet pairs only inside its own pair of files — the road's «РЕСУРС»
+    // with the corrected road's «РЕСУРС», never with the lighting's
+    var grp = function (o) { return o.group != null ? '\u241f' + o.group : ''; };
+    var apart = function (a, b) { return a.group != null && b.group != null && a.group !== b.group; };
     function byKey(keyOf) {
       var idx = {};
-      news.forEach(function (o, j) { var k = !used[j] && keyOf(o); if (k) (idx[k] = idx[k] || []).push(j); });
+      news.forEach(function (o, j) { var k = !used[j] && keyOf(o); if (k) (idx[k + grp(o)] = idx[k + grp(o)] || []).push(j); });
       olds.forEach(function (o, i) {
-        var k = to[i] < 0 && keyOf(o), c = k && idx[k];
+        var k = to[i] < 0 && keyOf(o), c = k && idx[k + grp(o)];
         if (c && c.length) { to[i] = c.shift(); used[to[i]] = true; }
       });
     }
@@ -303,7 +307,7 @@
       olds.forEach(function (o, i) {
         if (to[i] >= 0) return;
         var ba = bagOf(o);
-        bn.forEach(function (b, j) { var d = b ? dice(ba, b) : 0; if (d > 0.5) cand.push([d, i, j]); });
+        bn.forEach(function (b, j) { var d = b && !apart(o, news[j]) ? dice(ba, b) : 0; if (d > 0.5) cand.push([d, i, j]); });
       });
       cand.sort(function (x, y) { return y[0] - x[0] || Math.abs(x[1] - x[2]) - Math.abs(y[1] - y[2]) || x[1] - y[1] || x[2] - y[2]; });
       cand.forEach(function (c) { if (to[c[1]] < 0 && !used[c[2]]) { to[c[1]] = c[2]; used[c[2]] = true; } });
@@ -374,7 +378,8 @@
     var sp = pairObjects(olds, news).map(function (op) {
       var oa = op[0] >= 0 ? olds[op[0]] : null, ob = op[1] >= 0 ? news[op[1]] : null;
       var A = itemsOf(oa), B = itemsOf(ob);
-      var o = { name: (oa || ob).subtitle || (oa || ob).name || '', oldName: oa ? oa.subtitle || oa.name : '',
+      var at = (oa || ob).where ? (oa || ob).where + ' · ' : '';     // which estimate of several (join)
+      var o = { name: at + ((oa || ob).subtitle || (oa || ob).name || ''), oldName: oa ? oa.subtitle || oa.name : '',
                 newName: ob ? ob.subtitle || ob.name : '', only: !ob ? 'old' : !oa ? 'new' : '',
                 rows: [], oldSum: 0, newSum: 0, bad: 0, good: 0, amounts: compareAmounts(oa, ob) };
       return { o: o, A: A, B: B, raw: align(A, B), moved: [] };
@@ -591,6 +596,39 @@
     return out;
   }
 
-  S.compare = { versions: versions, workbook: workbook, requested: requested, classify: classify, align: align,
+  /**
+   * An application of several estimates and the corrected files of them, chosen together: which corrected file is
+   * which estimate — by the lines they share (name + unit), the most first, each estimate once; a file sharing less
+   * than a fifth of its lines with every estimate is none of them, and its sheets stand without a pair. The sheets
+   * then carry their pair of files (`group`, so that two sheets both called «РЕСУРС» are never crossed) and the
+   * name of their estimate (`where`, so that the table says which «РЕСУРС» a line is on). One file on each side is
+   * returned as it is: the comparison of one estimate stays exactly what it was.
+   *
+   * @param {Array<{label, objects}>} oldSets  the estimates (projects, or one file)
+   * @param {Array<{label, objects}>} newSets  the corrected files
+   * @returns {{olds, news, to: number[]}}  to[j] — the estimate of corrected file j, or -1
+   */
+  function join(oldSets, newSets) {
+    if (oldSets.length === 1 && newSets.length === 1) return { olds: oldSets[0].objects, news: newSets[0].objects, to: [0] };
+    var bag = function (set) {
+      var b = {};
+      set.objects.forEach(function (o) { var x = bagOf(o); for (var k in x) b[k] = (b[k] || 0) + x[k]; });
+      return b;
+    };
+    var A = oldSets.map(bag), B = newSets.map(bag), cand = [];
+    A.forEach(function (a, i) { B.forEach(function (b, j) { var d = dice(a, b); if (d > 0.2) cand.push([d, i, j]); }); });
+    cand.sort(function (x, y) { return y[0] - x[0] || x[1] - y[1] || x[2] - y[2]; });
+    var to = newSets.map(function () { return -1; }), used = oldSets.map(function () { return false; });
+    cand.forEach(function (c) { if (to[c[2]] < 0 && !used[c[1]]) { to[c[2]] = c[1]; used[c[1]] = true; } });
+    var mark = function (o, group, where) { return Object.assign({}, o, { group: group, where: where }); };
+    var olds = [], news = [];
+    oldSets.forEach(function (set, i) { set.objects.forEach(function (o) { olds.push(mark(o, i, set.label)); }); });
+    newSets.forEach(function (set, j) {
+      set.objects.forEach(function (o) { news.push(mark(o, to[j] >= 0 ? to[j] : 'n' + j, to[j] >= 0 ? oldSets[to[j]].label : set.label)); });
+    });
+    return { olds: olds, news: news, to: to };
+  }
+
+  S.compare = { versions: versions, join: join, workbook: workbook, requested: requested, classify: classify, align: align,
                 STATUS: STATUS, AMOUNT: AMOUNT, statusText: statusText, rowLabel: rowLabel, sheetLabel: sheetLabel, unasked: unasked };
 })(S);

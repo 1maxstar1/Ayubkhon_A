@@ -20,7 +20,7 @@ const S = load('fflate', 'normalize', 'match', 'sections', 'util', 'formula', 'x
 let fail = 0;
 const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) fail++; };
 
-const { book, bookOf, line, prices: pricesFor, xlsx, replyBook, replyBook2, replySmeta } = require('./compare-books.cjs');
+const { book, bookOf, line, prices: pricesFor, xlsx, replyBook, replyBook2, replySmeta, sheet, estimate } = require('./compare-books.cjs');
 
 const v1 = S.smeta.parseWorkbook(book(1), 'v1.xlsx');
 const v2 = S.smeta.parseWorkbook(book(2), 'v2.xlsx');
@@ -332,6 +332,36 @@ const bigBack = S.reply.parse(S.readXlsx(S.buildWorkbook(bigModel, { mode: 'chan
 const bigRm = S.reply.match(bigBack.entries, bigV1);
 check(bigRm.prices[bigKey] === bigM && bigRm.requested[bigKey] && bigRm.requested[bigKey].market === bigM,
   'and our own export read back as the reply gives that price back');
+
+/* ------------------------------------------------ an application of several estimates, corrected files chosen together */
+{
+  // two estimates of one application whose sheets have the same name and title (both «РЕСУРС», as the road and the
+  // lighting of one application came), and their corrected files chosen in the other order
+  const est = (rows) => S.smeta.parseWorkbook({ sheets: [sheet('РЕСУРС', [[null, null, null, null, null, 'Форма 4А АВС-4'],
+    ['Наименование стройки -', null, 'ТЕСТОВАЯ СТРОЙКА'], [], ...estimate('ТЕСТОВЫЕ РАБОТЫ', rows, { direct: 1 })])] }, 'x.xlsx');
+  const MAT = [null, null, 'СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'];
+  const road = (p) => est([MAT, line(1, 'ТЕСТОВЫЙ АСФАЛЬТ', 'Т', 10, p), line(2, 'ТЕСТОВЫЙ ЩЕБЕНЬ', 'М3', 5, 7), line(3, 'ТЕСТОВЫЙ БИТУМ', 'Т', 1, 13)]);
+  const lamp = (p) => est([MAT, line(1, 'ТЕСТОВАЯ ОПОРА', 'ШТ', 4, p), line(2, 'ТЕСТОВЫЙ КАБЕЛЬ', 'М', 100, 3), line(3, 'ТЕСТОВЫЙ СВЕТИЛЬНИК', 'ШТ', 4, 19)]);
+  const olds = [{ label: 'дорога.xlsx', objects: road(11) }, { label: 'освещение.xlsx', objects: lamp(23) }];
+  const news = [{ label: 'освещение-испр.xlsx', objects: lamp(21) }, { label: 'дорога-испр.xlsx', objects: road(9) }];
+  const j = S.compare.join(olds, news);
+  check(j.to.join() === '1,0', 'several corrected files: each is paired with its own estimate by the lines they share, in whatever order chosen (' + j.to.join() + ')');
+  const res = S.compare.versions(j.olds, j.news, {}, {});
+  const all = [].concat(...res.objects.map((o) => o.rows));
+  check(res.objects.length === 2 && res.objects.every((o) => !o.only) && res.objects[0].name.startsWith('дорога.xlsx · ') && res.objects[1].name.startsWith('освещение.xlsx · '),
+    'their two sheets called «РЕСУРС» are each compared with their own, and say which estimate they are (' + res.objects.map((o) => o.name + (o.only ? ' [' + o.only + ']' : '')).join(' | ') + ')');
+  check(all.find((r) => r.nm === 'ТЕСТОВЫЙ АСФАЛЬТ').p2 === 9 && all.find((r) => r.nm === 'ТЕСТОВАЯ ОПОРА').p2 === 21 && !all.some((r) => r.st === 'added' || r.st === 'removed'),
+    'every line is found in its corrected file: the two price changes, nothing «added» or «deleted»');
+  const crossed = S.compare.versions([].concat(olds[0].objects, olds[1].objects), [].concat(news[0].objects, news[1].objects), {}, {});
+  check([].concat(...crossed.objects.map((o) => o.rows)).some((r) => r.moved || r.st === 'added' || r.st === 'removed'),
+    '(the sheets put together without the pairing of files are crossed: the road against the lighting, its lines «moved» from the other estimate)');
+  const stray = S.compare.join(olds, [news[1], { label: 'чужая.xlsx', objects: est([MAT, line(1, 'ТЕСТОВЫЙ КИРПИЧ', 'ШТ', 100, 2), line(2, 'ТЕСТОВЫЙ РАСТВОР', 'М3', 1, 31)]) }]);
+  const sres = S.compare.versions(stray.olds, stray.news, {}, {});
+  check(stray.to.join() === '0,-1' && sres.objects.filter((o) => o.only).length === 2,
+    'a file sharing nothing with the estimates is none of them: its sheet, and the estimate left without a file, stand without a pair (' + stray.to.join() + ')');
+  const one = S.compare.join([olds[0]], [news[1]]);
+  check(one.olds === olds[0].objects && one.news === news[1].objects && !one.olds[0].group, 'one file on each side is compared exactly as before: nothing is marked');
+}
 
 console.log(fail ? '\nFAILED: ' + fail : '\nall compare checks passed');
 process.exit(fail ? 1 : 0);

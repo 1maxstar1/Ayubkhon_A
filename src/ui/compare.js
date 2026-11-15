@@ -14,7 +14,7 @@
   function Compare(app) {
     this.app = app;
     this.oldFile = null;     // { name, objects } when «Было» is a file, not a project
-    this.newFile = null;     // { name, objects }
+    this.newFile = null;     // { name, objects, parts: [{ label, objects }] } — one corrected file, or several (one per estimate)
     this.reply = null;       // { base, name, entries, match } — «Наш ответ» read against the «Было» it names
     this.res = null;
     this.gen = 0;            // which workspace the files belong to; see reset()
@@ -29,13 +29,44 @@
   /** «Наш ответ (Excel)»: the file chooser — the page without a server has nothing else to offer. */
   Compare.prototype.pickReply = function () { $('cmpReplyFile').click(); };
 
-  /** The returned estimate, from a file (F4: also handed over by «Сравнить версию» of the list of applications). */
-  Compare.prototype.takeNew = function (f) {
-    var self = this, gen = this.gen;
-    this.read(f, function (objs) {
+  /** The workspace slot of the i-th corrected file: «new», «new1», «new2» … (the version before knew only «new»). */
+  var NEW_MAX = 8;
+  function newSlot(i) { return i ? 'new' + i : 'new'; }
+  S.Compare_newSlots = function () { var a = []; for (var i = 0; i < NEW_MAX; i++) a.push(newSlot(i)); return a; };
+
+  /** The corrected files as one «Стало»: an application of several estimates comes back as several files. */
+  function joinNew(parts) {
+    return { name: parts.map(function (p) { return p.label; }).join(' + '),
+             objects: parts.reduce(function (all, p) { return all.concat(p.objects); }, []), parts: parts };
+  }
+
+  /**
+   * The returned estimate(s), from files (F4: also handed over by «Сравнить версию» of the list of applications).
+   * Several files at once are the corrected estimates of one application: each is compared with its own estimate
+   * (see base and S.compare.join). A file that cannot be read is said and left out; the rest are compared.
+   */
+  Compare.prototype.takeNew = function (files, back) {
+    var self = this, gen = this.gen, keep = !back;
+    files = [].concat(files).filter(Boolean).slice(0, NEW_MAX);
+    if (!files.length) { if (back) back(); return; }
+    var parts = [], k = 0;
+    var step = function () {
       if (gen !== undefined && gen !== self.gen) return;
-      self.newFile = { name: f.name, objects: objs }; chose('new', f); self.run();
-    });
+      if (k < files.length) {
+        var f = files[k++];
+        self.read(f, function (objs) { parts.push({ label: f.name, objects: objs, file: f }); step(); }, step);
+        return;
+      }
+      if (!parts.length) { if (back) back(); return; }
+      var had = self.newFile && self.newFile.parts ? self.newFile.parts.length : self.newFile ? 1 : 0;
+      self.newFile = joinNew(parts);
+      if (keep) {
+        parts.forEach(function (p, i) { chose(newSlot(i), p.file); });
+        for (var j = parts.length; j < had; j++) chose(newSlot(j), null);
+      }
+      if (back) back(); else self.run();
+    };
+    step();
   };
 
   Compare.prototype.bind = function () {
@@ -68,9 +99,8 @@
       if (f) self.loadReply(f);
     });
     $('cmpNewFile').addEventListener('change', function (e) {
-      var f = e.target.files[0]; e.target.value = '';
-      if (!f) return;
-      self.takeNew(f);
+      var fs = Array.prototype.slice.call(e.target.files || []); e.target.value = '';
+      if (fs.length) self.takeNew(fs);
     });
     // back on the view and the filter the page was reloaded with
     if (option($('cmpView'), S.hashGet('cv'))) $('cmpView').value = S.hashGet('cv');
@@ -137,7 +167,7 @@
   Compare.prototype.read = function (file, done, failed) {
     var app = this.app;
     failed = failed || function () {};
-    if (!/\.xls[xm]?$/i.test(file.name)) { app.toast('Принимаются только файлы .xlsx / .xlsm', true); failed(); return; }
+    if (!/\.xls[xm]?$/i.test(file.name)) { app.toast('Принимаются только файлы Excel: .xlsx, .xlsm, .xls', true); failed(); return; }
     app.busy(true, 'Чтение файла: ' + file.name + '…');
     var reader = new FileReader();
     reader.onerror = function () { app.busy(false); app.toast('Не удалось прочитать файл', true); failed(); };
@@ -212,11 +242,9 @@
     };
     var next = function () {
       if (!live()) return;
-      if (!files.new || self.newFile) { reply(); return; }
-      self.read(files.new, function (objs) {
-        if (live() && !self.newFile) self.newFile = { name: files.new.name, objects: objs };
-        reply();
-      }, reply);
+      var news = S.Compare_newSlots().map(function (k) { return files[k]; }).filter(Boolean);
+      if (!news.length || self.newFile) { reply(); return; }
+      self.takeNew(news, reply);
     };
     if (!files.old || this.oldFile) { next(); return; }
     this.read(files.old, function (objs) {
@@ -317,15 +345,42 @@
     model.resources.forEach(function (r) {
       if (!requested[r.key] && Math.abs((r.market || 0) - (r.price || 0)) >= 1) known[r.key] = r.market;
     });
-    return { label: p.file || p.name, objects: p.objects, requested: requested, known: known };
+    return { label: p.file || p.name, objects: p.objects, requested: requested, known: known,
+             sets: [{ label: p.file || p.name, objects: p.objects }] };
+  };
+
+  /**
+   * Several corrected files are the estimates of one application: the first version is then every estimate of it
+   * (each its own set, paired with its corrected file by S.compare.join), priced as the table we sent — one market
+   * price per name and unit over the application. One corrected file keeps the first version chosen.
+   */
+  Compare.prototype.wholeBase = function (b) {
+    var app = this.app, v = $('cmpOld').value;
+    if (!b || v === 'file' || app.projects.length < 2) return b;
+    var reply = this.reply && this.reply.base === v ? this.reply : null;
+    var projs = app.projects.map(function (p) { return Object.assign({}, p, { enabled: true }); });
+    var model = S.assemble(projs, app.prices);
+    var requested = reply ? reply.match.requested : S.compare.requested(model, app.reportOpts()), known = {};
+    model.resources.forEach(function (r) {
+      if (!requested[r.key] && Math.abs((r.market || 0) - (r.price || 0)) >= 1) known[r.key] = r.market;
+    });
+    var sets = app.projects.map(function (p) { return { label: p.file || p.name, objects: p.objects || [] }; });
+    return { label: 'все сметы заявки (' + sets.length + '): ' + sets.map(function (x) { return x.label; }).join(' + '),
+             objects: sets.reduce(function (all, x) { return all.concat(x.objects); }, []), requested: requested, known: known, sets: sets };
   };
 
   Compare.prototype.run = function () {
     this.only = null;
     var b = this.base();
     if (!b || !this.newFile) { this.res = null; this.render(); return; }
+    var parts = this.newFile.parts || [{ label: this.newFile.name, objects: this.newFile.objects }];
+    if (parts.length > 1) b = this.wholeBase(b);
     var t0 = performance.now();
-    this.res = S.compare.versions(b.objects, this.newFile.objects, b.requested, b.known);
+    var j = S.compare.join(b.sets || [{ label: b.label, objects: b.objects }], parts);
+    this.res = S.compare.versions(j.olds, j.news, b.requested, b.known);
+    // a corrected file that is none of the estimates: said, its sheets are shown without a pair
+    var lost = parts.filter(function (p, i) { return j.to[i] < 0; }).map(function (p) { return p.label; });
+    if (parts.length > 1 && lost.length) this.app.toast('Не удалось сопоставить со сметами заявки: ' + lost.join(', ') + ' — его листы показаны как листы без пары', true);
     this.labels = { oldLabel: b.label, newLabel: this.newFile.name, asked: Object.keys(b.requested).length,
                     reply: this.reply && this.reply.base === $('cmpOld').value ? this.reply : null };
     this.ms = Math.round(performance.now() - t0);

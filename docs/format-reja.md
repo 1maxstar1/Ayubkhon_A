@@ -25,6 +25,8 @@ Smetadagi bitta son jimgina noto'g'ri o'qilsa, rasmiy hujjatga noto'g'ri narx tu
 Qoidalar bilan o'qiladigan fayl turlari: .xlsx, .xlsm va (v2.16.3 dan) eski .xls — u SheetJS bilan o'qiladi va .xlsx bilan
 bir xil shaklga keltiriladi (`test/xls-read.cjs`). v2.16.4: «_ЛРС» varag'i (ikki qavatli narx sarlavhasi, jami va tashish
 qatorlari kod ustunida) ham o'qiladi; himoya to'plamida 23 fayl (yangi 8 tasi — 3 ta ariza), hammasi to'liq o'qiladi.
+v2.16.5: miqdori bo'sh tashish qatorlari (summa 0) ham o'qiladi, «Перевозка материалов» bandi — «other»; himoya
+to'plamida 66679 (+2 qator) va beshta .xls (faqat jamidan keyingi pul qatorlarining bo'limi) ko'rib chiqilib qayta yozildi.
 
 Keyinroq (hozir emas): «Разметка листа» — hech kim o'qiy olmagan faylda ustunlarni qo'lda ko'rsatish oynasi.
 

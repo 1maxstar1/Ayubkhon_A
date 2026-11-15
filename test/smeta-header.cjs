@@ -357,7 +357,7 @@ check(ck3.length === 1 && ck3[0].kind === 'weight' && ck3[0].r === 9 && ck3[0].w
 /* 19 — a resource estimate of another program (the «_ЛРС» sheet): «Сметная стоимость» over two levels — «в базисном
         уровне» (all «--») and «в текущем», each with «на ед. изм.» and «общая» a row lower; the totals («ИТОГО ПО …») in
         the code column; the haulage lines with their names in the code column too, under «Перевозка материалов» (sums as cached values, as a saved file has them) */
-const lrs = one({ sheets: [sheet('_ЛРС', [['ТЕСТОВАЯ СТРОЙКА'], [], [null, '(наименование стройки)'], [], [null, 'ЛОКАЛЬНЫЙ РЕСУРСНЫЙ СМЕТНЫЙ РАСЧЕТ'], [],
+const lrs = one({ sheets: [sheet('_ЛРС', [['ТЕСТОВАЯ СТРОЙКА'], [null, null, null, null, null, null, '#VALUE!'], [null, '(наименование стройки)'], [null, 'ЛОКАЛЬНЫЙ РЕСУРСНЫЙ СМЕТНЫЙ РАСЧЕТ'], ['на ', ','],
   ['Сметная стоимость', null, null, null, null, '--', 'ТЫС.СУМ.', '--', 'ТЫС.СУМ.'], [],
   ['N п.п.', 'Шифр номера нормативов и коды ресурсов', 'Наименование работ и затрат', 'Единица измерения', 'Количество ', 'Сметная стоимость, сум'],
   [null, null, null, null, null, 'в базисном уровне', null, 'в текущем (прогнозном)'],
@@ -373,6 +373,7 @@ const lrs = one({ sheets: [sheet('_ЛРС', [['ТЕСТОВАЯ СТРОЙКА']
   ['Перевозка материалов'],
   [1, 'ПЕРЕВОЗКА ТЕСТОВОЙ СМЕСИ НА 30 КМ ПО А/Д', null, 'ТН/КМ', 100, null, null, 2, 200],
   [2, 'ПЕРЕВОЗКА ТЕСТОВОГО ЩЕБНЯ НА 30 КМ ПО А/Д', null, 'ТН/КМ', 50, null, null, 3, 150],
+  [null, 'ПЕРЕВОЗКА ТЕСТОВОГО ПЕСКА НА 45 КМ ПО А/Д', null, 'ТН/КМ', null, null, null, 5, 0],
   [null, 'Итого по перевозке', null, 'СУМ', null, null, null, null, 350],
   [null, null, 'МАТЕРИАЛЬНЫЕ РЕСУРСЫ'],
   [1, '6076', 'ТЕСТОВАЯ СМЕСЬ ГОРЯЧАЯ', 'Т', 20, null, null, 17, 340],
@@ -384,7 +385,7 @@ const lrs = one({ sheets: [sheet('_ЛРС', [['ТЕСТОВАЯ СТРОЙКА']
   [], [null, 'СОСТАВИЛ', null, null, 'ТЕСТОВ Т.Т.']])] });
 const li = lrs.length ? lrs[0].rows.filter((r) => r.kind === 'item') : [];
 const lNames = li.map((r) => r.nm);
-check(lrs.length === 1 && li.length === 7, 'a «_ЛРС» sheet with «Сметная стоимость» over two levels is read: 7 resources (' + lNames.join(' | ') + ')');
+check(lrs.length === 1 && li.length === 8, 'a «_ЛРС» sheet with «Сметная стоимость» over two levels is read: 8 resources (' + lNames.join(' | ') + ')');
 const grader = li.find((r) => r.nm === 'ТЕСТОВЫЙ АВТОГРЕЙДЕР');
 check(grader && grader.qty === 4 && grader.price === 11 && grader.sum === 44,
   'the price and the sum are the current ones («в текущем»), not the base «--» (' + JSON.stringify(grader && [grader.qty, grader.price, grader.sum]) + ')');
@@ -395,6 +396,13 @@ check(!lNames.some((n) => /ИТОГО|Итого/.test(n)) && lrs[0].rows.some((
   'the totals in the code column are totals, not resources');
 check(li.some((r) => r.nm === 'ТЕСТОВАЯ СМЕСЬ ГОРЯЧАЯ') && li.some((r) => r.nm === 'ВОДА'),
   'the materials after «Итого по перевозке» are read: the estimate does not end at the first total in the code column');
+const sand = li.find((r) => /ТЕСТОВОГО ПЕСКА/.test(r.nm));
+check(sand && sand.qty === 0 && sand.price === 5 && sand.sum === 0,
+  'a haulage line with its price and no quantity (its sum 0), numbered or not, is read with the quantity 0 — nothing on the sheet goes unseen (' + JSON.stringify(sand && [sand.qty, sand.price, sand.sum]) + ')');
+check(li.filter((r) => /^ПЕРЕВОЗКА/.test(r.nm)).every((r) => r.section === 'other') && grader.section === 'machines',
+  'the lines under «Перевозка материалов» (a band in the number column) are haulage, not the machines of the band above (' + li.map((r) => r.section).join(',') + ')');
+check(lrs[0].title === 'ТЕСТОВАЯ СТРОЙКА' && lrs[0].subtitle !== ',',
+  'the construction is the line above its caption «(наименование стройки)» (not «#VALUE!»), and a blank «на ,» names no works (' + JSON.stringify([lrs[0].title, lrs[0].subtitle]) + ')');
 const lm = S.assemble([{ name: 'l', file: 'l.xlsx', objects: lrs, enabled: true }], {});
 const lmix = lm.rows.find((r) => r.kind === 'item' && /ПЕРЕВОЗКА ТЕСТОВОЙ СМЕСИ/.test(r.nm || r.name || ''));
 check(!!lmix, 'and the haulage line goes into the comparison table under its name');

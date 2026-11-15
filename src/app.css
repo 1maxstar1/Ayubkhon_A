@@ -610,3 +610,4 @@ body.compact main:not(.narrow){grid-template-columns:232px 1fr}
 .qe{border:0;background:none;cursor:pointer;font:inherit;color:inherit;padding:0;text-align:right;width:100%}
 .qe:hover{text-decoration:underline dotted}
 .qe.on{color:#b45309;font-weight:600}.qe.on s{color:var(--mute);font-weight:400}
+.qe .wait{color:#b45309;font-size:11px;white-space:nowrap}

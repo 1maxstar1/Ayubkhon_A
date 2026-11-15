@@ -162,13 +162,19 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   kirish emas** — u faqat qoldirilgan narxning belgisi («kamida shuncha») va qaror paytidagi solishtirish. Dalil faqat
   **oldingi** arizalardan (o'z sanasidan avvalgi, shu viloyat). Uch usul (spravochnik, tayanch, model) bir xil test
   qismida o'lchanadi; eng yaxshisidan bir punkt ichidagilarning eng soddasi tanlanadi; test qismi hech narsani
-  tanlamaydi. Model egasi sonlarni ko'rib rozi bo'lmaguncha ish sahifasida ishlatilmaydi.
+  tanlamaydi. Model egasi sonlarni ko'rib rozi bo'lmaguncha ish sahifasida ishlatilmaydi. «Принято» belgilari
+  (`/api/memory/accepted`) faqat solishtirilgan resurslarga (`scope`) tegadi; tashqi «Было» fayli hech narsa yubormaydi.
+  v2.16.1 dan oldingi ma'lumot (eski viloyatda qolgan jurnal/xotira, tasodifiy xotira raqamlari va ularga «mem:» havolalar)
+  server ishga tushganda bir marta tuzatiladi (`learning.js` `repair`, admin: `POST /api/admin/learning/repair`).
 * **Hajmlar va miqdorlar** (`src/lib/volumes.js`, `src/ui/volumes.js`, v2.15.0): ishlar 5-shakl vedomostidan
   (`01_ЛРВ`) o'qiladi; ekspertning qarori — `app.vol` (ish kaliti → loyiha hajmi, izoh) va `app.qtys` (resurs
   kaliti → jami miqdor va u qaysi smeta jamiga nisbatan yozilgani; obyekt chiqarilib jami o'zgarsa — yozilgan miqdor
   kutadi, kichikroq smetaga tushmaydi), ish maydonida saqlanadi. Yangi hajm resursni faqat bir birlikka × (yangi − eski) ga
   siljitadi. **Narxlar, tejash va Таблица №2 miqdorga tegmaydi** — miqdor faqat «Таблица №1 (объёмы)» varag'iga
-  chiqadi, u esa faqat biror narsa belgilanganda qo'shiladi (aks holda hujjat avvalgidek).
+  chiqadi, u esa faqat biror narsa belgilanganda qo'shiladi (aks holda hujjat avvalgidek). Holatda `qtys` — eski
+  versiya o'qiydigan son, `qtyBase` — u qaysi smeta jamiga nisbatan yozilgani (v2.16.6; orqaga qaytish «[object Object]»
+  bermaydi); kutayotgan miqdor jadvalda «⏸» bilan ko'rinadi; smeta miqdoriga teng va hech narsa siljitmagan miqdor
+  Таблица №1 ga qator bo'lib tushmaydi.
 * **Smeta formatlari** (`docs/format-reja.md`, v2.16.0): fayllarni **qoidalar** o'qiydi (`src/lib/smeta.js`); qoida
   o'zgarsa `SMETA_KIT=<kit> node test/smeta-corpus.cjs` qolgan fayllar avvalgidek o'qilishini isbotlashi shart (keyin
   ko'rib chiqib `--record`). Loyiha sifatida yuklangan har bir smeta `smeta_files` ga yoziladi (`src/ui/formats.js`):

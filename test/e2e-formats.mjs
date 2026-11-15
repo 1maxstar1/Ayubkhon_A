@@ -253,6 +253,15 @@ try {
   await page.waitForFunction(() => app.model && app.model.rows.length > 0, null, T);
   check(await until(async () => !!(await byHash(fRead))), 'after «Стереть» the same file uploaded again is recorded again');
 
+  // a record left by v2.16.0 for a file it read (no file kept); brought up to date, it says «doubtful» — and gets its file,
+  // so that the admin page, which counts it, can give it to be looked at
+  const staleDoubt = { hash: fDoubt.hash, name: fDoubt.name, size: fDoubt.bytes.length, by: boss.id, is_read: true, objects: 1, items: 3, checked: 3, doubt: false, version: 1 };
+  const sd = await api('/api/collections/smeta_files/records', { method: 'POST', body: JSON.stringify(staleDoubt) }, su);
+  await page.setInputFiles('#pick', fDoubt.path);
+  await page.waitForFunction(() => app.projects.length === 2, null, T);
+  check(sd && sd.id && await until(async () => { const x = await byHash(fDoubt); return x && x.version === 2 && x.doubt === true && x.file !== ''; }),
+    'an old record brought up to date as «doubtful» gets the file it lacked (' + JSON.stringify(await byHash(fDoubt) && { v: (await byHash(fDoubt)).version, doubt: (await byHash(fDoubt)).doubt, file: !!(await byHash(fDoubt)).file }) + ')');
+
   check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' / ') : ''));
 } catch (e) {
   check(false, 'the run stopped: ' + (e.message || e).split('\n')[0]);

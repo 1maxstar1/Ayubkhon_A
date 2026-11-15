@@ -707,10 +707,13 @@
       this.model = S.assemble(this.projects, this.prices);
       // formulas of the estimate that call something other than plain arithmetic go into the document as
       // numbers; said once for each such set of files, not on every rebuild
-      var fz = this.model.frozen, fzKey = fz && fz.count ? fz.count + ':' + fz.names.join(',') : '';
+      var fz = this.model.frozen, fzKey = fz && (fz.count || fz.dead) ? fz.count + ':' + fz.names.join(',') + ':' + (fz.dead || 0) : '';
       if (fzKey && fzKey !== this._frozenSaid) {
-        this.toast('В смете формул с функциями, которые программа не переносит в документ: ' + fz.count + ' (' +
-          fz.names.slice(0, 6).join(', ') + '). Вместо них записаны их значения — проверьте эти строки.', true);
+        var said = [];
+        if (fz.count) said.push('формул с функциями, которые программа не переносит в документ: ' + fz.count + ' (' + fz.names.slice(0, 6).join(', ') + ')');
+        // a formula reading a column of the estimate that the document leaves out: its number, on the market side too
+        if (fz.dead) said.push('формул, которые ссылаются на столбец сметы, не вошедший в документ: ' + fz.dead);
+        this.toast('В смете ' + said.join('; ') + '. Вместо них записаны их значения — они не пересчитываются по рыночным ценам; проверьте эти строки.', true);
       }
       this._frozenSaid = fzKey;
       var od = this.model.oddSums, odKey = od && od.count ? od.count + ':' + od.rows[0].r : '';

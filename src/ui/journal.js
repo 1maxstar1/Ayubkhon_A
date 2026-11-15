@@ -135,7 +135,8 @@
       clearTimeout(this.t);
       var pend = this.pend, keys = Object.keys(pend), self = this, app = A(), Sy = S.Sync;
       this.pend = {};
-      if (!keys.length) return;
+      // nothing new, but decisions still waiting (a server that did not answer, a request in flight): the page going sends them
+      if (!keys.length) { if (how && how.keepalive) this.send(how); return; }
       try {
         if (!this.ready() || !app || !app.model) return;
         var by = {};
@@ -167,6 +168,7 @@
     /** One request per application, one after another; what does not go out waits for the next commit. */
     send: function (how) {
       var self = this;
+      if (how && how.keepalive) return this.leave(how);
       if (this.busy || !this.q.length) return Promise.resolve();
       var ws = this.q[0].ws, part = [], rest = [], size = 0, leaving = !!(how && how.keepalive);
       this.q.forEach(function (x) {
@@ -187,6 +189,32 @@
           // workspace) will refuse again
           if (e && e.status === 0 && !e.isAbort) { self.q = part.concat(self.q); if (self.q.length > KEEP) self.q.splice(0, self.q.length - KEEP); }
         });
+    },
+
+    /**
+     * The page going: everything waiting goes now, whatever is in flight. As many decisions as fit (LEAVE_MAX) go in a
+     * request that outlives the page — it shares the browser's 64 KB with the state sync.js sends first; the rest go beside
+     * it as ordinary requests, as the page before v2.16.1 sent them all (they may still arrive). Nothing is held back.
+     */
+    leave: function (how) {
+      var all = this.q, sends = [];
+      this.q = [];
+      var byWs = {};
+      all.forEach(function (x) { (byWs[x.ws] = byWs[x.ws] || []).push(x.ev); });
+      Object.keys(byWs).forEach(function (ws) {
+        var evs = byWs[ws], keep = [], size = 0, i = 0;
+        for (; i < evs.length; i++) {
+          var n = JSON.stringify(evs[i]).length;
+          if (keep.length && size + n > LEAVE_MAX) break;
+          keep.push(evs[i]); size += n;
+        }
+        var post = function (part, opts) {
+          sends.push(S.pb.send('/api/journal/events', Object.assign({ method: 'POST', body: { workspace: ws, events: part } }, opts || {})).catch(function () { /* gone */ }));
+        };
+        post(keep, size <= LEAVE_MAX ? how : undefined);
+        for (var j = i; j < evs.length; j += BATCH) post(evs.slice(j, j + BATCH));
+      });
+      return Promise.all(sends);
     },
 
     /** Another application (or none): what was remembered about the one before does not carry over. */
@@ -293,10 +321,19 @@
       // nothing about what the contractor took — the marks of the last one stay
       var cmp = A() && A().compare_ui;
       if (!cmp || !cmp.res) return;
-      var keys = Object.keys(this.fixedKeys()).sort(), sig = Sy.ws.id + '|' + keys.join('\u0001');
+      // a first version from outside (a file, not this application's estimates): its comparison says nothing about what
+      // the contractor took of our prices — the marks stay as they are
+      var old = document.getElementById('cmpOld');
+      if (old && old.value === 'file') return;
+      // the resources this comparison is about: the lines of the estimates compared. One estimate of several compared
+      // leaves the marks of the others as they are (the server touches only these)
+      var scope = {};
+      (cmp.res.objects || []).forEach(function (o) { (o.rows || []).forEach(function (x) { if (x.key && x.q1 != null) scope[x.key] = 1; }); });
+      var keys = Object.keys(this.fixedKeys()).sort(), within = Object.keys(scope).sort();
+      var sig = Sy.ws.id + '|' + keys.join('\u0001') + '|' + within.join('\u0001');
       if (sig === this.acceptedSig) return;
       this.acceptedSig = sig;
-      S.pb.send('/api/memory/accepted', { method: 'POST', body: { workspace: Sy.ws.id, keys: keys } }).catch(function () { /* next time */ });
+      S.pb.send('/api/memory/accepted', { method: 'POST', body: { workspace: Sy.ws.id, keys: keys, scope: within } }).catch(function () { /* next time */ });
     },
 
     init: function () {

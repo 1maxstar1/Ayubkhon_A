@@ -8,6 +8,30 @@
   'use strict';
 
   /** «new», «new1» … — the workspace slots of the corrected files (src/ui/compare.js). */
+  /**
+   * The quantities set by hand, saved so that every version reads them: `qtys` key → the total (what v2.15–v2.16.0
+   * read), `qtyBase` key → the estimate's total it was set against (v2.16.1 on). A state saved by v2.16.1–v2.16.5 has
+   * `{ v, base }` in `qtys` itself; that is read too.
+   */
+  function splitQtys(map) {
+    var totals = {}, base = {};
+    Object.keys(map || {}).forEach(function (k) {
+      var e = map[k];
+      if (e != null && typeof e === 'object') { totals[k] = e.v; if (e.base != null) base[k] = e.base; } else totals[k] = e;
+    });
+    return { totals: totals, base: base };
+  }
+  function joinQtys(totals, base) {
+    if (!totals || typeof totals !== 'object') return null;
+    var out = {};
+    Object.keys(totals).forEach(function (k) {
+      var e = totals[k];
+      if (e != null && typeof e === 'object') out[k] = e;                                   // saved by v2.16.1–v2.16.5
+      else if (typeof e === 'number') out[k] = base && base[k] != null ? { v: e, base: base[k] } : e;
+    });
+    return out;
+  }
+
   function newSlots() { return S.Compare_newSlots ? S.Compare_newSlots() : ['new']; }
   if (!S.pb) return;
 
@@ -315,9 +339,10 @@
       app.spareBook = st.book || null;
       // the volumes and the quantities, before the model is built: the quantities follow them
       app.vol = st.vol && typeof st.vol === 'object' ? Object.assign({}, st.vol) : {};
-      app.qtys = st.qtys && typeof st.qtys === 'object' && st.keys === KEYS ? Object.assign({}, st.qtys) : {};
+      var qs = joinQtys(st.qtys, st.qtyBase);
+      app.qtys = qs && st.keys === KEYS ? qs : {};
       app.rebuild(); app.renderSide();
-      if (st.qtys && typeof st.qtys === 'object' && st.keys !== KEYS) { app.qtys = this.reindex(st.qtys).map; app.rebuild(); }
+      if (qs && st.keys !== KEYS) { app.qtys = this.reindex(qs).map; app.rebuild(); }
       // `prices2` is this version's keying; `prices` is the previous one's, kept
       // so a workspace saved here can still be opened by the older page.
       var saved = (st.keys === KEYS && st.prices2) ? st.prices2 : st.prices;
@@ -678,7 +703,10 @@
         checked: app.checked && Object.keys(app.checked).length ? app.checked : undefined,
         // the volumes of the works and the quantities the expert decided (src/ui/volumes.js)
         vol: app.vol && Object.keys(app.vol).length ? app.vol : undefined,
-        qtys: app.qtys && Object.keys(app.qtys).length ? app.qtys : undefined,
+        // `qtys` as the page before v2.16.1 reads it (a bare total), `qtyBase` beside it: the estimate's total each was set
+        // against — going back a version shows the totals, not «[object Object]» (the prices are kept the same way)
+        qtys: app.qtys && Object.keys(app.qtys).length ? splitQtys(app.qtys).totals : undefined,
+        qtyBase: app.qtys && Object.keys(app.qtys).length ? splitQtys(app.qtys).base : undefined,
         looseBook: app.looseBook || null,
         book: app.spareBook || null,
         compare: newSlots().reduce(function (c, k) { if (k !== 'new' && this.cmp[k]) c[k] = this.cmp[k]; return c; }.bind(this),

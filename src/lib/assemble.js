@@ -101,8 +101,9 @@
       // Formulas pointing at sheets we do not carry over (VLOOKUP into a price
       // book sheet, say) would export as #REF!, so keep their cached result.
       var alive = cell.f && cell.f.indexOf('!') < 0;
-      // … and a formula that reads a column left out of the table (it would point at nothing): its value
-      if (alive && deadRef(cell.f, colMap)) alive = false;
+      // … and a formula that reads a column left out of the table (it would point at nothing): its value — and counted, so
+      // that the page says so («ТРАНСПОРТНЫЕ РАСХОДЫ 5 %» of a column not carried stays the estimate's number on both sides)
+      if (alive && deadRef(cell.f, colMap)) { alive = false; kept.dead = (kept.dead || 0) + 1; }
       // … and so does a formula that calls anything but the plain functions an estimate is made of
       // (S.formula.unsafe): it goes into the document as the number the estimate shows, and is counted.
       if (alive) {
@@ -368,7 +369,7 @@
 
     var model = { rows: rows, nExtra: nExtra, resources: resources, spans: out,
       // {count, names}: source formulas that went in as numbers (see copyCells); count 0 for an ordinary estimate
-      frozen: { count: kept.count, names: Object.keys(kept.names).sort() },
+      frozen: { count: kept.count, names: Object.keys(kept.names).sort(), dead: kept.dead || 0 },
       // {count, rows:[{r, nm, sum, calc}]}: lines whose sum in the estimate is not quantity × price (the first twenty)
       oddSums: odd, cols: {
       IDX: C_IDX, NO: C_NO, NAME: C_NAME, UNIT: C_UNIT, QTY: C_QTY,

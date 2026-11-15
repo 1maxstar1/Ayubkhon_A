@@ -230,6 +230,16 @@ try {
   const acc2 = (await api(`/api/collections/price_memory/records?perPage=500&filter=${encodeURIComponent(`workspace='${wsId}'`)}`, {}, su)).items
     .filter((r) => r.accepted).map((r) => r.res_key).sort();
   check(JSON.stringify(acc2) === JSON.stringify(acc), 'no comparison on screen leaves the marks as they are');
+  // a first version from outside (a file): its comparison says nothing about what the contractor took of our prices
+  const posts = [];
+  page.on('request', (rq) => { if (/\/api\/memory\/accepted/.test(rq.url())) posts.push(rq.url()); });
+  await page.evaluate(() => { S.Journal.acceptedSig = ''; });
+  await page.setInputFiles('#cmpOldFile', f1);
+  await page.waitForFunction(() => app.compare_ui.oldFile && app.compare_ui.res, null, T);
+  await new Promise((r) => setTimeout(r, 800));
+  const acc3 = (await api(`/api/collections/price_memory/records?perPage=500&filter=${encodeURIComponent(`workspace='${wsId}'`)}`, {}, su)).items
+    .filter((r) => r.accepted).map((r) => r.res_key).sort();
+  check(posts.length === 0 && JSON.stringify(acc3) === JSON.stringify(acc), 'an outside file as «Было» posts nothing: the marks stay as they are (' + posts.length + ' posts)');
 
   // «Объёмы работ»: the volumes and the quantities set by hand are kept with the application (src/ui/volumes.js)
   await page.click('#wsList');
@@ -253,6 +263,36 @@ try {
   check(q.works === 2 && q.vol.length === 1 && q.vol[0].v === 1.5 && q.vol[0].note === 'по рабочему проекту',
     'after a reload the works are read again and the volume decided is back (' + JSON.stringify(q.vol) + ')');
   check(Math.abs(q.labour - 8) < 1e-9 && q.crane === 3, 'and the quantities follow it, with the one set by hand (' + q.labour + ', ' + q.crane + ')');
+
+  // a total set by hand is saved so that the version before v2.16.1 reads it too: a bare number in `qtys`, the estimate's
+  // total it was set against in `qtyBase` beside it — and read back whole
+  const crane = await page.evaluate(() => { const c = app.model.resources.find((x) => x.name === 'ТЕСТОВЫЙ КРАН 10 Т'); app.qtys[c.key] = { v: 5, base: c.qty }; app.rebuild(); return { key: c.key, qty: c.qty }; });
+  await page.evaluate(() => S.Sync.touch && S.Sync.touch());
+  await saved();
+  const st = (await api('/api/collections/workspaces/records/' + (await page.evaluate(() => S.Sync.ws.id)), {}, su)).state;
+  check(st.qtys[crane.key] === 5 && st.qtyBase && st.qtyBase[crane.key] === crane.qty,
+    'saved as the page before v2.16.1 reads it: a bare total in «qtys», the total it was set against in «qtyBase» (' + JSON.stringify([st.qtys[crane.key], st.qtyBase && st.qtyBase[crane.key]]) + ')');
+  await reload();
+  await page.waitForFunction(() => app.model && app.model.rows.length > 0 && !S.Sync.loading, null, T);
+  const back = await page.evaluate((k) => app.qtys[k], crane.key);
+  check(back && back.v === 5 && back.base === crane.qty, 'and read back whole (' + JSON.stringify(back) + ')');
+  // set against another total of the estimate (an object left out, the file replaced): it waits — marked beside the quantity
+  const wait = await page.evaluate((k) => {
+    app.qtys[k] = { v: 5, base: 999 }; app.rebuild();
+    const r = app.model.resources.find((x) => x.key === k);
+    app.prices_ui && app.prices_ui.apply && app.prices_ui.apply(true);
+    const cell = document.querySelector('button.qe[data-qe="' + CSS.escape(k) + '"]');
+    return { qty2: r.qty2 == null ? null : r.qty2, wait: r.qtyWait, cell: cell ? cell.textContent : '', title: cell && cell.querySelector('.wait') ? cell.querySelector('.wait').title : '' };
+  }, crane.key);
+  check(wait.qty2 !== 5 && wait.wait && wait.wait.v === 5 && /⏸/.test(wait.cell) && /не применяется/.test(wait.title),
+    'a total set against another estimate total waits: not applied, and marked beside the quantity (' + JSON.stringify(wait).slice(0, 200) + ')');
+  // a total equal to the estimate's, with no volume moving it: no change to show — no «2 → 2» row in Table №1
+  const same = await page.evaluate((c) => {
+    app.qtys[c.key] = { v: c.qty, base: c.qty }; app.rebuild();
+    const r = app.model.resources.find((x) => x.key === c.key);
+    return { auto: r.qtyAuto, rows: S.Volumes.resRows().filter((x) => x.name === 'ТЕСТОВЫЙ КРАН 10 Т').length };
+  }, crane);
+  check(same.auto == null && same.rows === 0, 'a total equal to the estimate\'s, nothing moving it, is no row of Table №1 (' + JSON.stringify(same) + ')');
 
   // an application of two estimates: both corrected files chosen at once (in the other order), each compared with its
   // own estimate, and both back after a reload

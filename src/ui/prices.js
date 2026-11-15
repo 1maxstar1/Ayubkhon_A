@@ -115,9 +115,12 @@
   function qtyBtn(r) {
     var on = r.qty2 != null && Math.abs(r.qty2 - r.qty) > 1e-9;
     if (!S.Volumes) return S.qty(r.qty);
+    // a total set by hand against another total of the estimate waits: marked, so that it is not lost unseen
+    var wait = r.qtyWait ? ' <span class="wait" title="Ранее указано ' + S.qty(r.qtyWait.v) + ' при количестве по смете ' +
+      S.qty(r.qtyWait.base) + '; смета изменилась — не применяется. Нажмите, чтобы указать заново">⏸ ' + S.qty(r.qtyWait.v) + '</span>' : '';
     return '<button class="qe' + (on ? ' on' : '') + '" data-qe="' + S.esc(r.key) + '" title="' +
       (on ? 'Количество по экспертизе; по смете ' + S.qty(r.qty) + '. Нажмите, чтобы изменить' : 'Нажмите, чтобы указать количество по экспертизе') + '">' +
-      (on ? '<s>' + S.qty(r.qty) + '</s> ' + S.qty(r.qty2) : S.qty(r.qty)) + '</button>';
+      (on ? '<s>' + S.qty(r.qty) + '</s> ' + S.qty(r.qty2) : S.qty(r.qty)) + wait + '</button>';
   }
 
   /** «✎»: the expert's own note on the resource, for the document's «Eslatma» column — only with the setting on (E17). */
@@ -366,7 +369,7 @@
         case 'wrongsec': return !!secWarn(r);
         case 'unchecked': return !app.checked[r.key];
         case 'checked': return !!app.checked[r.key];
-        case 'qty': return r.qty2 != null && Math.abs(r.qty2 - r.qty) > 1e-9;
+        case 'qty': return (r.qty2 != null && Math.abs(r.qty2 - r.qty) > 1e-9) || !!r.qtyWait;
         default: return true;
       }
     });

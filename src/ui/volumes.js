@@ -75,6 +75,10 @@
       if (hand != null) r.qty2 = hand;
       else if (r.qtyAuto != null) r.qty2 = r.qtyAuto;
       else delete r.qty2;
+      // a total set by hand against another total of the estimate (an object left out, the file replaced): it waits — not
+      // in the document, and said beside the quantity (prices.js) so that it is not lost unseen
+      var e = app.qtys && app.qtys[r.key];
+      if (hand == null && e && typeof e === 'object' && e.v != null) r.qtyWait = { v: e.v, base: e.base }; else delete r.qtyWait;
     });
   }
 
@@ -188,8 +192,12 @@
       var cur = r.qty2 != null ? r.qty2 : r.qty, auto = r.qtyAuto != null ? r.qtyAuto : r.qty;
       var shown = fmtV(cur);
       var t = window.prompt('Количество по экспертизе для «' + r.name + '» (' + r.unit + ').\nПо смете: ' + fmtV(r.qty) +
-        (r.qtyAuto != null ? '; по объёмам работ: ' + fmtV(r.qtyAuto) : '') + '. Пусто — автоматически.', shown);
-      if (t == null || String(t).trim() === shown) return;    // looked at, not changed
+        (r.qtyAuto != null ? '; по объёмам работ: ' + fmtV(r.qtyAuto) : '') + '. Пусто — автоматически.' +
+        (r.qtyWait ? '\nРанее указано ' + fmtV(r.qtyWait.v) + ' при количестве по смете ' + fmtV(r.qtyWait.base) +
+          ' — смета с тех пор изменилась, поэтому оно не применяется. OK — применить его к нынешней смете.' : ''), r.qtyWait ? fmtV(r.qtyWait.v) : shown);
+      if (t == null) return;
+      // looked at, not changed — unless a waiting total was shown: OK sets it against the estimate as it is now
+      if (!r.qtyWait && String(t).trim() === shown) return;
       var v = readV(t);
       if (v !== v) { app.toast('Количество — число', true); return; }
       app.qtys = app.qtys || {};
@@ -204,7 +212,9 @@
     resRows: function () {
       var app = A(), m = app.model;
       if (!m || !app.qtys) return [];
-      return m.resources.map(function (r) { return { r: r, v: handOf(app, r) }; }).filter(function (x) { return x.v != null; })
+      // a total equal to the estimate's, with no volume moving it (the volume cleared afterwards), is no change: no «10 → 10» row
+      return m.resources.map(function (r) { return { r: r, v: handOf(app, r) }; })
+        .filter(function (x) { return x.v != null && !(x.r.qtyAuto == null && Math.abs(x.v - (x.r.qty || 0)) <= 1e-9); })
         .map(function (x) { return { name: x.r.name, unit: x.r.unit, smeta: x.r.qty, expert: x.v, note: '' }; });
     },
 

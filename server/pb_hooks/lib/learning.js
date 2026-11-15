@@ -209,10 +209,19 @@ module.exports = {
     const body = e.requestInfo().body || {};
     const keys = (Array.isArray(body.keys) ? body.keys : []).map((k) => text(k)).filter(Boolean);
     if (keys.length > MAX_ROWS) throw new BadRequestError("Слишком много строк за один запрос: " + keys.length);
+    // `scope`: the resources the comparison was about (one estimate of several, say) — only their marks are touched;
+    // without it (the page before v2.16.6) every mark of the workspace is, as it always was
+    const scope = Array.isArray(body.scope) ? body.scope.map((k) => text(k)).filter(Boolean) : null;
+    if (scope && scope.length > MAX_ROWS * 4) throw new BadRequestError("Слишком много строк за один запрос: " + scope.length);
     const w = workspaceOf(body);
     let marked = 0;
     $app.runInTransaction((tx) => {
-      tx.db().newQuery("UPDATE price_memory SET accepted = FALSE WHERE workspace = {:w} AND accepted = TRUE").bind({ w: w.ws.id }).execute();
+      if (!scope) tx.db().newQuery("UPDATE price_memory SET accepted = FALSE WHERE workspace = {:w} AND accepted = TRUE").bind({ w: w.ws.id }).execute();
+      else for (let i = 0; i < scope.length; i += 200) {
+        const params = { w: w.ws.id }, marks = [];
+        scope.slice(i, i + 200).forEach((k, j) => { params["k" + j] = k; marks.push("{:k" + j + "}"); });
+        tx.db().newQuery("UPDATE price_memory SET accepted = FALSE WHERE workspace = {:w} AND accepted = TRUE AND res_key IN (" + marks.join(",") + ")").bind(params).execute();
+      }
       for (let i = 0; i < keys.length; i += 200) {
         const params = { w: w.ws.id }, marks = [];
         keys.slice(i, i + 200).forEach((k, j) => { params["k" + j] = k; marks.push("{:k" + j + "}"); });
@@ -221,6 +230,41 @@ module.exports = {
       }
     });
     return e.json(200, { marked: marked });
+  },
+
+  /**
+   * Data written before v2.16.1, brought into line once at start-up (learning.pb.js); a second run changes nothing.
+   *   - An application moved to another region by v2.16.0 or earlier left its journal and its memory in the old region
+   *     (corrections moved with it already): they follow it.
+   *   - A price_memory row of an application finished before v2.16.1 has a random id, so its next re-finish would give
+   *     it another and every «mem:<old id>» source would stop resolving: it gets the id every finish gives it now
+   *     (sha256 of workspace and resource), and the «mem:» sources that name it follow.
+   * Plain SQL: `updated` is not stamped (the hints are ordered by it).
+   */
+  repair(app) {
+    let regions = 0, ids = 0;
+    app.runInTransaction((tx) => {
+      for (const t of ["suggest_events", "price_memory"]) {
+        try {
+          regions += tx.db().newQuery("UPDATE " + t + " SET region = (SELECT w.region FROM workspaces w WHERE w.id = " + t + ".workspace) " +
+            "WHERE EXISTS (SELECT 1 FROM workspaces w WHERE w.id = " + t + ".workspace AND w.region != " + t + ".region)").execute().rowsAffected();
+        } catch (_) { /* no such table yet */ }
+      }
+      const rows = arrayOf(new DynamicModel({ id: "", workspace: "", res_key: "" }));
+      try { tx.db().newQuery("SELECT id, workspace, res_key FROM price_memory").all(rows); } catch (_) { return; }
+      for (const r of rows) {
+        const h = $security.sha256(r.workspace + "|" + r.res_key).slice(0, 15);
+        if (h === r.id) continue;
+        // one row per workspace and resource (a unique index): no other row can hold that id
+        tx.db().newQuery("UPDATE price_memory SET id = {:h} WHERE id = {:o}").bind({ h: h, o: r.id }).execute();
+        for (const t of ["corrections", "suggest_events"]) {
+          try { tx.db().newQuery("UPDATE " + t + " SET source = {:n} WHERE source = {:o}").bind({ n: "mem:" + h, o: "mem:" + r.id }).execute(); }
+          catch (_) { /* no such table */ }
+        }
+        ids++;
+      }
+    });
+    return { regions: regions, ids: ids };
   },
 
   /** GET /api/learning/stats — counts only (admin): what has been gathered to learn from. Never a name or a price. */

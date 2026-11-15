@@ -26,3 +26,20 @@ routerAdd("GET", "/api/learning/stats", (e) => {
 routerAdd("GET", "/api/formats/stats", (e) => {
   return require(`${__hooks}/lib/learning.js`).formats(e);
 }, $apis.requireAuth());
+
+// the same, on the administrator's word (and for the tests): what it put right
+routerAdd("POST", "/api/admin/learning/repair", (e) => {
+  require(`${__hooks}/lib/admin.js`).requireAdmin(e);
+  return e.json(200, require(`${__hooks}/lib/learning.js`).repair($app));
+}, $apis.requireAuth());
+
+// data of the versions before v2.16.1, put right once (lib/learning.js repair): a second start finds nothing to do
+onBootstrap((e) => {
+  e.next();
+  try {
+    const r = require(`${__hooks}/lib/learning.js`).repair($app);
+    if (r.regions || r.ids) $app.logger().info("learning data repaired at start-up", "regions", String(r.regions), "ids", String(r.ids));
+  } catch (err) {
+    $app.logger().warn("learning data repair skipped", "error", String(err));
+  }
+});

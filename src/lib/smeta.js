@@ -86,7 +86,11 @@
    */
   var LETTER = /[A-Za-z\u00C0-\u024F\u0400-\u04FF]/;
   /** A band of haulage — «ПЕРЕВОЗКА», «Транспортировка…», «Доставка…» — and a name that already says it. */
-  var HAUL = /^(ПЕРЕВОЗК|ТРАНСПОРТ|ДОСТАВК|ТАШИШ|TASHISH)/;
+  // only the words that mean haulage: «ТРАНСПОРТНЫЕ СРЕДСТВА», «ТРАНСПОРТНЫЕ МАШИНЫ И МЕХАНИЗМЫ», «ТРАНСПОРТНОЕ ОБОРУДОВАНИЕ»
+  // are resource bands, «ТРАНСПОРТНЫЕ РАСХОДЫ / УСЛУГИ / ЗАТРАТЫ» and «ТРАНСПОРТИРОВКА …» are haulage
+  var HAUL = /^(ПЕРЕВОЗК|ДОСТАВК|ТАШИШ|TASHISH|ТРАНСПОРТИРОВК|ТРАНСПОРТ\s*$|ТРАНСПОРТН(ЫЕ|АЯ|ЫЙ)\s+(РАСХОД|УСЛУГ|ЗАТРАТ))/;
+  /** A haulage band: a haulage word, even when the band names equipment too («ТРАНСПОРТИРОВКА (ОБОРУДОВАНИЕ)»). */
+  function haulBand(t) { var u = up(t); return HAUL.test(u) && (!isSection(t) || /^(ПЕРЕВОЗК|ДОСТАВК|ТАШИШ|TASHISH|ТРАНСПОРТИРОВК)/.test(u)); }
   // the same above the first line of a sheet read by its shape, where the row may as well be the sheet's own title
   // («ТРАНСПОРТНАЯ УЛИЦА»): only the words that can mean nothing but haulage
   var HAUL_OPEN = /^(ПЕРЕВОЗК|ДОСТАВК|ТАШИШ|TASHISH|ТРАНСПОРТИРОВК|ТРАНСПОРТ\s*$|ТРАНСПОРТНЫЕ\s+(РАСХОД|УСЛУГ|ЗАТРАТ))/;
@@ -405,16 +409,19 @@
       else if (L.code && !noTxt && nm && qty == null && isSection(nm)) { kind = 'section'; section = sectionOf(nm); sections++; }
       // a т·км line under a haulage band with its price but its quantity left empty (and so its sum 0): a line of the
       // estimate all the same — numbered or not — read with the quantity 0, so that nothing on the sheet goes unseen
-      else if (qty == null && !sum && price != null && nm && LETTER.test(nm) && HAUL.test(up(band)) && !isSection(band) && TKM.test(up(txt(cells[L.unit])))) { kind = 'item'; qty = 0; items++; }
+      else if (qty == null && !sum && price != null && nm && LETTER.test(nm) && haulBand(band) && TKM.test(up(txt(cells[L.unit])))) { kind = 'item'; qty = 0; items++; }
       else if (L.need && nm && LETTER.test(nm) && qty != null && !money(cells[L.unit]) && (S.num(noCell && noCell.v) != null || NUMBERED.test(noTxt) || price != null)) { kind = 'item'; items++; }
       else if (!L.need && nm && LETTER.test(nm) && qty != null && (!L.code || S.num(noCell && noCell.v) != null)) { kind = 'item'; items++; }
+      // «ПЕРЕВОЗКА» written in the name column (form 4А, or a sheet without bands in the № column): a band with no number on
+      // it — the lines under it are haulage
+      else if (nm && !noTxt && qty == null && price == null && sum == null && haulBand(nm)) { kind = 'section'; section = 'other'; }
       else if (nm) kind = 'extra';
       else if (noTxt && L.need) { kind = 'section'; section = sectionOf(noTxt); }
       else if (noTxt) {
         kind = 'section';
         // «Перевозка материалов» in the number column: its lines are haulage, not the machines of the band above
         // (the statement of required resources gives such a band «other» the same way — sectionOf)
-        if (HAUL.test(up(noTxt)) && !isSection(noTxt)) section = 'other';
+        if (haulBand(noTxt)) section = 'other';
       }
       else kind = 'blank';
 
@@ -422,7 +429,7 @@
       // a line under «ПЕРЕВОЗКА» is the haulage of a material, not the material: the same name under
       // «Строительные материалы» is another resource with another price (the owner, 2026-11-14)
       // … but not under a resource band whose title happens to begin so («ТРАНСПОРТНОЕ ОБОРУДОВАНИЕ» is equipment)
-      if (kind === 'item' && HAUL.test(up(band)) && !isSection(band) && !HAUL.test(up(nm))) nm = (nm === nm.toUpperCase() ? 'ПЕРЕВОЗКА ' : 'Перевозка ') + nm;
+      if (kind === 'item' && haulBand(band) && !HAUL.test(up(nm))) nm = (nm === nm.toUpperCase() ? 'ПЕРЕВОЗКА ' : 'Перевозка ') + nm;
       for (var w = cells.length - 1; w > wide; w--) {
         if (cells[w] && (cells[w].v != null || cells[w].f != null)) { wide = w; break; }
       }

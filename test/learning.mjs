@@ -188,6 +188,22 @@ try {
   check(!said.length, 'and nothing is said about it' + (said.length ? ' — ' + said.join(' | ') : ''));
   await page.unroute(J);
   await page.waitForFunction(() => !S.Journal.busy);
+  // the page going after a bulk change: every waiting decision is sent — as many as fit in the request that outlives the
+  // page (keepalive, at most 6000 characters), the rest beside it as ordinary requests; none is held back
+  const leave = await page.evaluate(async () => {
+    const J = S.Journal, calls = [], send = S.pb.send;
+    const ws = S.Sync.ws.id, big = 'Т'.repeat(400);
+    const was = J.q; J.q = [];
+    for (let i = 0; i < 230; i++) J.q.push({ ws, ev: { res_key: 'k' + i, name: big, action: 'bulk', lines: [], final_price: i } });
+    S.pb.send = (path, opts) => { calls.push({ path, keepalive: !!opts.keepalive, n: opts.body.events.length, size: JSON.stringify(opts.body.events).length }); return Promise.resolve({ saved: 0 }); };
+    J.busy = true;                                   // a request in flight does not hold the page's last word back
+    try { await J.commit({ keepalive: true }); } finally { S.pb.send = send; J.busy = false; J.q = was; }
+    return calls;
+  });
+  const kept = leave.filter((c) => c.keepalive), sentAll = leave.reduce((a, c) => a + c.n, 0);
+  check(kept.length === 1 && kept[0].size <= 6000 + 400 && leave.length >= 3 && sentAll === 230 && leave.every((c) => c.path === '/api/journal/events' && c.n <= 100),
+    'the page going: all 230 waiting decisions are sent, a few in the request that outlives the page, the rest beside it (' + leave.map((c) => c.n + (c.keepalive ? 'k' : '')).join('+') + ')');
+
   check(errors.length === 0, 'no page errors so far' + (errors.length ? ': ' + errors.join(' | ') : ''));
 
   /* ------------------------------------------------------------- «✓ Завершить» */
@@ -261,6 +277,34 @@ try {
     'the contractor\'s «Исправлено» marks the corrected row named, and no other');
   acc = await call('POST', '/api/memory/accepted', expert, { workspace: ws, keys: [] });
   check((await all('price_memory', `workspace='${ws}'`)).every((r) => !r.accepted), 'and a later comparison without it takes the mark away');
+  // a comparison of one estimate of several (`scope`: the resources it was about) touches only their marks
+  await call('POST', '/api/memory/accepted', expert, { workspace: ws, keys: [anchorKey] });
+  acc = await call('POST', '/api/memory/accepted', expert, { workspace: ws, keys: [], scope: [untouchedKey] });
+  check(acc.status === 200 && (await all('price_memory', `workspace='${ws}'`)).find((r) => r.res_key === anchorKey).accepted,
+    'a comparison of other resources (another estimate of the application) leaves this mark as it is');
+  acc = await call('POST', '/api/memory/accepted', expert, { workspace: ws, keys: [], scope: [anchorKey] });
+  check(!(await all('price_memory', `workspace='${ws}'`)).find((r) => r.res_key === anchorKey).accepted, 'one about it, without it, takes it away');
+
+  /* ------------------------------------------------------------- data of the versions before v2.16.1, put right */
+  {
+    // a row remembered by v2.16.0 (a random id), a correction of another application that applied it («mem:<that id>»),
+    // and a row left in the old region by a move made then
+    const crypto = await import('node:crypto');
+    const oldId = 'oldrandomid0001', key = 'ТЕСТ СТАРЫЙ КЛЮЧ' + '\u241f' + 'м', want = crypto.createHash('sha256').update(ws + '|' + key).digest('hex').slice(0, 15);
+    const wsRec = await api('/api/collections/workspaces/records/' + ws, {}, su);
+    const elsewhere = wsRec.region === 'andijon' ? 'xorazm' : 'andijon';
+    let mk = await call('POST', '/api/collections/price_memory/records', su, { id: oldId, workspace: ws, res_key: key, kind: 'corrected', region: elsewhere, final_price: 7 });
+    const corr = await call('POST', '/api/collections/corrections/records', su, { workspace: ws, res_key: 'ТЕСТ ДРУГОЙ' + '\u241f' + 'м', market_price: 7, source: 'mem:' + oldId });
+    const rep = await call('POST', '/api/admin/learning/repair', su, {});
+    const moved = await all('price_memory', `workspace='${ws}' && res_key='${key}'`);
+    const c2 = await api('/api/collections/corrections/records/' + corr.body.id, {}, su);
+    check(mk.status === 200 && rep.status === 200 && rep.body.ids >= 1 && rep.body.regions >= 1 && moved.length === 1 && moved[0].id === want && moved[0].region === wsRec.region && c2.source === 'mem:' + want,
+      'an old random id gets the one every finish gives now, and the «mem:» that named it follows; a row left in the old region follows its application (' + JSON.stringify(rep.body) + ')');
+    const again = await call('POST', '/api/admin/learning/repair', su, {});
+    check(again.body.ids === 0 && again.body.regions === 0, 'a second run finds nothing to do');
+    await call('DELETE', '/api/collections/price_memory/records/' + want, su);
+    await call('DELETE', '/api/collections/corrections/records/' + corr.body.id, su);
+  }
 
   /* ------------------------------------------------------------- the routes */
   const lineOf = (i) => ({ k: 'ref', p: i, tier: 'document', how: 'exact', sim: 0.123456789, price: 10 + i, name: 'СЕКРЕТ', flags: ['x'.repeat(100)], rids: Array.from({ length: 50 }, (_, j) => j) });

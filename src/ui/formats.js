@@ -177,7 +177,21 @@
         if (it.read && !(fmt && fmt.read && fmt.sample)) return null;     // a read file is recorded with its sample, or not at all
         fmt = fmt || { v: L.VERSION, objects: 0, items: 0, checked: 0, score: null, doubt: false, signature: '', sample: null };
         var body = self.fields(it, fmt);
-        if (rec) { delete body.hash; return col.update(rec.id, body, { requestKey: null }); }
+        if (rec) {
+          delete body.hash;
+          // a record brought up to date that now says «unread» or «doubtful» gets the file it lacks — it is counted on the
+          // admin page and has to be there to be downloaded (v2.16.1 updated the fields and left the file out)
+          var attach = (!it.read || body.doubt) && !rec.file && it.file.size <= KEEP_MAX && typeof FormData !== 'undefined';
+          if (!attach) return col.update(rec.id, body, { requestKey: null });
+          var up = new FormData();
+          Object.keys(body).forEach(function (k) { up.append(k, k === 'sample' ? JSON.stringify(body[k]) : String(body[k])); });
+          up.append('file', it.file, it.name || 'smeta.xlsx');
+          return col.update(rec.id, up, { requestKey: null }).catch(function (e) {
+            var bad = e && e.response && e.response.data;
+            if (e && e.status === 400 && bad && bad.file) return col.update(rec.id, body, { requestKey: null });
+            throw e;
+          });
+        }
         body.by = S.me().id;
         var keep = (!it.read || body.doubt) && it.file.size <= KEEP_MAX && typeof FormData !== 'undefined';
         if (!keep) return col.create(body, { requestKey: null });

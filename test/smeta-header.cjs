@@ -206,6 +206,17 @@ const jm = S.assemble([{ name: 'j', file: 'j.xlsx', objects: just, enabled: true
 const jRow = jm.rows.find((r) => r.kind === 'item');
 check(jRow && jRow.cells[jm.cols.NO] && jRow.cells[jm.cols.NO].v === 1 && jRow.cells[jm.cols.UNIT].v === 'М3' && !jm.rows.some((r) => r.cells && Object.keys(r.cells).some((k) => r.cells[k] && r.cells[k].v === 'С101-0001')),
   'the code column between them is left out of the document, never written over the № or the unit');
+// a line whose formula reads that left-out column (the overhead worked out from a figure in it) goes in as its value —
+// and is counted, so that the page says it stays the estimate's number on the market side too
+const dead = one({ sheets: [sheet('РЕСУРС', [
+  ['Ведомость ресурсов'],
+  ['№ п/п', 'Обоснование', 'Наименование', 'Ед. изм.', 'Количество', 'Цена за ед.', 'Сумма'],
+  ['СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'],
+  [1, 7, 'ЩЕБЕНЬ ТЕСТОВЫЙ', 'М3', 4, 17, 68],
+  [null, null, 'ТРАНСПОРТНЫЕ РАСХОДЫ 5 %', 'СУМ', null, null, '=B4*0.5'],
+  ['ИТОГО', null, null, 'СУМ', null, null, '=SUM(G4:G5)']])] });
+const dm = S.assemble([{ name: 'd', file: 'd.xlsx', objects: dead, enabled: true }], {});
+check(dm.frozen.dead === 1 && dm.frozen.count === 0, 'a formula reading the left-out column goes in as its value and is counted for the page (' + JSON.stringify(dm.frozen) + ')');
 
 /* 11 — a band whose title begins like a haulage word but is a resource band */
 const eq = one({ sheets: [sheet('РЕСУРС', [
@@ -216,6 +227,27 @@ const eq = one({ sheets: [sheet('РЕСУРС', [
 ])] });
 const ei = eq.length ? eq[0].rows.filter((r) => r.kind === 'item') : [];
 check(ei.length === 1 && ei[0].nm === 'ЛИФТ ТЕСТОВЫЙ ПАССАЖИРСКИЙ' && ei[0].section === 'equipment', '«ТРАНСПОРТНОЕ ОБОРУДОВАНИЕ» is equipment: its lines are not renamed as haulage');
+// the other bands that begin so are resource bands too; «ТРАНСПОРТИРОВКА (ОБОРУДОВАНИЕ)» is haulage, equipment named or not;
+// and «ПЕРЕВОЗКА» written in the name column (no number on it) is a haulage band as well
+const bands = one({ sheets: [sheet('РЕСУРС', [
+  ['N п/п', 'НАИМЕНОВАНИЕ', 'ЕД. ИЗМ.', 'КОЛ-ВО', 'ЦЕНА ЗА ЕД.', 'СУММА (сум)'],
+  [1, 2, 3, 4, 5, 6],
+  ['СТРОИТЕЛЬНЫЕ МАШИНЫ И МЕХАНИЗМЫ'],
+  [1, 'КАТОК ТЕСТОВЫЙ', 'МАШ.-Ч', 2, 13, 26],
+  ['ТРАНСПОРТНЫЕ СРЕДСТВА'],
+  [1, 'АВТОМОБИЛЬ ТЕСТОВЫЙ БОРТОВОЙ', 'МАШ.-Ч', 3, 11, 33],
+  ['ТРАНСПОРТНЫЕ МАШИНЫ И МЕХАНИЗМЫ'],
+  [1, 'ТЯГАЧ ТЕСТОВЫЙ', 'МАШ.-Ч', 1, 19, 19],
+  ['ТРАНСПОРТИРОВКА (ОБОРУДОВАНИЕ)'],
+  [1, 'ЩИТ ТЕСТОВЫЙ', 'Т', 2, 7, 14],
+  ['СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'],
+  [1, 'ЩЕБЕНЬ ТЕСТОВЫЙ', 'М3', 4, 17, 68],
+  [null, 'ПЕРЕВОЗКА'],
+  [1, 'ЩЕБЕНЬ ТЕСТОВЫЙ', 'Т', 6, 3, 18]
+])] });
+const bi = bands.length ? bands[0].rows.filter((r) => r.kind === 'item').map((r) => r.nm) : [];
+check(bi.join('|') === 'КАТОК ТЕСТОВЫЙ|АВТОМОБИЛЬ ТЕСТОВЫЙ БОРТОВОЙ|ТЯГАЧ ТЕСТОВЫЙ|ПЕРЕВОЗКА ЩИТ ТЕСТОВЫЙ|ЩЕБЕНЬ ТЕСТОВЫЙ|ПЕРЕВОЗКА ЩЕБЕНЬ ТЕСТОВЫЙ',
+  '«ТРАНСПОРТНЫЕ СРЕДСТВА / МАШИНЫ» are resource bands; «ТРАНСПОРТИРОВКА (ОБОРУДОВАНИЕ)» and «ПЕРЕВОЗКА» in the name column are haulage (' + bi.join(' | ') + ')');
 
 /* 12 — a sheet read by its shape that opens with «ПЕРЕВОЗКА» */
 const top = one({ sheets: [sheet('ПЕРЕВОЗКА', [

@@ -32,3 +32,4 @@ v2.14.0 ef626b21e1d3520af2e22dee536ae3e804d0c66b Narx modeli: olchov (admin Sobr
 v2.14.1 71d9bc7e55a414b26cff59f3b49e6bd51d91e00e Vedomost potrebnyh resursov oqiladi
 v2.14.2 0b71b8dc854982ef1a730f75c988a0fc7f0d4656 TRANSPORT varagi oqiladi
 v2.16.5 25b235f95342d1510244fde068033809eba5e22f several corrected files, summary copies, haulage without tkm, foreign volume sheet, 80 files
+v2.16.6 78f60ddec1026918ba646017365f8f5cd96a097a open v2.16.1 findings: rollback quantities, waiting mark, page-leave journal, haulage words, old data repair, scoped marks

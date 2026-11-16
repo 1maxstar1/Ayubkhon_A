@@ -1,6 +1,6 @@
 {
   "name": "smeta-taqqoslash",
-  "version": "2.16.6",
+  "version": "2.16.7",
   "description": "Smeta resurs narxlarini taqqoslash va TAQQOSLASH JADVALI №2 tayyorlash vositasi",
   "type": "module",
   "private": true,

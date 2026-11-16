@@ -45,7 +45,7 @@ sh server/release.sh X.Y.Z "izoh" --row matn.md [--dry]   # reliz bitta buyruq b
 node test/server-helper.mjs; sh test/release-script.sh    # test serveri yetim qolmaydi; reliz skripti vaqtinchalik nusxada
 sh server/setup.sh && sh server/run.sh                # PocketBase (server rejimi), README «Server rejimi»
 sh server/laptop.sh [autostart|status|backup|drive|restore|update|stop]   # noutbuk rejimi: bitta odam, baza shu diskda; zaxira ikki joyga
-server\laptop.cmd [autostart|status|backup|update|rollback|autoupdate|drive|stop|debug|doctor]   # xuddi shu, Windows'da (Node/Git kerak emas)
+server\laptop.cmd [autostart|status|backup|restore|update|rollback|autoupdate|drive|stop|debug|doctor]   # xuddi shu, Windows'da (Node/Git kerak emas); restore — Mac zaxirasini ham tiklaydi
 irm https://raw.githubusercontent.com/1maxstar1/Ayubkhon_A/HEAD/server/install-windows.ps1 | iex   # Windows: bitta qator bilan o'rnatish/yangilash
 sh test/laptop-windows.sh                             # Windows ishga tushirgichi, pwsh ostida
 sh test/laptop-backup.sh; node test/backup-prune.cjs  # Mac ishga tushirgichi: zaxira, ikkinchi joy, tiklash; qaysi nusxalar saqlanadi

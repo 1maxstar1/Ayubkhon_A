@@ -128,6 +128,69 @@ echo "$SIGNIN" | grep -q '"role":"admin"' && ok 'with the account put back to ad
 is "$(curl -s -o /dev/null -w '%{http_code}' "$URL/" -D - | grep -ci '^cache-control: no-cache')" 1 'and the page is served so the browser asks for it afresh'
 ps1 start | grep -q 'Allaqachon ishlayapti' && ok 'a start after that leaves the current one alone' || no 'restart loop'
 
+echo '-- restore: the database from a copy, the Mac'"'"'s too --'
+# A copy from another computer: its superuser has that computer's password and its account another address. Here:
+# a backup with a marker account in it, then the marker gone, another one made, and this computer's password changed.
+sutok() { curl -sS -X POST "$URL/api/collections/_superusers/auth-with-password" -H 'content-type: application/json' \
+  -d "{\"identity\":\"ekspert@example.com\",\"password\":\"$1\"}" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p'; }
+has_user() { curl -sS "$URL/api/collections/users/records?filter=email%3D%27$1%27" -H "Authorization: $2" | grep -c '"email":"'; }
+mkuser() { curl -sS -o /dev/null -X POST "$URL/api/collections/users/records" -H "Authorization: $2" -H 'content-type: application/json' \
+  -d "{\"email\":\"$1\",\"password\":\"Pa55word-$1\",\"passwordConfirm\":\"Pa55word-$1\",\"role\":\"ekspert\",\"active\":true}"; }
+SU=$(sutok "$PASS")
+mkuser 'mac@example.com' "$SU"
+ps1 backup >/dev/null
+MACZIP="$T/from-mac/pb_backup_20261116090000.zip"; mkdir -p "$T/from-mac" "$T/u/Downloads"
+cp "$(ls -t "$TAQ_BACKUPS"/pb_*.zip | head -1)" "$MACZIP"; cp "$MACZIP" "$T/u/Downloads/"
+MID=$(curl -sS "$URL/api/collections/users/records?filter=email%3D%27mac%40example.com%27" -H "Authorization: $SU" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -1)
+curl -sS -o /dev/null -X DELETE "$URL/api/collections/users/records/$MID" -H "Authorization: $SU"
+mkuser 'later@example.com' "$SU"
+is "$(has_user mac%40example.com "$SU")$(has_user later%40example.com "$SU")" 01 'before: the marker of the copy gone, another account made'
+HOME="$T/u" ps1 restore 2>&1 | grep -q "Downloads/pb_backup_20261116090000.zip" && ok 'restore with no file lists the copies it sees, the Downloads folder too' || no "restore list: $(HOME="$T/u" ps1 restore 2>&1 | head -5)"
+# refused, and nothing changes
+printf 'not a zip' > "$T/from-mac/pb_broken.zip"
+OUT=$(TAQ_RESTORE_YES=1 ps1 restore "$T/from-mac/pb_broken.zip" 2>&1)
+echo "$OUT" | grep -q 'zip emas' && ok 'a file that is no zip is refused' || no "broken zip: $OUT"
+( cd "$T/from-mac" && printf 'x' > readme.txt && zip -q pb_other.zip readme.txt )
+OUT=$(TAQ_RESTORE_YES=1 ps1 restore "$T/from-mac/pb_other.zip" 2>&1)
+echo "$OUT" | grep -q "data.db yo'q" && ok 'a zip that is no copy of the database is refused' || no "foreign zip: $OUT"
+python3 -I -c "import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],'w'); z.writestr('data.db','x'); z.writestr('../evil.txt','x'); z.close()" "$T/from-mac/pb_evil.zip"
+OUT=$(TAQ_RESTORE_YES=1 ps1 restore "$T/from-mac/pb_evil.zip" 2>&1)
+echo "$OUT" | grep -q "begona yo'l" && ok 'a zip with a path out of its folder is refused' || no "zip slip: $OUT"
+[ ! -e "$TAQ_HOME/evil.txt" ] && [ ! -e "$T/evil.txt" ] && ok '... and nothing of it is written' || no 'zip slip wrote a file'
+OUT=$(TAQ_RESTORE_YES=1 ps1 restore "$T/from-mac/none.zip" 2>&1)
+echo "$OUT" | grep -q 'Fayl topilmadi' && ok 'a file that is not there is said' || no "missing: $OUT"
+OUT=$(printf "yo'q\n" | ps1 restore "$MACZIP" 2>&1)
+echo "$OUT" | grep -q 'Bekor qilindi' && ok 'asked first: «yo'"'"'q» leaves it' || no "confirm: $OUT"
+is "$(health)$(has_user later%40example.com "$SU")" 2001 'and after each of these the program runs on the database it had'
+ls -d "$TAQ_HOME"/pb_data.before-restore-* >/dev/null 2>&1 && no 'a refused restore moved the database aside' || ok 'no database was moved aside for them'
+# this computer's own password is another one than the copy's
+NEWPASS=OtherComputerPass1234567
+sed -i "s/^PB_ADMIN_PASS=.*/PB_ADMIN_PASS=$NEWPASS/" "$TAQ_HOME/settings.env"
+OUT=$(TAQ_RESTORE_YES=1 ps1 restore "$MACZIP" 2>&1)
+echo "$OUT" | grep -q 'Tiklandi: pb_backup_20261116090000.zip' && ok 'restore puts the copy in' || no "restore: $OUT"
+echo "$OUT" | grep -q 'arizalar: [0-9]*   narx xotirasi: [0-9]*   narx tuzatishlari: [0-9]*' && ok 'and says what came back, in numbers' || no "restore counts: $OUT"
+is "$(health)" 200 'the program runs on it'
+SU2=$(sutok "$NEWPASS")
+[ -n "$SU2" ] && ok "the superuser is this computer's: its own password works" || no 'superuser after restore'
+is "$(has_user mac%40example.com "$SU2")$(has_user later%40example.com "$SU2")" 10 'the data is the copy'"'"'s: its account back, the later one gone'
+curl -sS -X POST "$URL/api/laptop/signin" | grep -q '"email":"ekspert@example.com"' && ok 'and the page signs in by itself' || no 'signin after restore'
+ASIDE=$(ls -d "$TAQ_HOME"/pb_data.before-restore-* 2>/dev/null | head -1)
+[ -n "$ASIDE" ] && [ -f "$ASIDE/data.db" ] && ok 'the database it replaced is kept aside, whole' || no "aside: $ASIDE"
+echo "$OUT" | grep -q "avvalgi baza: .*pb_data.before-restore-" && ok 'and the restore says where' || no 'aside not said'
+[ -d "$TAQ_HOME/restore-unzip" ] && no 'the unpacking folder is left behind' || ok 'the unpacking folder is cleared away'
+# the database zipped by hand, inside its folder (pb_data/data.db): taken the same
+rm -rf "$T/byhand"; mkdir -p "$T/byhand/pb_data"
+( cd "$T/byhand/pb_data" && unzip -q "$MACZIP" && cd .. && zip -qr "$T/from-mac/pb_byhand.zip" pb_data )
+OUT=$(TAQ_RESTORE_YES=1 ps1 restore "$T/from-mac/pb_byhand.zip" 2>&1)
+echo "$OUT" | grep -q 'Tiklandi: pb_byhand.zip' && [ -f "$TAQ_HOME/pb_data/data.db" ] && [ ! -d "$TAQ_HOME/pb_data/pb_data" ] \
+  && ok 'a copy zipped by hand inside its folder is taken the same way' || no "by hand: $OUT"
+is "$(ls -d "$TAQ_HOME"/pb_data.before-restore-* | wc -l | tr -d ' ')" 2 'each restore keeps the database it replaced'
+rm -rf "$TAQ_HOME"/pb_data.before-restore-*
+# back to this run's password, for what follows
+sed -i "s/^PB_ADMIN_PASS=.*/PB_ADMIN_PASS=$PASS/" "$TAQ_HOME/settings.env"
+ps1 stop >/dev/null; ps1 start >/dev/null
+[ -n "$(sutok "$PASS")" ] && ok 'the next start makes the superuser match the settings again' || no 'password back'
+
 echo '-- versions, on a copy of the program --'
 # The program as the ZIP installs it - no .git - so it updates itself. A new
 # version goes into app\<version>-<commit> beside the data; the program folder

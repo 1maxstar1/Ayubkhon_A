@@ -6,6 +6,8 @@
 #   laptop.cmd autostart       ... and from now on start at every Windows sign-in
 #   laptop.cmd status          is it running, which version, backups, Drive
 #   laptop.cmd backup          make a copy now (kept in %USERPROFILE%\Backups\smeta)
+#   laptop.cmd restore [zip]   put the database back from a copy - this computer's, or the Mac's
+#                              (no argument: the copies it can see; the database there now is moved aside)
 #   laptop.cmd update          take the newest release now
 #   laptop.cmd rollback        go back to the version before the last update
 #   laptop.cmd rollback v2.4.0 ... or to a release by name
@@ -1583,6 +1585,127 @@ switch ($Command) {
     if ($started) { Stop-ServerOnly }
   }
 
+  # The database put back from a copy: one of this computer's own, or the Mac's
+  # (sh server/laptop.sh backup there - its copy reaches Google Drive's «Smeta
+  # zaxira (Mac)» by itself, or comes by hand). No argument: the copies it can
+  # see. The database there now is moved aside, never deleted; the program then
+  # starts the usual way, so the superuser and the account are this computer's
+  # own whatever computer the copy came from.
+  'restore' {
+    Wait-Install
+    Ensure-Settings $false
+    $s = Read-Settings
+    $dirs = @($Backups)
+    if ($s['BACKUP_COPY']) { $dirs += $s['BACKUP_COPY']; $dirs += (Join-Path (Split-Path -Parent $s['BACKUP_COPY']) 'Smeta zaxira (Mac)') }
+    foreach ($r in @(Drive-Roots)) { $dirs += (Join-Path $r $DriveFolder); $dirs += (Join-Path $r 'Smeta zaxira (Mac)') }
+    $dirs += (Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads')
+    $dirs = @($dirs | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Container) } | Select-Object -Unique)
+    if (-not $Arg) {
+      Say "Zaxira nusxalari (yangisi birinchi):"
+      $n = 0
+      foreach ($d in $dirs) {
+        foreach ($f in @(Get-ChildItem -LiteralPath $d -Filter 'pb_*.zip' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 15)) {
+          Say ("  {0}  {1}  ({2:N1} MB)" -f $f.LastWriteTime.ToString('yyyy-MM-dd HH:mm'), $f.FullName, ($f.Length / 1MB)); $n++
+        }
+      }
+      if (-not $n) { Say "  hech narsa topilmadi" }
+      Say ""
+      Say "Tiklash:  laptop.cmd restore <fayl.zip>   (to'liq yo'l, yoki shu ro'yxatdagi fayl nomi)"
+      Say "Mac'dagi bazani ko'chirish: Mac'da  sh server/laptop.sh backup  - zaxira fayli shu kompyuterga keltirilib, shu buyruq bilan tiklanadi."
+      break
+    }
+    $zip = $null
+    if (Test-Path -LiteralPath $Arg -PathType Leaf) { $zip = (Resolve-Path -LiteralPath $Arg).ProviderPath }
+    else { foreach ($d in $dirs) { $p = Join-Path $d $Arg; if (-not $zip -and (Test-Path -LiteralPath $p -PathType Leaf)) { $zip = $p } } }
+    if (-not $zip) { Die "Fayl topilmadi: $Arg   (ro'yxat: laptop.cmd restore)" }
+    # What is inside: a copy of this program's database (data.db), at the top or in one folder, and nothing that
+    # would land outside the folder it is unpacked into.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $prefix = $null
+    try {
+      $z = [IO.Compression.ZipFile]::OpenRead($zip)
+      try {
+        foreach ($e in $z.Entries) {
+          $name = $e.FullName -replace '\\', '/'
+          if ($name -match '(^|/)\.\.(/|$)' -or $name -match '^/' -or $name -match '^[A-Za-z]:') { throw "fayl ichida begona yo'l bor: $name" }
+          if ($name -match '^(([^/]+/)?)data\.db$') { if ($null -eq $prefix -or $Matches[1].Length -lt $prefix.Length) { $prefix = $Matches[1] } }
+        }
+      } finally { $z.Dispose() }
+    } catch { Die "Zaxira fayli ochilmadi yoki zip emas: $zip ($($_.Exception.Message))" }
+    if ($null -eq $prefix) { Die "Bu dastur zaxirasi emas (ichida data.db yo'q): $zip" }
+    if ($env:TAQ_RESTORE_YES -ne '1') {
+      Say "Baza shu nusxadan tiklanadi:  $zip"
+      Say "Hozirgi baza o'chirilmaydi - chetga olinadi ($Data.before-restore-...)."
+      $ans = Read-Host "Davom etilsinmi? (ha / yo'q)"
+      if ($ans -notmatch '^\s*(ha|h|yes|y)\s*$') { Die "Bekor qilindi." }
+    }
+    if (-not (Take-Lock)) { Die "Hozir yangi versiya o'rnatilyapti - tugagach qayta urinib ko'ring." }
+    try {
+      $hadSup = [bool](Pid-Alive $SupFile)
+      Stop-Server
+      Stop-PortHolder
+      if (Answering) { Die "$Port-port boshqa dastur qo'lida - avval uni yoping (laptop.cmd stop) yoki kompyuterni qayta yoqing." }
+      $aside = "$Data.before-restore-" + (Get-Date).ToString('yyyyMMdd-HHmmss')
+      if (Test-Path -LiteralPath $Data) {
+        # the server's files are let go a moment after it ends
+        $moved = $false
+        for ($i = 0; $i -lt 20 -and -not $moved; $i++) {
+          try { Move-Item -LiteralPath $Data -Destination $aside; $moved = $true } catch { Start-Sleep -Milliseconds 500 }
+        }
+        if (-not $moved) { Die "Hozirgi bazani chetga olib bo'lmadi ($Data band) - kompyuterni qayta yoqib, yana urinib ko'ring. Hech narsa o'zgarmadi." }
+      }
+      $tmp = Join-Path $AppHome 'restore-unzip'
+      $back = {
+        Remove-Item -LiteralPath $Data -Recurse -Force -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $aside) { Move-Item -LiteralPath $aside -Destination $Data }
+      }
+      try {
+        if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Recurse -Force }
+        Expand-Archive -LiteralPath $zip -DestinationPath $tmp -Force
+        $from = $tmp
+        if ($prefix) { $from = Join-Path $tmp $prefix.TrimEnd('/') }
+        Move-Item -LiteralPath $from -Destination $Data
+        Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+      } catch {
+        $msg = $_.Exception.Message
+        Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        & $back
+        Die "Ochib bo'lmadi ($msg) - avvalgi baza joyiga qaytarildi."
+      }
+      # a copy from the Mac carries the pid and the logs of the server it was taken from
+      foreach ($f in @('serve.pid', 'serve.log', 'serve.log.1', 'autostart.log')) { Remove-Item -LiteralPath (Join-Path $Data $f) -Force -ErrorAction SilentlyContinue }
+      # the copies kept inside the old database folder stay reachable from the admin page
+      $oldCopies = Join-Path $aside 'backups'
+      if (Test-Path -LiteralPath $oldCopies) {
+        New-Item -ItemType Directory -Force -Path (Join-Path $Data 'backups') | Out-Null
+        Get-ChildItem -LiteralPath $oldCopies -Filter '*.zip' | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination (Join-Path (Join-Path $Data 'backups') $_.Name) -Force }
+      }
+      $script:NoDie = $true
+      try { Prepare; Start-Server; After-Start }
+      catch {
+        $msg = $_.Exception.Message
+        $script:NoDie = $false
+        Stop-ServerOnly
+        & $back
+        Die "Tiklangan baza bilan dastur ishga tushmadi ($msg) - avvalgi baza joyiga qaytarildi (laptop.cmd start)."
+      }
+      $script:NoDie = $false
+      $tok = Su-Token
+      $count = { param($c) try { [int](Api 'Get' "/api/collections/$c/records?perPage=1" $null $tok).totalItems } catch { '?' } }
+      Say ""
+      Say "Tiklandi: $(Split-Path -Leaf $zip)"
+      Say "  arizalar: $(& $count 'workspaces')   narx xotirasi: $(& $count 'price_memory')   narx tuzatishlari: $(& $count 'corrections')"
+      if (Test-Path -LiteralPath $aside) { Say "  avvalgi baza: $aside  (hammasi joyida ekaniga ishonch hosil qilgach o'chirishingiz mumkin)" }
+      if ($hadSup -or (Autostart-On)) {
+        Stop-ServerOnly
+        Start-Supervisor 'resumed'
+        if (Wait-Supervisor) { Say "  dastur yana fonda ishlayapti: $Url/" } else { Say "  fonda ishga tushmadi - laptop.cmd start" }
+      } else {
+        Say "  dastur ishlayapti: $Url/"
+      }
+    } finally { Drop-Lock }
+  }
+
   # The newest release, now, even one that failed before. A git checkout - a
   # developer's copy - is pulled instead.
   'update' {
@@ -1726,5 +1849,5 @@ switch ($Command) {
     Say "O'chirildi: endi o'zi ishga tushmaydi. Ma'lumot joyida: $Data"
   }
 
-  default { Die "Buyruqlar: start, autostart, status, backup, update, rollback, autoupdate, drive, stop, uninstall, debug, doctor" }
+  default { Die "Buyruqlar: start, autostart, status, backup, restore, update, rollback, autoupdate, drive, stop, uninstall, debug, doctor" }
 }

@@ -546,12 +546,21 @@ oynasida: `C:\Smeta\server\laptop.cmd autostart`. Boshqa buyruqlar ham xuddi shu
 |---|---|
 | `laptop.cmd status` | ishlayaptimi, versiya, oxirgi yangilanish, zaxiralar, Drive |
 | `laptop.cmd backup` | hoziroq zaxira olish |
+| `laptop.cmd restore` / `restore <fayl.zip>` | zaxiralar ro'yxati (shu kompyuterniki, Google Drive'dagi Mac nusxalari, «Загрузки») / bazani o'sha nusxadan tiklash — Mac'nikidan ham |
 | `laptop.cmd update` | eng yangi relizni hoziroq o'rnatish |
 | `laptop.cmd rollback` | oxirgi yangilanishdan oldingi versiyaga qaytish |
 | `laptop.cmd rollback v2.4.0` | ro'yxatdagi istalgan relizga qaytish |
 | `laptop.cmd autoupdate off` / `on` | o'zi yangilanishini o'chirish / yoqish |
 | `laptop.cmd drive` / `drive off` | zaxiralarni Google Drive'ga ham qo'yish / to'xtatish |
 | `laptop.cmd stop` · `uninstall` · `debug` · `doctor` | to'xtatish · o'zi ishga tushmasin · xatoni ko'rish · tashxis |
+
+**Mac'dagi bazani Windows'ga ko'chirish** (bir martalik): avval ikkalasi ham yangilanadi (bir xil versiya). Mac'da
+`sh server/laptop.sh backup` — zaxira fayli (`~/Backups/smeta/pb_backup_….zip`) chiqadi, Google Drive ulangan bo'lsa u
+o'zi «Smeta zaxira (Mac)» papkasiga ham tushadi. Faylni Windows'ga keltiring (Drive, fleshka yoki Telegram — «Загрузки»
+papkasiga) va `C:\Smeta\server\laptop.cmd restore` — ro'yxatdan faylni ko'rib, `laptop.cmd restore <fayl.zip>`.
+Windows'dagi hozirgi baza o'chirilmaydi, chetga olinadi; hisob va parol Windows'niki bo'lib qoladi. Bu **nusxa**: keyin
+ikki kompyuterda kiritilgan narsa bir-biriga o'tmaydi — qaysi kompyuterda ishlashni tanlang, yoki keyinroq yana ko'chiring
+(u holda qabul qiluvchidagi yangi yozuvlar chetga olingan bazada qoladi).
 
 **O'zi yangilanadi.** `autostart` qilingan kompyuterda fondagi kuzatuvchi har
 6 soatda GitHub'dagi `server/releases.txt` ga qaraydi. Yangi reliz bo'lsa, uni

@@ -63,6 +63,12 @@ try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::S
 $OnWindows = ($PSVersionTable.PSEdition -eq 'Desktop') -or ($IsWindows -eq $true)
 $Root      = Split-Path -Parent $PSScriptRoot
 $PbVersion = '0.34.0'
+# The sha256 PocketBase publishes for each archive (checksums.txt of the release): the archive is checked
+# before anything in it is unpacked, and a version with no sum here is refused (fourth audit, C1).
+$PbSha256 = @{
+  '0.34.0/amd64' = '76de59741106767ac518e860916ce4fb68740d44207ce2be73cd3f14f884757e'
+  '0.34.0/arm64' = '7c9073acd1a78da905963ab04f53ac55bb22fec05b5e56efec101c79e1d88dda'
+}
 $Port      = '8090'; if ($env:TAQ_PORT) { $Port = $env:TAQ_PORT }
 $Url       = "http://127.0.0.1:$Port"
 
@@ -92,8 +98,11 @@ $Keep     = 14
 # the branch at the moment of looking. TAQ_RELEASES (a file) and
 # TAQ_RELEASE_ZIP (a folder of <commit>.zip) are for the test.
 $Repo        = 'https://github.com/1maxstar1/Ayubkhon_A'
+# The list is looked for on the branch, and - if the branch cannot be read (renamed, removed) - on whatever
+# branch the repository opens on, so that one change there does not stop every update in silence (C1).
 $ReleaseList = 'https://raw.githubusercontent.com/1maxstar1/Ayubkhon_A/claude/excel-price-validation-5ehbvb/server/releases.txt'
-if ($env:TAQ_RELEASES) { $ReleaseList = $env:TAQ_RELEASES }
+$ReleaseListAlt = 'https://raw.githubusercontent.com/1maxstar1/Ayubkhon_A/HEAD/server/releases.txt'
+if ($env:TAQ_RELEASES) { $ReleaseList = $env:TAQ_RELEASES; $ReleaseListAlt = '' }
 $AppsDir      = Join-Path $AppHome 'app'
 $CurrentFile  = Join-Path $AppHome 'current.txt'
 $PreviousFile = Join-Path $AppHome 'previous.txt'
@@ -310,6 +319,12 @@ function Ensure-PocketBase {
   $tmp = Join-Path $AppHome 'pocketbase-unzip'
   Say "PocketBase yuklanmoqda ($arch, bir marta)..."
   Invoke-WebRequest -UseBasicParsing -Uri $u -OutFile $zip
+  $want = $PbSha256["$PbVersion/$arch"]
+  $got = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLower()
+  if (-not $want -or $got -ne $want) {
+    Remove-Item $zip -Force -ErrorAction SilentlyContinue
+    throw "PocketBase arxivi tekshiruvdan o'tmadi (sha256 $got, kutilgani '$want') - hech narsa ochilmadi"
+  }
   if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force }
   Expand-Archive -Path $zip -DestinationPath $tmp -Force
   Move-Item (Join-Path $tmp 'pocketbase.exe') $Pb -Force
@@ -804,11 +819,19 @@ function Wait-Supervisor {
 
 function Read-Releases {
   $text = ''
-  if ($ReleaseList -match '^https?://') { $text = [string](Invoke-WebRequest -UseBasicParsing -Uri $ReleaseList -TimeoutSec 30).Content }
+  if ($ReleaseList -match '^https?://') {
+    try { $text = [string](Invoke-WebRequest -UseBasicParsing -Uri $ReleaseList -TimeoutSec 30).Content }
+    catch {
+      if (-not $ReleaseListAlt) { throw }
+      $text = [string](Invoke-WebRequest -UseBasicParsing -Uri $ReleaseListAlt -TimeoutSec 30).Content
+    }
+  }
   else { $text = [IO.File]::ReadAllText($ReleaseList) }
   $list = @()
+  # Only a full 40-character commit is a release: a short one names whichever commit happens to begin
+  # with it, and one made to begin the same way could stand in for it (C1).
   foreach ($line in ($text -split "`n")) {
-    $m = [regex]::Match($line, '^\s*v(\d+\.\d+\.\d+)\s+([0-9a-fA-F]{7,40})\b')
+    $m = [regex]::Match($line, '^\s*v(\d+\.\d+\.\d+)\s+([0-9a-fA-F]{40})\b')
     if ($m.Success -and -not ($list | Where-Object { $_.Tag -eq ('v' + $m.Groups[1].Value) })) {
       $sha = $m.Groups[2].Value.ToLower()
       $list += [pscustomobject]@{ Tag = 'v' + $m.Groups[1].Value; Num = [version]$m.Groups[1].Value; Sha = $sha

@@ -95,7 +95,11 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   smetaning o'zi ko'rsatgan **qiymat** yoziladi, va sahifa nechta ekanini
   aytadi (v2.9.4, egasining qarori). Ro'yxat — ruxsat etilganlar ro'yxati:
   unga funksiya qo'shish mumkin, uni «taqiqlanganlar» ro'yxatiga aylantirish
-  mumkin emas.
+  mumkin emas. Hujjatga kirmagan ustunni o'qiydigan formula (v2.16.7,
+  `assemble.js` `inlineDead`): o'sha katakdagi son (yoki jadval ustunlaridan
+  tuzilgan bir qadamli formula) formulaga yozib qo'yiladi va u tirik qoladi;
+  bo'lmasa qiymat yoziladi va sahifa sanaydi — faqat hujjatda haqiqatan qotib
+  qolgan (resurs qatorining miqdori/summasi emas, nol emas) qiymatlarni.
 * Bitta resursning bozor narxi — nomi va o'lchov birligi bo'yicha bitta qiymat;
   u loyihadagi **barcha** qatorlarga tushadi.
 * Bir resurs smetalarda bir nechta narx bilan uchrashi mumkin. Foydalanuvchi
@@ -180,7 +184,9 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   ko'rib chiqib `--record`). Loyiha sifatida yuklangan har bir smeta `smeta_files` ga yoziladi (`src/ui/formats.js`):
   xesh, qanday o'qilgani, va **nom-narxsiz** format namunasi (`src/lib/ml/layout.js`; sxema o'zgarsa `VERSION`
   ko'tariladi); fayl o'zi faqat o'qilmagan yoki summalari mos kelmagan bo'lsa saqlanadi. Yozish hech qachon ishni
-  to'xtatmaydi. Egasining smetalari, namunalar, `golden.json` va vaznlar repoga tushmaydi. Model (keyingi qadamlar)
+  to'xtatmaydi. Sahifa o'qigan faylning tavsifi o'sha o'qishning o'zidan olinadi (worker `describe: true` bilan ikkinchi
+  xabar yuboradi — fayl ikki marta o'qilmaydi, o'qish kutmaydi); ochilmagan yoki o'quvchi to'xtatgan fayl tavsifsiz, darhol
+  saqlanadi (v2.16.7). Egasining smetalari, namunalar, `golden.json` va vaznlar repoga tushmaydi. Model (keyingi qadamlar)
   qoidalar o'qigan faylga **tegmaydi**: faqat hech narsa o'qilmaganda taklif qiladi, o'qigani arifmetika bilan
   tekshiriladi va «проверьте» deb ko'rsatiladi.
   Eski Excel (.xls) fayllar (v2.16.3) SheetJS bilan o'qiladi (`src/lib/xlsx-read.js` `readOld`; SheetJS faqat fayllarni

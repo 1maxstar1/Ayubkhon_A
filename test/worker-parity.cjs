@@ -50,6 +50,7 @@ function throughWorker(src, name, bytes, extra) {
   vm.runInContext(src, ctx, { filename: 'worker' });
   const copy = new Uint8Array(bytes);     // the page transfers the buffer; the worker owns its copy
   ctx.onmessage({ data: Object.assign({ cmd: 'parse', id: 7, name, buffer: copy.buffer }, extra || {}) });
+  throughWorker.all = posted;             // every message of the last call (a reading asked with `describe` posts two)
   return posted[0];
 }
 
@@ -140,6 +141,19 @@ check(broken && broken.fmt && broken.fmt.sample === null && broken.fmt.hash === 
 const hashed = throughWorker(src, 'f.xlsx', bytes, { cmd: 'hash' });
 check(hashed && hashed.hash === require('crypto').createHash('sha256').update(Buffer.from(bytes)).digest('hex') && hashed.size === bytes.length,
   'index.html: «hash» answers with the file\'s SHA-256 and size');
+// a reading asked together with its description (app.js readOne): the reading first, exactly as it is alone, then what
+// the file looks like — made from that reading (the file is not read again), without the hash the page asks for apart
+const both = throughWorker(src, 'f.xlsx', bytes, { describe: true }), two = throughWorker.all.slice();
+const want = describeHere(bytes); want.hash = ''; want.size = 0;
+check(two.length === 2 && both.ok && Object.keys(both).sort().join() === 'id,ms,name,objects,ok,sheetCount,works' &&
+  two[1].id === 7 && two[1].described === true && JSON.stringify(two[1].fmt) === JSON.stringify(want),
+  'index.html: a reading asked with its description answers twice — the reading, then the description of that reading');
+throughWorker(src, 'n.xlsx', noSheet, { describe: true });
+check(throughWorker.all.length === 2 && throughWorker.all[1].fmt.read === false && !!throughWorker.all[1].fmt.sample, 'index.html: … also for a file with no resource sheet');
+throughWorker(src, 'j.xlsx', junk, { describe: true });
+check(throughWorker.all.length === 1 && throughWorker.all[0].ok === false, 'index.html: a file that cannot be opened answers once, with its error');
+throughWorker(workerSource('smeta-taqqoslash.html'), 'f.xlsx', bytes, { describe: true });
+check(throughWorker.all.length === 2 && throughWorker.all[1].fmt === null, 'the single-file page\'s worker has nothing to describe with (and is never asked)');
 const single = throughWorker(workerSource('smeta-taqqoslash.html'), 'f.xlsx', bytes, { cmd: 'describe' });
 check(single && single.fmt === null && single.error !== '', 'the single-file page\'s worker cannot describe (and is never asked to)');
 

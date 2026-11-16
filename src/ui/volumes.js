@@ -237,10 +237,13 @@
      * Table №1 is written from the works of all of them (table()), so a reply of two files finds the works of both.
      * → { rows, found, missing: [entry], changed, set } or null (no such sheet).
      */
-    readReply: function (wb) {
+    readReply: function (wb, first) {
       var rp = V.parseReply(wb);
       if (!rp) return null;
-      var m = V.match(rp.entries, this.works());
+      // a work two estimates have alike (name, unit, volume): the reply's line is the chosen estimate's («Было») first
+      var works = this.works();
+      if (first) works = works.filter(function (w) { return w.project === first; }).concat(works.filter(function (w) { return w.project !== first; }));
+      var m = V.match(rp.entries, works);
       // the «объем» sheet of another object, left in a reply made from an earlier one: its title names another object
       // than the prices', and most of its lines are not in the estimate — only the prices are read (the owner, 2026-11-15)
       if (rp.other && m.found.length * 2 < rp.entries.length) {

@@ -92,7 +92,39 @@
     return false;
   }
 
-  function copyCells(srcCells, L, colMap, rowDelta, into, kept) {
+  /**
+   * A formula that reads a column left out of the table, with what it reads written in its place — when that is a plain
+   * number (the percentage kept beside «ТРАНСПОРТНЫЕ РАСХОДЫ» in the code column, =G40*B45 → =G40*0.05): the formula then
+   * lives, and is worked out again from the market prices. A cell there that is itself a formula of the table's own columns
+   * is written in as that formula. A range over such a column, a chain of such cells, a text — nothing to write in: null,
+   * and the formula goes in as its value.
+   * `cellAt(col, row)` — the source cell of the same estimate, or nothing.
+   */
+  function inlineDead(f, colMap, cellAt) {
+    if (f.indexOf('"') >= 0) return null;              // a text in the formula may look like a reference
+    var ok = true;
+    var out = f.replace(/(^|[^A-Za-z0-9_.!$])\$?([A-Z]{1,3})\$?(\d+)/g, function (m, pre, letters, digits, off, whole) {
+      var after = whole.charAt(off + m.length);
+      if (after === '(' || after === '!') return m;
+      var c = S.colIndex(letters);
+      if (c > (1 << 14) || colMap(c)) return m;        // a column the document has
+      if (pre === ':' || after === ':') { ok = false; return m; }
+      var cell = cellAt(c, +digits);
+      if (cell && cell.f != null) {
+        // what it reads is itself worked out from the table's own columns (the tonnes of a haulage line, =F49+F50, kept in
+        // a column the table leaves out): that formula, in brackets. One step only — a chain is left as a value.
+        var inner = String(cell.f).replace(/^=/, '');
+        if (!inner || inner.indexOf('!') >= 0 || inner.indexOf('"') >= 0 || deadRef('=' + inner, colMap)) { ok = false; return m; }
+        return pre + '(' + inner + ')';
+      }
+      var v = cell ? cell.v : null;
+      if (typeof v !== 'number' || !isFinite(v)) { ok = false; return m; }
+      return pre + (v < 0 ? '(' + v + ')' : String(v));
+    });
+    return ok ? out : null;
+  }
+
+  function copyCells(srcCells, L, colMap, rowDelta, into, kept, cellAt) {
     for (var c = 1; c < srcCells.length; c++) {
       var cell = srcCells[c];
       if (!cell) continue;
@@ -100,22 +132,31 @@
       if (!tc) continue;
       // Formulas pointing at sheets we do not carry over (VLOOKUP into a price
       // book sheet, say) would export as #REF!, so keep their cached result.
-      var alive = cell.f && cell.f.indexOf('!') < 0;
-      // … and a formula that reads a column left out of the table (it would point at nothing): its value — and counted, so
-      // that the page says so («ТРАНСПОРТНЫЕ РАСХОДЫ 5 %» of a column not carried stays the estimate's number on both sides)
-      if (alive && deadRef(cell.f, colMap)) { alive = false; kept.dead = (kept.dead || 0) + 1; }
+      var f = cell.f, alive = f && f.indexOf('!') < 0;
+      // … and a formula that reads a column left out of the table (it would point at nothing): the number it reads there is
+      // written into it (inlineDead) and it lives; when that is no plain number, the formula goes in as its value — and is
+      // counted, so that the page says it stays the estimate's number on both sides
+      if (alive && deadRef(f, colMap)) {
+        var fixed = cellAt ? inlineDead(f, colMap, cellAt) : null;
+        if (fixed && !deadRef(fixed, colMap)) f = fixed;
+        else { alive = false; var dead = true; }
+      }
       // … and so does a formula that calls anything but the plain functions an estimate is made of
       // (S.formula.unsafe): it goes into the document as the number the estimate shows, and is counted.
       if (alive) {
-        var bad = S.formula.unsafe(cell.f);
+        var bad = S.formula.unsafe(f);
         if (bad.length) {
           alive = false;
           kept.count++;
           for (var b = 0; b < bad.length; b++) kept.names[bad[b]] = true;
         }
       }
-      if (alive) into[tc] = { f: S.formula.translate(cell.f, colMap, rowDelta) };
+      if (alive) into[tc] = { f: S.formula.translate(f, colMap, rowDelta) };
       else if (cell.v != null && cell.v !== '') into[tc] = { v: cell.v };
+      // noted, not counted yet: the row may still write its own cell there (a resource line's quantity and sum are the
+      // table's own, whatever the estimate had) — only a value that stays in the document is «frozen» (see the caller)
+      if (dead && into[tc]) (kept.row = kept.row || []).push({ tc: tc, cell: into[tc] });
+      dead = false;
     }
   }
 
@@ -251,12 +292,16 @@
         push({ kind: 'object', pi: pi, oi: oi, cells: cellsOf(C_NO, obj.subtitle || obj.name) });
         blank(1);
         var tally = new Tally();
+        // the estimate's own cells by their place on its sheet: what a formula reads in a column the table leaves out
+        var byR = {};
+        obj.rows.forEach(function (x) { byR[x.r] = x.cells; });
+        var cellAt = function (c, r) { var cs = byR[r]; return cs ? cs[c] : null; };
 
         obj.rows.forEach(function (sr) {
           var cells = {};
           var target = rows.length + 1;
           var delta = target - sr.r;
-          copyCells(sr.cells, L, colMap, delta, cells, kept);
+          copyCells(sr.cells, L, colMap, delta, cells, kept, cellAt);
           cells[C_IDX] = { v: target };
 
           var row = {
@@ -341,6 +386,12 @@
                 ? { f: S.formula.translate(src.f, marketMap, 0) } : { v: src.v };
             }
           } else if (sr.kind === 'section') tally.band();
+          // formulas of a left-out column that went in as values — those still standing in the row as it is written
+          if (kept.row) {
+            // (a nought that stays a nought — the empty line of a haulage sheet — is nothing to look at)
+            kept.row.forEach(function (d) { if (cells[d.tc] === d.cell && d.cell.v !== 0) kept.dead = (kept.dead || 0) + 1; });
+            kept.row = null;
+          }
           push(row);
         });
 

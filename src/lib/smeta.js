@@ -265,6 +265,12 @@
     return 0;
   }
 
+  /** Nothing on the row but the cell in column c. */
+  function alone(cells, c) {
+    for (var k = 1; k < cells.length; k++) if (k !== c && cells[k] && ((cells[k].v != null && cells[k].v !== '') || cells[k].f != null)) return false;
+    return true;
+  }
+
   /**
    * The text of the code column when it is a name, not a code: a line the program wrote whole into «Шифр»
    * («ПЕРЕВОЗКА АСФАЛЬТОБЕТОНА НА 80 КМ ПО А/Д», «ИТОГО ПО СТРОИТЕЛЬНЫМ МАШИНАМ:») while the name column stays empty.
@@ -414,7 +420,8 @@
       else if (!L.need && nm && LETTER.test(nm) && qty != null && (!L.code || S.num(noCell && noCell.v) != null)) { kind = 'item'; items++; }
       // «ПЕРЕВОЗКА» written in the name column (form 4А, or a sheet without bands in the № column): a band with no number on
       // it — the lines under it are haulage
-      else if (nm && !noTxt && qty == null && price == null && sum == null && haulBand(nm)) { kind = 'section'; section = 'other'; }
+      // (a title alone on its row: a money line «ТРАНСПОРТНЫЕ РАСХОДЫ 5 % | СУМ | …» is a line, whatever its sum)
+      else if (nm && !noTxt && qty == null && price == null && sum == null && haulBand(nm) && alone(cells, L.name)) { kind = 'section'; section = 'other'; }
       else if (nm) kind = 'extra';
       else if (noTxt && L.need) { kind = 'section'; section = sectionOf(noTxt); }
       else if (noTxt) {

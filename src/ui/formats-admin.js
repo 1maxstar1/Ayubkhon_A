@@ -229,10 +229,15 @@
       $('fmtList').addEventListener('click', function (e) {
         var b = e.target.closest ? e.target.closest('button[data-act]') : null;
         var tr = b && b.closest('tr[data-id]'), r = tr && self.rec(tr.dataset.id);
-        if (!r || self.busy) return;
+        if (!r) return;
         var cell = tr.querySelector('.st'), act = b.dataset.act;
         var fail = function (er) { $('fmtStat').textContent = (r.name || '') + ': ' + (er && er.status ? S.pbErr(er) : (er && er.message || er)); };
+        // a download waits for nothing; the rest wait for the check that is running — and say so (they used to do nothing)
         if (act === 'get') { self.download(r).catch(fail); return; }
+        if (self.busy) {
+          $('fmtStat').textContent = 'Идёт проверка файла (до 90 секунд) — «' + (act === 'drop' ? 'Убрать' : 'Проверить снова') + '» сработает, когда она закончится. Нажмите ещё раз после неё.';
+          return;
+        }
         if (act === 'again') {
           b.disabled = true;
           self.busy = true;          // one check at a time: «Проверить все» and the other rows wait for it

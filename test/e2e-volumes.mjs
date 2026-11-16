@@ -195,6 +195,21 @@ try {
   const two = await page.evaluate(() => { const k = Object.keys(app.vol)[0]; return { k, v: app.vol[k].v }; });
   check(/^Тест_второй\.xlsx/.test(two.k) && near(two.v, 1.25), 'a work of the second estimate is found by a reply read against the first (' + two.k.slice(0, 20) + ')');
 
+  // two estimates with the very same work (name, unit, volume): the reply's line is the chosen estimate's («Было»)
+  {
+    const fw3 = join(dir, 'Тест_копия.xlsx');
+    writeFileSync(fw3, xlsx(S, bookWithWorks()));
+    await page.goto('file://' + join(root, 'dist/smeta-taqqoslash.html'));
+    await page.setInputFiles('#pick', [fw, fw3]);
+    await page.waitForFunction(() => window.app && app.projects.length === 2 && app.pending === 0, null, { timeout: 30 * 1000 });
+    await page.click('.tab[data-pane="compare"]');
+    await page.selectOption('#cmpOld', 'p1');
+    await page.setInputFiles('#cmpReplyFile', fv);
+    await page.waitForFunction(() => Object.keys(app.vol).length === 2, null, { timeout: 30 * 1000 });
+    const keys = await page.evaluate(() => Object.keys(app.vol));
+    check(keys.every((k) => /^Тест_копия\.xlsx/.test(k)), 'a work two estimates have alike goes to the estimate chosen as «Было», not to the first (' + keys.map((k) => k.slice(0, 16)).join(', ') + ')');
+  }
+
   // a reply made from an earlier one: its «объем» sheet is of another object (the title says so, and its works are not in
   // this estimate) — only the prices are read, and the page says why
   {

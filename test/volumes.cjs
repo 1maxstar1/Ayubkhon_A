@@ -169,5 +169,14 @@ const t1 = S.volumes.table(two, { [two[0].key]: { v: null, note: NOTE } }, [], {
 check(!t1.rows.some((r) => r.kind === 'vsection' && r.cells[2].v === 'Склад') && /по объекту:\n«Склад»/.test(t1.rows.find((r) => r.kind === 'vintro').cells[1].v),
   'table: one estimate — no object heading, the intro names it');
 
+// two files of one construction carry the same title: still two lists, each named by its own estimate
+const twins = S.volumes.list([st], 'a.xlsx').map((w) => Object.assign(w, { projectTitle: 'Склад', project: 'Склад дорога' }))
+  .concat(S.volumes.list([st], 'b.xlsx').map((w) => Object.assign(w, { projectTitle: 'Склад', project: 'Склад освещение' })));
+const tw = {}; tw[twins[0].key] = { v: null, note: NOTE }; tw[twins[4].key] = { v: 0.2, note: '' };
+const t3 = S.volumes.table(twins, tw, [], { objects: ['Склад'] });
+const heads3 = t3.rows.filter((r) => r.kind === 'vsection').map((r) => r.cells[2].v);
+check(heads3.join('|') === 'Склад — Склад дорога|РАЗДЕЛ 1. Земляные работы|Склад — Склад освещение|РАЗДЕЛ 1. Земляные работы',
+  'table: two estimates with one title are still two lists, each under its own name (' + heads3.join('|') + ')');
+
 console.log(fail ? fail + ' failed' : 'all ok');
 process.exit(fail ? 1 : 0);

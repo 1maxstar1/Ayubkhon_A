@@ -216,7 +216,36 @@ const dead = one({ sheets: [sheet('РЕСУРС', [
   [null, null, 'ТРАНСПОРТНЫЕ РАСХОДЫ 5 %', 'СУМ', null, null, '=B4*0.5'],
   ['ИТОГО', null, null, 'СУМ', null, null, '=SUM(G4:G5)']])] });
 const dm = S.assemble([{ name: 'd', file: 'd.xlsx', objects: dead, enabled: true }], {});
-check(dm.frozen.dead === 1 && dm.frozen.count === 0, 'a formula reading the left-out column goes in as its value and is counted for the page (' + JSON.stringify(dm.frozen) + ')');
+const dRow = dm.rows.find((r) => r.nm === 'ТРАНСПОРТНЫЕ РАСХОДЫ 5 %');
+check(dm.frozen.dead === 0 && dRow && dRow.cells[dm.cols.SUM].f === '=7*0.5' && dRow.cells[dm.cols.MSUM] && dRow.cells[dm.cols.MSUM].f === '=7*0.5',
+  'a formula reading a plain number in the left-out column gets that number written in and stays alive, on both sides (' + JSON.stringify(dRow && [dRow.cells[dm.cols.SUM], dRow.cells[dm.cols.MSUM]]) + ')');
+// the number beside the line, times a sum of the table: alive, and worked out from the market sum on the market side
+const liveSheet = sheet('РЕСУРС', [
+  ['Ведомость ресурсов'],
+  ['№ п/п', 'Обоснование', 'Наименование', 'Ед. изм.', 'Количество', 'Цена за ед.', 'Сумма'],
+  ['СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'],
+  [1, 'С101', 'ЩЕБЕНЬ ТЕСТОВЫЙ', 'М3', 4, 17, 68],
+  [null, 0.05, 'ТРАНСПОРТНЫЕ РАСХОДЫ 5 %', 'СУМ', null, null, '=G4*B5'],
+  [null, '=1+1', 'ЗАГОТОВИТЕЛЬНЫЕ РАСХОДЫ', 'СУМ', null, null, '=G4*B6'],
+  [null, '=B5*2', 'СКЛАДСКИЕ РАСХОДЫ', 'СУМ', null, null, '=G4*B7'],
+  [null, null, 'ПРОЧИЕ', 'СУМ', null, null, '=SUM(B5:B6)'],
+  // a resource line whose quantity is worked out from the left-out column: its quantity and sum are the table's own anyway
+  [2, 3, 'ПЕСОК ТЕСТОВЫЙ', 'М3', '=B9*2', 5, '=E9*F9']]);
+liveSheet.rows[9][5] = { f: '=B9*2', v: 6 }; liveSheet.rows[9][7] = { f: '=E9*F9', v: 30 };     // as a saved file has them: with their values
+const live = one({ sheets: [liveSheet] });
+const lv = S.assemble([{ name: 'd', file: 'd.xlsx', objects: live, enabled: true }], {});
+const cellsOf = (nm) => { const r = lv.rows.find((x) => x.nm === nm); return r ? [r.cells[lv.cols.SUM], r.cells[lv.cols.MSUM]] : null; };
+const item = lv.rows.find((r) => r.kind === 'item'), at = item ? item.cells[lv.cols.IDX].v : 0;
+const t5 = cellsOf('ТРАНСПОРТНЫЕ РАСХОДЫ 5 %');
+check(t5 && t5[0].f === '=' + 'G' + at + '*0.05' && t5[1].f === '=' + 'I' + at + '*0.05',
+  'the percentage kept in the left-out column is written into the formula: the line follows the market sum (' + JSON.stringify(t5) + ')');
+const noF = (nm) => { const c = cellsOf(nm); return !!c && (!c[0] || c[0].f == null); };
+const z = cellsOf('ЗАГОТОВИТЕЛЬНЫЕ РАСХОДЫ');
+check(z && z[0].f === '=G' + at + '*(1+1)' && z[1].f === '=I' + at + '*(1+1)', 'a cell there that is a formula of plain numbers is written in as that formula (' + JSON.stringify(z) + ')');
+check(noF('СКЛАДСКИЕ РАСХОДЫ') && noF('ПРОЧИЕ'), 'a chain of such cells, or a range over the left-out column, is nothing to write in: those go in as values');
+const sandRow = lv.rows.find((r) => r.nm === 'ПЕСОК ТЕСТОВЫЙ');
+check(sandRow && sandRow.kind === 'item' && sandRow.cells[lv.cols.QTY].v === 6 && /^=E\d+\*F\d+$/.test(sandRow.cells[lv.cols.SUM].f),
+  'a resource line keeps the table\'s own quantity and sum whatever its estimate formula read (' + JSON.stringify(sandRow && [sandRow.cells[lv.cols.QTY], sandRow.cells[lv.cols.SUM]]) + ')');
 
 /* 11 — a band whose title begins like a haulage word but is a resource band */
 const eq = one({ sheets: [sheet('РЕСУРС', [

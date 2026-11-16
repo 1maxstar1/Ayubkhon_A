@@ -284,7 +284,8 @@ var S = (typeof S !== 'undefined' && S) || {};
 
   /** Everything kept about one file: which file, how it was read, and its sample. `wb` null: it could not be opened. */
   function describe(bytes, wb, objects) {
-    var objs = objects || [], out = { v: VERSION, hash: sha256(bytes), size: bytes.length, read: objs.length > 0,
+    // `bytes` null: the description alone — whoever asks knows the file's hash and size already
+    var objs = objects || [], out = { v: VERSION, hash: bytes ? sha256(bytes) : '', size: bytes ? bytes.length : 0, read: objs.length > 0,
       objects: objs.length, items: 0, checked: 0, score: null, doubt: false, signature: '', sample: null };
     if (!wb) return out;
     var ck = check(objs);

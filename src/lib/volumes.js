@@ -317,11 +317,20 @@ var S = (typeof S !== 'undefined' && S) || {};
     merges.push('A' + h1 + ':A' + (h1 + 1), 'B' + h1 + ':B' + (h1 + 1), 'C' + h1 + ':C' + (h1 + 1), 'D' + h1 + ':E' + h1, 'F' + h1 + ':F' + (h1 + 1));
     row('vnum', { 1: { v: 1 }, 2: { v: 2 }, 3: { v: 3 }, 4: { v: 4 }, 5: { v: 5 }, 6: { v: 6 } });
     var section = null, project = null, decided = (works || []).filter(function (w) { var d = vol && vol[w.key]; return d && (d.v != null || d.note); });
-    var several = decided.some(function (w) { return w.projectTitle !== decided[0].projectTitle; });
+    // an estimate is its own project (`project`: the name of its sheet tab, one per file), whatever its title: two files of
+    // one construction carry the same title, and their works are still two lists
+    var groupOf = function (w) { return w.project != null ? w.project : w.projectTitle; };
+    var several = decided.some(function (w) { return groupOf(w) !== groupOf(decided[0]); });
+    var shared = {};
+    decided.forEach(function (w) { (shared[w.projectTitle] = shared[w.projectTitle] || {})[groupOf(w)] = 1; });
     decided.forEach(function (w) {
       var d = vol[w.key];
-      // works of several estimates: each under its own object, its sections starting afresh
-      if (several && w.projectTitle !== project) { project = w.projectTitle; section = null; row('vsection', { 2: { v: project } }); }
+      // works of several estimates: each under its own object, its sections starting afresh; a title two estimates share
+      // is told apart by the estimate's own name
+      if (several && groupOf(w) !== project) {
+        project = groupOf(w); section = null;
+        row('vsection', { 2: { v: w.projectTitle + (Object.keys(shared[w.projectTitle]).length > 1 && w.project ? ' — ' + w.project : '') } });
+      }
       if (w.section !== section) { section = w.section; if (section) row('vsection', { 2: { v: section } }); }
       var cells = { 1: { v: ++n }, 2: { v: w.name }, 3: { v: w.unit }, 4: { v: w.volume }, 6: { v: d.note || '' } };
       if (d.v != null) cells[5] = { v: d.v };

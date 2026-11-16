@@ -428,7 +428,8 @@
       act.addEventListener('click', function () { close(); opts.action.fn(); });
       el.appendChild(act);
     }
-    if (err || opts.action) {
+    // `opts.close`: a notice (not an error) that has to be read — it stays as long as `opts.ms` says and has its «×»
+    if (err || opts.action || opts.close) {
       var x = document.createElement('button');
       x.type = 'button'; x.className = 'toast-x'; x.textContent = '×'; x.title = 'Закрыть';
       x.addEventListener('click', close);
@@ -451,7 +452,7 @@
   App.prototype.addFiles = function (files) {
     var self = this;
     files = files.filter(function (f) { return /\.xlsx?$|\.xlsm$/i.test(f.name); });
-    if (!files.length) { this.toast('Принимаются только файлы .xlsx / .xlsm', true); return; }
+    if (!files.length) { this.toast('Принимаются только файлы Excel: .xlsx, .xlsm, .xls', true); return; }
     this.busy(true, 'Чтение файлов: ' + files.length + '…');
     // Files finish parsing in whatever order the worker gets to them, so each
     // one keeps the slot it was picked in; the projects are appended in that
@@ -480,17 +481,25 @@
       if (self.worker) {
         var id = ++self.seq, worker = self.worker;
         var job = { id: id, file: file, slot: slot };
+        // the record of the file's format (src/ui/formats.js) is made from this very reading: the worker posts its
+        // description right after the result — the reading does not wait for it, and the file is not read a second time
+        var gotDesc = null, described = S.Formats ? new Promise(function (ok) { gotDesc = ok; }) : null;
         var onMsg = function (e) {
           if (e.data.id !== id) return;
-          worker.removeEventListener('message', onMsg);
+          if (e.data.described) { worker.removeEventListener('message', onMsg); if (gotDesc) gotDesc(e.data.fmt || null); return; }
+          if (!described) worker.removeEventListener('message', onMsg);
+          // the description follows at once, or not at all (the worker replaced meanwhile)
+          else setTimeout(function () { worker.removeEventListener('message', onMsg); gotDesc(null); }, 5000);
           self.jobs.splice(self.jobs.indexOf(job), 1);
           self.watchWorker();
-          self.onParsed(file.name, e.data, slot);
+          var res = e.data;
+          if (described) res.described = described;
+          self.onParsed(file.name, res, slot);
         };
         worker.addEventListener('message', onMsg);
         self.jobs.push(job);
         self.watchWorker();
-        worker.postMessage({ cmd: 'parse', id: id, name: file.name, buffer: buf }, [buf]);
+        worker.postMessage({ cmd: 'parse', id: id, name: file.name, buffer: buf, describe: !!described }, [buf]);
       } else {
         var res;
         try {

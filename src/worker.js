@@ -4,6 +4,8 @@
  * are being read.
  *
  *   { cmd: 'parse', id, name, buffer }     → { ok, id, name, objects, works, sheetCount, ms } | { ok: false, id, name, error }
+ *                                            with `describe: true`, a second message follows a reading that succeeded:
+ *                                            { id, described: true, fmt } — the description made from that reading
  *   { cmd: 'hash', id, buffer }            → { id, hash, size }                       which file this is (SHA-256)
  *   { cmd: 'describe', id, name, buffer }  → { id, fmt }                              what the file looks like
  *                                            (docs/format-reja.md; S.ml.layout.describe — a file that cannot be opened
@@ -31,6 +33,14 @@
         ok: true, id: msg.id, name: msg.name, objects: objects, works: works,
         sheetCount: wb.sheets.length, ms: Date.now() - t0
       });
+      // asked for with the reading (`describe`): what the file looks like, from the workbook just read — posted after the
+      // result, so the reading never waits for it, and the file is not read again for it. No hash here (the page asks
+      // for it apart, off the reading's way): `null` for the bytes.
+      if (msg.describe) {
+        var fmt = null;
+        try { fmt = S.ml && S.ml.layout ? S.ml.layout.describe(null, wb, objects) : null; } catch (e2) { fmt = null; }
+        self.postMessage({ id: msg.id, described: true, fmt: fmt });
+      }
     } catch (err) {
       self.postMessage({ ok: false, id: msg.id, name: msg.name, error: String(err && err.message || err) });
     }

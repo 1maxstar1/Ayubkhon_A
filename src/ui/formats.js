@@ -103,7 +103,8 @@
         read: !!(res.ok && res.objects && res.objects.length),
         error: res.ok ? '' : String(res.error || '').slice(0, 200),
         ws: S.Sync && S.Sync.ws ? S.Sync.ws.id : '',
-        restoring: !!(S.Sync && S.Sync.loading)
+        restoring: !!(S.Sync && S.Sync.loading),
+        described: res.described || null            // a promise of the description the page's own reading gives (app.js readOne)
       });
       clearTimeout(this.timer);
       this.timer = setTimeout(function () { self.flush(); }, 300);
@@ -168,12 +169,31 @@
       return out;
     },
 
+    /**
+     * What the file looks like. From the page's own reading when it gave one (no second reading of the file); nothing for
+     * a file that could not be opened or that the reader gave up on — there is nothing to describe, and waiting for a
+     * second reader to give up on it too kept the file off the server for as long (the tab may be closed meanwhile);
+     * else asked of this module's worker, as before.
+     */
+    describeOf: function (it) {
+      var self = this;
+      if (!it.read && it.error) return Promise.resolve(null);
+      var pre = it.described ? Promise.resolve(it.described).catch(function () { return null; }) : Promise.resolve(null);
+      return pre.then(function (fmt) {
+        if (fmt) return fmt;
+        return self.ask('describe', it.file, it.name).then(function (r) { return r.fmt || null; }, function () { return null; });
+      });
+    },
+
     one: function (it, rec) {
       var self = this, col = S.pb.collection('smeta_files');
-      // a record that already says as much is left as it is
-      if (rec && !(it.read && !rec.is_read) && (rec.version || 0) >= L.VERSION) return Promise.resolve(null);
+      // a record that already says as much is left as it is — an unread file uploaded again is said to be kept already
+      if (rec && !(it.read && !rec.is_read) && (rec.version || 0) >= L.VERSION) {
+        if (!it.read && rec.file && !it.restoring) self.said(it, true);
+        return Promise.resolve(null);
+      }
       if (rec && rec.is_read && !it.read) return Promise.resolve(null);
-      return this.ask('describe', it.file, it.name).then(function (r) { return r.fmt || null; }, function () { return null; }).then(function (fmt) {
+      return this.describeOf(it).then(function (fmt) {
         if (it.read && !(fmt && fmt.read && fmt.sample)) return null;     // a read file is recorded with its sample, or not at all
         fmt = fmt || { v: L.VERSION, objects: 0, items: 0, checked: 0, score: null, doubt: false, signature: '', sample: null };
         var body = self.fields(it, fmt);
@@ -212,13 +232,14 @@
     },
 
     /** After an unread file has really been kept: where to find it. */
-    said: function (it) {
+    said: function (it, already) {
       var app = window.app;
       if (!app || !app.toast) return;
-      // an error-style notice: it stays long enough to be read and has its close button (a plain one is gone in 2.6 s)
-      app.toast('«' + it.name + '» не прочитан и сохранён для разработчика: ' + (S.isAdmin && S.isAdmin()
+      // a notice, not an error (the error about the file itself is said by the page): it stays long enough to be read and
+      // has its close button, and does not push real errors off the screen
+      app.toast('«' + it.name + '» не прочитан и ' + (already ? 'уже сохранён' : 'сохранён') + ' для разработчика: ' + (S.isAdmin && S.isAdmin()
         ? 'страница администратора → «Обучение» → «Распознавание форматов смет» → «Скачать».'
-        : 'администратор может скачать его на своей странице («Распознавание форматов смет»).'), true);
+        : 'администратор может скачать его на своей странице («Распознавание форматов смет»).'), false, { close: true, ms: 20 * 1000 });
     }
   };
 

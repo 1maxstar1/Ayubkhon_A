@@ -99,6 +99,8 @@ try {
   await page.waitForSelector('#wsBox:not([hidden])');
   const ws = await page.evaluate(() => S.Sync.ws.id);
 
+  // every question asked of this module's own worker, by kind: a file the page has read is described from that reading
+  await page.evaluate(() => { const ask = S.Formats.ask; window.__asked = []; S.Formats.ask = function (cmd) { window.__asked.push(cmd); return ask.apply(this, arguments); }; });
   /* a file the rules read */
   await page.setInputFiles('#pick', fRead.path);
   await page.waitForFunction(() => app.model && app.model.rows.length > 0, null, T);
@@ -111,6 +113,7 @@ try {
     'whose it is, in which application, by which version — and the file itself is not kept');
   check(r && r.sample && r.sample.sheets.length === 1 && r.sample.sheets[0].b.length === 2 && r.sample.sheets[0].b[0].L.name === 3 && /i/.test(r.sample.sheets[0].k),
     'its sample carries what the rules read: the blocks, their columns, the kind of every row');
+  check((await page.evaluate(() => window.__asked.join())) === 'hash', 'the file was not read a second time for its description: only its hash was asked (' + await page.evaluate(() => window.__asked.join()) + ')');
 
   /* no resource sheet; cannot be opened; sums that do not agree */
   await page.setInputFiles('#pick', fNone.path);
@@ -120,6 +123,26 @@ try {
     'not read, kept whole, its sample without labels');
   await page.waitForFunction(() => /не прочитан и сохранён для разработчика/.test(document.getElementById('toast').textContent), null, T);
   check(true, 'and the page says it is kept — once it is');
+  const note = await page.evaluate(() => { const el = Array.from(document.querySelectorAll('#toast .toast-item')).find((x) => /сохранён для разработчика/.test(x.textContent));
+    return el ? { err: el.classList.contains('err'), close: !!el.querySelector('.toast-x') } : null; });
+  check(note && note.err === false && note.close === true, 'as a notice with its «×», not as an error (' + JSON.stringify(note) + ')');
+  // the same unread file uploaded again: nothing is stored twice, and the page says it is kept already
+  await page.evaluate(() => { document.getElementById('toast').innerHTML = ''; });
+  await page.setInputFiles('#pick', fNone.path);
+  await page.waitForFunction(() => /не прочитан и уже сохранён для разработчика/.test(document.getElementById('toast').textContent), null, T);
+  check((await records()).filter((x) => x.hash === fNone.hash).length === 1, 'an unread file uploaded again is said to be kept already — one record, as before');
+  // a file the reader gave up on: kept at once, without asking a second reader to give up on it too
+  const before = await page.evaluate(() => window.__asked.length);
+  const hung = Buffer.from('это файл, на котором чтение остановлено ' + 'x'.repeat(64));
+  await page.evaluate(async (bytes) => {
+    const f = new File([new Uint8Array(bytes)], 'Тест_завис.xlsx');
+    S.Formats.take(f, f.name, { ok: false, error: 'не прочитан за 90 секунд — файл повреждён или слишком велик' });
+    await S.Formats.idle();
+  }, Array.from(hung));
+  const hungRec = (await records()).find((x) => x.hash === sha(hung));
+  const askedSince = await page.evaluate((n) => window.__asked.slice(n).join(), before);
+  check(hungRec && hungRec.is_read === false && hungRec.file !== '' && askedSince === 'hash', 'a file the reader gave up on is kept at once: no second reading is waited for (' + askedSince + ')');
+  await api('/api/collections/smeta_files/records/' + hungRec.id, { method: 'DELETE' }, su);
   await page.setInputFiles('#pick', fJunk.path);
   check(await until(async () => !!(await byHash(fJunk))), 'a file that cannot be opened leaves a record');
   r = await byHash(fJunk);
@@ -200,6 +223,13 @@ try {
   const saved = join(dir, 'got.xlsx');
   await dl.saveAs(saved);
   check(dl.suggestedFilename() === fNone.name && sha(readFileSync(saved)) === fNone.hash, '«Скачать» gives the file back, byte for byte, under its own name');
+  // while a check runs: «Скачать» still works, «Убрать» says it waits (it used to do nothing, and say nothing)
+  await admin.evaluate(() => { S.FormatsAdmin.busy = true; });
+  const [dl2] = await Promise.all([admin.waitForEvent('download', T), admin.click(row(fNone.name) + ' button[data-act=get]')]);
+  await admin.click(row(fNone.name) + ' button[data-act=drop]');
+  const waits = await admin.textContent('#fmtStat');
+  await admin.evaluate(() => { S.FormatsAdmin.busy = false; });
+  check(dl2.suggestedFilename() === fNone.name && /Идёт проверка файла/.test(waits) && !!(await byHash(fNone)), 'during a check «Скачать» works and «Убрать» says it waits (' + waits.slice(0, 60) + '…)');
   // a file the worker does not finish within the time: given up, the worker replaced, nothing changed
   await admin.evaluate(() => { S.FormatsAdmin.limit = 1; });
   await admin.click(row(fNone.name) + ' button[data-act=again]');

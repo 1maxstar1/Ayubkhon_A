@@ -82,16 +82,40 @@ su_token() {
 
 start_server() {
   mkdir -p server/pb_data
+  # Something else answering here would be taken for this server: the next step, signing in, then failed with
+  # «the password does not match» — about a port that was simply taken (fourth audit, G2).
+  if answering; then die "$PORT-port band — boshqa dastur egallagan (sh server/laptop.sh stop, yoki PB_PORT=... bilan boshqa port)"; fi
+  # The log of the run before is kept beside the new one: a server that fell over left its reason there, and
+  # starting again used to write over it (G2).
+  if [ -s "$LOG" ]; then mv -f "$LOG" "$LOG.1"; fi
   # PB_AUTOLOGIN: no sign-in at all on a laptop only its owner uses (owner's
   # decision, 2026-10). PB_AUTOLOGIN=0 sh server/laptop.sh brings the login back.
   ( cd server && PB_DEV=1 PB_LAPTOP=1 PB_AUTOLOGIN="${PB_AUTOLOGIN:-1}" PB_AUTOLOGIN_EMAIL="$PB_ADMIN_EMAIL" \
       PB_HTTP="127.0.0.1:$PORT" sh run.sh >"$ROOT/$LOG" 2>&1 & echo $! > "$ROOT/$PID_FILE" )
   i=0
   while [ $i -lt 20 ]; do
-    answering && return 0
+    if answering && running; then return 0; fi
     sleep 1; i=$((i + 1))
   done
   say "server ishga tushmadi — $LOG ga qarang"; tail -5 "$LOG" 2>/dev/null; exit 1
+}
+
+# Under «start» nothing else brings the server back (launchd does that for «serve»): a server that fell over
+# is started again, and if it keeps falling over within minutes, the launcher stops and says why instead of
+# trying for ever (G2). Each call is one look; RESTARTS counts the recent ones.
+RESTARTS=0
+RESTART_AT=0
+keep_alive() {
+  running && return 0
+  now=$(date +%s)
+  if [ $((now - RESTART_AT)) -gt 600 ]; then RESTARTS=0; fi
+  RESTARTS=$((RESTARTS + 1)); RESTART_AT=$now
+  if [ $RESTARTS -gt 3 ]; then
+    say "server qayta-qayta to'xtab qolyapti — $LOG ga qarang:"; tail -10 "$LOG" 2>/dev/null; exit 1
+  fi
+  say "server to'xtab qoldi — qayta ishga tushirilmoqda ($(date '+%H:%M'))"
+  rm -f "$PID_FILE"
+  start_server
 }
 
 # The version label the page carries in its header (class="ver").
@@ -123,8 +147,12 @@ stop_port_holder() {
   while [ $i -lt 20 ] && answering; do sleep 0.5; i=$((i + 1)); done
 }
 
+# Waits for the server to be gone, not a fixed second: start_server refuses a port something still answers on.
 stop_server() {
-  if running; then kill "$(cat "$PID_FILE")" 2>/dev/null || true; sleep 1; fi
+  if running; then
+    kill "$(cat "$PID_FILE")" 2>/dev/null || true
+    i=0; while [ $i -lt 20 ] && running; do sleep 0.5; i=$((i + 1)); done
+  fi
   rm -f "$PID_FILE"
 }
 
@@ -314,8 +342,9 @@ case "${1:-start}" in
     stop() { stop_server; say ""; say "to'xtatildi"; exit 0; }
     trap stop INT TERM
     n=0
-    while running; do
+    while :; do
       sleep 1; n=$((n + 1))
+      keep_alive
       if [ $n -ge 3600 ]; then n=0; backup_if_stale; fi
     done
     ;;
@@ -325,6 +354,9 @@ case "${1:-start}" in
   serve)
     setup
     stop_server
+    # A PocketBase this launcher did not start (an earlier run whose pid file is gone) is let go the way
+    # «start» lets it go; anything else on the port makes start_server say the port is taken.
+    if answering; then stop_port_holder; fi
     start_server
     ensure_user
     backup_if_stale

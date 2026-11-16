@@ -608,7 +608,8 @@
    * What a haulage sheet gets wrong, as the expert would point it out (nothing is changed — the estimate is read as it is):
    *   weight  a material counted in tonnes carries a specific weight other than 1: its tonnes, its т·км and its sum
    *           are that many times what they are («АСФАЛЬТОБЕТОННАЯ СМЕСЬ», ТН, weight 2);
-   *   total   the sheet's «ВСЕГО» is not the sum of its lines — a line left out of the SUM (SUM(J8:J12) above a line 13).
+   *   total   the sheet's «ВСЕГО» is not the sum of its lines — a line left out of the SUM (SUM(J8:J12) above a line 13);
+   *           a money line («3% от стоимости материалов») may be in the total or out of it, both are the estimate's own way.
    * Each: { kind, r, nm, unit, …, text } — `text` in the page's language, ready to show.
    */
   var TONNES = /^(Т|ТН|ТОН|ТОННА|ТОНН|ТОННЫ)$/;
@@ -630,18 +631,22 @@
     });
     var tot = null;
     for (var i = out.length - 1; i >= 0 && !tot; i--) if (out[i].kind === 'total' && out[i].sum != null) tot = out[i];
-    // a money line above the total — «На остальные материалы 3% от стоимости материалов» — is in it by right: not haulage
-    // of a material (no т·км, no km), so not a resource, but its sum belongs to the «ИТОГО» all the same
-    if (tot) out.forEach(function (x) { if (x.kind === 'extra' && x.r < tot.r && x.sum != null) { lines += x.sum; } });
-    if (tot && linesN) {
-      var diff = lines - tot.sum;
-      if (Math.abs(diff) > Math.max(1, Math.abs(lines) * 1e-6)) {
-        // the line (or lines) whose sum is the difference: the ones left out
-        var miss = items.filter(function (it) { return it.sum != null && Math.abs(it.sum - diff) <= Math.max(1, Math.abs(diff) * 1e-6); });
-        checks.push({ kind: 'total', r: tot.r, total: tot.sum, lines: lines, diff: diff, missing: miss.map(function (m) { return m.nm; }),
-          text: '«' + (tot.nm || 'ВСЕГО') + '» ' + fmt(tot.sum) + ' не равно сумме строк ' + fmt(lines) +
-            (miss.length ? ' — не учтена строка «' + miss[0].nm + '» (' + fmt(miss[0].sum) + ')' : ' (разница ' + fmt(diff) + ')') });
-      }
+    // a money line above the total — «На остальные материалы 3% от стоимости материалов» — is not haulage of a material
+    // (no т·км, no km), so not a resource. Estimates put it either way: inside the «ИТОГО», or outside it (SUM over the
+    // materials only — the owner's own corrected file leaves it so, 2026-11-16). Neither is a mistake to point out: the
+    // materials read here are what the estimate charges in both. Only a total that is neither is said.
+    var extras = 0;
+    if (tot) out.forEach(function (x) { if (x.kind === 'extra' && x.r < tot.r && x.sum != null) extras += x.sum; });
+    function near(a, b) { return Math.abs(a - b) <= Math.max(1, Math.abs(a) * 1e-6); }
+    if (tot && linesN && !near(lines, tot.sum) && !near(lines + extras, tot.sum)) {
+      // the line (or lines) whose sum is the difference: the ones left out — with the money line in the total, or out of it
+      var all = lines + extras;
+      var missIn = items.filter(function (it) { return it.sum != null && near(it.sum, all - tot.sum); });
+      var missOut = extras ? items.filter(function (it) { return it.sum != null && near(it.sum, lines - tot.sum); }) : [];
+      var shown = missIn.length || !missOut.length ? all : lines, miss = missIn.length ? missIn : missOut, diff = shown - tot.sum;
+      checks.push({ kind: 'total', r: tot.r, total: tot.sum, lines: shown, diff: diff, missing: miss.map(function (m) { return m.nm; }),
+        text: '«' + (tot.nm || 'ВСЕГО') + '» ' + fmt(tot.sum) + ' не равно сумме строк ' + fmt(shown) +
+          (miss.length ? ' — не учтена строка «' + miss[0].nm + '» (' + fmt(miss[0].sum) + ')' : ' (разница ' + fmt(diff) + ')') });
     }
     return checks;
   }

@@ -487,11 +487,20 @@ check(h4.length === 1 && h4[0].layout.transport && h4i.length === 2 && h4i[0].nm
 check(h4i.every((r) => r.cells[h4[0].layout.qty].v === r.qty && r.cells[h4[0].layout.qty].f == null && r.cells[h4[0].layout.sum].f == null),
   'the т·км and the sum go into the document as values: the sheet\'s formulas name the km and the tonnes, which are left out');
 check(!(h4[0].checks || []).length, 'the 3 % line is part of the «ИТОГО»: no line is said to be missing (' + JSON.stringify((h4[0].checks || []).map((c) => c.text)) + ')');
-// the same sheet whose «ИТОГО» (2 691) is the SUM of the two materials only: the 3 % line on the sheet is left out of it
-const haul5 = sheet('Транспорт', haul4.rows.slice(1).map((cs) => (cs || []).slice(1).map((c) => (c ? c.v : null))).map((l) => (l[1] === 'ИТОГО' ? [4, 'ИТОГО', null, null, null, null, null, null, 2691] : l)));
-const ck5 = (one({ sheets: [haul5] })[0] || {}).checks || [];
-check(ck5.length === 1 && ck5[0].kind === 'total' && ck5[0].total === 2691 && ck5[0].lines === 2708,
-  'an «ИТОГО» that leaves the 3 % line out is still said (' + ck5.map((c) => c.text).join('; ') + ')');
+// the same sheet whose «ИТОГО» (2 691) is the SUM of the two materials only, the 3 % line on the sheet left out of it: the
+// estimate's own way (the owner's corrected file leaves it so) — the materials read are what it charges, nothing is said
+const withTotal = (t) => sheet('Транспорт', haul4.rows.slice(1).map((cs) => (cs || []).slice(1).map((c) => (c ? c.v : null))).map((l) => (l[1] === 'ИТОГО' ? [4, 'ИТОГО', null, null, null, null, null, null, t] : l)));
+const ck5 = (one({ sheets: [withTotal(2691)] })[0] || {}).checks || [];
+check(ck5.length === 0, 'an «ИТОГО» of the materials only, with the 3 % line outside it, is no mistake (' + ck5.map((c) => c.text).join('; ') + ')');
+// with the 3 % line outside, a material left out is still said: its name, and the sum of the material lines
+const ck6 = (one({ sheets: [withTotal(2553)] })[0] || {}).checks || [];
+check(ck6.length === 1 && ck6[0].kind === 'total' && ck6[0].total === 2553 && ck6[0].lines === 2691 && ck6[0].missing.join() === 'ТЕСТОВЫЙ БИТУМ' &&
+  /не учтена строка «ТЕСТОВЫЙ БИТУМ» \(138\)/.test(ck6[0].text),
+  'a material left out of an «ИТОГО» that leaves the 3 % line out too: said, and which line (' + ck6.map((c) => c.text).join('; ') + ')');
+// and a total that is neither the materials nor the materials with the 3 % line: said, with the difference
+const ck7 = (one({ sheets: [withTotal(2601)] })[0] || {}).checks || [];
+check(ck7.length === 1 && ck7[0].lines === 2708 && ck7[0].diff === 107 && !ck7[0].missing.length && /разница 107/.test(ck7[0].text),
+  'an «ИТОГО» that is no sum of the lines at all: said, with the difference (' + ck7.map((c) => c.text).join('; ') + ')');
 
 console.log(fail ? '\nFAILED: ' + fail : '\nall passed');
 process.exit(fail ? 1 : 0);

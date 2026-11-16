@@ -606,8 +606,9 @@
       said.push('«' + p.file + '» повторяет строки смет: ' + of.map(function (q) { return q.file; }).slice(0, 4).join(', ') +
         (of.length > 4 ? ' и ещё ' + (of.length - 4) : ''));
     });
+    // a notice, not an error: nothing went wrong — the program kept the resources from being counted twice
     if (said.length) this.toast(said.join('; ') + ' — такой сводный файл выключен, чтобы ресурсы не считались дважды. ' +
-      'Если он нужен, включите его галочкой слева.', true);
+      'Если он нужен, включите его галочкой слева.', false, { close: true, ms: 20 * 1000 });
   };
 
   /** A sheet tab name has to be short and unique; keep it human. */

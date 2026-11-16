@@ -204,7 +204,9 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   bo'yicha juftlanadi (`S.compare.join`), bir xil nomli varaqlar («РЕСУРС») hech qachon almashmaydi; ish maydonida
   `new`, `new1` … slotlarida saqlanadi (40 tagacha; arizada 80 tagacha fayl — `pb_schema.json` workspaces.files va
   `sync.js` `MAX_FILES` birga o'zgaradi). т·км ustuni yo'q tashish varag'i: т·км = tonna × km (ikki qatorli sarlavha),
-  hujjatga qiymat bo'lib yoziladi; ИТОГО tekshiruvi undagi pul qatorini («3% от стоимости материалов») ham qo'shadi.
+  hujjatga qiymat bo'lib yoziladi. ИТОГО tekshiruvi: pul qatori («3% от стоимости материалов») ИТОГО ichida ham, tashqarisida ham
+  bo'lishi mumkin — ikkalasi xato emas (egasining tuzatilgan faylida shunday qoldirilgan, 2026-11-16); faqat material qatori tushib
+  qolsa yoki ИТОГО hech biriga teng bo'lmasa aytiladi. «ОБЩИЙ ИТОГ» o'chirilgani — xato emas, oddiy xabar (qizil emas).
   Boshqa smetalarni qatorma-qator takrorlaydigan fayl («ОБЩИЙ ИТОГ», `S.copiesOf`) yuklanganda o'chiriladi va aytiladi —
   ресурс ikki marta sanalmaydi; solishtirish va «Наш ответ» o'chirilgan loyihaga qaramaydi. «Наш ответ» ning «объем»
   varag'i boshqa obyektni nomlasa (sarlavhadagi «по объекту:» yoki «ТАБЛИЦА №2» ostidagi qator narx varag'inikidan farq

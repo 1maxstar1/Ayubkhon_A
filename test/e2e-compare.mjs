@@ -308,8 +308,11 @@ try {
     await page.waitForFunction(() => window.app && app.projects.length === 3 && app.model && app.pending <= 0, null, { timeout: 30 * 1000 });
     await page.waitForTimeout(500);
     const r3 = await page.evaluate(() => ({ on: app.projects.map((p) => p.file + ':' + (p.enabled !== false)), toast: document.getElementById('toast').textContent,
-      crane: app.model.resources.find((x) => x.name === 'ТЕСТОВЫЙ КРАН 10 Т').qty }));
-    check(r3.on.join(' ') === 'Тест_v1.xlsx:true Тест_освещение.xlsx:true ОБЩИЙ_ИТОГ.xlsx:false' && /ОБЩИЙ_ИТОГ\.xlsx» повторяет строки смет/.test(r3.toast) && r3.crane === 2,
+      crane: app.model.resources.find((x) => x.name === 'ТЕСТОВЫЙ КРАН 10 Т').qty,
+      // nothing went wrong: the message is a notice with its «×», not an error
+      kind: [...document.querySelectorAll('#toast .toast-item')].filter((e) => /повторяет строки смет/.test(e.textContent))
+        .map((e) => (e.classList.contains('err') ? 'error' : 'notice') + (e.querySelector('.toast-x') ? '+x' : '')).join() }));
+    check(r3.on.join(' ') === 'Тест_v1.xlsx:true Тест_освещение.xlsx:true ОБЩИЙ_ИТОГ.xlsx:false' && /ОБЩИЙ_ИТОГ\.xlsx» повторяет строки смет/.test(r3.toast) && r3.crane === 2 && r3.kind === 'notice+x',
       'a summary book copying the estimates is switched off and said: every resource counted once (' + JSON.stringify(r3).slice(0, 300) + ')');
   }
 

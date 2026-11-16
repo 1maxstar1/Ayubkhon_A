@@ -7,6 +7,24 @@ sahifasidagi sonlarni yuboradi. **Keyingi qadam (2-qadam, v2.16.0 dan oldin emas
 ish sahifasida «вероятно завышено → предлагаемая цена X» va «Применить все предложения» — faqat egasi 1-qadam
 sonlarini ko'rib rozi bo'lgach yoqiladi (darvoza 2).
 
+**Darvoza 1 — birinchi sonlar (2026-11-16, egasining dataset fayli; faqat sonlar, nom va narxsiz).** 14 ta yakunlangan
+ariza (13 tasi Toshkent viloyati, 1 tasi Farg'ona; test qismi — eng yangi 3 tasi), 1837 xotira qatori: 265 narx
+o'zgartirilgan, 1560 tasi tekshirilib qoldirilgan, 12 tasi nolga tushirilgan. Hammasi «Наш ответ (Excel)» orqali kiritilgan
+(jurnalda 277 ommaviy qaror, «Применить» — 0). Tartiblovchi uchun 605 savol: `near` 72 (66 o'quv / 6 test), `none` 109,
+`left` 424, `ref` 0; o'tkazib yuborilgan: `above` 507, `empty` 713, `empty_corrected` 84.
+- Bugungi qoidalar (`p3`, o'quv qismi): birinchi qator to'g'ri 22/66 (0,33), to'g'ri qator birinchi uchtalikda 36/66 (0,55);
+  26 savolda to'g'ri qator umuman ko'rsatilmagan. Test qismida atigi 6 savol — son ma'nosiz (0,50 [0,13 … 1]).
+- O'qitilgan tartiblovchi (listwise logistik regressiya, L2 1,0, 400 qadam — sozlamalar oldindan qotirilgan; o'quv
+  qismida «bitta arizani chetda qoldirib», test qismiga tegilmadi): birinchi qator 21/66 — bugungidan yaxshi emas;
+  birinchi uchtalik 45/66 (bugun 36) — biroz yaxshi, lekin 66 misolda ishonchsiz. **Xulosa:** `ref + near` = 72 — «o'nlab»
+  (§7 qoidasi): tartiblovchi modeli hozir dasturga qo'yilmaydi, xotira va `p3` qoladi, ma'lumot yig'iladi.
+- Asosiy topilma: o'zgartirilgan 265 narxdan faqat 72 tasi spravochnik qatoriga 2 % ichida yaqin; 109 tasi hech qaysi
+  qatorga yaqin emas, 84 tasida spravochnikda qator umuman yo'q — ekspert narxlarining ~73 % i spravochnikdan kelmaydi.
+  Shuning uchun yo'nalish to'g'ri: **narx modeli** (o'z oldingi narxlari). Takrorlanish: 322 resurs kalitidan 84 tasi 2+
+  arizada uchraydi (ba'zilari 10–14 tasida); test savollarining 75/108 tasi o'quv arizalarida bor edi.
+- Navbatda: egasidan `price.*` sonlari (admin → «Набор для обучения» → «Собрать и измерить» → «Скопировать числа») — narx
+  modelining o'lchovi faqat egasining bazasida hisoblanadi (dataset faylida narx yo'q).
+
 **Keyingi sessiya uchun — qayerdan davom etiladi:** egasi §7 dagi sonlarni yuborgach, ularga qarab 4-bosqich
 (`src/lib/ml/{logreg,mlp,calib}.js`, tajribalar jadvali) boshlanadi. Sonlar kelmaguncha model kodi yozilmaydi:
 qaysi model kerakligi (yoki umuman kerak emasligi) savollar soniga va `p3` ning hozirgi aniqligiga bog'liq.

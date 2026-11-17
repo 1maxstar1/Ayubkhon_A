@@ -209,7 +209,15 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   qolsa yoki ИТОГО hech biriga teng bo'lmasa aytiladi. «ОБЩИЙ ИТОГ» o'chirilgani — xato emas, oddiy xabar (qizil emas).
   Kod ustuni bor varaqda raqamsiz qator ham resurs, agar resursdek narxlangan bo'lsa (birlik pul emas, kol-vo × narx = summa,
   yig'ma qator nomi emas — «В Т.Ч. …», «ЗАТРАТЫ ТРУДА …», «ИТОГО/ВСЕГО»): smeta tuzuvchi band oxiriga qo'lda qo'shgan qatorlar
-  (2026-11-17, `smeta-header` 21). «Наш ответ» da narxsiz, faqat izohli qator («-», «обоснов» yoki bo'sh narx + izoh) — so'ralgan,
+  (2026-11-17, `smeta-header` 21). «ЛОКАЛЬНО-РЕСУРСНАЯ ВЕДОМОСТЬ» (har ish ostida o'z resurslari):
+  «Количество» ikki ustun («на единицу измерения» / «по проектным данным») — miqdor loyihaviy ustundan; birlikka miqdori yo'q
+  ish qatori (shifr, «1000 М3») resurs emas — uning summasi ostidagi resurslar yig'indisi (`smeta-header` 22). «N п/п» —
+  raqam ustuni, kod ustuni oraliqda tursa ham: bandlar shu ustunda ko'rinadi (25). «Расчёт стоимости перевозки» varag'i:
+  т·км = потребность × вес × км, narx «на тн/км», summa «Общая цена» (23); yonida «Стоимость мат-ов без перевозки» ustuni
+  bor varaq o'qilmaydi — u tashishni material narxiga qo'shadi, resurs varag'i esa o'sha narxni allaqachon olgan (24).
+  Javob jadvalida «МАШ-ЧАС»/«ЧЕЛ-ЧАС» = «маш.-ч»/«чел.-ч» (`reply.js` `unitOf`, `match.js` ga tegmaydi); «%» qatori resurs
+  emas; boshqacha yozilgan nom faqat smeta narxi — jadvalning o'z ustuni yoki «Цены по ПСД» — teng bo'lsa topiladi
+  (o'xshashlik ≥ 0,8). «Наш ответ» da narxsiz, faqat izohli qator («-», «обоснов» yoki bo'sh narx + izoh) — so'ralgan,
   narxsiz qator (`market: null`): narx qo'ymaydi, «Сравнение версий» uni so'ralgan deb baholaydi; raqamli, lekin son emas
   narx («7 500 сум») avvalgidek «цена не прочитана».
   Boshqa smetalarni qatorma-qator takrorlaydigan fayl («ОБЩИЙ ИТОГ», `S.copiesOf`) yuklanganda o'chiriladi va aytiladi —

@@ -24,6 +24,10 @@
     ['note', /ESLATMA|ПРИМЕЧ|IZOH|ИЗОХ|NOTE/],
     ['market', /BOZOR|РЫН|MARKET/],
     ['price', /LOYIHA|СМЕТ|SMETA/],
+    // «Цены по ПСД» (the price of the project documentation): the smeta's own price under another name. Read apart from
+    // `price` — a line is not tied to it — and used only to confirm a name written differently («АВТОГРЕЙДЕРЫ … 99 КВТ
+    // /135 Л.С/» is the smeta's «Автогрейдеры … 99 (135) кВт (л.с.)» when the price agrees)
+    ['psd', /ПСД|PSD/],
     ['name', /NOMI|НАИМЕН|NAME/],
     ['unit', /O.?LCHOV|ЕД\.?\s*ИЗМ|^ЕД\.?$|UNIT|BIRLIK/],
     ['no', /^№|^N(\s|$)|T\/R|П\/П/]
@@ -71,6 +75,9 @@
         if (!name || /^\d+$/.test(name)) continue;                     // numbering rows
         var no = C.no ? text(row[C.no]).trim() : '';
         var unit = C.unit ? text(row[C.unit]).trim() : '', note = C.note ? text(row[C.note]).replace(/\s+/g, ' ').trim() : '';
+        // a percentage («Прочие затраты подрядчика | % | 17») is no resource: there is nothing in the smeta to put it on
+        if (unit === '%') continue;
+        var psd = C.psd ? S.num(text(row[C.psd])) : null;
         if (market == null) {
           // a header row repeated (our export's second, bilingual one): nothing
           if (mt && (NAME.test(key(name)) || MARKET.test(key(mt)) || PRICE.test(key(mt)))) continue;
@@ -80,7 +87,7 @@
           // that one is listed as not read, as before
           if (unit && !/\d/.test(mt) && (note || /[A-Za-zА-Яа-яЁё]/.test(mt))) {
             var said = /[A-Za-zА-Яа-яЁё]/.test(mt) && key(mt) !== key(note) ? mt + (note ? ' — ' + note : '') : note || mt;
-            entries.push({ no: no, name: name, unit: unit, price: C.price ? S.num(text(row[C.price])) : null, market: null, note: said, sheet: sh });
+            entries.push({ no: no, name: name, unit: unit, price: C.price ? S.num(text(row[C.price])) : null, psd: psd, market: null, note: said, sheet: sh });
             n++;
             continue;
           }
@@ -93,6 +100,7 @@
           name: name,
           unit: unit,
           price: C.price ? S.num(text(row[C.price])) : null,
+          psd: psd,
           market: market,
           note: note,
           sheet: sh
@@ -117,13 +125,17 @@
   // on a large quantity is a price we asked for
   function unchanged(p, m) { return S.near(p, m); }
   function bare(s) { return S.nameKey(s).replace(/[\s.,;:()"'«»-]+/g, ''); }
+  /** The unit as the smeta and the reply both mean it: «ЧЕЛ-ЧАС» is «чел.-ч», «МАШ-ЧАС» is «маш.-ч». Here, and not in
+   *  S.unitKey (src/lib/match.js is measured: a change there is one of the similarity's, made with its numbers). */
+  function unitOf(u) { return S.unitKey(u || '').replace(/^(ЧЕЛ|МАШ)ЧАС$/, '$1Ч'); }
 
   /**
    * Each line of the reply to the smeta's resources: name and unit, and the smeta price when the
    * table gives one. A name broken over lines («2-» / «3,75 М») is matched without its spaces and
    * punctuation, unless that joins numbers apart («ТРУБА 1 20» is not ТРУБА 120, «4.11» not
-   * 4.1.1); failing that, the closest name of the same unit and price (similarity ≥ 0.9) with the
-   * same numbers — АНКЕР М8 never lands on АНКЕР М5. A line with no unit, whose name the smeta has
+   * 4.1.1); failing that, the closest name of the same unit and the same smeta price (similarity ≥ 0.8;
+   * the price from the table's own column, else its «Цены по ПСД») with the same numbers — АНКЕР М8
+   * never lands on АНКЕР М5. A line with no unit, whose name the smeta has
    * in several units, prices none of them (`ambiguous`). A resource priced again by a later line
    * at another price keeps the first (`conflicts`).
    */
@@ -134,23 +146,26 @@
         if (r.kind !== 'item') return;
         var k = S.resKey(r.nm || '', r.unit || '', r.price == null ? 0 : r.price);
         if (!res.has(k)) res.set(k, { key: k, nm: r.nm || '', nk: S.nameKey(r.nm || ''), bk: bare(r.nm || ''),
-                                       uk: S.unitKey(r.unit || ''), unit: r.unit || '', price: r.price || 0 });
+                                       uk: unitOf(r.unit || ''), unit: r.unit || '', price: r.price || 0 });
       });
     });
     var all = Array.from(res.values());
     var out = { prices: {}, requested: {}, found: [], missing: [], ambiguous: [], conflicts: [] };
     var given = {};                                         // key → the market price its first line gave
     entries.forEach(function (e) {
-      var uk = S.unitKey(e.unit || ''), nk = S.nameKey(e.name), bk = bare(e.name);
+      var uk = unitOf(e.unit || ''), nk = S.nameKey(e.name), bk = bare(e.name);
       var fits = function (x) { return (!uk || x.uk === uk) && (e.price == null || samePrice(x.price, e.price)); };
       var hit = all.filter(function (x) { return x.nk === nk && fits(x); });
       if (!hit.length) {
         hit = all.filter(function (x) { return x.bk === bk && fits(x) && S.numberRelation(x.nm, e.name) !== 'conflict'; });
       }
-      if (!hit.length && e.price != null) {
-        var best = null, bs = 0.9;
+      // a name written differently: the closest one of the same unit, the same numbers and the same smeta price — the
+      // table's own column, or its «Цены по ПСД»; the price is what makes it safe (0.8: «… 99 КВТ /135 Л.С/» is 0.83)
+      var ref = e.price != null ? e.price : e.psd;
+      if (!hit.length && ref != null) {
+        var best = null, bs = 0.8;
         all.forEach(function (x) {
-          if (!fits(x) || !S.sameNumbers(x.nm, e.name)) return;
+          if ((uk && x.uk !== uk) || !samePrice(x.price, ref) || !S.sameNumbers(x.nm, e.name)) return;
           var sim = S.charSimilarity(x.nm, e.name);
           if (sim >= bs) { bs = sim; best = x; }
         });

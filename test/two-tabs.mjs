@@ -127,6 +127,25 @@ await C.waitForSelector('#screen-list:not([hidden])');
 check(await C.evaluate(() => !S.Sync.ws && document.getElementById('wsFrozen').hidden) && (await onServer()).filter(Boolean).length === 3,
   '«К списку заявок» leaves the covered tab and changes nothing on the server');
 
+/* a tab whose files do not come (the link lost for a moment as it opens, or the page reloaded while they came — the third
+   tab above does that when the second one hands over) empties nothing: its next save keeps the files and their projects */
+const D = await tab();
+const fileGet = (u) => /^\/api\/files\/[^/]+\/[^/]+\/[^/]+$/.test(u.pathname);     // a stored file, not /api/files/token
+await D.route(fileGet, (r) => r.abort());
+await D.goto(url);
+await D.waitForFunction(() => window.S && S.Sync.ws && !S.Sync.loading, null, { timeout: 30 * 1000 });
+check(await D.evaluate(() => app.projects.length === 0), 'tab D: the file does not come, and nothing is on screen');
+await D.evaluate(() => { S.Sync.dirty = true; return S.Sync.saveNow(); });
+const wD = await api('/api/collections/workspaces/records/' + wsId, {}, su);
+const pD = keys.map((k) => wD.state.prices2 && wD.state.prices2[k.key] === k.price - 1);
+check(wD.files.length === 1 && (wD.state.projects || []).length === 1 && wD.state.projects[0].fileId === wD.files[0] &&
+  Object.keys(wD.state.files || {}).length === 1 && pD.filter(Boolean).length === 3,
+  'and its save removes nothing: the file, its project and the prices stay on the server (' + JSON.stringify([wD.files, (wD.state.projects || []).map((x) => x.fileId), pD]) + ')');
+await D.unroute(fileGet);
+await D.reload();
+await ready(D);
+check(await has(D, 3) && await has(D, 0), 'the page opened again has the file back, with its prices');
+
 await browser.close();
 pb.stop();
 rmSync(dir, { recursive: true, force: true });

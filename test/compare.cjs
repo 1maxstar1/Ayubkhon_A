@@ -328,6 +328,28 @@ check(['ТЕСТОВЫЙ АНКЕР М5|ШТ|17', 'ТЕСТОВАЯ ПЛИТА 4
 check(S.compare.classify({ price: 17, qty: 4 }, { price: 17, qty: 4 }, rm3.requested[k('ТЕСТОВЫЙ АНКЕР М5', 'ШТ', 17)]) === 'note',
   'a note line left as it was is «примечание»');
 
+// another expert's table: the units «МАШ-ЧАС» / «ЧЕЛ-ЧАС» for the smeta's «маш.-ч» / «чел.-ч»; a name written another way
+// («… 99 КВТ /135 Л.С/» for «… 99 (135) кВт (л.с.)»), tied by «Цены по ПСД» — the smeta's price under another name; and a
+// «%» line («Прочие затраты подрядчика | % | 17»), which is no resource
+const rp4 = S.reply.parse({ sheets: [sheet('цены', [['СРАВНИТЕЛЬНАЯ ТАБЛИЦА №2'], [],
+  ['№ п/п', 'Наименование ресурса', 'Ед.изм.', 'Цены по ПСД', 'Среднерыночная стоимость', 'Примечание'], [1, 2, 3, 4, 5, 6],
+  [1, 'ЗАТРАТЫ ТРУДА ТЕСТОВЫХ РАБОЧИХ', 'ЧЕЛ-ЧАС', 30, null, 'Рекомендуется принять согласно ШНК'],
+  [2, 'ТЕСТОВЫЕ АВТОГРЕЙДЕРЫ СРЕДНЕГО ТИПА 99 КВТ /135 Л.С/', 'МАШ-ЧАС', 380, 327, 'Пересмотреть указанную цену'],
+  [3, 'ТЕСТОВЫЕ АВТОГРЕЙДЕРЫ СРЕДНЕГО ТИПА 99 КВТ /135 Л.С/', 'МАШ-ЧАС', 410, 327, 'Пересмотреть указанную цену'],
+  [4, 'Прочие затраты подрядчика', '%', 17, null, 'Рекомендуется принять согласно ШНК']])] });
+check(rp4.entries.length === 3 && !rp4.entries.some((e) => e.unit === '%') && rp4.entries[1].psd === 380,
+  'a «%» line is no resource; «Цены по ПСД» is read beside the line (' + rp4.entries.map((e) => e.name + ' ' + e.unit + ' ' + e.psd).join('; ') + ')');
+const sm4 = [{ rows: [
+  { kind: 'item', nm: 'Затраты труда тестовых рабочих', unit: 'чел.-ч', price: 30 },
+  { kind: 'item', nm: 'Тестовые автогрейдеры среднего типа 99 (135) кВт (л.с.)', unit: 'маш.-ч', price: 380 },
+  { kind: 'item', nm: 'Тестовые автогрейдеры среднего типа 99 (135) кВт (л.с.)', unit: 'маш.-ч', price: 395 }] }];
+const rm4 = S.reply.match(rp4.entries, sm4);
+const grK = S.resKey('Тестовые автогрейдеры среднего типа 99 (135) кВт (л.с.)', 'маш.-ч', 380);
+check(rm4.prices[grK] === 327 && Object.keys(rm4.prices).length === 1,
+  '«МАШ-ЧАС» is «маш.-ч», and the name written another way is found by its «Цены по ПСД» (380): that line only, not the one at 395');
+check(rm4.requested[S.resKey('Затраты труда тестовых рабочих', 'чел.-ч', 30)] && rm4.missing.length === 1 && rm4.missing[0].psd === 410,
+  '«ЧЕЛ-ЧАС» is «чел.-ч»; a line whose «Цены по ПСД» (410) is no price of the smeta is not put on the nearest name (' + rm4.missing.map((e) => e.name + ' ' + e.psd).join('; ') + ')');
+
 // our own export of two projects: one report sheet each, both read back
 const proj2 = S.smeta.parseWorkbook(replySmeta(), 'r.xlsx');
 const p2 = Object.assign({}, rm.prices);

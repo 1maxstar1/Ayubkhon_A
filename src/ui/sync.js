@@ -147,11 +147,16 @@
       this.listen();
       this.walSweep();
       window.addEventListener('beforeunload', function (e) {
+        // a page going away while its files come takes nothing more in: the browser cuts them off, and that is no
+        // failure to go on from (open() would restore an empty application, and the next save would be that)
+        if (self.loading) self.seq++;
         self.leave();
         // an estimate whose file is not on the server would not be there after the reload: the browser asks
         if (self.ws && !self.frozen && self.hasUnsaved()) { e.preventDefault(); e.returnValue = ''; }
       });
-      window.addEventListener('pagehide', function () { self.leave(); });
+      window.addEventListener('pagehide', function () { if (self.loading) self.seq++; self.leave(); });
+      // kept by the browser and shown again (back/forward): what was cut off above is fetched anew
+      window.addEventListener('pageshow', function (e) { if (e.persisted && self.loading && self.ws) location.reload(); });
       // put out of sight — another tab, another window: saved now rather than when the timers get to it
       document.addEventListener('visibilitychange', function () {
         if (document.visibilityState !== 'hidden' || !self.ws || self.loading || self.frozen) return;
@@ -181,6 +186,7 @@
       newSlots().forEach(function (k) { if (k !== 'new' && sc[k]) this.cmp[k] = sc[k]; }, this);
       this.corr = {};
       this.unsaved = {};
+      this.away = {};
       clearTimeout(this.ut);
       this.loading = true;
       this.wal = this.walRead(w.id);
@@ -236,7 +242,11 @@
       }).catch(function (e) {
         if (!current()) return;
         app.busy(false);
-        app.toast('Не удалось получить файлы: ' + (e.message || e), true);
+        // the files stay the workspace's: not on screen now, they are no files a project dropped — a save must neither
+        // remove them from the server nor their projects from the state (it used to do both: a link lost for a moment
+        // on opening, or a page reloaded while its files came, and the next save emptied the application)
+        wanted.forEach(function (f) { self.away[f.name] = f.id; });
+        app.toast('Не удалось получить файлы: ' + (e.message || e) + '. Они остаются в заявке — обновите страницу', true);
         self.restore();
       });
     },
@@ -597,7 +607,7 @@
           // the older tab has just written something this tab opened without
           if ((self.dirty && !self.restoredOnly) || self.hasUnsaved()) {
             A().toast('В другой вкладке были несохранённые правки этой заявки. Обновите страницу, чтобы увидеть их.', true);
-          } else location.reload();
+          } else { self.seq++; location.reload(); }     // nothing still arriving is taken in on the way out
         }
       };
     },
@@ -686,7 +696,12 @@
     },
 
     state: function () {
-      var app = A(), self = this, prices = this.savedPrices();
+      var app = A(), self = this, prices = this.savedPrices(), live = {};
+      app.projects.forEach(function (p) { live[p.file] = 1; });
+      // the projects whose files could not be fetched on opening (see open()): kept as they were saved
+      var away = ((this.ws && this.ws.state && this.ws.state.projects) || []).filter(function (sp) {
+        return self.away && self.away[sp.file] && !live[sp.file];
+      });
       return {
         projects: app.projects.map(function (p) {
           return {
@@ -694,7 +709,7 @@
             enabled: p.enabled !== false, open: p.open !== false,
             objects: p.objects.map(function (o) { return { name: o.name, enabled: o.enabled !== false }; })
           };
-        }),
+        }).concat(away),
         files: this.files,
         prices: this.downgrade(prices),       // readable by the previous version
         prices2: prices,
@@ -728,8 +743,9 @@
       var live = {};
       app.projects.forEach(function (p) { live[p.file] = 1; });
       this.renderUnsaved();     // a held file whose project was taken off the list is no longer waited for
-      var stale = Object.keys(this.files).filter(function (n) { return !live[n]; }).map(function (n) { return self.files[n]; });
-      Object.keys(this.files).forEach(function (n) { if (!live[n]) delete self.files[n]; });
+      var gone = function (n) { return !live[n] && !(self.away && self.away[n]); };
+      var stale = Object.keys(this.files).filter(gone).map(function (n) { return self.files[n]; });
+      Object.keys(this.files).forEach(function (n) { if (gone(n)) delete self.files[n]; });
       st.files = this.files;
       var changed = app.model ? app.model.resources.filter(function (r) { return !S.near(r.price, r.market); }).length : 0;
       var body = { state: st, changed: changed, updated_by: S.me().id };
@@ -1258,7 +1274,7 @@
         throw e;
       }).then(function () {
         self.wal = {}; self.walN = 0; self.mine = {}; self.refused = ''; self.cutSaid = 0;
-        self.ws = null; self.app = null; self.files = {}; self.corr = {}; self.marks = {}; self.cmp = {};
+        self.ws = null; self.app = null; self.files = {}; self.away = {}; self.corr = {}; self.marks = {}; self.cmp = {};
         self.unsaved = {}; clearTimeout(self.ut); self.renderUnsaved();
         self.thaw();
         S.hashSet('ws', '');

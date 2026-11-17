@@ -136,7 +136,9 @@
       var raw = txt(cells[c]);
       var u = up(raw);
       if (!u) continue;
-      if (!noRaw && /^\s*№/.test(raw)) noRaw = c;
+      // the number column by its raw header: «№ …», or «N п/п» / «N п.п.» (a code column such as «Код АВС» may stand
+      // between it and the name: the bands in the number column are then seen)
+      if (!noRaw && (/^\s*№/.test(raw) || /^\s*[NН]\s*п\s*[\/.]?\s*п\.?\s*$/i.test(raw))) noRaw = c;
       if (u.indexOf('НАИМЕНОВАНИЕ') >= 0) { L = L || {}; L.name = c; }
       else if (/^N\s*П\/П$|^№/.test(u) || u === 'N П/П' || (folded && u === 'N П П')) { L = L || {}; L.no = c; }
       else if (u.indexOf('ЕД') === 0 && u.indexOf('ИЗМ') > 0) { L = L || {}; L.unit = c; }
@@ -151,9 +153,17 @@
     if (!L || !L.name || !L.qty) return null;
     if (!L.price || !L.sum) {
       var sub = rows[r + 1] || [];
+      // «Количество» over two columns — «на единицу измерения» (the norm of one unit of the work) and «по проектным
+      // данным» (the quantity): the second is the quantity, and the first is neither the quantity nor the price (the
+      // local resource statement, «ЛОКАЛЬНО-РЕСУРСНАЯ ВЕДОМОСТЬ», where the works and their resources stand together)
+      for (var kq = 1; kq < sub.length; kq++) {
+        if (!/^ПО ПРОЕКТНЫМ/.test(up(txt(sub[kq])))) continue;
+        if (kq > L.qty && kq <= L.qty + 2 && up(txt(sub[L.qty])).indexOf('НА ЕДИНИЦУ') === 0) { L.unitQty = L.qty; L.qty = kq; }
+        break;
+      }
       for (var k = 1; k < sub.length; k++) {
         var s = up(txt(sub[k]));
-        if (!L.price && s.indexOf('НА ЕДИНИЦУ') === 0) L.price = k;
+        if (!L.price && s.indexOf('НА ЕДИНИЦУ') === 0 && k !== L.unitQty) L.price = k;
         else if (!L.sum && (s === 'ОБЩАЯ' || s === 'ВСЕГО')) L.sum = k;
       }
       L.subRow = r + 1;
@@ -427,6 +437,9 @@
       // numbered lines only: «В Т.Ч. ЗАТРАТЫ ТРУДА МАШИНИСТОВ» and the closing
       // «ЗАТРАТЫ ТРУДА РАБОЧИХ» carry a quantity but are not resources.
       else if (L.code && !noTxt && nm && qty == null && isSection(nm)) { kind = 'section'; section = sectionOf(nm); sections++; }
+      // the local resource statement: a work («РАЗРАБОТКА ГРУНТА …», 1000 М3) has no norm of one unit — only its
+      // resources below it have one; the work is not a resource, its resources are
+      else if (L.unitQty && nm && qty != null && S.num(cells[L.unitQty] && cells[L.unitQty].v) == null) kind = 'extra';
       // a т·км line under a haulage band with its price but its quantity left empty (and so its sum 0): a line of the
       // estimate all the same — numbered or not — read with the quantity 0, so that nothing on the sheet goes unseen
       else if (qty == null && !sum && price != null && nm && LETTER.test(nm) && haulBand(band) && TKM.test(up(txt(cells[L.unit])))) { kind = 'item'; qty = 0; items++; }
@@ -533,23 +546,30 @@
         var raw = txt(cells[c]), u = up(raw);
         if (!u && !/^\s*№/.test(raw)) continue;
         // «Наименование материалов», or a bare «МАТЕРЯЛЫ» / «Материалы»; «ЕД ИЗ» as well as «Ед. изм.»; «ТОН/КМ» as well as «тн/км»
-        if (/^НА?И?МЕНОВАНИЕ МАТЕРИАЛ|^МАТЕР[ИЬ]?[АЯ]ЛЫ?$/.test(u)) h.name = c;
+        // a material's own price («Стоимость мат-ов без перевозки»): such a sheet adds the haulage to the material's
+        // price, which the resource sheet already carries — it is a calculation of prices, not a cost of its own
+        if (/^СТОИМОСТЬ? МАТ/.test(u)) h.matPrice = c;
+        // «Наименование работ и затрат, характеристика …» on a «Расчёт стоимости перевозки» sheet names the materials too
+        else if (/^НА?И?МЕНОВАНИЕ МАТЕРИАЛ|^МАТЕР[ИЬ]?[АЯ]ЛЫ?$|^НАИМЕНОВАНИЕ РАБОТ И ЗАТРАТ/.test(u)) h.name = c;
         else if (/^ЕД( |$)/.test(u) && u.indexOf('ИЗ') > 0) h.unit = c;
         else if (/^ЕД/.test(u) && u.indexOf('ИЗМ') > 0) h.unit = c;
         else if (/^СТОИМОСТЬ ЗА/.test(u)) h.price = c;           // «Стоимость за один тн/км» — before the km test
+        else if (/^НА Т(Н|ОН)? ?КМ$/.test(u)) h.price = c;       // «на тн/км» under «автотр расход»
         else if (/^(ТН|Т|ТОН|ТОНН) КМ$/.test(u)) h.tkm = c;
-        else if (/(^| )КМ$/.test(u)) h.km = c;
+        else if (/(^| )КМ$/.test(u) || /^РАСС ?Т(Е)?( |$)/.test(u)) h.km = c;     // «… км», or «Расст» / «расс-т»
         // read for the checks below only: the material's own quantity, its specific weight, the tonnes
-        else if (/^КОЛ(ИЧЕСТВ|И ЧЕСТВО|ВО$)/.test(u)) h.amount = c;
+        else if (/^КОЛ(ИЧЕСТВ|И ЧЕСТВО|ВО$)|^ПОТРЕБНОСТ/.test(u)) h.amount = c;
         else if (/^(УДЕЛЬ? ?НЫЙ|ОБ[ЪЬ]?ЕМ ?НЫЙ) ВЕС/.test(u)) h.weight = c;     // «Удельный», «Удель- ный», «Объем- ный»
         else if (/^(ОБЩ|ОБШ)(ИЙ|АЯ)? ?(ТОНН|ВЕС)/.test(u)) h.tons = c;
-        else if (u === 'ВСЕГО' || u.indexOf('СУММА') === 0 || /^СТОИМОСТЬ ГРУЗОПЕРЕВОЗ/.test(u) || (u === 'ИТОГО' && !h.sum)) h.sum = c;
+        else if (/^ОБЩАЯ ЦЕНА/.test(u)) h.sum = c;          // «Общая цена» — the whole cost, beside a «Всего» of one unit
+        else if ((u === 'ВСЕГО' && !h.sum) || u.indexOf('СУММА') === 0 || /^СТОИМОСТЬ ГРУЗОПЕРЕВОЗ/.test(u) || (u === 'ИТОГО' && !h.sum)) h.sum = c;
         else if (/^\s*№/.test(raw) || /^N П П$/.test(u)) h.no = c;
       }
       return h;
     }
     // the т·км is a column of its own, or — on a sheet without one — the tonnes × the km of the line
-    function whole(h) { return h.name && h.km && (h.tkm || h.tons) && h.price && h.sum; }
+    // or — on a sheet with neither — the quantity × the specific weight × the km («Расчёт стоимости перевозки»)
+    function whole(h) { return h.name && h.km && (h.tkm || h.tons || (h.amount && h.weight)) && h.price && h.sum && !h.matPrice; }
     for (r = 1; r < Math.min(rows.length, 20) && !H; r++) {
       if (!rows[r]) continue;
       var h = headOf(rows[r], {});
@@ -564,7 +584,8 @@
     }
     if (!H) return null;
     var computed = !H.tkm;              // т·км = tonnes × km, written into the tonnes' place
-    var L = { no: H.no || 1, name: H.name, unit: H.unit || H.name + 1, qty: H.tkm || H.tons, price: H.price, sum: H.sum,
+    var byAmount = !H.tkm && !H.tons;   // т·км = quantity × specific weight × km, written into the quantity's place
+    var L = { no: H.no || 1, name: H.name, unit: H.unit || H.name + 1, qty: H.tkm || H.tons || H.amount, price: H.price, sum: H.sum,
       headerRow: H.headerRow, subRow: 0, numRow: 0, lastCol: H.sum, transport: true };
     var keep = [L.no, L.name, L.unit, L.qty, L.price, L.sum];
     function slim(cells, over) {
@@ -574,6 +595,13 @@
       return out;
     }
     function km(v) { return Math.round(v) === v ? String(v) : String(+v.toFixed(3)).replace('.', ','); }
+    // the name under a header merged over two columns («Наименование …» over B:C) is written in either of them
+    function nameAt(cs) {
+      var t = txt(cs[L.name]).replace(/\s+/g, ' ').trim();
+      if (!t && L.unit > L.name + 1) t = txt(cs[L.name + 1]).replace(/\s+/g, ' ').trim();
+      return t;
+    }
+    H.nameAt = nameAt;
     var title = '', subtitle = '';
     for (r = 1; r < L.headerRow; r++) {
       var t = '';
@@ -584,11 +612,14 @@
     var out = [], items = 0, last = lastContentRow(rows);
     for (r = L.headerRow; r <= last; r++) {
       var cs = rows[r] || [];
-      var name = txt(cs[L.name]).replace(/\s+/g, ' ').trim();
+      var name = nameAt(cs);
       var noCell = cs[L.no], noTxt = txt(noCell);
       var tkm = S.num(cs[L.qty] && cs[L.qty].v), price = S.num(cs[L.price] && cs[L.price].v), sum = S.num(cs[L.sum] && cs[L.sum].v);
       var dist = S.num(cs[H.km] && cs[H.km].v);
-      if (computed) tkm = tkm != null && dist != null ? tkm * dist : null;
+      if (byAmount) {
+        var wt = S.num(cs[H.weight] && cs[H.weight].v);
+        tkm = tkm != null && wt != null && dist != null ? tkm * wt * dist : null;
+      } else if (computed) tkm = tkm != null && dist != null ? tkm * dist : null;
       var row = { r: r, kind: 'blank', section: 'other', sub: false, no: S.num(noCell && noCell.v), noTxt: noTxt, nm: name, unit: txt(cs[L.unit]),
         qty: tkm, price: price, sum: sum, cells: slim(cs) };
       if (r === L.headerRow) row.kind = 'header';
@@ -633,7 +664,7 @@
     function fmt(v) { return S.money ? S.money(v) : String(Math.round(v)); }
     out.forEach(function (x) {
       if (x.kind !== 'item') return;
-      var cs = rows[x.r] || [], name = txt(cs[H.name]).replace(/\s+/g, ' ').trim(), unit = txt(cs[H.unit]);
+      var cs = rows[x.r] || [], name = H.nameAt ? H.nameAt(cs) : txt(cs[H.name]).replace(/\s+/g, ' ').trim(), unit = txt(cs[H.unit]);
       items.push({ r: x.r, nm: name, sum: x.sum });
       if (x.sum != null) { lines += x.sum; linesN++; }
       var w = H.weight ? S.num(cs[H.weight] && cs[H.weight].v) : null;

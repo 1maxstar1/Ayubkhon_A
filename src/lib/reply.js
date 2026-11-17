@@ -5,7 +5,8 @@
  * are put on the smeta they were written for, and its lines are what the comparison of
  * versions judges as asked.
  *
- *   S.reply.parse(wb)              → { entries: [{ no, name, unit, price, market, note, sheet }],
+ *   S.reply.parse(wb)              → { entries: [{ no, name, unit, price, market, note, sheet }] (market null: a line
+ *                                       answered with a note and no price — «-», «обоснов», or the note alone),
  *                                       unread: [{ no, name, text, sheet }], sheets: [name],
  *                                       sheet, cols (of the first sheet read), hasPrice }
  *   S.reply.match(entries, objects) → { prices: key → market, requested: key → { market | note },
@@ -69,20 +70,31 @@
         var mt = text(row[C.market]).replace(/\s+/g, ' ').trim(), market = S.num(mt);
         if (!name || /^\d+$/.test(name)) continue;                     // numbering rows
         var no = C.no ? text(row[C.no]).trim() : '';
+        var unit = C.unit ? text(row[C.unit]).trim() : '', note = C.note ? text(row[C.note]).replace(/\s+/g, ' ').trim() : '';
         if (market == null) {
-          // a price written but not a number; a header row repeated (our export's second, bilingual one) is not one
-          if (mt && !NAME.test(key(name)) && !MARKET.test(key(mt)) && !PRICE.test(key(mt))) {
-            unread.push({ no: no, name: name, text: mt, sheet: sh });
+          // a header row repeated (our export's second, bilingual one): nothing
+          if (mt && (NAME.test(key(name)) || MARKET.test(key(mt)) || PRICE.test(key(mt)))) continue;
+          // a resource line we answered without a price of our own — «-», «обоснов», or the note alone («Стоимость
+          // ресурса должна быть обоснована…»): asked all the same, a note and no price (it used to be dropped, or
+          // listed as a price that could not be read). A cell with figures in it («7 500 сум») is a price we wrote:
+          // that one is listed as not read, as before
+          if (unit && !/\d/.test(mt) && (note || /[A-Za-zА-Яа-яЁё]/.test(mt))) {
+            var said = /[A-Za-zА-Яа-яЁё]/.test(mt) && key(mt) !== key(note) ? mt + (note ? ' — ' + note : '') : note || mt;
+            entries.push({ no: no, name: name, unit: unit, price: C.price ? S.num(text(row[C.price])) : null, market: null, note: said, sheet: sh });
+            n++;
+            continue;
           }
+          // a price written but not a number
+          if (mt) unread.push({ no: no, name: name, text: mt, sheet: sh });
           continue;                                                    // section and total rows: no price
         }
         entries.push({
           no: no,
           name: name,
-          unit: C.unit ? text(row[C.unit]).trim() : '',
+          unit: unit,
           price: C.price ? S.num(text(row[C.price])) : null,
           market: market,
-          note: C.note ? text(row[C.note]).trim() : '',
+          note: note,
           sheet: sh
         });
         n++;
@@ -152,6 +164,8 @@
         if (ks.length > 1) { out.ambiguous.push({ entry: e, units: ks.map(function (k) { return us[k]; }) }); return; }
       }
       hit.forEach(function (x) {
+        // a line answered with a note and no price: asked, priced by nothing (a price another line gave stays)
+        if (e.market == null) { if (!out.requested[x.key]) out.requested[x.key] = { note: e.note }; return; }
         if (given[x.key] != null && given[x.key] !== e.market) {
           out.conflicts.push({ entry: e, key: x.key, kept: given[x.key] });
           return;

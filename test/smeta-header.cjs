@@ -502,5 +502,39 @@ const ck7 = (one({ sheets: [withTotal(2601)] })[0] || {}).checks || [];
 check(ck7.length === 1 && ck7[0].lines === 2708 && ck7[0].diff === 107 && !ck7[0].missing.length && /разница 107/.test(ck7[0].text),
   'an «ИТОГО» that is no sum of the lines at all: said, with the difference (' + ck7.map((c) => c.text).join('; ') + ')');
 
+/* 21 — the local resource estimate with a code column whose band ends with lines the estimator added by hand, without
+        numbers («Разъединитель | комплект | 1 | … », counted by the band's «ИТОГО»): resources all the same. Lines with no
+        number that are not resources stay out: «В Т.Ч. ЗАТРАТЫ ТРУДА МАШИНИСТОВ» priced like one, a money line in «СУМ»,
+        and a line whose quantity × price is not its sum */
+const lrs2 = one({ sheets: [sheet('3', [[null, 'ТЕСТОВАЯ СТРОЙКА'], [null, '(наименование стройки)'], [null, null, 'ЛОКАЛЬНЫЙ РЕСУРСНЫЙ СМЕТНЫЙ РАСЧЕТ'], [],
+  ['N п.п.', 'Шифр номера нормативов и коды ресурсов', 'Наименование работ и затрат', 'Единица измерения', 'Количество ', 'Сметная стоимость'],
+  [null, null, null, null, null, 'в базисном уровне'],
+  [null, null, null, null, null, 'на.ед.изм.', 'общая'],
+  [1, 2, 3, 4, 5, 6, 7],
+  [null, null, 'ТРУДОВЫЕ РЕСУРСЫ'],
+  ['1', '1', 'ЗАТРАТЫ ТРУДА РАБОЧИХ-СТРОИТЕЛЕЙ', 'ЧЕЛ.-Ч', 13, 7, 91],
+  [null, 'ИТОГО ПО ТРУДОВЫМ РЕСУРСАМ:', null, 'СУМ', null, null, 91],
+  [null, null, 'СТРОИТЕЛЬНЫЕ МАШИНЫ И МЕХАНИЗМЫ'],
+  ['2', '101', 'ТЕСТОВЫЙ АВТОГИДРОПОДЪЕМНИК', 'МАШ.-Ч', 3, 29, 87],
+  [null, null, 'В Т.Ч. ЗАТРАТЫ ТРУДА МАШИНИСТОВ', 'ЧЕЛ.-Ч', 3, 7, 21],
+  [null, 'ИТОГО ПО СТРОИТЕЛЬНЫМ МАШИНАМ:', null, 'СУМ', null, null, 87],
+  [null, null, 'МАТЕРИАЛЬНЫЕ РЕСУРСЫ'],
+  ['3', 'СЦЕНА', 'ТЕСТОВЫЙ ИЗОЛЯТОР ПОДВЕСНОЙ', 'ШТ', 6, 31, 186],
+  [null, 'СЦЕНА', 'ТЕСТОВЫЙ РАЗЪЕДИНИТЕЛЬ 6 КВ', 'комплект', 1, 1093.75, 1093.75],
+  [null, 'СЦЕНА', 'ТЕСТОВЫЙ РАЗРЯДНИК', 'шт', 3, 47.5, 142.5],
+  [null, 'СЦЕНА', 'ТЕСТОВЫЙ ЗАЖИМ НАТЯЖНОЙ', 'ШТ', 4, 19, 97],
+  [null, 'ИТОГО ПО СТРОИТЕЛЬНЫМ МАТЕРИАЛАМ:', null, 'СУМ', null, null, 1422.25],
+  [null, null, 'ТРАНСПОРТНЫЕ РАСХОДЫ', 'СУМ', 0.03, 1422.25, 42.6675],
+  [null, 'ВСЕГО ПО СТРОИТЕЛЬНЫМ МАТЕРИАЛАМ:', null, 'СУМ', null, null, 1464.9175]])] });
+const l2 = lrs2.length ? lrs2[0].rows.filter((r) => r.kind === 'item') : [];
+const l2n = l2.map((r) => r.nm);
+check(l2n.includes('ТЕСТОВЫЙ РАЗЪЕДИНИТЕЛЬ 6 КВ') && l2n.includes('ТЕСТОВЫЙ РАЗРЯДНИК') && l2.find((r) => r.nm === 'ТЕСТОВЫЙ РАЗРЯДНИК').section === 'materials',
+  'lines added by hand without numbers, priced like resources, are read under their band (' + l2n.join(' | ') + ')');
+const l2mat = l2.filter((r) => r.section === 'materials').reduce((t, r) => t + r.sum, 0);
+check(Math.abs(l2mat - 186 - 1093.75 - 142.5) < 1e-6, 'the materials read: the numbered line and the two priced ones (' + l2mat + ')');
+check(!l2n.some((n) => /В Т\.Ч\./.test(n)) && !l2n.includes('ТРАНСПОРТНЫЕ РАСХОДЫ'),
+  '«В Т.Ч. ЗАТРАТЫ ТРУДА МАШИНИСТОВ» priced like a line, and the money line in «СУМ», are not resources');
+check(!l2n.includes('ТЕСТОВЫЙ ЗАЖИМ НАТЯЖНОЙ'), 'nor a line without a number whose quantity × price is not its sum (4 × 19 ≠ 97)');
+
 console.log(fail ? '\nFAILED: ' + fail : '\nall passed');
 process.exit(fail ? 1 : 0);

@@ -303,6 +303,31 @@ check((rm2.conflicts || []).length === 1 && rm2.conflicts[0].kept === 1000.25 &&
 check((rp2.unread || []).length === 1 && rp2.unread[0].name === 'ТЕСТОВЫЙ ЩЕБЕНЬ' && rp2.unread[0].text === '7 500 сум' &&
   rp2.unread[0].sheet === 'A', 'a price that cannot be read («7 500 сум») is listed, not dropped');
 check(rm2.missing.length === 3 && rm2.missing.every((e) => e.sheet === 'A'), 'what is not found says which sheet it came from');
+// lines answered without a price of our own — «-», «обоснов», or the note alone (equipment: «должна быть обоснована»):
+// asked all the same, with the note and no price; a price written with figures («7 500 сум») is still a price not read
+const rp3 = S.reply.parse({ sheets: [sheet('C', [['СОПОСТАВИТЕЛЬНАЯ ТАБЛИЦА №2'], [],
+  ['№ п/п', 'Наименование ресурса', 'Ед.изм.', 'Цены по ПСД', 'Рыночные цены', 'Примечание'], [1, 2, 3, 4, 5, 6],
+  ['Строительные материалы'],
+  [1, 'ТЕСТОВАЯ ТРУБА 120', 'М', 9, 7, 'Пересмотреть стоимость ресурса'],
+  [2, 'ТЕСТОВЫЙ АНКЕР М5', 'ШТ', 17, '-', 'По технологии не требуется'],
+  [3, 'ТЕСТОВАЯ ПЛИТА 4.1.1', 'ШТ', 40, 'обоснов', 'Пересмотреть стоимость ресурса'],
+  ['Оборудование'],
+  [1, 'ТЕСТОВЫЙ КАБЕЛЬ', 'М', 1234.5, null, 'Стоимость ресурса должна быть обоснована'],
+  [2, 'ТЕСТОВЫЙ ЩЕБЕНЬ', 'М3', 9990, '7 500 сум', '']])] });
+const notes3 = rp3.entries.filter((e) => e.market == null);
+check(rp3.entries.length === 4 && notes3.length === 3 && notes3.map((e) => e.note).join(' | ') ===
+  'По технологии не требуется | обоснов — Пересмотреть стоимость ресурса | Стоимость ресурса должна быть обоснована',
+  'lines answered with «-», «обоснов» or a note alone are read: a note, no price (' + notes3.map((e) => e.name + ': ' + e.note).join('; ') + ')');
+check(rp3.unread.length === 1 && rp3.unread[0].text === '7 500 сум', 'a price written with figures that is no number is still listed as not read');
+const rm3 = S.reply.match(rp3.entries, rsm);
+check(Object.keys(rm3.prices).length === 1 && rm3.prices[k('ТЕСТОВАЯ ТРУБА 120', 'М', 9)] === 7 && rm3.missing.length === 0,
+  'only the priced line sets a price; every line is found');
+check(['ТЕСТОВЫЙ АНКЕР М5|ШТ|17', 'ТЕСТОВАЯ ПЛИТА 4.1.1|ШТ|40', 'ТЕСТОВЫЙ КАБЕЛЬ|М|1234.5'].every((t) => {
+  const [n, u, p] = t.split('|'); const r = rm3.requested[k(n, u, +p)]; return r && r.market == null && r.note;
+}), 'the note lines are asked: «Сравнение версий» judges them as asked, not as changes nobody asked for');
+check(S.compare.classify({ price: 17, qty: 4 }, { price: 17, qty: 4 }, rm3.requested[k('ТЕСТОВЫЙ АНКЕР М5', 'ШТ', 17)]) === 'note',
+  'a note line left as it was is «примечание»');
+
 // our own export of two projects: one report sheet each, both read back
 const proj2 = S.smeta.parseWorkbook(replySmeta(), 'r.xlsx');
 const p2 = Object.assign({}, rm.prices);

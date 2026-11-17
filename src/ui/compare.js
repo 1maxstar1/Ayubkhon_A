@@ -441,7 +441,7 @@
     var m = rp.match, unread = rp.unread || [], ambiguous = m.ambiguous || [], conflicts = m.conflicts || [];
     function line(e) {
       return (e.no ? e.no + '. ' : '') + e.name + ' · ' + e.unit + ' · ' + (e.price != null ? S.price(e.price) : '—') +
-        ' → ' + S.price(e.market);
+        ' → ' + (e.market != null ? S.price(e.market) : 'примечание');
     }
     function li(t) { return '<li>' + S.esc(t) + '</li>'; }
     function details(title, items) {

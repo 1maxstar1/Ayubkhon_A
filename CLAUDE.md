@@ -207,6 +207,11 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   hujjatga qiymat bo'lib yoziladi. ИТОГО tekshiruvi: pul qatori («3% от стоимости материалов») ИТОГО ichida ham, tashqarisida ham
   bo'lishi mumkin — ikkalasi xato emas (egasining tuzatilgan faylida shunday qoldirilgan, 2026-11-16); faqat material qatori tushib
   qolsa yoki ИТОГО hech biriga teng bo'lmasa aytiladi. «ОБЩИЙ ИТОГ» o'chirilgani — xato emas, oddiy xabar (qizil emas).
+  Kod ustuni bor varaqda raqamsiz qator ham resurs, agar resursdek narxlangan bo'lsa (birlik pul emas, kol-vo × narx = summa,
+  yig'ma qator nomi emas — «В Т.Ч. …», «ЗАТРАТЫ ТРУДА …», «ИТОГО/ВСЕГО»): smeta tuzuvchi band oxiriga qo'lda qo'shgan qatorlar
+  (2026-11-17, `smeta-header` 21). «Наш ответ» da narxsiz, faqat izohli qator («-», «обоснов» yoki bo'sh narx + izoh) — so'ralgan,
+  narxsiz qator (`market: null`): narx qo'ymaydi, «Сравнение версий» uni so'ralgan deb baholaydi; raqamli, lekin son emas
+  narx («7 500 сум») avvalgidek «цена не прочитана».
   Boshqa smetalarni qatorma-qator takrorlaydigan fayl («ОБЩИЙ ИТОГ», `S.copiesOf`) yuklanganda o'chiriladi va aytiladi —
   ресурс ikki marta sanalmaydi; solishtirish va «Наш ответ» o'chirilgan loyihaga qaramaydi. «Наш ответ» ning «объем»
   varag'i boshqa obyektni nomlasa (sarlavhadagi «по объекту:» yoki «ТАБЛИЦА №2» ostidagi qator narx varag'inikidan farq

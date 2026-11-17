@@ -100,6 +100,20 @@
   var NUMBERED = /^\s*\d+\.\s*$/;
   /** A line priced in sums («СУМ»): a money line of the statement (5 % of the materials…), not a resource. */
   function money(cell) { return /^СУМ$/.test(up(txt(cell))); }
+  /**
+   * A line without a number of its own on a sheet with a code column, priced the way a resource is: a unit that is not
+   * money, quantity × price = sum, and not the name of a summary line (form 4А's «В Т.Ч. ЗАТРАТЫ ТРУДА МАШИНИСТОВ» and
+   * closing «ЗАТРАТЫ ТРУДА РАБОЧИХ» carry a quantity and are not resources). Estimators add such lines by hand at the
+   * end of a band — «<разъединитель> | комплект | 1 | <цена> | <сумма>», no number, above an «ИТОГО ПО СТРОИТЕЛЬНЫМ
+   * МАТЕРИАЛАМ» whose SUM counts them — and they were left out (2026-11-17).
+   */
+  var SUMMARY_LINE = /^(В ?Т ?Ч|В ТОМ ЧИСЛЕ|ЗАТРАТЫ ТРУДА|ИТОГО|ВСЕГО)( |$)/;
+  function pricedLine(cells, L, nm, qty, price, sum) {
+    if (!(qty > 0 && price > 0 && sum > 0)) return false;
+    var unit = txt(cells[L.unit]).trim();
+    if (!unit || money(cells[L.unit]) || unit.indexOf('%') >= 0 || SUMMARY_LINE.test(up(nm))) return false;
+    return Math.abs(qty * price - sum) <= Math.max(1, sum * 0.002);
+  }
 
   /**
    * The header row at r and the six meaningful columns, or null.
@@ -417,7 +431,8 @@
       // estimate all the same — numbered or not — read with the quantity 0, so that nothing on the sheet goes unseen
       else if (qty == null && !sum && price != null && nm && LETTER.test(nm) && haulBand(band) && TKM.test(up(txt(cells[L.unit])))) { kind = 'item'; qty = 0; items++; }
       else if (L.need && nm && LETTER.test(nm) && qty != null && !money(cells[L.unit]) && (S.num(noCell && noCell.v) != null || NUMBERED.test(noTxt) || price != null)) { kind = 'item'; items++; }
-      else if (!L.need && nm && LETTER.test(nm) && qty != null && (!L.code || S.num(noCell && noCell.v) != null)) { kind = 'item'; items++; }
+      else if (!L.need && nm && LETTER.test(nm) && qty != null &&
+        (!L.code || S.num(noCell && noCell.v) != null || (!noTxt && pricedLine(cells, L, nm, qty, price, sum)))) { kind = 'item'; items++; }
       // «ПЕРЕВОЗКА» written in the name column (form 4А, or a sheet without bands in the № column): a band with no number on
       // it — the lines under it are haulage
       // (a title alone on its row: a money line «ТРАНСПОРТНЫЕ РАСХОДЫ 5 % | СУМ | …» is a line, whatever its sum)

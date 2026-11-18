@@ -141,8 +141,8 @@
         <label class="count">Было</label>
         <select id="cmpOld" title="Первая версия: проект с вашими рыночными ценами (то, что мы отправили) или файл"></select>
         <input type="file" id="cmpOldFile" accept=".xlsx,.xlsm,.xls" hidden>
-        <button class="btn sm" id="cmpReplyBtn" title="Таблица, которую мы отправили (наш экспорт или PDF, переведённый в Excel): её цены ставятся в проект и считаются замечаниями">Наш ответ (Excel)</button>
-        <input type="file" id="cmpReplyFile" accept=".xlsx,.xlsm" hidden>
+        <button class="btn sm" id="cmpReplyBtn" title="Таблица, которую мы отправили (наш экспорт в Excel или PDF): её цены ставятся в проект и считаются замечаниями">Наш ответ (Excel/PDF)</button>
+        <input type="file" id="cmpReplyFile" accept=".xlsx,.xlsm,.pdf" hidden>
         <button class="btn sm" id="cmpNewBtn" title="Смета, которую отправитель прислал после исправления. Если в заявке несколько смет — выберите все исправленные файлы сразу: каждый сравнится со своей сметой">Загрузить исправленную смету</button>
         <input type="file" id="cmpNewFile" accept=".xlsx,.xlsm,.xls" multiple hidden>
         <span class="count where" id="cmpNewName"></span>
@@ -218,7 +218,7 @@
 </div></div>
 <div id="busy" class="busy"><div class="spin"></div><span id="busyText">Обработка…</span></div>
 
-<input type="file" id="bookInput" accept=".json,.xlsx" hidden>
+<input type="file" id="bookInput" accept=".json,.xlsx,.pdf" hidden>
 
 <script>window.__WORKER_SRC__ = /*__WORKER__*/;</script>
 <script>window.__REFS_WORKER_SRC__ = /*__REFS_WORKER__*/;</script>

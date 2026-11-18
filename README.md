@@ -164,9 +164,10 @@ fayllar kompyuterdan chiqmaydi.
      (5% → 7%); bo'limning «ИТОГО» si o'z qatorlari yig'indisiga teng emas,
      va bu farq faqat qaytgan versiyada paydo bo'lgan (raqam qo'lda yozilgan).
      Ikkala versiyada bir xil turgan eski farq belgilanmaydi.
-   * **«Наш ответ (Excel)»** (v2.8.0) — biz yuborgan jadval fayl sifatida: dasturning
-     o'z eksporti (321.xlsx dagi «TAQQOSLASH JADVALI №2» varag'i) yoki eski PDF javobdan
-     yasalgan Excel (ustunlari `№ · Наименование · Ед. изм. · Цена по смете · Рыночная
+   * **«Наш ответ (Excel/PDF)»** (v2.8.0; PDF — v2.16.13) — biz yuborgan jadval fayl sifatida: dasturning
+     o'z eksporti (321.xlsx dagi «TAQQOSLASH JADVALI №2» varag'i), uning PDF ga chop etilgani
+     (Excel'dan yoki «Microsoft: Print To PDF»; jadval chiziqlari bo'yicha o'qiladi, skan emas) yoki
+     eski PDF javobdan yasalgan Excel (ustunlari `№ · Наименование · Ед. изм. · Цена по смете · Рыночная
      цена · Примечание`; o'zbekcha sarlavhalar ham tanib olinadi). Har bir qator smetadagi
      resursga nom + birlik + smeta narxi bo'yicha (narx so'mgacha yaxlitlangan bo'lsa ham)
      topiladi; nomi boshqacha bo'lingan bo'lsa — bo'sh joy va tinish belgilarisiz, bo'lmasa
@@ -340,7 +341,8 @@ src/
     assemble.js       Лист1 ni yig'ish + resurslar ro'yxati + jamilar formulalari
     report.js         TAQQOSLASH JADVALI №2 (uch rejim) + Mundarija
     export.js         uslublar va tayyor kitob
-    compare.js, reply.js   «Сравнение версий», «Наш ответ (Excel)»
+    compare.js, reply.js   «Сравнение версий», «Наш ответ (Excel/PDF)»
+    pdf-read.js       PDF dagi jadvalni kitob shaklida o'qish (javobimiz PDF da)
     volumes.js        5-shakl vedomost ishlari, javobning «объем» varag'i, Сопоставительная таблица №1
     ml/layout.js      smeta fayli «qanday ko'rinadi» — nom va narxsiz format namunasi, imzo, arifmetika, xesh
     registry-parse.js      arizalar reyestrini o'qish
@@ -677,7 +679,7 @@ viloyatdagi oldingi loyihalar narxlari ko'rinadi: avval shu kontragent
 beradi — belgilanganlari bitta «Применить выбранные» bilan qo'yiladi (qo'lda
 yozilgan narxga tegmaydi, «Отменить» bilan qaytadi). Har
 eksport `exports` da saqlanadi, ariza kartochkasidan yuklab olinadi va
-«Наш ответ (Excel)» da birinchi bo'lib taklif qilinadi. Tugallangan arizani
+«Наш ответ (Excel/PDF)» da birinchi bo'lib taklif qilinadi. Tugallangan arizani
 «Вернуть в работу» qaytaradi; ro'yxatdagi «Сравнить версию» qaytgan smetani
 to'g'ri solishtirishga olib boradi. Arizaning viloyatini admin sahifasida
 o'zgartirish mumkin — narx tuzatishlari ham birga ko'chadi.

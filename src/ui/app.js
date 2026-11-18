@@ -451,8 +451,14 @@
 
   App.prototype.addFiles = function (files) {
     var self = this;
+    // a PDF dropped here is, as a rule, our reply: said where it goes
+    var pdfs = files.filter(function (f) { return /\.pdf$/i.test(f.name); });
     files = files.filter(function (f) { return /\.xlsx?$|\.xlsm$/i.test(f.name); });
-    if (!files.length) { this.toast('Принимаются только файлы Excel: .xlsx, .xlsm, .xls', true); return; }
+    if (pdfs.length) {
+      this.toast(pdfs.map(function (f) { return f.name; }).join(', ') + ': это PDF — смета читается только из Excel. ' +
+        'Наш ответ в PDF загружается кнопкой «Наш ответ (Excel/PDF)» на вкладке «Сравнение версий».', true);
+    }
+    if (!files.length) { if (!pdfs.length) this.toast('Принимаются только файлы Excel: .xlsx, .xlsm, .xls', true); return; }
     this.busy(true, 'Чтение файлов: ' + files.length + '…');
     // Files finish parsing in whatever order the worker gets to them, so each
     // one keeps the slot it was picked in; the projects are appended in that
@@ -1269,7 +1275,7 @@
       // price, matched the way «Сравнение версий» matches it, over any price set before
       if (!isJson && S.reply && self.projects.length) {
         try {
-          var rp = S.reply.parse(S.readXlsx(new Uint8Array(reader.result)));
+          var rp = S.reply.parse(S.readTable(new Uint8Array(reader.result)));
           if (rp.entries.length && rp.cols.price) {
             var all = [];
             self.projects.forEach(function (p) { all = all.concat(p.objects); });
@@ -1334,9 +1340,9 @@
     if (isJson) reader.readAsText(file); else reader.readAsArrayBuffer(file);
   };
 
-  /** Accept a plain price list as a spreadsheet too: name / unit / price columns. */
+  /** Accept a plain price list as a spreadsheet (or one printed to PDF) too: name / unit / price columns. */
   function bookFromXlsx(bytes) {
-    var wb = S.readXlsx(bytes);
+    var wb = S.readTable(bytes);
     for (var s = 0; s < wb.sheets.length; s++) {
       var rows = wb.sheets[s].rows;
       var hdr = -1, cName = 0, cUnit = 0, cPrice = 0;

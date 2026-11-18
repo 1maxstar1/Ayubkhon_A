@@ -119,6 +119,26 @@
     return Math.abs(qty * price - sum) <= Math.max(1, sum * 0.002);
   }
 
+  /** The band of what the customer gets back: «ВОЗВРАТ МАТЕРИАЛОВ ЗАКАЗЧИКА». */
+  var RETURN_BAND = /^ВОЗВРАТ/;
+
+  /**
+   * The row that numbers the columns of the table («1 | 2 | 3 | 4 | 5 | 6»): the cells of the layout's columns that are
+   * filled hold whole numbers one more each than the one before, at least four of them.
+   */
+  function countsColumns(cells, L) {
+    var cols = [L.no, L.name, L.unit, L.qty, L.price, L.sum].filter(function (c) { return c; });
+    var seen = 0, prev = null;
+    for (var i = 0; i < cols.length; i++) {
+      var cell = cells[cols[i]];
+      if (!cell || cell.v == null || String(cell.v).trim() === '') continue;
+      var v = S.num(cell.v);
+      if (v == null || v !== Math.round(v) || (prev != null && v !== prev + 1)) return false;
+      prev = v; seen++;
+    }
+    return seen >= 4;
+  }
+
   /**
    * A share of a cost: «Перевозка материалов 5 % от стоимости» priced 0,05 — its «quantity» is the cost it is a share
    * of. A money line, whatever unit stands beside it: estimators copy the «тн/км» of the haulage lines above it, and it
@@ -461,6 +481,9 @@
 
       if (r === L.headerRow || r === L.subRow) kind = 'header';
       else if (r === L.numRow) kind = 'numbering';
+      // the row that numbers the columns («1 2 3 4 5 6») on a sheet read by its shape: part of the header, not a line
+      // (it went into the document as one, «2 | 3 | 4 | 5 | 6»)
+      else if (!L.numRow && countsColumns(cells, L)) kind = 'numbering';
       else if (isTotal(noTxt) || isTotal(nm)) kind = 'total';
       else if (noTxt && isSection(noTxt) && qty == null) { kind = 'section'; section = sectionOf(noTxt); sections++; }
       // Form 4А writes its bands in the name column, and its resources are the
@@ -479,6 +502,13 @@
           nextNo(r).indexOf(noTxt.trim() + '.') !== 0)) { kind = 'extra'; work = noTxt.trim(); }
       // a share of a cost (see shareLine): a money line, numbered or not, whatever its unit
       else if (nm && qty != null && shareLine(nm, price)) kind = 'extra';
+      // a line in money with no price of its own («ТРАНСПОРТНЫЕ РАСХОДЫ | СУМ | 5 | | 31 995 849» — 5 % of the
+      // materials above it): a money line; a resource has a price for its unit. On a sheet read by its shape it was
+      // taken for a resource with no price (2026-11-18)
+      else if (nm && qty != null && price == null && MONEY.test(up(txt(cells[L.unit])))) kind = 'extra';
+      // what the customer gets back («ВОЗВРАТ МАТЕРИАЛОВ ЗАКАЗЧИКА»: the used pipes taken out): bought by nobody, priced
+      // by nobody — no resource of the estimate
+      else if (nm && RETURN_BAND.test(up(band))) kind = 'extra';
       // a т·км line under a haulage band with its price but its quantity left empty (and so its sum 0): a line of the
       // estimate all the same — numbered or not — read with the quantity 0, so that nothing on the sheet goes unseen
       else if (qty == null && !sum && price != null && nm && LETTER.test(nm) && haulBand(band) && TKM.test(up(txt(cells[L.unit])))) { kind = 'item'; qty = 0; items++; }
@@ -818,7 +848,7 @@
       var q = {}, value = {};
       (o.rows || []).forEach(function (r) {
         if (r.kind !== 'item') return;
-        var k = S.nameKey(r.nm || '') + '␟' + S.unitKey(r.unit || '') + '␟' + r3(r.price);
+        var k = S.nameKey(r.nm || '') + '\u241f' + S.unitKey(r.unit || '') + '\u241f' + r3(r.price);
         q[k] = (q[k] || 0) + (r.qty || 0);
         value[k] = (value[k] || 0) + Math.abs(r.sum || 0);
       });
@@ -829,14 +859,31 @@
       if (me.keys.length < 10) return;
       var others = [];
       bags.forEach(function (b, j) { if (j !== i && b.keys.length) others.push(j); });
-      if (others.length < 2 || others.length > 16) return;
+      if (others.length < 2) return;
       var total = me.keys.reduce(function (t, k) { return t + me.value[k]; }, 0);
-      // a set of the others whose lines add up to these: tried by the sum of what each holds of these resources first
-      // (every subset of at most 16 objects), then line by line
+      var adds = function (set) {
+        var lines = 0, value = 0;
+        me.keys.forEach(function (k) {
+          var e = set.reduce(function (t, j) { return t + (bags[j].q[k] || 0); }, 0);
+          if (near(me.q[k], e)) { lines++; value += me.value[k]; }
+        });
+        return lines >= 0.9 * me.keys.length && value >= 0.9 * total;
+      };
+      // the sets a summary is made of, as books have them: every other object, or every other object whose resources
+      // are all among these (a summary of some of the objects) — a few lines the estimator changed on the summary alone
+      // do not stand in the way
+      var inside = others.filter(function (j) { return bags[j].keys.every(function (k) { return k in me.q; }); });
+      var tried0 = [others, inside.length >= 2 && inside.length < others.length ? inside : null];
+      for (var t0 = 0; t0 < tried0.length; t0++) {
+        if (tried0[t0] && adds(tried0[t0])) { out.push({ i: i, of: tried0[t0] }); return; }
+      }
+      // else any set of the others whose lines add up to these: tried by the sum of what each holds of these resources
+      // first (every subset of at most 16 objects), then line by line
       var held = others.map(function (j) {
         return me.keys.reduce(function (t, k) { return t + (bags[j].q[k] || 0) * (me.q[k] ? me.value[k] / me.q[k] : 0); }, 0);
       });
       var want = me.keys.reduce(function (t, k) { return t + (me.q[k] ? me.value[k] : 0); }, 0);
+      if (others.length > 16) return;
       var n = others.length, sums = [0], tried = 0;
       for (var mask = 1; mask < (1 << n) && tried < 64; mask++) {
         var low = mask & -mask, bit = 0;
@@ -845,12 +892,7 @@
         if (low === mask || !near(sums[mask], want)) continue;
         tried++;
         var set = others.filter(function (j, b) { return mask & (1 << b); });
-        var lines = 0, value = 0;
-        me.keys.forEach(function (k) {
-          var e = set.reduce(function (t, j) { return t + (bags[j].q[k] || 0); }, 0);
-          if (near(me.q[k], e)) { lines++; value += me.value[k]; }
-        });
-        if (lines >= 0.9 * me.keys.length && value >= 0.9 * total) { out.push({ i: i, of: set }); return; }
+        if (adds(set)) { out.push({ i: i, of: set }); return; }
       }
     });
     return out;

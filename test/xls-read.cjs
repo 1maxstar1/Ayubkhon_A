@@ -69,6 +69,20 @@ const asXlsx = S.smeta.parseWorkbook(S.readXlsx(new Uint8Array(X.write((() => {
 check(JSON.stringify(asXlsx.map((o) => o.rows.map((r) => [r.kind, r.nm, r.qty, r.price, r.sum]))) === JSON.stringify(objs.map((o) => o.rows.map((r) => [r.kind, r.nm, r.qty, r.price, r.sum]))),
   'and gives what the same book saved as .xlsx gives');
 
+// an .xls that holds, by chance, the four bytes that end a zip archive («PK\x05\x06», here the low bytes of a number):
+// told by its first bytes and read as the old book it is — taken for an archive it was refused with «нет описания
+// книги» (2026-11-18)
+{
+  const odd = Buffer.from([0x50, 0x4B, 0x05, 0x06, 0x00, 0x00, 0xF0, 0x3F]).readDoubleLE(0);
+  const stray = xls([{ name: 'Лист1', rows: [['TEST', odd], ['ЩЕБЕНЬ ТЕСТОВЫЙ', 'М3', 4]] }]);
+  let k = -1;
+  for (let i = 0; i + 3 < stray.length; i++) if (stray[i] === 0x50 && stray[i + 1] === 0x4B && stray[i + 2] === 5 && stray[i + 3] === 6) k = i;
+  let got = null, err = '';
+  try { got = S.readXlsx(stray); } catch (e) { err = e.message; }
+  check(k > 0 && got && got.sheets[0].rows[2][1].v === 'ЩЕБЕНЬ ТЕСТОВЫЙ',
+    'an .xls with the end-of-zip bytes inside it is read as the old book it is (' + (k > 0 ? 'bytes at ' + k : 'bytes not written') + (err ? ': ' + err : '') + ')');
+}
+
 // without SheetJS (the page itself, a browser without workers) the old advice stands
 const bare = load(load.PIPELINE);
 let msg = '';

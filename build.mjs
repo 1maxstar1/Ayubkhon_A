@@ -36,6 +36,7 @@ const SCRIPTS = [
   'src/lib/export.js',
   'src/lib/compare.js',
   'src/lib/reply.js',
+  'src/lib/pdf-read.js',      // «Наш ответ» printed to PDF, read back as a book
   'src/lib/volumes.js',
   'src/ui/grid.js',
   'src/ui/prices.js',

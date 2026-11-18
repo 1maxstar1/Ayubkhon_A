@@ -327,7 +327,8 @@
             "application/vnd.ms-excel.sheet.macroenabled.12",
             "application/vnd.ms-excel",
             "application/zip",
-            "application/octet-stream"
+            "application/octet-stream",
+            "application/pdf"
           ],
           "protected": true
         },

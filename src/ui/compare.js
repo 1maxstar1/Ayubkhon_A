@@ -26,7 +26,7 @@
   function chose(slot, file) { document.dispatchEvent(new CustomEvent('cmp:file', { detail: { slot: slot, file: file || null } })); }
   function option(sel, v) { return !!v && Array.prototype.some.call(sel.options, function (o) { return o.value === v; }); }
 
-  /** «Наш ответ (Excel)»: the file chooser — the page without a server has nothing else to offer. */
+  /** «Наш ответ (Excel/PDF)»: the file chooser — the page without a server has nothing else to offer. */
   Compare.prototype.pickReply = function () { $('cmpReplyFile').click(); };
 
   /** The workspace slot of the i-th corrected file: «new», «new1», «new2» … (the version before knew only «new»). */
@@ -272,9 +272,10 @@
   };
 
   /**
-   * «Наш ответ»: the table we sent, as a spreadsheet (our export, or an older PDF reply turned
-   * into Excel). Its prices go onto the «Было» project — over whatever was typed or auto-applied:
-   * the reply is what was actually sent — and its lines become what the comparison judges.
+   * «Наш ответ»: the table we sent — our export as a spreadsheet, or the same table printed to PDF
+   * (S.readPdf reads it into the shape of a book). Its prices go onto the «Было» project — over
+   * whatever was typed or auto-applied: the reply is what was actually sent — and its lines become
+   * what the comparison judges.
    */
   Compare.prototype.loadReply = function (file, back) {
     var self = this, app = this.app, gen = this.gen;
@@ -295,7 +296,7 @@
     reader.onload = function () {
       if (gen !== self.gen) return;
       var parsed, wb;
-      try { wb = S.readXlsx(new Uint8Array(reader.result)); parsed = S.reply.parse(wb); }
+      try { wb = S.readTable(new Uint8Array(reader.result)); parsed = S.reply.parse(wb); }
       catch (e) { app.toast(file.name + ': ' + (e.message || e), true); end(); return; }
       // the «объем» sheet beside the prices: the volumes go onto the works of the projects in (src/ui/volumes.js) —
       // not when the first version is an outside file: the reply is then about that file

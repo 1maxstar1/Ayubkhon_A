@@ -69,7 +69,10 @@ check(moved.length === 1 && moved[0].items === 3, 'a sheet with its bands in the
 check(moved.length === 1 && JSON.stringify(items(moved[0])) === JSON.stringify(items(withHead[0])), '… the same three resources');
 check(moved.length === 1 && !moved[0].layout.guessed && moved[0].layout.name === 2 && moved[0].layout.qty === 4 &&
   moved[0].layout.price === 5 && moved[0].layout.sum === 6, '… in the columns the header names');
-check(moved.length === 1 && !moved[0].rows.some((r) => r.kind === 'header' || r.kind === 'numbering') && moved[0].rows[0].nm === '2',
+// (its «1 2 3 4 5 6» line is the table's numbering row, as on the same sheet read by its shape — section 34 — and as
+// in the document: blue, the market columns numbered «5 6»; until 2026-11-18 it was a line of the estimate)
+check(moved.length === 1 && !moved[0].rows.some((r) => r.kind === 'header') && moved[0].rows[0].nm === '2' &&
+  moved[0].rows[0].kind === 'numbering' && withHead[0].rows[0].kind === 'numbering',
   '… and laid out like every other ordinary sheet: the table starts at its «1 2 3 4 5 6» line, no header row in it');
 check(moved.length === 1 && moved[0].title === 'ТЕСТОВАЯ СТРОЙКА' && moved[0].subtitle === 'ТЕСТОВАЯ УЛИЦА', '… under the same two title lines');
 
@@ -899,6 +902,50 @@ const e33o = S.smeta.parseWorkbook({ sheets: [e33sheet('1', e33a), e33sheet('2',
 check(e33o.length === 4 && e33own.length === 0, '… four objects with the same resources and quantities of their own are all read (' + e33o.length + ')');
 const e33two = one({ sheets: [e33sheet('1', e33a), e33sheet('Ресурс', e33a)] });
 check(e33two.length === 2, '… and a book of two sheets is read as it was: a summary of one object is no summary (' + e33two.length + ')');
+
+/* 34 — a sheet read by its shape (no header found): the row that numbers its columns («1 | 2 | 3 | 4 | 5 | 6») is part of
+        the header — it went into the document as a line «2 | 3 | 4 | 5 | 6»; a line in money with a quantity and no price
+        («ТРАНСПОРТНЫЕ РАСХОДЫ | СУМ | 5 | | 6»: a percentage of the materials) is a money line, not a resource with no
+        price; the band of what the customer gets back («ВОЗВРАТ МАТЕРИАЛОВ ЗАКАЗЧИКА») holds no resource of the estimate */
+const f34 = one({ sheets: [sheet('3', [...TOP, HEAD, [1, 2, 3, 4, 5, 6],
+  ['СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'],
+  [1, 'ЩЕБЕНЬ ТЕСТОВЫЙ', 'М3', 4, 17, 68],
+  [2, 'АНКЕР ТЕСТОВЫЙ М8', 'ШТ', 3, 19, 57],
+  [null, 'ТРАНСПОРТНЫЕ РАСХОДЫ', 'СУМ', 5, null, 6],
+  [null, 'ЗАГОТОВИТЕЛЬНО-СКЛАДСКИЕ РАСХОДЫ', 'сўм', 2, null, 3],
+  ['ИТОГО', null, 'СУМ', null, null, 134],
+  ['ВОЗВРАТ МАТЕРИАЛОВ ЗАКАЗЧИКА'],
+  [1, 'ТЕСТОВЫЕ ТРУБЫ СТАЛЬНЫЕ Б/У', 'Т', 2, 300, 600]])] });
+const f34rows = f34.length ? f34[0].rows : [];
+const f34k = (re) => (f34rows.find((r) => re.test(r.nm || '')) || {}).kind;
+check(f34.length === 1 && f34[0].layout.guessed && f34rows.filter((r) => r.kind === 'numbering').length === 1 &&
+  !f34rows.some((r) => r.kind !== 'numbering' && r.nm === '2'),
+  'a sheet read by its shape: the row numbering its columns is the header\'s, not a line «2 | 3 | 4 | 5 | 6»');
+check(f34k(/^ТРАНСПОРТНЫЕ/) === 'extra' && f34k(/^ЗАГОТОВИТЕЛЬНО/) === 'extra',
+  'a line in money with a quantity and no price is a money line (' + f34k(/^ТРАНСПОРТНЫЕ/) + ', ' + f34k(/^ЗАГОТОВИТЕЛЬНО/) + ')');
+check(f34k(/Б\/У/) === 'extra' && items(f34[0]).join('|') === 'ЩЕБЕНЬ ТЕСТОВЫЙ|АНКЕР ТЕСТОВЫЙ М8',
+  'what the customer gets back is no resource; the resources are the two materials (' + items(f34[0]).join(' | ') + ')');
+// a priced line in money stays as it was (section 31 holds the rest), and a resource with no price on its own sheet too
+const f34b = one({ sheets: [sheet('3', [...TOP, HEAD, [1, 2, 3, 4, 5, 6], ['СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'],
+  [1, 'ЩЕБЕНЬ ТЕСТОВЫЙ', 'М3', 4, 17, 68], [2, 'ТЕСТОВЫЙ ПЕСОК', 'М3', 6, null, null], ['ИТОГО', null, 'СУМ', null, null, 68]])] });
+check(f34b.length === 1 && items(f34b[0]).join('|') === 'ЩЕБЕНЬ ТЕСТОВЫЙ|ТЕСТОВЫЙ ПЕСОК',
+  '… while a material with no price written is still a resource (' + (f34b.length ? items(f34b[0]).join(' | ') : '') + ')');
+
+/* 35 — the summary statement of resources («Ресурс») again: an estimator who changed a few of its lines on the summary
+        alone left it a summary all the same (read, it counted every resource twice); and a book of more than sixteen
+        objects, whose summary adds up all of them, is told too */
+const g35 = (n, edit) => {
+  const fns = Array.from({ length: n }, (x, s) => (i) => i + s);
+  const sheets = fns.map((fn, s) => e33sheet(String(s + 1), fn));
+  sheets.push(e33sheet('Ресурс', (i) => fns.reduce((t, fn) => t + fn(i), 0) + (edit && i === 2 ? edit : 0)));
+  const left = [];
+  const objs = S.smeta.parseWorkbook({ sheets }, 'a.xlsx', left);
+  return { objs: objs.length, left: left.map((x) => x.name + ':' + x.of.length) };
+};
+const g35a = g35(3, 1), g35b = g35(18, 0), g35c = g35(18, 2);
+check(g35a.objs === 3 && g35a.left.join() === 'Ресурс:3', 'a summary of three objects with one line changed on it alone is still a summary (' + JSON.stringify(g35a) + ')');
+check(g35b.objs === 18 && g35b.left.join() === 'Ресурс:18', 'a summary of eighteen objects is told (' + JSON.stringify(g35b) + ')');
+check(g35c.objs === 18 && g35c.left.join() === 'Ресурс:18', '… also with a line changed on it (' + JSON.stringify(g35c) + ')');
 
 console.log(fail ? '\nFAILED: ' + fail : '\nall passed');
 process.exit(fail ? 1 : 0);

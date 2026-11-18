@@ -34,8 +34,9 @@ SMETA_KIT=<kit> node test/smeta-corpus.cjs [--record]  # o'quvchi egasi yuborgan
 node test/export-formulas.cjs                         # eksport qayta o'qiladi, formulalari hisoblanadi: ИТОГО = qatorlar yig'indisi (uch turda)
 node test/export-names.cjs                            # varaq nomlari («&», 31 belgi, \ / * ? : [ ], katta-kichik harf) va bitta qo'shimcha ustun yashirin
 node test/xls-read.cjs                                # eski Excel (.xls, 97–2003): worker'dagi SheetJS orqali, .xlsx bilan bir xil o'qiladi
+node test/pdf-read.cjs                                # «Наш ответ» PDF da: jadval chiziqlari bo'yicha kataklarga, Excel bilan bir xil o'qiladi (PDF lar test/pdf-make.cjs da yasaladi)
 node test/worker-parity.cjs                           # sahifadagi worker o'quvchi qaytargan narsani aynan qaytaradi
-node test/compare.cjs; node test/e2e-compare.mjs      # «Сравнение версий» va «Наш ответ (Excel)»: qaytgan smetani birinchisi va jadvalimiz bilan solishtirish
+node test/compare.cjs; node test/e2e-compare.mjs      # «Сравнение версий» va «Наш ответ (Excel/PDF)»: qaytgan smetani birinchisi va jadvalimiz bilan solishtirish
 node test/volumes.cjs; node test/e2e-volumes.mjs      # «Объёмы работ»: 5-shakl ishlari, yangi hajm → resurs miqdori, javobning «объем» varag'i, Таблица №1
 node test/e2e-compare-keep.mjs                        # ... va ish maydonida: yuklangan fayllar qayta yuklashdan keyin qaytadi
 node test/browser.mjs [a.xlsx b.xlsx]                 # haqiqiy brauzerda (bitta-fayl rejim); faylsiz — o'ylab topilgan smetada
@@ -192,7 +193,22 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   qoidalar o'qigan faylga **tegmaydi**: faqat hech narsa o'qilmaganda taklif qiladi, o'qigani arifmetika bilan
   tekshiriladi va «проверьте» deb ko'rsatiladi.
   Eski Excel (.xls) fayllar (v2.16.3) SheetJS bilan o'qiladi (`src/lib/xlsx-read.js` `readOld`; SheetJS faqat fayllarni
-  o'qiydigan worker'da) — natija .xlsx bilan bir xil shaklda; himoya testi (`smeta-corpus`) .xls ni ham o'qiydi. Tashish varag'i («перевозка», `transportSheet`) xatolari
+  o'qiydigan worker'da) — natija .xlsx bilan bir xil shaklda; himoya testi (`smeta-corpus`) .xls ni ham o'qiydi.
+  Fayl turi birinchi baytlaridan aniqlanadi (v2.16.13): «D0 CF 11 E0» — eski kitob, ichida tasodifan zip oxiri baytlari
+  («PK 05 06») bo'lsa ham arxiv deb olinmaydi (5 ta .xls «нет описания книги» deb rad etilardi); «%PDF» — smeta emas, sahifa
+  PDF javob qayerga yuklanishini aytadi. Shakli bo'yicha o'qilgan varaq (v2.16.13, `smeta-header` 34–35): ustunlarni
+  raqamlaydigan qator («1 2 3 4 5 6», kamida to'rtta ketma-ket butun son) — sarlavhaning raqamlash qatori, hujjatda 321.xlsx
+  dagidek moviy, bozor ustunlari «5 6» bilan (avval smeta qatori bo'lib tushardi); pul birligidagi, miqdori bor, narxi yo'q
+  qator («ТРАНСПОРТНЫЕ РАСХОДЫ | СУМ | 5 | | …») — pul qatori, resurs emas; «ВОЗВРАТ …» bandi ostidagi qatorlar (buyurtmachiga
+  qaytariladigan material) — resurs emas. «Ресурс» yig'ma varag'i bir necha qatori faqat unda tuzatilgan bo'lsa ham (qatorlar
+  va summaning 90 % i obyektlar yig'indisiga teng), 16 tadan ko'p obyektli kitobda ham aniqlanadi.
+  **«Наш ответ» PDF da** (v2.16.13, `src/lib/pdf-read.js`, `S.readPdf`/`S.readTable`): jadval Excel'dan yoki «Microsoft: Print
+  To PDF» bilan chop etilgan PDF dan o'qiladi — har bir harf sahifadagi o'rniga qo'yiladi, qatorlar va ustunlar jadvalning o'z
+  chiziqlaridan (ingichka to'rtburchak yoki chiziq), birlashtirilgan katak matni yuqori-chap katakda, katak ichida defisdan
+  keyin bo'lingan so'z («ПМ-» / «100А») qayta qo'shiladi. Natija `S.readXlsx` bilan bir xil shaklda, shuning uchun
+  `reply.parse` o'zgarmagan; «Сравнение версий» («Наш ответ (Excel/PDF)») va «Книга цен» ikkalasi o'qiydi; server ish
+  maydoni PDF ni ham saqlaydi (`pb_schema.json` workspaces.files: `application/pdf`). Skan (rasm), parolli PDF va belgilar
+  jadvali yo'q shrift — aniq xabar bilan rad etiladi; rasmdan matn taxmin qilinmaydi. Testlar faqat test o'zi yasagan PDF da. Tashish varag'i («перевозка», `transportSheet`) xatolari
   (`haulChecks`): tonnadagi material uchun solishtirma og'irlik 1 emas; «ВСЕГО» qatorlar yig'indisiga teng emas (qator
   tushib qolgan) — sahifa ogohlantiradi, smetaning o'zi o'zgartirilmaydi. Ikki qavatli «Сметная стоимость» sarlavhasi
   («в базисном» — «--», «в текущем» — «на ед. / общая» bir qator pastda) joriy narxdan o'qiladi; kod ustunidagi «ИТОГО …»

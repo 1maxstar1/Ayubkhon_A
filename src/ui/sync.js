@@ -87,7 +87,7 @@
     saveRetry: SAVE_RETRY_MS,
 
     init: function () {
-      // «Наш ответ (Excel)» (F3): the exports this application keeps on the server are offered first, the disk after
+      // «Наш ответ (Excel/PDF)» (F3): the exports this application keeps on the server are offered first, the disk after
       if (S.Compare && S.Compare.prototype.pickReply) {
         var pickDisk = S.Compare.prototype.pickReply;
         S.Compare.prototype.pickReply = function (btn) {

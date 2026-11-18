@@ -240,6 +240,20 @@
 
   function read(bytes) {
     var MB = 1024 * 1024, all = 0, tooBig = '', zipped;
+    // «D0 CF 11 E0» opens an OLE compound file: an Excel 97–2003 book, or an .xlsx Excel has put a password on. Told
+    // by those first bytes before anything else: such a file can hold the four bytes that end a zip archive by
+    // chance, and taken for an archive it was refused as «нет описания книги» (2026-11-18)
+    if (bytes && bytes[0] === 0xD0 && bytes[1] === 0xCF && bytes[2] === 0x11 && bytes[3] === 0xE0) {
+      var old = readOld(bytes);
+      if (old) return old;
+      throw new Error('Это книга Excel старого формата (.xls) или защищённая паролем. Откройте её в Excel и ' +
+        'сохраните как «Книга Excel (.xlsx)» без пароля.');
+    }
+    // a PDF given where a book is read (a smeta, «Было», «Стало»): said so — only our reply is read from a PDF
+    if (bytes && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
+      throw new Error('Это PDF, а не книга Excel. Смета читается только из Excel; наш ответ в PDF загружается ' +
+        'кнопкой «Наш ответ (Excel/PDF)» на вкладке «Сравнение версий».');
+    }
     try {
       zipped = fflate.unzipSync(bytes, {
         filter: function (f) {
@@ -252,13 +266,6 @@
         }
       });
     } catch (e) {
-      // «D0 CF 11 E0» opens an OLE compound file: an Excel 97–2003 book, or an .xlsx Excel has put a password on
-      if (bytes && bytes[0] === 0xD0 && bytes[1] === 0xCF && bytes[2] === 0x11 && bytes[3] === 0xE0) {
-        var old = readOld(bytes);
-        if (old) return old;
-        throw new Error('Это книга Excel старого формата (.xls) или защищённая паролем. Откройте её в Excel и ' +
-          'сохраните как «Книга Excel (.xlsx)» без пароля.');
-      }
       throw new Error('Файл повреждён или это не книга Excel: архив не открывается.' + AGAIN);
     }
     // part names inside a package are not case-sensitive

@@ -29,6 +29,9 @@ writeFileSync(f1, xlsx(S, book(1)));
 writeFileSync(f2, xlsx(S, book(2)));
 const f3 = join(dir, 'Наш_ответ.xlsx');
 writeFileSync(f3, xlsx(S, replyBook()));
+// the same reply printed to PDF (test/pdf-make.cjs: as «Microsoft: Print To PDF» prints it)
+const fPdf = join(dir, 'Наш_ответ.pdf');
+writeFileSync(fPdf, require('./pdf-make.cjs').bookPdf(replyBook(), { perPage: 4 }));
 
 const browser = await chromium.launch(launchOpts);
 const page = await browser.newPage({ viewport: { width: 1500, height: 950 }, acceptDownloads: true });
@@ -215,6 +218,46 @@ try {
     () => check(false, '«Книга цен» reads the reply by smeta price too'));
   const m5book = await page.evaluate(() => app.model.resources.filter((x) => x.name === 'ТЕСТОВЫЙ АНКЕР М5').map((x) => x.price + '→' + x.market).join(' '));
   check(m5book === '17→15', 'only the line of the smeta price the reply names is priced (' + m5book + ')');
+
+  // «Наш ответ (Excel/PDF)» given the PDF: the same prices on the project, the same remarks
+  await page.goto('file://' + join(root, 'dist/smeta-taqqoslash.html'));
+  await page.setInputFiles('#pick', f1);
+  await page.waitForFunction(() => window.app && app.model && app.model.rows.length > 0, null, { timeout: 30 * 1000 });
+  await page.click('.tab[data-pane="compare"]');
+  check(/\.pdf/.test(await page.getAttribute('#cmpReplyFile', 'accept')) && /PDF/.test(await page.textContent('#cmpReplyBtn')),
+    'the reply button takes a PDF and says so');
+  await page.setInputFiles('#cmpReplyFile', fPdf);
+  await page.waitForFunction(() => app.compare_ui.reply, null, { timeout: 30 * 1000 }).catch(() => {});
+  const pdfPriced = await page.evaluate(() => {
+    const r = app.model.resources.find((x) => x.name === 'ТЕСТОВЫЙ АНКЕР М8');
+    return r && r.market;
+  });
+  const pdfDone = await page.textContent('#cmpReplyDone').catch(() => '');
+  check(pdfPriced === 16 && /Наш ответ применён/.test(pdfDone) && /Наш_ответ\.pdf/.test(pdfDone) && /строк 7, найдено в смете 6/.test(pdfDone),
+    'the reply as a PDF puts the same prices on the project and says what landed (' + pdfPriced + ' · ' + pdfDone.slice(0, 120) + ')');
+  await page.setInputFiles('#cmpNewFile', f2);
+  await page.waitForFunction(() => app.compare_ui.res, null, { timeout: 30 * 1000 });
+  check(/замечания из файла «Наш_ответ\.pdf»: 6 \(строк в файле 7\)/.test(await page.textContent('.cmp-files')),
+    'the corrected smeta is judged against the PDF reply: 6 remarks of 7 lines');
+  // … and through «Книга цен»
+  await page.goto('file://' + join(root, 'dist/smeta-taqqoslash.html'));
+  await page.setInputFiles('#pick', f1);
+  await page.waitForFunction(() => window.app && app.model && app.model.rows.length > 0, null, { timeout: 30 * 1000 });
+  await page.setInputFiles('#bookInput', fPdf);
+  await page.waitForFunction(() => {
+    const r = app.model.resources.find((x) => x.name === 'ТЕСТОВЫЙ АНКЕР М8');
+    return r && r.market === 16;
+  }, null, { timeout: 30 * 1000 }).then(() => check(true, '«Книга цен» reads the PDF reply too'),
+    () => check(false, '«Книга цен» reads the PDF reply too'));
+  // a PDF given as a smeta: said what it is and where it goes, and it does not become a project
+  {
+    await page.goto('file://' + join(root, 'dist/smeta-taqqoslash.html'));
+    await page.setInputFiles('#pick', fPdf);
+    await page.waitForFunction(() => /это PDF.*Наш ответ \(Excel\/PDF\)/.test(document.getElementById('toast').textContent), null, { timeout: 30 * 1000 })
+      .then(() => check(true, 'a PDF given as a smeta is said to be a PDF, with where the PDF reply goes'),
+        async () => check(false, 'a PDF given as a smeta is said to be a PDF (' + await page.textContent('#toast') + ')'));
+    check(await page.evaluate(() => app.projects.length) === 0, 'the PDF does not become a project');
+  }
 
   // the tab open before the project is there (a reload on «Сравнение версий»: the workspace brings its
   // projects back after the tab is shown) — «Было» must follow, and the returned file must still compare

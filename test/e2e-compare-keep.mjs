@@ -24,6 +24,8 @@ const f1 = join(dir, 'Тест_v1.xlsx'), f2 = join(dir, 'Тест_v2.xlsx'), f3
 writeFileSync(f1, xlsx(S, book(1)));
 writeFileSync(f2, xlsx(S, book(2)));
 writeFileSync(f3, xlsx(S, replyBook()));
+const fPdf = join(dir, 'Наш_ответ.pdf');                 // the same reply printed to PDF (test/pdf-make.cjs)
+writeFileSync(fPdf, require('./pdf-make.cjs').bookPdf(replyBook(), { perPage: 4 }));
 const f4 = join(dir, 'Тест_объёмы.xlsx');
 writeFileSync(f4, xlsx(S, bookWithWorks()));
 const f5 = join(dir, 'Тест_объёмы_испр.xlsx');           // the corrected file of f4, unchanged
@@ -34,7 +36,7 @@ const { api, su } = pb;
 let fail = 0;
 const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) fail++; };
 
-const rows = pb.rows().slice(0, 4);
+const rows = pb.rows().slice(0, 5);
 await api('/api/registry/import', { method: 'POST', body: JSON.stringify({ rows }) }, su);
 
 const browser = await chromium.launch(launchOpts);
@@ -319,6 +321,27 @@ try {
   await saved();
   check(await page.evaluate(() => !S.Sync.cmp.new1) && await page.evaluate(() => S.Sync.ws.files.length) === nFiles - 1,
     'choosing one corrected file again removes the second from the server');
+
+  // our reply as a PDF: stored with the application like the spreadsheet (the server takes a PDF among its files), and
+  // back after a reload
+  await page.click('#wsList');
+  await page.waitForSelector('#screen-list:not([hidden])');
+  await openApp(rows[4].number);
+  await page.setInputFiles('#pick', f1);
+  await page.waitForFunction(() => app.model && app.model.rows.length > 0 && S.Sync.ws.files.length === 1 && !S.Sync.loading, null, T);
+  await page.click('.tab[data-pane="compare"]');
+  await page.setInputFiles('#cmpReplyFile', fPdf);
+  await page.waitForFunction(() => app.compare_ui.reply, null, T);
+  await saved();
+  const pdfToast = await page.textContent('#toast');
+  check(await page.evaluate(() => S.Sync.ws.files.length) === 2 && await page.evaluate(() => S.Sync.cmp.reply && S.Sync.cmp.reply.name) === 'Наш_ответ.pdf' &&
+    !/не сохранён/.test(pdfToast), 'the PDF reply is stored on the server with the application (' + pdfToast.slice(0, 100) + ')');
+  await reload();
+  await page.waitForFunction(() => app.compare_ui.reply, null, T);
+  const pdfBack = await page.evaluate(() => ({ name: app.compare_ui.reply.name, n: app.compare_ui.reply.entries.length,
+    m8: app.model.resources.find((x) => x.name === 'ТЕСТОВЫЙ АНКЕР М8').market }));
+  check(pdfBack.name === 'Наш_ответ.pdf' && pdfBack.n === 7 && pdfBack.m8 === 16,
+    'after a reload the PDF reply is back: its 7 lines, its prices on the project (' + JSON.stringify(pdfBack) + ')');
 
   check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' / ') : ''));
 } catch (e) {

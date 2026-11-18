@@ -105,6 +105,9 @@ ORDER.push('volumes');
 // what a smeta file looks like, without what it says (docs/format-reja.md)
 FILE['ml-layout'] = 'src/lib/ml/layout.js';
 ORDER.push('ml-layout');
+// a reply table printed to PDF, read back as a book
+FILE['pdf-read'] = 'src/lib/pdf-read.js';
+ORDER.push('pdf-read');
 const ML = ['ml-features', 'ml-metrics', 'ml-dataset', 'ml-pricedata', 'ml-pricemodel'];
 ORDER.push(...ML);
 

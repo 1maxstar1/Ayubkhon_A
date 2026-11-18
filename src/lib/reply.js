@@ -39,6 +39,8 @@
   // U+2014 (em dash), U+2212 (the minus sign) - with spaces between them. Built from the codes: by eye most of them
   // cannot be told from a hyphen, and typed into the source they would not be seen to be there
   var DASHES = new RegExp('^[-' + String.fromCharCode(0x2010, 0x2011, 0x2013, 0x2014, 0x2212) + ' ]+$');
+  // a name that already says it is haulage (the reader's own prefix, or the estimator's word): see match()
+  var HAUL_NAME = /^(ПЕРЕВОЗК|ДОСТАВК|ТРАНСПОРТИРОВК|ТАШИШ|TASHISH)/;
 
   function text(c) { return c && c.v != null ? String(c.v) : ''; }
   function key(s) { return S.nameKey(s).replace(/[ʻʼ‘’`´]/g, "'"); }
@@ -165,6 +167,13 @@
       var hit = all.filter(function (x) { return x.nk === nk && fits(x); });
       if (!hit.length) {
         hit = all.filter(function (x) { return x.bk === bk && fits(x) && S.numberRelation(x.nm, e.name) !== 'conflict'; });
+      }
+      // a haulage line named as the sheet names it («Асфальт - 11 км»): the reader calls a line under a haulage band
+      // «Перевозка …» (the same name under «Материалы» is the material), and the table, made from the sheet, does not
+      if (!hit.length && !HAUL_NAME.test(nk)) {
+        var hk = S.nameKey('ПЕРЕВОЗКА ' + e.name), hb = bare('ПЕРЕВОЗКА ' + e.name);
+        hit = all.filter(function (x) { return x.nk === hk && fits(x); });
+        if (!hit.length) hit = all.filter(function (x) { return x.bk === hb && fits(x) && S.numberRelation(x.nm, e.name) !== 'conflict'; });
       }
       // a name written differently: the closest one of the same unit, the same numbers and the same smeta price — the
       // table's own column (similarity ≥ 0.9), or its «Цены по ПСД» (≥ 0.8: «… 99 КВТ /135 Л.С/» is 0.83, and no table

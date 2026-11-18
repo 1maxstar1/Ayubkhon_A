@@ -234,6 +234,10 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   turadi (v2.16.12, 29). Tashish varag'ida summa ustuni — o'ngdagi «Всего», undan chapdagi «Сумма …» / «Итого» / «Всего»
   emas; faqat «Общая цена» yonidagi «Всего» (bir birlik narxi) summa emas (28). Masofa ustuni — «… км» yoki yolg'iz «Расст»
   / «расс-т» / «Расст-е»; «Расст-е на перев-у» (temir yo'l masofasi) qayerda tursa ham avtomobil km i emas (30).
+  Narxi nomidagi foizga teng ulush qatori («Перевозка материалов - 5 % от стоимости» | 0,05) — birligi qanday yozilganidan
+  qat'i nazar («тн/км», «тн-км») pul qatori, resurs emas (v2.16.12, `smeta-header` 32). Bir kitobda boshqa obyekt varaqlarini
+  qo'shib chiqadigan ochiq yig'ma varaq («Ресурс»: har qatori bir xil obyektlar to'plamidagi miqdorlar yig'indisi) o'qilmaydi
+  va sahifa aytadi — u bilan resurslar ikki marta sanalardi; o'z miqdorlari bor obyekt hech qachon shunday hisoblanmaydi (33).
   Javob jadvalida «МАШ-ЧАС»/«ЧЕЛ-ЧАС» = «маш.-ч»/«чел.-ч» (`reply.js` `unitOf`, `match.js` ga tegmaydi); «%» qatori resurs
   emas;
   boshqacha yozilgan nom faqat smeta narxi teng bo'lsa topiladi: jadvalning o'z narx ustuni bilan — o'xshashlik ≥ 0,9, faqat
@@ -241,7 +245,8 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   hech biriga qo'yilmaydi, «не найдено» bo'ladi; bitta nomning yaxlitlashda farq qiladigan ikki narxi — bitta resurs, narx
   ikkalasiga tushadi. «ПСД» li sarlavha faqat narx so'zi bilan («Цены по ПСД», «Стоимость по ПСД») yoki yolg'iz («ПСД», «По
   ПСД» — ikki qatorli sarlavhaning pastki qatori) bo'lsa «Цены по ПСД» ustuni: «Наименование … по ПСД» — nom, «Ед.изм. по
-  ПСД» — birlik, «Кол-во по ПСД» — narx emas.
+  ПСД» — birlik, «Кол-во по ПСД» — narx emas. Jadvaldagi tashish qatori varaqdagidek nomlangan bo'lsa («Асфальт - 11 км»),
+  o'quvchi «Перевозка …» deb atagan qatorga bog'lanadi; shu nomli, boshqa birlikdagi material — material (v2.16.12).
   «Наш ответ» da narxsiz, faqat izohli qator («-», «обоснов» yoki bo'sh narx + izoh; izohsiz yolg'iz chiziqcha — «-», «—»
   yoki minus belgisi — ham, agar qatorda birlik bo'lsa) — so'ralgan, narxsiz qator (`market: null`): narx qo'ymaydi,
   «Сравнение версий» uni so'ralgan deb baholaydi; raqamli, lekin son emas

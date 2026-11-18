@@ -858,5 +858,47 @@ check(d31n.join('|') === 'ТЕСТОВЫЙ ИЗОЛЯТОР ПОДВЕСНОЙ|�
   Math.abs(d31i.reduce((t, r) => t + r.sum, 0) - 428.5) < 1e-6,
   '… while the lines added by hand in a unit that is not money are read, and the materials add up to their «ИТОГО» (428,5)');
 
+/* 32 — a share of a cost under the haulage band: «Перевозка материалов - 5 % от стоимости» priced 0,05, its «quantity» the
+        cost it is a share of, with the «тн/км» of the lines above it typed beside it: a money line, not a resource of
+        0,05 a т·км (it was offered a market price); a material named with a percentage keeps its own price */
+const e32 = (unit) => one({ sheets: [sheet('3', [...TOP, HEAD, [1, 2, 3, 4, 5, 6],
+  ['СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'],
+  [1, 'ТЕСТОВЫЙ ЩЕБЕНЬ', 'М3', 20, 150, 3000],
+  [2, 'ТЕСТОВЫЙ РАСТВОР 5 %', 'М3', 2, 400, 800],
+  ['ИТОГО ПО МАТЕРИАЛАМ', null, 'СУМ', null, null, 3800],
+  ['ПЕРЕВОЗКА СТРОИТЕЛЬНЫХ МАТЕРИАЛОВ'],
+  [1, 'ТЕСТОВЫЙ ЩЕБЕНЬ - 5 км', 'тн/км', 150, 9, 1350],
+  [2, 'Перевозка материалов - 5 % от стоимости', unit, 800, 0.05, 40],
+  ['ИТОГО ПО ПЕРЕВОЗКЕ', null, 'СУМ', null, null, 1390]])] });
+const e32r = ['тн/км', 'тн-км', 'СУМ'].map((u) => {
+  const o = e32(u), rows = o.length ? o[0].rows : [];
+  return { items: rows.filter((r) => r.kind === 'item').map((r) => r.nm), share: rows.find((r) => /% от стоимости/.test(r.nm || '')) };
+});
+check(e32r.every((x) => x.share && x.share.kind === 'extra' && x.share.sum === 40 && !x.items.some((n) => /от стоимости/.test(n))),
+  'a share of a cost («5 % от стоимости» at 0,05) is a money line whatever its unit — тн/км, тн-км, СУМ (' + e32r.map((x) => x.share && x.share.kind).join(', ') + ')');
+check(e32r[0].items.join('|') === 'ТЕСТОВЫЙ ЩЕБЕНЬ|ТЕСТОВЫЙ РАСТВОР 5 %|Перевозка ТЕСТОВЫЙ ЩЕБЕНЬ - 5 км',
+  '… while a material named with a percentage, priced as a material, is a resource, and so is the haulage line (' + e32r[0].items.join(' | ') + ')');
+
+/* 33 — a book shown with its summary statement of resources («Ресурс»), each line the quantity of a resource summed over
+        some of the object sheets: not read — read with them it counted every resource twice; an object that only shares
+        the resources of the others, with quantities of its own, is read */
+const e33res = Array.from({ length: 12 }, (x, i) => ['ТЕСТОВЫЙ РЕСУРС ' + 'АБВГДЕЖЗИКЛМ'[i], i % 3 ? 'М3' : 'ШТ', 10 + 5 * i]);
+const e33sheet = (name, qty) => {
+  const lines = e33res.map((r, i) => [i + 1, r[0], r[1], qty(i + 1), r[2], qty(i + 1) * r[2]]);
+  return sheet(name, [...TOP, HEAD, [1, 2, 3, 4, 5, 6], ['СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'], ...lines,
+    ['ИТОГО ПО МАТЕРИАЛАМ', null, 'СУМ', null, null, lines.reduce((t, l) => t + l[5], 0)]]);
+};
+const e33a = (i) => i, e33b = (i) => 2 * i + 1, e33c = () => 3, e33d = (i) => 5 * i - 2;
+const e33left = [];
+const e33 = S.smeta.parseWorkbook({ sheets: [e33sheet('1', e33a), e33sheet('2', e33b), e33sheet('3', e33c),
+  e33sheet('Ресурс', (i) => e33a(i) + e33b(i))] }, 'a.xlsx', e33left);
+check(e33.map((o) => o.name).join() === '1,2,3' && JSON.stringify(e33left) === '[{"name":"Ресурс","of":["1","2"]}]',
+  'the summary sheet that adds up sheets 1 and 2 is not read, and said (' + e33.map((o) => o.name).join() + ' ' + JSON.stringify(e33left) + ')');
+const e33own = [];
+const e33o = S.smeta.parseWorkbook({ sheets: [e33sheet('1', e33a), e33sheet('2', e33b), e33sheet('3', e33c), e33sheet('4', e33d)] }, 'a.xlsx', e33own);
+check(e33o.length === 4 && e33own.length === 0, '… four objects with the same resources and quantities of their own are all read (' + e33o.length + ')');
+const e33two = one({ sheets: [e33sheet('1', e33a), e33sheet('Ресурс', e33a)] });
+check(e33two.length === 2, '… and a book of two sheets is read as it was: a summary of one object is no summary (' + e33two.length + ')');
+
 console.log(fail ? '\nFAILED: ' + fail : '\nall passed');
 process.exit(fail ? 1 : 0);

@@ -433,6 +433,23 @@ check(e7tm.prices[k('ТЕСТОВЫЙ ПРОВОД МЕДНЫЙ ГИБКИЙ', '
   Object.keys(e7tm.prices).concat(Object.keys(e7tp.prices)).join('; ') + ' | ambiguous ' + e7tm.ambiguous.length + ', missing ' +
   (e7tm.missing.length + e7tp.missing.length) + ')');
 
+// a haulage line written in the table as the sheet writes it («Асфальт - 11 км»): the reader names a line under a haulage
+// band «Перевозка …», so the name alone did not find it and the line was «не найдено»; a material of the same name in
+// another unit stays the material
+const e8sm = [{ rows: [
+  { kind: 'item', nm: 'Перевозка ТЕСТОВЫЙ АСФАЛЬТ - 11 км', unit: 'тн/км', price: 1337 },
+  { kind: 'item', nm: 'ТЕСТОВЫЙ ЩЕБЕНЬ - 5 км', unit: 'М3', price: 120 },
+  { kind: 'item', nm: 'Перевозка ТЕСТОВЫЙ ЩЕБЕНЬ - 5 км', unit: 'тн/км', price: 1419 }] }];
+const e8m = S.reply.match([
+  { name: 'ТЕСТОВЫЙ АСФАЛЬТ - 11 км', unit: 'тн/км', price: null, psd: 1337, market: 965, note: '' },
+  { name: 'ТЕСТОВЫЙ ЩЕБЕНЬ - 5 км', unit: 'тн/км', price: null, psd: 1419, market: 985, note: '' },
+  { name: 'ТЕСТОВЫЙ ЩЕБЕНЬ - 5 км', unit: 'М3', price: 120, psd: null, market: 100, note: '' }], e8sm);
+check(e8m.missing.length === 0 && e8m.prices[k('Перевозка ТЕСТОВЫЙ АСФАЛЬТ - 11 км', 'тн/км', 1337)] === 965 &&
+  e8m.prices[k('Перевозка ТЕСТОВЫЙ ЩЕБЕНЬ - 5 км', 'тн/км', 1419)] === 985 && e8m.prices[k('ТЕСТОВЫЙ ЩЕБЕНЬ - 5 км', 'М3', 120)] === 100 &&
+  Object.keys(e8m.prices).length === 3,
+  'a haulage line named without «Перевозка» is put on the haulage line; the material of that name stays the material (' +
+  Object.keys(e8m.prices).join('; ') + ' | missing ' + e8m.missing.length + ')');
+
 // our own export of two projects: one report sheet each, both read back
 const proj2 = S.smeta.parseWorkbook(replySmeta(), 'r.xlsx');
 const p2 = Object.assign({}, rm.prices);

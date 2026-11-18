@@ -506,7 +506,9 @@
           var wb = S.readXlsx(new Uint8Array(buf)), works = [];
           // the works of form 5 are an add-on: a sheet they cannot take costs the works, never the estimate
           try { works = S.volumes ? S.volumes.parseWorkbook(wb) : []; } catch (e2) { works = []; }
-          res = { ok: true, objects: S.smeta.parseWorkbook(wb, file.name), works: works, sheetCount: wb.sheets.length };
+          var left = [];
+          res = { ok: true, objects: S.smeta.parseWorkbook(wb, file.name, left), works: works, sheetCount: wb.sheets.length };
+          if (left.length) res.summaries = left;
         } catch (err) {
           res = { ok: false, error: String(err.message || err) };
         }
@@ -571,7 +573,14 @@
         };
         if (entry.file) this.fileRead(entry.file);
       }
-      this.toast(name + ': найдено листов объектов: ' + res.objects.length);
+      // a summary sheet of the book (the statement «Ресурс» shown): not read, and said — nothing on it is lost, every
+      // line of it is the sum of the sheets it names
+      var sums = (res.summaries || []).map(function (s) {
+        return 'лист «' + s.name + '» складывает листы ' + s.of.map(function (n) { return '«' + n + '»'; }).join(', ');
+      });
+      if (sums.length) this.toast(name + ': найдено листов объектов: ' + res.objects.length + '; ' + sums.join('; ') +
+        ' этой же книги — такой сводный лист не читается, чтобы ресурсы не считались дважды.', false, { close: true, ms: 20 * 1000 });
+      else this.toast(name + ': найдено листов объектов: ' + res.objects.length);
     }
     if (this.pending <= 0) {
       var self = this, added = [];

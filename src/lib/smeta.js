@@ -120,6 +120,19 @@
   }
 
   /**
+   * A share of a cost: «Перевозка материалов 5 % от стоимости» priced 0,05 — its «quantity» is the cost it is a share
+   * of. A money line, whatever unit stands beside it: estimators copy the «тн/км» of the haulage lines above it, and it
+   * was read as a resource of 0,05 a т·км, hundreds of millions of them, offered a market price (2026-11-18). Only a
+   * name that says the percentage and a price that is that very share: a material named with a percentage («РАСТВОР
+   * 5 %») has a price of its own.
+   */
+  function shareLine(nm, price) {
+    var m = /(\d+(?:[.,]\d+)?)\s*%/.exec(nm);
+    if (!m || price == null || !(price > 0) || price > 1) return false;
+    return Math.abs(price - parseFloat(m[1].replace(',', '.')) / 100) < 1e-9;
+  }
+
+  /**
    * The header row at r and the six meaningful columns, or null.
    *
    * Two spellings of the header are known. The resource sheets: НАИМЕНОВАНИЕ ·
@@ -464,6 +477,8 @@
       else if (L.unitQty && nm && qty != null && S.num(cells[L.unitQty] && cells[L.unitQty].v) == null &&
         !(work && noTxt.trim().indexOf(work + '.') === 0 && pricedLine(cells, L, nm, qty, price, sum) &&
           nextNo(r).indexOf(noTxt.trim() + '.') !== 0)) { kind = 'extra'; work = noTxt.trim(); }
+      // a share of a cost (see shareLine): a money line, numbered or not, whatever its unit
+      else if (nm && qty != null && shareLine(nm, price)) kind = 'extra';
       // a т·км line under a haulage band with its price but its quantity left empty (and so its sum 0): a line of the
       // estimate all the same — numbered or not — read with the quantity 0, so that nothing on the sheet goes unseen
       else if (qty == null && !sum && price != null && nm && LETTER.test(nm) && haulBand(band) && TKM.test(up(txt(cells[L.unit])))) { kind = 'item'; qty = 0; items++; }
@@ -783,8 +798,69 @@
     return parseSheetObjects(sheet)[0] || null;
   }
 
-  /** Every resource object of a workbook, in file order. */
-  function parseWorkbook(wb, fileName) {
+  /**
+   * The objects of a book that only add up other objects of the same book: the summary statement of resources
+   * («Ресурс», «Сводная ведомость»), each line the quantity of one resource summed over the object sheets (SUMIF over
+   * them). Usually hidden, and a hidden sheet is not read; a book sent back with it shown is the same book, and read
+   * with its objects it counted every resource twice — the comparison of two versions took its every line for a new
+   * one (2026-11-18). Told by the figures alone, no formula needed: an object is such a sum when, for one set of at
+   * least two other objects, nine lines in ten (by count and by sum) carry the quantity of the same resource (name,
+   * unit, price) on those objects added together. An object that merely shares resources with the others — the same
+   * lines, quantities of its own — is no sum of them.
+   *
+   * @returns {Array<{i: number, of: number[]}>}  the sums (index in `objects`) and the objects each adds up
+   */
+  function sumsOfOthers(objects) {
+    var out = [];
+    if (objects.length < 3) return out;
+    var r3 = function (v) { return v == null ? '' : String(Math.round(v * 1000) / 1000); };
+    var bags = objects.map(function (o) {
+      var q = {}, value = {};
+      (o.rows || []).forEach(function (r) {
+        if (r.kind !== 'item') return;
+        var k = S.nameKey(r.nm || '') + '␟' + S.unitKey(r.unit || '') + '␟' + r3(r.price);
+        q[k] = (q[k] || 0) + (r.qty || 0);
+        value[k] = (value[k] || 0) + Math.abs(r.sum || 0);
+      });
+      return { q: q, value: value, keys: Object.keys(q) };
+    });
+    var near = function (a, b) { return Math.abs(a - b) <= Math.max(1e-6, Math.abs(b) * 1e-4); };
+    bags.forEach(function (me, i) {
+      if (me.keys.length < 10) return;
+      var others = [];
+      bags.forEach(function (b, j) { if (j !== i && b.keys.length) others.push(j); });
+      if (others.length < 2 || others.length > 16) return;
+      var total = me.keys.reduce(function (t, k) { return t + me.value[k]; }, 0);
+      // a set of the others whose lines add up to these: tried by the sum of what each holds of these resources first
+      // (every subset of at most 16 objects), then line by line
+      var held = others.map(function (j) {
+        return me.keys.reduce(function (t, k) { return t + (bags[j].q[k] || 0) * (me.q[k] ? me.value[k] / me.q[k] : 0); }, 0);
+      });
+      var want = me.keys.reduce(function (t, k) { return t + (me.q[k] ? me.value[k] : 0); }, 0);
+      var n = others.length, sums = [0], tried = 0;
+      for (var mask = 1; mask < (1 << n) && tried < 64; mask++) {
+        var low = mask & -mask, bit = 0;
+        while ((1 << bit) !== low) bit++;
+        sums[mask] = sums[mask ^ low] + held[bit];
+        if (low === mask || !near(sums[mask], want)) continue;
+        tried++;
+        var set = others.filter(function (j, b) { return mask & (1 << b); });
+        var lines = 0, value = 0;
+        me.keys.forEach(function (k) {
+          var e = set.reduce(function (t, j) { return t + (bags[j].q[k] || 0); }, 0);
+          if (near(me.q[k], e)) { lines++; value += me.value[k]; }
+        });
+        if (lines >= 0.9 * me.keys.length && value >= 0.9 * total) { out.push({ i: i, of: set }); return; }
+      }
+    });
+    return out;
+  }
+
+  /**
+   * Every resource object of a workbook, in file order. A hidden sheet is not read, nor an object that only adds up
+   * others of the book (sumsOfOthers); `left`, when given, is told of each such object: { name, of: [names] }.
+   */
+  function parseWorkbook(wb, fileName, left) {
     var objects = [];
     for (var i = 0; i < wb.sheets.length; i++) {
       var sh = wb.sheets[i];
@@ -795,7 +871,14 @@
         objects.push(list[k]);
       }
     }
-    return objects;
+    var sums = sumsOfOthers(objects);
+    if (!sums.length) return objects;
+    var drop = {};
+    sums.forEach(function (s) {
+      drop[s.i] = 1;
+      if (left) left.push({ name: objects[s.i].name, of: s.of.map(function (j) { return objects[j].name; }) });
+    });
+    return objects.filter(function (o, i) { return !drop[i]; });
   }
 
   S.smeta = {

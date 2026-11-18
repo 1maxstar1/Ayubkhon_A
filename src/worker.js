@@ -24,15 +24,20 @@
       // The objects go back as the parser made them. They used to be copied field by field here, and a field
       // the parser gained later (`equipTitle`) was never added to the copy: the rule that rests on it worked
       // in every test and not in the page. test/worker-parity.cjs holds the two together.
-      var objects = S.smeta.parseWorkbook(wb, msg.name);
+      // `left`: objects that only add up others of the book (the summary statement «Ресурс» shown), not read — said on
+      // the page; posted only when there is one, so that the message is as it was for every other book
+      var left = [];
+      var objects = S.smeta.parseWorkbook(wb, msg.name, left);
       // the works and their volumes (local resource statement of form 5), for «Объёмы работ»: an add-on — a sheet it
       // cannot take costs the works, never the estimate's resources
       var works = [];
       try { works = S.volumes ? S.volumes.parseWorkbook(wb) : []; } catch (e) { works = []; }
-      self.postMessage({
+      var out = {
         ok: true, id: msg.id, name: msg.name, objects: objects, works: works,
         sheetCount: wb.sheets.length, ms: Date.now() - t0
-      });
+      };
+      if (left.length) out.summaries = left;
+      self.postMessage(out);
       // asked for with the reading (`describe`): what the file looks like, from the workbook just read — posted after the
       // result, so the reading never waits for it, and the file is not read again for it. No hash here (the page asks
       // for it apart, off the reading's way): `null` for the bytes.

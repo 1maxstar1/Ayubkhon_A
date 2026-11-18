@@ -556,7 +556,14 @@ oynasida: `C:\Smeta\server\laptop.cmd autostart`. Boshqa buyruqlar ham xuddi shu
 | `laptop.cmd drive` / `drive off` | zaxiralarni Google Drive'ga ham qo'yish / to'xtatish |
 | `laptop.cmd stop` · `uninstall` · `debug` · `doctor` | to'xtatish · o'zi ishga tushmasin · xatoni ko'rish · tashxis |
 
-**Mac'dagi bazani Windows'ga ko'chirish** (bir martalik): avval ikkalasi ham yangilanadi (bir xil versiya). Mac'da
+**Ikki kompyuterdagi ishni birlashtirish** (v2.16.18): ikkalasida ham ish bo'lsa, almashtirish o'rniga **birlashtiring**.
+Avval ikkalasi ham bir xil versiyaga yangilanadi. Birinchi kompyuterda admin sahifasi → «Перенос данных между компьютерами» →
+**«Выгрузить для переноса»** — `perenos-….zip` fayli tushadi. Uni ikkinchi kompyuterga keltirib, o'sha joyda **«Загрузить с
+другого компьютера»**: avval har bir ariza bilan nima bo'lishi ko'rsatiladi (qo'shiladi / almashtiriladi / bu yerdagisi qoladi),
+«Объединить» bosilgach baza zaxiraga olinadi (`before-transfer-….zip`) va arizalar qo'shiladi. Ikkala kompyuterda bor ariza —
+qaysi birida keyinroq o'zgartirilgan bo'lsa o'shaniki qoladi; almashtirilgani zaxirada. Keyin bitta kompyuterda ishlang.
+
+**Mac'dagi bazani Windows'ga ko'chirish** (bir martalik, almashtirib): avval ikkalasi ham yangilanadi (bir xil versiya). Mac'da
 `sh server/laptop.sh backup` — zaxira fayli (`~/Backups/smeta/pb_backup_….zip`) chiqadi, Google Drive ulangan bo'lsa u
 o'zi «Smeta zaxira (Mac)» papkasiga ham tushadi. Faylni Windows'ga keltiring (Drive, fleshka yoki Telegram — «Загрузки»
 papkasiga) va `C:\Smeta\server\laptop.cmd restore` — ro'yxatdan faylni ko'rib, `laptop.cmd restore <fayl.zip>`.

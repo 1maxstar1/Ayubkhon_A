@@ -611,3 +611,9 @@ body.compact main:not(.narrow){grid-template-columns:232px 1fr}
 .qe:hover{text-decoration:underline dotted}
 .qe.on{color:#b45309;font-weight:600}.qe.on s{color:var(--mute);font-weight:400}
 .qe .wait{color:#b45309;font-size:11px;white-space:nowrap}
+
+/* «Перенос данных» (admin): what happens to each application */
+#trTable tr.tr-replace .tr-what{color:var(--amber,#b26a00)}
+#trTable tr.tr-keep .tr-what{color:var(--mute)}
+#trTable .tr-what.done{font-weight:600}
+#trTable .tr-what.err,#trState.err{color:var(--red,#c0392b)}

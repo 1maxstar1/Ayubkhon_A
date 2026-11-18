@@ -195,7 +195,7 @@ function build() {
         // «Распознавание форматов смет»: the threshold and the version of the samples (the reading is in the worker)
         'src/lib/ml/layout.js',
         'src/ui/auth.js', 'src/ui/apps-admin.js', 'src/ui/admin.js', 'src/ui/refs-admin.js', 'src/ui/uzex-admin.js', 'src/ui/learning-admin.js', 'src/ui/dataset-admin.js',
-        'src/ui/formats-admin.js', 'src/ui/version.js']
+        'src/ui/formats-admin.js', 'src/ui/transfer-admin.js', 'src/ui/version.js']
         .filter((p) => existsSync(join(root, p))).map(read).join('\n;\n'));
     emit('admin.html', admin);
   }

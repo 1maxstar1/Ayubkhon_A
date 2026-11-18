@@ -198,6 +198,7 @@ browser_run e2e-hints    node test/e2e-hints.mjs "$S1"
 browser_run contragent-prices node test/contragent-prices.mjs
 browser_run learning     node test/learning.mjs
 browser_run e2e-memory   node test/e2e-memory.mjs
+browser_run transfer     node test/transfer.mjs
 browser_run e2e-dataset  node test/e2e-dataset.mjs
 if [ -n "$REG" ]; then browser_run e2e-fullregistry node test/e2e-fullregistry.mjs "$REG"; else skip e2e-fullregistry "reyestr fayli berilmagan"; fi
 echo "-----------------------------------"

@@ -59,6 +59,7 @@ sh test/pb-smoke.sh; node test/e2e-workspace.mjs      # server rejimi testlari
 node test/contragent-prices.mjs                       # «Цены этого контрагента…»: oldingi narxlar bitta ro'yxatda, bitta tasdiq
 node test/learning.mjs                                # o'rganish uchun yozuvlar: qarorlar jurnali, «Завершить» oynasi va narxlar xotirasi
 node test/memory.cjs; node test/e2e-memory.mjs        # xotira ishlatilishi: «пам.» tartibi, «ранее принято» chegarasi (mustaqil arizalar, yosh), kalit
+node test/transfer.mjs                                # «Перенос данных»: Mac va Windows bazalarini birlashtirish (eksport → zaxira → import, ziddiyatda oxirgi o'zgargani)
 node test/ml.cjs; node test/e2e-dataset.mjs           # o'rganish: belgilar (smeta narxisiz), metrikalar, dataset va bugungi qoidalar o'lchovi; admin «Набор для обучения»
 node test/ml-price.cjs                                # narx modeli: dalillar (oldingi arizalar, spravochnik), yo'qotish va gradient, qaror, sintetik ekspert
 node test/ml-layout.cjs; node test/e2e-formats.mjs    # format namunasi (nom va narxsiz), imzo, arifmetika, xesh; `smeta_files` ga yozish va admin «Распознавание форматов смет»
@@ -299,6 +300,17 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   saqlashda o'chiriladi (undan oldin emas). Sahifa fayllar yuklanayotganda ketishga so'ralsa (beforeunload), shu paytdagi
   xato hisobga olinmaydi; sahifa 2 soniyadan keyin ham o'rnida bo'lsa — shu paytda uzilgan fayllar qayta olinadi; faqat
   pagehide yakuniy.
+* **Kompyuterlar orasida ko'chirish** (v2.16.18, egasining qarori 2026-11-18; `server/pb_hooks/transfer.pb.js`,
+  `lib/transfer.js`, `src/ui/transfer-admin.js`, `test/transfer.mjs`): admin sahifasi «Перенос данных между компьютерами».
+  «Выгрузить для переноса» — ish maydoni bor arizalar, ularning fayllari, holati, tuzatishlari, eksportlari, jurnali, xotirasi,
+  kontragentlari va format namunalari bitta .zip ga (`transfer.json` + fayllar). «Загрузить с другого компьютера» — avval reja
+  ko'rsatiladi, keyin **bazaning zaxirasi** (`before-transfer-….zip`, `$app.createBackup`), keyin ariza-ariza, har biri bitta
+  tranzaksiyada: ariza raqam bo'yicha, kontragent INN bo'yicha moslanadi (reyestrda yo'q ariza fayldan yaratiladi); bu yerda
+  ish maydoni yo'q — qo'shiladi; ikkalasida bor — **oxirgi o'zgartirilgani** (`updated`) qoladi, almashtirilgani zaxirada.
+  Fayllar yangi nom oladi va holat ichidagi nomlar shunga almashtiriladi; ish maydoni, xotira va jurnal yozuvlari bo'sh bo'lsa
+  o'z id si bilan (xotira id si ish maydoni id sidan), sanalar SQL bilan aslidek. Ko'chiriladigan maydonlar `lib/transfer.js` `F`
+  da birma-bir yozilgan — sxemaga maydon qo'shilsa, u yerga ham. Spravochnik paketi va UZEX ko'chirilmaydi. Bitta odam,
+  bitta kompyuter: birlashtirilgandan keyin bittasida ishlanadi.
 * **Xavfsizlik bo'limi hozircha o'chirilgan (egasining qarori, 2026-10-24).**
   Dastur bitta odamning o'z kompyuterida ishlaydi, uni boshqa hech kim
   ishlatmaydi va ko'rmaydi — shuning uchun noutbuk rejimida kirish oynasi,

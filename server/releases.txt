@@ -38,3 +38,4 @@ v2.16.11 81f0e4634c65a88dd04a8b786864b9b93ff0beb9 new smeta layouts, reply units
 v2.16.12 9f124dffaad8da3346b428044b118a860b23abbd review fixes, summary sheet not counted twice, percentage haulage lines, haulage names in replies
 v2.16.14 fd12ccbef2ffe615e0e922cf97bdfe235d047dc5 PDF reply: word gaps from the page, not from space glyphs
 v2.16.15 ddebb0ed67f16def15bd4e9abec1b937a63ee43c Price box keeps what is typed when the list redraws
+v2.16.17 fedd2c271955ae855113b90c6c376fd28323d130 Above-accepted hint from one application

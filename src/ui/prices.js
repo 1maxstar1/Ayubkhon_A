@@ -153,8 +153,11 @@
       var rec = self.byKey(inp.dataset.key);
       if (!rec) return;
       var t = self.app.typedPrice(inp);
-      if (t.kind === 'bad') return;                 // not a number: nothing changes, the box says so (App.typedPrice)
-      self.app.setPrice(rec.key, t.kind === 'empty' ? rec.price : t.v);
+      // what the typing set, for the list's repaint to keep the text as typed (VList.paint)
+      if (t.kind === 'bad') { inp.dataset.set = 'bad'; return; }  // not a number: nothing changes, the box says so (App.typedPrice)
+      var v = t.kind === 'empty' ? rec.price : t.v;
+      inp.dataset.set = String(v);
+      self.app.setPrice(rec.key, v);
       inp.classList.toggle('edited', !S.near(rec.price, rec.market));
       self.updateRowEcho(inp, rec);
     });
@@ -163,7 +166,7 @@
       var inp = e.target;
       if (!inp.classList || !inp.classList.contains('pin')) return;
       var rec = self.byKey(inp.dataset.key);
-      if (rec && !S.VList.restoring) { inp.value = fmtIn(rec.market); inp.dataset.was = String(rec.market); }
+      if (rec && !S.VList.restoring) { inp.value = fmtIn(rec.market); inp.dataset.was = String(rec.market); delete inp.dataset.set; }
       inp.select();
     });
     scroll.addEventListener('focusout', function (e) {
@@ -176,6 +179,7 @@
         if (inp.dataset.was != null && !S.near(rec.market, +inp.dataset.was) && !self.app.checked[rec.key]) self.app.setChecked([rec.key], true, true);
         inp.value = S.price(rec.market);
       }
+      delete inp.dataset.set;
     });
 
     scroll.addEventListener('keydown', function (e) {

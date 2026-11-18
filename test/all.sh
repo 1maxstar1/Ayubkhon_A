@@ -173,6 +173,7 @@ run ownership        node test/ownership.mjs
 run disable-user     node test/disable-user.mjs
 browser_run browser      node test/browser.mjs "$S1" "$S2"
 browser_run price-book   node test/price-book.mjs
+browser_run price-typing node test/price-typing.mjs
 browser_run layout-1366  node test/layout-1366.mjs
 browser_run version-notice node test/version-notice.mjs
 browser_run server-down  node test/server-down.mjs

@@ -7422,6 +7422,10 @@ var S = (typeof S !== 'undefined' && S) || {};
     var keep = act && this.body.contains(act) && act.dataset
       ? (act.dataset.focus || act.dataset.key) : null;
     var selStart = keep ? act.selectionStart : 0, selEnd = keep ? act.selectionEnd : 0;
+    // a price box being typed in, read before the rows go: taking the focused box off the page fires its focusout,
+    // whose handler writes the price back into it with grouped digits and forgets what the typing set
+    var typed = keep && act.dataset.set != null
+      ? { set: act.dataset.set, value: act.value, bad: act.classList.contains('bad'), title: act.title } : null;
 
     this.body.style.transform = 'translateY(' + (first * this.rowHeight) + 'px)';
     this.body.innerHTML = this.render(first, last);
@@ -7438,6 +7442,19 @@ var S = (typeof S !== 'undefined' && S) || {};
         // expert entering the box — the handlers of focusin tell the two apart by VList.restoring (a popover closed
         // with Esc stays closed through a repaint, E3)
         if (act.dataset.was != null) again.dataset.was = act.dataset.was;
+        // A price box being typed in (data-set: the price the typing set, or «bad» when the text is no number yet): while
+        // the list shows that price, the text typed and its caret stay as they were. Drawn anew from the price, the box
+        // was rewritten with grouped digits («2071» → «2 071») and the caret put back at the same index — one place off,
+        // so the next digits landed in the wrong place: «207187» typed slowly came out «207 871» (2026-11-18). A price
+        // put by anything else (Esc, «Применить», a book) clears data-set (App.setPrice) and is shown as before.
+        if (tag === 'input' && typed) {
+          var set = typed.set, shown = S.num(again.value);
+          if (set === 'bad' || (shown != null && set !== '' && Math.abs(shown - (+set)) <= 1e-6 * Math.max(1, Math.abs(shown)))) {
+            again.value = typed.value;
+            again.dataset.set = set;
+            if (typed.bad) { again.classList.add('bad'); again.title = typed.title; }
+          } else selStart = selEnd = again.value.length;
+        }
         VList.restoring = true;
         try { again.focus(); } finally { VList.restoring = false; }
         try { again.setSelectionRange(selStart, selEnd); } catch (e) { /* not a text input */ }
@@ -7637,8 +7654,11 @@ var S = (typeof S !== 'undefined' && S) || {};
       var rec = self.byKey(inp.dataset.key);
       if (!rec) return;
       var t = self.app.typedPrice(inp);
-      if (t.kind === 'bad') return;                 // not a number: nothing changes, the box says so (App.typedPrice)
-      self.app.setPrice(rec.key, t.kind === 'empty' ? rec.price : t.v);
+      // what the typing set, for the list's repaint to keep the text as typed (VList.paint)
+      if (t.kind === 'bad') { inp.dataset.set = 'bad'; return; }  // not a number: nothing changes, the box says so (App.typedPrice)
+      var v = t.kind === 'empty' ? rec.price : t.v;
+      inp.dataset.set = String(v);
+      self.app.setPrice(rec.key, v);
       inp.classList.toggle('edited', !S.near(rec.price, rec.market));
       self.updateRowEcho(inp, rec);
     });
@@ -7647,7 +7667,7 @@ var S = (typeof S !== 'undefined' && S) || {};
       var inp = e.target;
       if (!inp.classList || !inp.classList.contains('pin')) return;
       var rec = self.byKey(inp.dataset.key);
-      if (rec && !S.VList.restoring) { inp.value = fmtIn(rec.market); inp.dataset.was = String(rec.market); }
+      if (rec && !S.VList.restoring) { inp.value = fmtIn(rec.market); inp.dataset.was = String(rec.market); delete inp.dataset.set; }
       inp.select();
     });
     scroll.addEventListener('focusout', function (e) {
@@ -7660,6 +7680,7 @@ var S = (typeof S !== 'undefined' && S) || {};
         if (inp.dataset.was != null && !S.near(rec.market, +inp.dataset.was) && !self.app.checked[rec.key]) self.app.setChecked([rec.key], true, true);
         inp.value = S.price(rec.market);
       }
+      delete inp.dataset.set;
     });
 
     scroll.addEventListener('keydown', function (e) {
@@ -9178,8 +9199,11 @@ var S = (typeof S !== 'undefined' && S) || {};
       var row = self.rowByKeyFirst(key);
       if (!row) return;
       var t = self.typedPrice(inp);
-      if (t.kind === 'bad') return;
-      self.setPrice(key, t.kind === 'empty' ? row.price : t.v);
+      // what the typing set, for the list's repaint to keep the text as typed (VList.paint)
+      if (t.kind === 'bad') { inp.dataset.set = 'bad'; return; }
+      var v = t.kind === 'empty' ? row.price : t.v;
+      inp.dataset.set = String(v);
+      self.setPrice(key, v);
       self.echoSheetRows(key);
     });
 
@@ -9188,7 +9212,7 @@ var S = (typeof S !== 'undefined' && S) || {};
       var inp = e.target;
       if (!inp.classList || !inp.classList.contains('pin')) return;
       var row = self.rowByKeyFirst(inp.dataset.key);
-      if (row && !S.VList.restoring) { inp.value = inVal(row.market); inp.dataset.was = String(row.market); }
+      if (row && !S.VList.restoring) { inp.value = inVal(row.market); inp.dataset.was = String(row.market); delete inp.dataset.set; }
       inp.select();
     });
     scroll.addEventListener('focusout', function (e) {
@@ -9196,6 +9220,7 @@ var S = (typeof S !== 'undefined' && S) || {};
       if (!inp.classList || !inp.classList.contains('pin')) return;
       var row = self.rowByKeyFirst(inp.dataset.key);
       if (row) { self.leftPrice(inp, row.price); inp.value = S.price(row.market); }
+      delete inp.dataset.set;
     });
 
     scroll.addEventListener('keydown', function (e) {
@@ -9753,7 +9778,15 @@ var S = (typeof S !== 'undefined' && S) || {};
     });
   };
 
+  /** A price put on the resource whose box has the caret, by anything but that box's typing: the box shows the price. */
+  function untype(map) {
+    var a = typeof document !== 'undefined' ? document.activeElement : null;
+    if (a && a.dataset && a.dataset.set != null && a.dataset.key in map && a.dataset.set !== String(map[a.dataset.key])) delete a.dataset.set;
+  }
+
   App.prototype.setPrice = function (key, value) {
+    var one = {}; one[key] = value;
+    untype(one);
     this.prices[key] = value;
     delete this.pct[key];
     this.applyOne(key, value);
@@ -9761,6 +9794,7 @@ var S = (typeof S !== 'undefined' && S) || {};
 
   App.prototype.setPrices = function (map) {
     var self = this;
+    untype(map);
     Object.keys(map).forEach(function (k) { self.prices[k] = map[k]; delete self.pct[k]; });
     if (this.model) S.applyPrices(this.model, this.prices);
     this.prices_ui.apply();

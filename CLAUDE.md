@@ -41,6 +41,7 @@ node test/volumes.cjs; node test/e2e-volumes.mjs      # «Объёмы рабо�
 node test/e2e-compare-keep.mjs                        # ... va ish maydonida: yuklangan fayllar qayta yuklashdan keyin qaytadi
 node test/browser.mjs [a.xlsx b.xlsx]                 # haqiqiy brauzerda (bitta-fayl rejim); faylsiz — o'ylab topilgan smetada
 node test/price-book.mjs                              # «Книга цен»: saqlash, qayta yuklash, jadval ko'rinishidagi narxlar ro'yxati
+node test/price-typing.mjs                            # narxni raqamma-raqam yozish: ro'yxat qayta chizilsa ham katakda aynan yozilgani qoladi
 sh test/all.sh [reyestr.xls smeta1.xlsx smeta2.xlsx]  # hamma test; faylsiz — sintetik smetalarda (test/synth.cjs). Yashil bo'lishi shart
 sh server/release.sh X.Y.Z "izoh" --row matn.md [--dry]   # reliz bitta buyruq bilan: versiya, qurish, to'plam, ikki commit, push
 node test/server-helper.mjs; sh test/release-script.sh    # test serveri yetim qolmaydi; reliz skripti vaqtinchalik nusxada
@@ -275,6 +276,12 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   (egasining qarori, 2026-11-15: ekspert eski javobni shablon qilib, «объем» varag'ini o'chirmay qoldiradi).
 * Raqamlar hech qachon yo'qolmaydi: `АНКЕР М5` ≠ `АНКЕР М8`, `4.1.1` ≠ `4.11`;
   ikki raqam orasidagi ajratgich o'chirilmaydi.
+* **Narx katagiga yozish** (v2.16.15, `src/ui/grid.js` `VList.paint`, `test/price-typing.mjs`): har raqam narxni qo'yadi va
+  ro'yxat qayta chiziladi. Yozilayotgan katak (`data-set` — yozish qo'ygan narx yoki «bad») ro'yxat shu narxni ko'rsatar ekan,
+  matni va kursori bilan aynan qoladi; uni eski katak olib tashlanishidan oldin o'qiladi (olib tashlash focusout chaqiradi).
+  Avval katak guruhlangan raqamlar bilan qayta yozilib («2071» → «2 071»), kursor bir joyga siljib qolardi: «207187» → «207 871».
+  Narxni yozishdan boshqa narsa qo'ysa (Esc, «Применить», kitob) `App.setPrice`/`setPrices` `data-set` ni o'chiradi va
+  katak yangi narxni ko'rsatadi.
 * **Ekranda yo'q smetalar** (v2.16.12, `src/ui/sync.js` `away`, `test/away-files.mjs`). Ariza ochilganda saqlangan holatdagi
   smetaning fayli serverda turgan, lekin ekranga chiqmagan bo'lishi mumkin: yuklab bo'lmagan (aloqa, 404) yoki o'qilmagan
   (vaqt chegarasi, qoida endi varaq topmaydi). Bunday smeta «away»: saqlash uning faylini serverdan o'chirmaydi, loyihasini

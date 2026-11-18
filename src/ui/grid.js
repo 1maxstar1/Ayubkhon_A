@@ -142,6 +142,10 @@
     var keep = act && this.body.contains(act) && act.dataset
       ? (act.dataset.focus || act.dataset.key) : null;
     var selStart = keep ? act.selectionStart : 0, selEnd = keep ? act.selectionEnd : 0;
+    // a price box being typed in, read before the rows go: taking the focused box off the page fires its focusout,
+    // whose handler writes the price back into it with grouped digits and forgets what the typing set
+    var typed = keep && act.dataset.set != null
+      ? { set: act.dataset.set, value: act.value, bad: act.classList.contains('bad'), title: act.title } : null;
 
     this.body.style.transform = 'translateY(' + (first * this.rowHeight) + 'px)';
     this.body.innerHTML = this.render(first, last);
@@ -158,6 +162,19 @@
         // expert entering the box — the handlers of focusin tell the two apart by VList.restoring (a popover closed
         // with Esc stays closed through a repaint, E3)
         if (act.dataset.was != null) again.dataset.was = act.dataset.was;
+        // A price box being typed in (data-set: the price the typing set, or «bad» when the text is no number yet): while
+        // the list shows that price, the text typed and its caret stay as they were. Drawn anew from the price, the box
+        // was rewritten with grouped digits («2071» → «2 071») and the caret put back at the same index — one place off,
+        // so the next digits landed in the wrong place: «207187» typed slowly came out «207 871» (2026-11-18). A price
+        // put by anything else (Esc, «Применить», a book) clears data-set (App.setPrice) and is shown as before.
+        if (tag === 'input' && typed) {
+          var set = typed.set, shown = S.num(again.value);
+          if (set === 'bad' || (shown != null && set !== '' && Math.abs(shown - (+set)) <= 1e-6 * Math.max(1, Math.abs(shown)))) {
+            again.value = typed.value;
+            again.dataset.set = set;
+            if (typed.bad) { again.classList.add('bad'); again.title = typed.title; }
+          } else selStart = selEnd = again.value.length;
+        }
         VList.restoring = true;
         try { again.focus(); } finally { VList.restoring = false; }
         try { again.setSelectionRange(selStart, selEnd); } catch (e) { /* not a text input */ }

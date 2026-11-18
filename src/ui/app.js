@@ -257,8 +257,11 @@
       var row = self.rowByKeyFirst(key);
       if (!row) return;
       var t = self.typedPrice(inp);
-      if (t.kind === 'bad') return;
-      self.setPrice(key, t.kind === 'empty' ? row.price : t.v);
+      // what the typing set, for the list's repaint to keep the text as typed (VList.paint)
+      if (t.kind === 'bad') { inp.dataset.set = 'bad'; return; }
+      var v = t.kind === 'empty' ? row.price : t.v;
+      inp.dataset.set = String(v);
+      self.setPrice(key, v);
       self.echoSheetRows(key);
     });
 
@@ -267,7 +270,7 @@
       var inp = e.target;
       if (!inp.classList || !inp.classList.contains('pin')) return;
       var row = self.rowByKeyFirst(inp.dataset.key);
-      if (row && !S.VList.restoring) { inp.value = inVal(row.market); inp.dataset.was = String(row.market); }
+      if (row && !S.VList.restoring) { inp.value = inVal(row.market); inp.dataset.was = String(row.market); delete inp.dataset.set; }
       inp.select();
     });
     scroll.addEventListener('focusout', function (e) {
@@ -275,6 +278,7 @@
       if (!inp.classList || !inp.classList.contains('pin')) return;
       var row = self.rowByKeyFirst(inp.dataset.key);
       if (row) { self.leftPrice(inp, row.price); inp.value = S.price(row.market); }
+      delete inp.dataset.set;
     });
 
     scroll.addEventListener('keydown', function (e) {
@@ -832,7 +836,15 @@
     });
   };
 
+  /** A price put on the resource whose box has the caret, by anything but that box's typing: the box shows the price. */
+  function untype(map) {
+    var a = typeof document !== 'undefined' ? document.activeElement : null;
+    if (a && a.dataset && a.dataset.set != null && a.dataset.key in map && a.dataset.set !== String(map[a.dataset.key])) delete a.dataset.set;
+  }
+
   App.prototype.setPrice = function (key, value) {
+    var one = {}; one[key] = value;
+    untype(one);
     this.prices[key] = value;
     delete this.pct[key];
     this.applyOne(key, value);
@@ -840,6 +852,7 @@
 
   App.prototype.setPrices = function (map) {
     var self = this;
+    untype(map);
     Object.keys(map).forEach(function (k) { self.prices[k] = map[k]; delete self.pct[k]; });
     if (this.model) S.applyPrices(this.model, this.prices);
     this.prices_ui.apply();

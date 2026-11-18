@@ -134,6 +134,15 @@ fayllar kompyuterdan chiqmaydi.
      juftlanadi (eng uzun umumiy ketma-ketlik): qo'shilgan yoki o'chirilgan qator
      keyingi qatorlarni surib yubormaydi. Varaqlar nomi bo'yicha, bo'lmasa
      tartibi bo'yicha juftlanadi.
+   * Arizada bir nechta smeta bo'lsa, ularning tuzatilgan fayllari birga tanlanadi
+     va har biri o'z smetasi bilan solishtiriladi. Juftlash (v2.16.19) avval **fayl
+     nomi** bo'yicha (katta-kichik harf, «_»/«-»/bo'sh joy, kengaytma va «(1)» farq
+     qilmaydi; raqamlar farq qiladi); nomi mos kelmaganlari — umumiy qatorlar (nom +
+     birlik) bo'yicha, qatorlari bir xil bo'lsa — miqdorlari bo'yicha, ular ham bir xil
+     bo'lsa — nomi yaqinroq smeta bilan. Fayllar qaysi tartibda tanlangani endi hech
+     narsani hal qilmaydi (avval resurslar ro'yxati bir xil smetalar tanlash tartibi
+     bo'yicha almashib qolardi: 15-smeta 8-smeta bilan solishtirilib, hajmlar «oshgan»
+     ko'rinardi).
    * **«So'ralgan narx»** — jadvalimizda yuborilgan narx: hisobot o'zining
      rejimi va chegarasi bilan qayta o'qiladi (Excel'dagidek). Chegaradan past
      qolib, jadvalga tushmagan narxlarimiz kulrang, faqat ma'lumot uchun
@@ -210,6 +219,15 @@ Ekspert narxdan tashqari **hajmlarni** ham tekshiradi (egasining talabi, 2026-11
   bo'limlar bo'yicha (`№ · Наименование работ и затрат · Ед.изм. · по локальной ресурсной
   смете · по рабочему проекту · Примечание`), keyin «Количество ресурсов» ostida qo'lda
   o'zgartirilgan resurslar. Hech narsa belgilanmagan bo'lsa — hujjat avvalgidek.
+* **«Сравнение версий»** (v2.16.19) tuzatilgan smetaning ham 5-shakl vedomostini o'qiydi va
+  «Объёмы работ (ведомость)» kartasida aytadi: ishlar hajmi o'zgarmadimi (`без изменений`), yoki
+  nechta ish hajmi **oshgan** / kamaygan, nechta yangi ish qo'shilgan / olib tashlangan; kartaning
+  ostida o'zgargan ishlar ro'yxati — «Объём было → стало». Har bir smeta o'z tuzatilgan fayli bilan
+  solishtiriladi; bir xil shifr va nomli ikki ish tartibi almashsa ham hajmi bo'yicha juftlanadi.
+  Tuzatilgan faylda vedomost yo'q bo'lsa — «не сравнивались» (hech qachon «без изменений» emas).
+* Javobning «объем» varag'i boshqa obyektga tegishli bo'lsa (ekspert eski javobni shablon qilib
+  qoldirgan), sahifa endi sababini ham aytadi: varaq boshqa ariza javobidan qolgan, bu arizaning
+  hajmlari «Объёмы работ» vkladkasida belgilanadi va hujjatga o'zining Таблица №1 i tushadi.
 * Server rejimida hajmlar va miqdorlar ish maydoni bilan saqlanadi (sahifa qayta
   yuklansa ham qaytadi). Ishning kaliti — fayl, nomi, birligi, shifri va hajmi: o'sha fayl
   qayta o'qilsa, qarorlar o'z joyiga qaytadi.

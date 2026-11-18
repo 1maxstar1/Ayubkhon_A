@@ -190,7 +190,11 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   chiqadi, u esa faqat biror narsa belgilanganda qo'shiladi (aks holda hujjat avvalgidek). Holatda `qtys` — eski
   versiya o'qiydigan son, `qtyBase` — u qaysi smeta jamiga nisbatan yozilgani (v2.16.6; orqaga qaytish «[object Object]»
   bermaydi); kutayotgan miqdor jadvalda «⏸» bilan ko'rinadi; smeta miqdoriga teng va hech narsa siljitmagan miqdor
-  Таблица №1 ga qator bo'lib tushmaydi.
+  Таблица №1 ga qator bo'lib tushmaydi. «Сравнение версий» (v2.16.19, `S.volumes.changes`, `compare.js` `workDiff`) har bir
+  smetaning 5-shakl ishlarini o'z tuzatilgan fayli bilan solishtiradi (nom + birlik + shifr, ichida hajmi bo'yicha — tartib
+  almashsa ham): «Объёмы работ (ведомость)» kartasi — oshgan/yangi ish bo'lsa qizil, faqat kamaygan/olib tashlangan bo'lsa
+  sariq; tuzatilganda vedomost yo'q bo'lsa — «не сравнивались», «без изменений» emas. Ish hajmi resurs miqdoridan alohida
+  aytiladi (resurslar qatorma-qator «объём ↑/↓» da qoladi).
 * **Smeta formatlari** (`docs/format-reja.md`, v2.16.0): fayllarni **qoidalar** o'qiydi (`src/lib/smeta.js`); qoida
   o'zgarsa `SMETA_KIT=<kit> node test/smeta-corpus.cjs` qolgan fayllar avvalgidek o'qilishini isbotlashi shart (keyin
   ko'rib chiqib `--record`). Loyiha sifatida yuklangan har bir smeta `smeta_files` ga yoziladi (`src/ui/formats.js`):
@@ -226,8 +230,11 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   «Наш ответ» bitta jadval butun ariza uchun — u arizaning barcha smetalari bilan solishtiriladi. Raqam ustunidagi
   «Перевозка материалов» bandi ostidagi qatorlar — «other» (mashinalar emas); miqdori bo'sh, summasi 0 bo'lgan т·км qatori
   ham o'qiladi (miqdor 0) — varaqdagi hech narsa ko'rinmay qolmaydi; «(наименование стройки)» izohi — ustidagi qator nomi
-  (v2.16.5). «Стало» ga bir nechta tuzatilgan fayl birga beriladi (ariza smetalari): har biri o'z smetasiga umumiy qatorlari
-  bo'yicha juftlanadi (`S.compare.join`), bir xil nomli varaqlar («РЕСУРС») hech qachon almashmaydi; ish maydonida
+  (v2.16.5). «Стало» ga bir nechta tuzatilgan fayl birga beriladi (ariza smetalari): har biri o'z smetasiga juftlanadi
+  (`S.compare.join`, v2.16.19): avval fayl nomi bo'yicha (`fileKey`: harf, ajratgich, kengaytma, «(1)» farq qilmaydi; nom
+  ikkala tomonda yagona bo'lsa), qolganlari umumiy qatorlari bo'yicha, qatorlar teng bo'lsa — miqdorlari, keyin nomi
+  yaqinligi; tanlash tartibi hech qachon hal qilmaydi (67503: resurslari bir xil to'rt smeta tartib bo'yicha almashib, hajm
+  «oshgan» ko'rinardi). Bir xil nomli varaqlar («РЕСУРС») hech qachon almashmaydi; ish maydonida
   `new`, `new1` … slotlarida saqlanadi (40 tagacha; arizada 80 tagacha fayl — `pb_schema.json` workspaces.files va
   `sync.js` `MAX_FILES` birga o'zgaradi). т·км ustuni yo'q tashish varag'i: т·км = tonna × km (ikki qatorli sarlavha),
   hujjatga qiymat bo'lib yoziladi. ИТОГО tekshiruvi: pul qatori («3% от стоимости материалов») ИТОГО ichida ham, tashqarisida ham

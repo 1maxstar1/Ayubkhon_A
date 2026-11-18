@@ -508,6 +508,32 @@ check(bigRm.prices[bigKey] === bigM && bigRm.requested[bigKey] && bigRm.requeste
     'a file sharing nothing with the estimates is none of them: its sheet, and the estimate left without a file, stand without a pair (' + stray.to.join() + ')');
   const one = S.compare.join([olds[0]], [news[1]]);
   check(one.olds === olds[0].objects && one.news === news[1].objects && !one.olds[0].group, 'one file on each side is compared exactly as before: nothing is marked');
+
+  // estimates of one road listing the very same resources (four alike in one application). The lines alone tie, and
+  // the files chosen in another order were paired by that order: the 15th compared with the 8th, its quantities «raised»
+  const twin = (q, p) => est([MAT, line(1, 'ТЕСТОВЫЙ АСФАЛЬТ', 'Т', q, p), line(2, 'ТЕСТОВЫЙ ЩЕБЕНЬ', 'М3', q * 2, 7), line(3, 'ТЕСТОВЫЙ БИТУМ', 'Т', q / 10, 13)]);
+  const NS = [15, 14, 11, 8], ORDER = [8, 15, 14, 11];
+  const who = (j, olds) => j.to.map((i) => (i < 0 ? '-' : olds[i].n)).join();
+  // by name (the same file sent back; «_» and «-» for « » do not matter) — even with the contents all alike
+  const nOld = NS.map((n) => ({ n, label: n + '_Смета_10V0' + n + '_АЙ_68_96_КМ.xls', objects: twin(3, 11) }));
+  const nNew = ORDER.map((n) => ({ label: n + ' Смета 10V0' + n + ' АЙ 68-96 КМ.xls', objects: twin(3, 9) }));
+  const jn = S.compare.join(nOld, nNew);
+  check(who(jn, nOld) === ORDER.join(), 'corrected files of estimates alike are paired by their names first, in whatever order chosen (' + who(jn, nOld) + ')');
+  // names that say nothing: by the quantities (a correction of prices leaves them as they were)
+  const qOld = NS.map((n) => ({ n, label: 'смета ' + n + '.xls', objects: twin(n, 11) }));
+  const qNew = ORDER.map((n, i) => ({ label: 'исправленная ' + 'абвг'[i] + '.xls', objects: twin(n, 9) }));
+  const jq = S.compare.join(qOld, qNew);
+  check(who(jq, qOld) === ORDER.join(), 'names that differ: the lines alike, paired by their quantities (' + who(jq, qOld) + ')');
+  const rq = S.compare.versions(jq.olds, jq.news, {}, {});
+  check(!rq.totals.counts.qtyup && !rq.totals.counts.qtydown && !rq.totals.unaskedUp, 'and no quantity is «raised» or «lowered»: only the prices changed');
+  // all alike, quantities too: by the nearer name
+  const sOld = NS.map((n) => ({ n, label: n + ' Смета 10V0' + n + '.xls', objects: twin(3, 11) }));
+  const sNew = ORDER.map((n) => ({ label: n + ' Смета 10V0' + n + ' испр.xls', objects: twin(3, 9) }));
+  const js = S.compare.join(sOld, sNew);
+  check(who(js, sOld) === ORDER.join(), 'contents alike and names not the same: by the nearer name (' + who(js, sOld) + ')');
+  check(S.compare.fileKey('2_Смета_D020_АЙ_68_96_КМ (1).XLS') === S.compare.fileKey('2 смета d020 ай 68-96 км.xls') &&
+    S.compare.fileKey('АНКЕР М5.xls') !== S.compare.fileKey('АНКЕР М8.xls') && S.compare.fileKey('4.1.1.xls') !== S.compare.fileKey('4.11.xls'),
+    'a file\'s name as a key: case, separators, the extension and a copy\'s «(1)» do not matter; its digits do');
 }
 
 /* ------------------------------------------------ a summary file that copies the estimates of the application */

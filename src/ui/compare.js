@@ -35,6 +35,29 @@
   S.Compare_newSlots = function () { var a = []; for (var i = 0; i < NEW_MAX; i++) a.push(newSlot(i)); return a; };
 
   /** The corrected files as one «Стало»: an application of several estimates comes back as several files. */
+  /**
+   * The volumes of the works (the statement of form 5) of each estimate against its corrected file: did they change?
+   * The resources' quantities say it line by line; this says it of the works a reviewer asked to justify. Null when no
+   * pair has works on both sides (an estimate without that statement).
+   */
+  function workDiff(sets, parts, to) {
+    if (!S.volumes || !S.volumes.changes) return null;
+    var has = function (st) { return (st || []).some(function (s) { return s.works && s.works.length; }); };
+    var out = { works: 0, same: 0, up: [], down: [], gone: [], added: [], pairs: 0, noNew: 0 };
+    parts.forEach(function (p, i) {
+      var o = to[i] >= 0 && to.length > 1 ? sets[to[i]] : sets.length === 1 ? sets[0] : null;
+      if (!o || !has(o.works)) return;
+      if (!has(p.works)) { out.noNew++; return; }
+      var c = S.volumes.changes(o.works, p.works), where = sets.length > 1 ? o.label : '';
+      var tag = function (x) { return Object.assign({ where: where }, x); };
+      out.pairs++; out.works += c.works; out.same += c.same;
+      out.up = out.up.concat(c.up.map(tag)); out.down = out.down.concat(c.down.map(tag));
+      out.gone = out.gone.concat(c.gone.map(function (w) { return { where: where, work: w }; }));
+      out.added = out.added.concat(c.added.map(function (w) { return { where: where, work: w }; }));
+    });
+    return out.pairs || out.noNew ? out : null;
+  }
+
   function joinNew(parts) {
     return { name: parts.map(function (p) { return p.label; }).join(' + '),
              objects: parts.reduce(function (all, p) { return all.concat(p.objects); }, []), parts: parts };
@@ -54,7 +77,7 @@
       if (gen !== undefined && gen !== self.gen) return;
       if (k < files.length) {
         var f = files[k++];
-        self.read(f, function (objs) { parts.push({ label: f.name, objects: objs, file: f }); step(); }, step);
+        self.read(f, function (objs, works) { parts.push({ label: f.name, objects: objs, works: works || [], file: f }); step(); }, step);
         return;
       }
       if (!parts.length) { if (back) back(); return; }
@@ -84,9 +107,9 @@
     $('cmpOldFile').addEventListener('change', function (e) {
       var f = e.target.files[0]; e.target.value = '';
       if (!f) { self.fillOld(); return; }
-      self.read(f, function (objs) {
+      self.read(f, function (objs, works) {
         if (self.reply) chose('reply', null);
-        self.oldFile = { name: f.name, objects: objs }; self.reply = null;
+        self.oldFile = { name: f.name, objects: objs, works: works || [] }; self.reply = null;
         chose('old', f);
         self.fillOld(); self.based(); self.run();
       }, function () { self.fillOld(); });
@@ -177,7 +200,8 @@
         app.busy(false);
         if (!res.ok) { app.toast(file.name + ': ' + res.error, true); failed(); return; }
         if (!res.objects.length) { app.toast(file.name + ': листы ресурсов не найдены', true); failed(); return; }
-        done(res.objects);
+        // the works of form 5 beside the resources: «Сравнение версий» says whether their volumes changed
+        done(res.objects, res.works || []);
       };
       if (app.worker) {
         var id = ++app.seq;
@@ -189,7 +213,11 @@
         app.worker.addEventListener('message', onMsg);
         app.worker.postMessage({ cmd: 'parse', id: id, name: file.name, buffer: buf }, [buf]);
       } else {
-        try { finish({ ok: true, objects: S.smeta.parseWorkbook(S.readXlsx(new Uint8Array(buf)), file.name) }); }
+        try {
+          var wb = S.readXlsx(new Uint8Array(buf)), works = [];
+          try { works = S.volumes ? S.volumes.parseWorkbook(wb) : []; } catch (e) { works = []; }
+          finish({ ok: true, objects: S.smeta.parseWorkbook(wb, file.name), works: works });
+        }
         catch (err) { finish({ ok: false, error: String(err.message || err) }); }
       }
     };
@@ -247,8 +275,8 @@
       self.takeNew(news, reply);
     };
     if (!files.old || this.oldFile) { next(); return; }
-    this.read(files.old, function (objs) {
-      if (live() && !self.oldFile) self.oldFile = { name: files.old.name, objects: objs };
+    this.read(files.old, function (objs, works) {
+      if (live() && !self.oldFile) self.oldFile = { name: files.old.name, objects: objs, works: works || [] };
       next();
     }, next);
   };
@@ -335,7 +363,8 @@
     var v = $('cmpOld').value;
     var reply = this.reply && this.reply.base === v ? this.reply : null;
     if (v === 'file' && this.oldFile) {
-      return { label: this.oldFile.name, objects: this.oldFile.objects, requested: reply ? reply.match.requested : {}, known: {} };
+      return { label: this.oldFile.name, objects: this.oldFile.objects, requested: reply ? reply.match.requested : {}, known: {},
+               sets: [{ label: this.oldFile.name, objects: this.oldFile.objects, works: this.oldFile.works || [] }] };
     }
     var p = this.app.projects[+String(v).slice(1)];
     if (!p) return null;
@@ -348,7 +377,7 @@
       if (!requested[r.key] && Math.abs((r.market || 0) - (r.price || 0)) >= 1) known[r.key] = r.market;
     });
     return { label: p.file || p.name, objects: p.objects, requested: requested, known: known,
-             sets: [{ label: p.file || p.name, objects: p.objects }] };
+             sets: [{ label: p.file || p.name, objects: p.objects, works: p.works || [] }] };
   };
 
   /**
@@ -368,7 +397,7 @@
     model.resources.forEach(function (r) {
       if (!requested[r.key] && Math.abs((r.market || 0) - (r.price || 0)) >= 1) known[r.key] = r.market;
     });
-    var sets = on.map(function (p) { return { label: p.file || p.name, objects: p.objects || [] }; });
+    var sets = on.map(function (p) { return { label: p.file || p.name, objects: p.objects || [], works: p.works || [] }; });
     return { label: 'все сметы заявки (' + sets.length + '): ' + sets.map(function (x) { return x.label; }).join(' + '),
              objects: sets.reduce(function (all, x) { return all.concat(x.objects); }, []), requested: requested, known: known, sets: sets };
   };
@@ -380,8 +409,10 @@
     var parts = this.newFile.parts || [{ label: this.newFile.name, objects: this.newFile.objects }];
     if (parts.length > 1) b = this.wholeBase(b);
     var t0 = performance.now();
-    var j = S.compare.join(b.sets || [{ label: b.label, objects: b.objects }], parts);
+    var sets = b.sets || [{ label: b.label, objects: b.objects }];
+    var j = S.compare.join(sets, parts);
     this.res = S.compare.versions(j.olds, j.news, b.requested, b.known);
+    this.works = workDiff(sets, parts, j.to);
     // a corrected file that is none of the estimates: said, its sheets are shown without a pair
     var lost = parts.filter(function (p, i) { return j.to[i] < 0; }).map(function (p) { return p.label; });
     if (parts.length > 1 && lost.length) this.app.toast('Не удалось сопоставить со сметами заявки: ' + lost.join(', ') + ' — его листы показаны как листы без пары', true);
@@ -540,11 +571,12 @@
         T.amountFlags ? lines(T.amountFlags) + ' требуют внимания' : 'расхождений нет',
         'изменилась сумма: ' + lines(T.amountRows) + ' · текст/процент и «итог ≠ сумма строк» — красным, ' +
         'итог не пересчитан — жёлтым', 'sheets') +
+      worksCard(this.works) +
       '</div>' +
       '<div class="cmp-files">Было: <b>' + S.esc(L.oldLabel) + '</b> · Стало: <b>' + S.esc(L.newLabel) + '</b> · ' +
       (L.reply ? 'замечания из файла «' + S.esc(L.reply.name) + '»: ' + L.asked + ' (строк в файле ' + L.reply.entries.length + ')' :
         'замечаний в нашей таблице: ' + L.asked) + ' · ' + lines(T.rows) + ' · ' + this.ms + ' мс</div>' +
-      (L.reply ? replyNotes(L.reply) : '');
+      (L.reply ? replyNotes(L.reply) : '') + worksList(this.works);
 
     var view = $('cmpView').value, filter = $('cmpFilter').value;
     var q = S.nameKey($('cmpQ').value || '');
@@ -631,6 +663,34 @@
     '<col style="width:260px">';
 
   /** go: 'unasked' opens the lines nobody asked about, 'sheets' the sheet totals. */
+  /** «Объёмы работ»: did the volumes of the works change in the corrected file — up, down, works new or gone. */
+  function worksCard(W) {
+    if (!W) return '';
+    if (!W.pairs) return card('', 'Объёмы работ (ведомость)', 'не сравнивались', 'в исправленной смете нет ведомости объёмов работ');
+    var moved = W.up.length + W.down.length + W.gone.length + W.added.length;
+    return card(W.up.length || W.added.length ? 'bad' : moved ? 'part' : 'good', 'Объёмы работ (ведомость)',
+      moved ? 'увеличено ' + W.up.length + ' · уменьшено ' + W.down.length : 'без изменений',
+      W.works + ' работ · без изменений ' + W.same + ' · новых ' + W.added.length + ' · удалено ' + W.gone.length +
+      (W.noNew ? ' · без ведомости в исправленной: ' + W.noNew : ''));
+  }
+  /** The works whose volume changed, under the cards: what the reviewer checks against the drawings. */
+  function worksList(W) {
+    if (!W || !W.pairs) return '';
+    var rows = [];
+    var line = function (st, x, from, to) {
+      rows.push('<tr class="' + st + '"><td>' + S.esc(x.work.name) + (x.where ? '<small> · ' + S.esc(x.where) + '</small>' : '') + '</td><td>' +
+        S.esc(x.work.unit || '') + '</td><td class="n">' + (from == null ? '—' : S.qty(from)) + '</td><td class="n">' + (to == null ? '—' : S.qty(to)) + '</td></tr>');
+    };
+    W.up.forEach(function (x) { line('t-bad', x, x.from, x.to); });
+    W.added.forEach(function (x) { line('t-bad', x, null, x.work.volume); });
+    W.down.forEach(function (x) { line('t-part', x, x.from, x.to); });
+    W.gone.forEach(function (x) { line('t-part', x, x.work.volume, null); });
+    if (!rows.length) return '';
+    return '<details class="cmp-miss cmp-works"' + (rows.length <= 12 ? ' open' : '') + '><summary>Изменились объёмы работ (ведомость): ' + rows.length +
+      '</summary><div><table class="cmp"><tr><th>Работа</th><th>Ед. изм.</th><th>Объём было</th><th>Объём стало</th></tr>' + rows.join('') +
+      '</table></div></details>';
+  }
+
   function card(tone, title, big, small, go) {
     return '<div class="cmp-card ' + tone + (go ? ' go" data-go="' + go + '" title="Показать' : '') + '"><div class="t">' + title +
       '</div><div class="b">' + big + '</div><div class="s">' + small + '</div></div>';

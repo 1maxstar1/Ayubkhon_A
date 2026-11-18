@@ -229,6 +229,47 @@ try {
       done: (document.getElementById('cmpReplyDone') || {}).textContent || '' }));
     check(fx.vol === 0 && fx.m8 === 16 && /относится к другому объекту \(«ТЕСТОВАЯ ЧУЖАЯ ДОРОГА»\)/.test(fx.done) && /прочитаны только цены/.test(fx.done),
       'a «объем» sheet of another object left in the reply: its volumes are not taken, the prices are, and it is said (' + fx.done.slice(fx.done.indexOf('Объёмы'), fx.done.indexOf('Объёмы') + 140) + ')');
+    check(/остался от ответа по другой заявке/.test(fx.done) && /вкладке «Объёмы работ»/.test(fx.done),
+      'and why it is so, and where the volumes of this application are marked instead');
+  }
+
+  // «Сравнение версий» with the corrected file: did the volumes of the works (form 5) change? Unchanged — said so; one raised,
+  // one gone — the card says how many and the list names them, with the volume before and after
+  {
+    const same = join(dir, 'Тест_объёмы_испр.xlsx');
+    writeFileSync(same, xlsx(S, bookWithWorks()));
+    await open(fw);
+    await page.click('.tab[data-pane="compare"]');
+    await page.setInputFiles('#cmpNewFile', same);
+    await page.waitForFunction(() => app.compare_ui.res, null, { timeout: 30 * 1000 });
+    const w0 = await page.evaluate(() => ({ w: app.compare_ui.works, sum: document.getElementById('cmpSummary').textContent }));
+    check(w0.w && w0.w.works === 2 && w0.w.same === 2 && /Объёмы работ \(ведомость\)\s*без изменений/.test(w0.sum) && !/Изменились объёмы работ/.test(w0.sum),
+      'the corrected file with the same works: «Объёмы работ — без изменений» (' + JSON.stringify(w0.w && { works: w0.w.works, same: w0.w.same }) + ')');
+
+    const up = bookWithWorks();
+    const lrv = up.sheets[up.sheets.length - 1];
+    lrv.rows.forEach((cells) => {
+      if (!cells) return;
+      if (cells[3] && cells[3].v === 'ТЕСТОВАЯ КЛАДКА СТЕН') cells[5] = { v: 2.5 };
+      if (cells[3] && cells[3].v === 'ТЕСТОВЫЙ МОНТАЖ АНКЕРОВ') cells[3] = { v: 'ТЕСТОВЫЙ МОНТАЖ БОЛТОВ' };
+    });
+    const fu = join(dir, 'Тест_объёмы_больше.xlsx');
+    writeFileSync(fu, xlsx(S, up));
+    await page.setInputFiles('#cmpNewFile', fu);
+    await page.waitForFunction(() => app.compare_ui.works && app.compare_ui.works.up.length, null, { timeout: 30 * 1000 });
+    const w1 = await page.evaluate(() => ({ w: app.compare_ui.works, sum: document.getElementById('cmpSummary').textContent,
+      bad: !!document.querySelector('#cmpSummary .cmp-card.bad .t') && [...document.querySelectorAll('#cmpSummary .cmp-card.bad .t')].some((t) => /Объёмы работ/.test(t.textContent)),
+      rows: [...document.querySelectorAll('#cmpSummary .cmp-works tr')].slice(1).map((tr) => [...tr.cells].map((c) => c.textContent.trim()).join(' | ')) }));
+    check(w1.w.up.length === 1 && near(w1.w.up[0].from, 2) && near(w1.w.up[0].to, 2.5) && w1.w.added.length === 1 && w1.w.gone.length === 1 && w1.w.same === 0,
+      'a volume raised, a work renamed: one up (2 → 2.5), one new and one gone (' + JSON.stringify({ up: w1.w.up.length, added: w1.w.added.length, gone: w1.w.gone.length }) + ')');
+    check(w1.bad && /увеличено 1 · уменьшено 0/.test(w1.sum) && /новых 1 · удалено 1/.test(w1.sum), 'the card is red and says so');
+    check(w1.rows.length === 3 && /^ТЕСТОВАЯ КЛАДКА СТЕН \| М3 \| 2(,000)? \| 2,5(00)?$/.test(w1.rows[0]) && /ТЕСТОВЫЙ МОНТАЖ БОЛТОВ \| 100 ШТ \| — \|/.test(w1.rows[1]) &&
+      /ТЕСТОВЫЙ МОНТАЖ АНКЕРОВ \| 100 ШТ \| .+ \| —$/.test(w1.rows[2]), 'the list names each work with its volume before and after (' + w1.rows.join(' / ') + ')');
+
+    // a corrected file without form 5: not compared, and said so — never «без изменений»
+    await page.setInputFiles('#cmpNewFile', fp);
+    await page.waitForFunction(() => app.compare_ui.works && !app.compare_ui.works.pairs, null, { timeout: 30 * 1000 });
+    check(/Объёмы работ \(ведомость\)\s*не сравнивались/.test(await page.textContent('#cmpSummary')), 'a corrected file without form 5: the volumes are «не сравнивались», not «без изменений»');
   }
 
   check(!errors.length, 'no errors on the page' + (errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''));

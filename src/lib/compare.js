@@ -597,9 +597,31 @@
   }
 
   /**
+   * A file's name as a key: case, the extension, separators («_» for « », «68_96» for «68-96») and a copy's «(1)»
+   * do not tell two files apart.
+   */
+  function fileKey(label) {
+    return String(label || '').toLowerCase().replace(/ё/g, 'е')
+      .replace(/\.(xlsx|xlsm|xls|pdf)$/, '').replace(/\s*\(\d{1,2}\)$/, '')
+      .replace(/[^0-9a-z\u0400-\u04ff]+/g, ' ').trim();
+  }
+  /** Words two file names share, 2·shared / (|A| + |B|): «15 Смета 10V094 испр» is nearer «15 Смета 10V094 …» than «8 Смета 10V084 …». */
+  function nameSim(a, b) {
+    var x = {}, y = {};
+    fileKey(a).split(' ').forEach(function (w) { if (w) x[w] = (x[w] || 0) + 1; });
+    fileKey(b).split(' ').forEach(function (w) { if (w) y[w] = (y[w] || 0) + 1; });
+    return dice(x, y);
+  }
+
+  /**
    * An application of several estimates and the corrected files of them, chosen together: which corrected file is
-   * which estimate — by the lines they share (name + unit), the most first, each estimate once; a file sharing less
-   * than a fifth of its lines with every estimate is none of them, and its sheets stand without a pair. The sheets
+   * which estimate. First by the file's name: the corrected file is sent back under the name of its estimate, and
+   * estimates of one road often list the very same resources (four of them alike in one application — the lines
+   * alone paired them by the order the files were chosen in, and the 15th estimate was compared with the 8th). A
+   * name only one estimate and one corrected file have is their pair. The rest by the lines they share (name + unit),
+   * the most first; lines alike — by their quantities too (a correction of prices leaves them as they were), then by
+   * the nearer name; each estimate once; a file sharing less than a fifth of its lines with every estimate is none of
+   * them, and its sheets stand without a pair. The sheets
    * then carry their pair of files (`group`, so that two sheets both called «РЕСУРС» are never crossed) and the
    * name of their estimate (`where`, so that the table says which «РЕСУРС» a line is on). One file on each side is
    * returned as it is: the comparison of one estimate stays exactly what it was.
@@ -615,11 +637,37 @@
       set.objects.forEach(function (o) { var x = bagOf(o); for (var k in x) b[k] = (b[k] || 0) + x[k]; });
       return b;
     };
-    var A = oldSets.map(bag), B = newSets.map(bag), cand = [];
-    A.forEach(function (a, i) { B.forEach(function (b, j) { var d = dice(a, b); if (d > 0.2) cand.push([d, i, j]); }); });
-    cand.sort(function (x, y) { return y[0] - x[0] || x[1] - y[1] || x[2] - y[2]; });
+    // the same lines with their quantities: two estimates alike in names differ in how much of each
+    var qbag = function (set) {
+      var b = {};
+      set.objects.forEach(function (o) {
+        itemsOf(o).forEach(function (r) { var k = nuKey(r) + '\u241f' + Math.round((r.qty || 0) * 1000); b[k] = (b[k] || 0) + 1; });
+      });
+      return b;
+    };
     var to = newSets.map(function () { return -1; }), used = oldSets.map(function () { return false; });
-    cand.forEach(function (c) { if (to[c[2]] < 0 && !used[c[1]]) { to[c[2]] = c[1]; used[c[1]] = true; } });
+    // by name: one estimate and one corrected file of that name
+    var count = function (sets) { var c = {}; sets.forEach(function (s) { var k = fileKey(s.label); if (k) c[k] = (c[k] || 0) + 1; }); return c; };
+    var cOld = count(oldSets), cNew = count(newSets);
+    newSets.forEach(function (s, j) {
+      var k = fileKey(s.label);
+      if (!k || cOld[k] !== 1 || cNew[k] !== 1) return;
+      for (var i = 0; i < oldSets.length; i++) if (fileKey(oldSets[i].label) === k) { to[j] = i; used[i] = true; return; }
+    });
+    // the rest by their lines
+    var A = oldSets.map(bag), B = newSets.map(bag), QA = null, QB = null, cand = [];
+    A.forEach(function (a, i) {
+      if (used[i]) return;
+      B.forEach(function (b, j) {
+        if (to[j] >= 0) return;
+        var d = dice(a, b);
+        if (d <= 0.2) return;
+        if (!QA) { QA = oldSets.map(qbag); QB = newSets.map(qbag); }
+        cand.push([d, dice(QA[i], QB[j]), nameSim(oldSets[i].label, newSets[j].label), i, j]);
+      });
+    });
+    cand.sort(function (x, y) { return y[0] - x[0] || y[1] - x[1] || y[2] - x[2] || x[3] - y[3] || x[4] - y[4]; });
+    cand.forEach(function (c) { if (to[c[4]] < 0 && !used[c[3]]) { to[c[4]] = c[3]; used[c[3]] = true; } });
     var mark = function (o, group, where) { return Object.assign({}, o, { group: group, where: where }); };
     var olds = [], news = [];
     oldSets.forEach(function (set, i) { set.objects.forEach(function (o) { olds.push(mark(o, i, set.label)); }); });
@@ -629,6 +677,6 @@
     return { olds: olds, news: news, to: to };
   }
 
-  S.compare = { versions: versions, join: join, workbook: workbook, requested: requested, classify: classify, align: align,
+  S.compare = { versions: versions, join: join, fileKey: fileKey, workbook: workbook, requested: requested, classify: classify, align: align,
                 STATUS: STATUS, AMOUNT: AMOUNT, statusText: statusText, rowLabel: rowLabel, sheetLabel: sheetLabel, unasked: unasked };
 })(S);

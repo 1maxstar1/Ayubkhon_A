@@ -345,7 +345,34 @@ var S = (typeof S !== 'undefined' && S) || {};
       cols: [{ min: 1, max: 1, width: 6 }, { min: 2, max: 2, width: 70 }, { min: 3, max: 3, width: 14 }, { min: 4, max: 5, width: 16 }, { min: 6, max: 6, width: 42 }] };
   }
 
-  S.volumes = { NOTE: NOTE, table: table, parseSheet: parseSheet, parseWorkbook: parseWorkbook, list: list, parseReply: parseReply, match: match,
+  /**
+   * The works of a first version and of its corrected file, side by side («Сравнение версий»: did the volumes change?).
+   * A work is its name, unit and code; the same work met again is paired with one of the same volume first, then in
+   * order — so a volume changed in one place of a repeated work is that one change. Returns { works, same, up, down,
+   * gone, added } — up / down: [{ work, from, to }] of the first version's work; gone: works the corrected file has not;
+   * added: works only it has. Statements as parseWorkbook() gives them.
+   */
+  function changes(a, b) {
+    var key = function (w) { return up(w.name) + '␟' + S.unitKey(w.unit || '') + '␟' + String(w.code || '').replace(/\s+/g, ''); };
+    var la = list(a), lb = list(b), pool = {}, out = { works: la.length, worksNew: lb.length, same: 0, up: [], down: [], gone: [], added: [] };
+    lb.forEach(function (w) { (pool[key(w)] = pool[key(w)] || []).push(w); });
+    var rest = [];
+    la.forEach(function (w) {
+      var c = pool[key(w)] || [], i = -1;
+      for (var j = 0; j < c.length; j++) if (same(c[j].volume, w.volume)) { i = j; break; }
+      if (i >= 0) { c.splice(i, 1); out.same++; } else rest.push(w);
+    });
+    rest.forEach(function (w) {
+      var c = pool[key(w)] || [];
+      if (!c.length) { out.gone.push(w); return; }
+      var n = c.shift();
+      (n.volume > w.volume ? out.up : out.down).push({ work: w, from: w.volume, to: n.volume });
+    });
+    Object.keys(pool).forEach(function (k) { pool[k].forEach(function (w) { out.added.push(w); }); });
+    return out;
+  }
+
+  S.volumes = { changes: changes, NOTE: NOTE, table: table, parseSheet: parseSheet, parseWorkbook: parseWorkbook, list: list, parseReply: parseReply, match: match,
     titleObject: titleObject, otherObject: otherObject,
     deltas: deltas, key: baseKey };
 })(S);

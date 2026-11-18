@@ -178,5 +178,33 @@ const heads3 = t3.rows.filter((r) => r.kind === 'vsection').map((r) => r.cells[2
 check(heads3.join('|') === 'Склад — Склад дорога|РАЗДЕЛ 1. Земляные работы|Склад — Склад освещение|РАЗДЕЛ 1. Земляные работы',
   'table: two estimates with one title are still two lists, each under its own name (' + heads3.join('|') + ')');
 
+/* ------------------------------------------------------- «Сравнение версий»: did the works' volumes change */
+const lines = (fix) => {
+  const src = [
+    ['N п.п.', 'Шифр номера нормативов и коды ресурсов', 'Наименование работ и затрат', 'Единица измерения', 'Количество'],
+    [null, null, null, null, 'на ед. измерения', 'по проектным данным'],
+    [1, 2, 3, 4, 5, 6],
+    ['РАЗДЕЛ 1. Земляные работы'],
+  ];
+  fix.forEach(([no, code, name, unit, v]) => { src.push([no, code, name, unit, v]); src.push([no + '.1', '1', 'Затраты труда рабочих', 'чел.-ч', 3, 3 * v]); });
+  return S.volumes.parseSheet(sheet('01_ЛРВ', src));
+};
+const W = [[1, 'Е01-001-01', 'Разработка грунта экскаватором', '1000 м3', 0.4], [2, 'Е01-002-01', 'Засыпка траншей', '100 м3', 2.5],
+  [3, 'Е06-001-01', 'Устройство бетонной подготовки', '100 м3', 0.2], [4, 'Е06-001-01', 'Устройство бетонной подготовки', '100 м3', 0.1]];
+const was = [lines(W)];
+const c0 = S.volumes.changes(was, [lines(W)]);
+check(c0.works === 4 && c0.same === 4 && !c0.up.length && !c0.down.length && !c0.gone.length && !c0.added.length,
+  'changes: the same statement — every work the same, nothing up or down');
+const c1 = S.volumes.changes(was, [lines([W[0], W[1], W[3], W[2]])]);
+check(c1.same === 4 && !c1.up.length && !c1.down.length, 'changes: two works of one code and name swapped in order — still the same volumes');
+const c2 = S.volumes.changes(was, [lines([[1, 'Е01-001-01', 'Разработка грунта экскаватором', '1000 м3', 0.3], W[1], W[2],
+  [4, 'Е06-001-01', 'Устройство бетонной подготовки', '100 м3', 0.15], [5, 'Е11-001-01', 'Устройство покрытия', '100 м2', 1.2]])]);
+check(c2.same === 2 && c2.up.length === 1 && near(c2.up[0].from, 0.1) && near(c2.up[0].to, 0.15) &&
+  c2.down.length === 1 && c2.down[0].work.code === 'Е01-001-01' && near(c2.down[0].to, 0.3) &&
+  c2.added.length === 1 && c2.added[0].code === 'Е11-001-01' && !c2.gone.length,
+  'changes: one work of two with a code raised, another lowered, a new work added (the twin with the same volume stays the same)');
+const c3 = S.volumes.changes(was, [lines([W[0], W[2], W[3]])]);
+check(c3.same === 3 && c3.gone.length === 1 && c3.gone[0].name === 'Засыпка траншей' && c3.worksNew === 3, 'changes: a work taken out is gone');
+
 console.log(fail ? fail + ' failed' : 'all ok');
 process.exit(fail ? 1 : 0);

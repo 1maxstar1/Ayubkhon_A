@@ -135,7 +135,30 @@ var S = (typeof S !== 'undefined' && S) || {};
   S.col = col; S.colIndex = colIndex; S.esc = esc;
   S.near = near; S.num = num;
   S.vat = { RATE: 0.12, looksGross: looksGross };
-  S.money = money; S.price = price; S.qty = qty; S.debounce = debounce;
+  /**
+   * Is this book our own Таблица №2 — the document this program writes, or the reply made from it — and not an
+   * estimate? A sheet carries the title the program itself writes («TAQQOSLASH JADVALI №2», in its first rows), or at
+   * least half of the sheets carry the table's Russian title. Its «Лист1» reads as an estimate (name, unit, quantity,
+   * price, sum): loaded among the estimates, every resource was counted twice. An estimate book with one comparison
+   * sheet among its own is not taken for it.
+   */
+  function isTable2(wb) {
+    var OURS = /TAQQOSLASH\s+JADVALI\s*№\s*2/i, T2 = /(СОПОСТАВИТЕЛЬНАЯ|СРАВНИТЕЛЬНАЯ)\s+ТАБЛИЦА\s*№\s*2/i;
+    var sheets = (wb && wb.sheets) || [], ours = 0, n = 0;
+    sheets.forEach(function (s) {
+      for (var r = 1; r <= 12 && r < s.rows.length; r++) {
+        var row = s.rows[r] || [];
+        for (var c = 1; c < row.length; c++) {
+          if (!row[c] || typeof row[c].v !== 'string') continue;
+          if (OURS.test(row[c].v)) { ours++; return; }
+          if (T2.test(row[c].v)) { n++; return; }
+        }
+      }
+    });
+    return ours > 0 || (n > 0 && n * 2 >= sheets.length);
+  }
+
+  S.money = money; S.price = price; S.qty = qty; S.debounce = debounce; S.isTable2 = isTable2;
 
   /*
    * The interface is Russian (CLAUDE.md). Values the server stores as codes — a market, a role, an export mode —

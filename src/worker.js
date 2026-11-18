@@ -37,6 +37,8 @@
         sheetCount: wb.sheets.length, ms: Date.now() - t0
       };
       if (left.length) out.summaries = left;
+      // our own Таблица №2 (the document, or the reply made from it): said on the page, never an estimate
+      if (S.isTable2 && S.isTable2(wb)) out.table2 = true;
       self.postMessage(out);
       // asked for with the reading (`describe`): what the file looks like, from the workbook just read — posted after the
       // result, so the reading never waits for it, and the file is not read again for it. No hash here (the page asks

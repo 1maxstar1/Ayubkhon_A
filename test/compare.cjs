@@ -531,6 +531,20 @@ check(bigRm.prices[bigKey] === bigM && bigRm.requested[bigKey] && bigRm.requeste
   const sNew = ORDER.map((n) => ({ label: n + ' Смета 10V0' + n + ' испр.xls', objects: twin(3, 9) }));
   const js = S.compare.join(sOld, sNew);
   check(who(js, sOld) === ORDER.join(), 'contents alike and names not the same: by the nearer name (' + who(js, sOld) + ')');
+  // the sender returned one corrected file of two estimates: the other estimate stands as it was — not «deleted»
+  const half = S.compare.join(olds, [news[1]], true);
+  const hres = S.compare.versions(half.olds, half.news, {}, {});
+  const hall = [].concat(...hres.objects.map((o) => o.rows));
+  check(half.to.join() === '0' && half.alone.join() === '1' && half.how.join() === 'lines' && hres.objects.every((o) => !o.only) &&
+    !hall.some((r) => r.st === 'removed' || r.st === 'added') && hall.find((r) => r.nm === 'ТЕСТОВАЯ ОПОРА').p2 === 23,
+    'an estimate without a corrected file stands unchanged beside the one that came back: nothing «deleted» (alone ' + half.alone.join() + ')');
+  check(S.compare.join(olds, [news[1]]).news.length < half.news.length && !S.compare.join(olds, [{ label: 'чужая.xlsx', objects: est([MAT, line(1, 'ТЕСТОВЫЙ КИРПИЧ', 'ШТ', 100, 2)]) }], true).alone.length,
+    '(only when asked, and only when some file found its estimate)');
+  check(jn.how.every((h) => h === 'name') && jq.how.every((h) => h === 'lines'), 'and each pair says how it was made: by the name, or by the lines');
+  // one corrected file against the estimate chosen as «Было»: the estimate it is nearer to is found, to be said
+  check(S.compare.nearer(olds, news[0], 0) === 1 && S.compare.nearer(olds, news[0], 1) === -1 && S.compare.nearer(olds, news[1], 0) === -1 &&
+    S.compare.nearer(nOld, nNew[0], 0) === -1,
+    'a corrected file nearer to another estimate than the chosen one is found; estimates alike are no reason to say so');
   check(S.compare.fileKey('2_Смета_D020_АЙ_68_96_КМ (1).XLS') === S.compare.fileKey('2 смета d020 ай 68-96 км.xls') &&
     S.compare.fileKey('АНКЕР М5.xls') !== S.compare.fileKey('АНКЕР М8.xls') && S.compare.fileKey('4.1.1.xls') !== S.compare.fileKey('4.11.xls'),
     'a file\'s name as a key: case, separators, the extension and a copy\'s «(1)» do not matter; its digits do');
@@ -580,6 +594,18 @@ check(bigRm.prices[bigKey] === bigM && bigRm.requested[bigKey] && bigRm.requeste
   const three = S.versionsOf([road, fixed, same]);
   check(three.filter((x) => x.i === 2).map((x) => x.of + ':' + x.prices).join() === '1:2,0:0',
     'every earlier estimate it repeats is named, the nearest first (' + JSON.stringify(three) + ')');
+}
+
+/* ------------------------------------------------ our own Таблица №2 is not an estimate */
+{
+  const m = S.assemble([{ id: 'p1', name: 'T', title: 'T', objects: v1, enabled: true }], {});
+  const ours = S.readXlsx(S.buildWorkbook(m, { mode: 'all' }));
+  check(S.isTable2(ours) && S.smeta.parseWorkbook(ours, 'x.xlsx').length > 0,
+    'the document this program writes reads as an estimate — and is known for our own Таблица №2');
+  const t2 = sheet('цены', [['СРАВНИТЕЛЬНАЯ ТАБЛИЦА №2'], ['№', 'Наименование', 'Ед. изм.', 'Цена по смете', 'Рыночная цена'], [1, 'ТЕСТОВЫЙ КРАН 10 Т', 'МАШ.-Ч', 13, 11]]);
+  check(S.isTable2({ sheets: [t2] }) && S.isTable2({ sheets: [t2, sheet('объем', [['объёмы']])] }) && !S.isTable2(book(1)) &&
+    !S.isTable2({ sheets: [...book(1).sheets, ...book(2).sheets, t2] }),
+    'so is a reply under its Russian title; an estimate is not, nor an estimate book with one comparison sheet among its own');
 }
 
 console.log(fail ? '\nFAILED: ' + fail : '\nall compare checks passed');

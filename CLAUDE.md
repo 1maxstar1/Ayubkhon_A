@@ -15,6 +15,11 @@ bajarilgan (v2.9.2 – v2.10.0: yashil to'plam va CI, qulaylik va QQS), 6–7 na
 `docs/format-reja.md` — smeta formatlarini tanishni o'rganish rejasi (himoya testi, har bir yuklangan smetadan format
 namunasi yig'ish, 100 fayldan keyin model, AI faqat qoidalar o'qiy olmagan faylda); qaysi qadam bajarilgani boshida yozilgan.
 
+**Xatolardan saboqlar** — `docs/saboqlar.md`: egasining arizalarida topilgan xato turlari, har birining qo'riqchisi va
+xato topilganda bajariladigan tartib (haqiqiy faylda takrorlash → eski kodda yiqiladigan sintetik test → shu turdagi
+qo'shni holatlarni darhol sinash → umumiy o'zini tekshirish → barcha haqiqiy fayllarda o'lchov → yozib qo'yish).
+Xato tuzatilganda shu tartib **to'liq** bajariladi va hujjat yangilanadi.
+
 ## Muloqot tili
 
 **Foydalanuvchiga har doim o'zbek tilida (lotin alifbosida) javob berish.**
@@ -295,6 +300,14 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   (`versionNoted`, holatda saqlanadi): galochka qaytarsa, qayta o'chirilmaydi; avval saqlangan ariza ochilganda ham tekshiriladi.
   «Сравнение версий» vkladkasiga sudrab tashlangan fayl smeta bo'lib qo'shilmaydi: PDF yoki «Наш ответ» tugmasiga — javob,
   qolgani — tuzatilgan smeta (`compare.js` `dropped`). «×» li xabar (`opts.close`) keyingi oddiy xabarlar ostida yo'qolmaydi.
+  «Сравнение версий» o'zini tekshiradi (v2.16.20, `docs/saboqlar.md`): tuzatilgan fayli qaytmagan smeta o'zgarmagan deb
+  turadi (`join(…, fill)`; 9 smetadan 4 tasi qaytganda qolganlarining 1375 qatori «удалено» chiqardi); «Сопоставление
+  файлов» ro'yxati har bir juftni va qanday topilganini ko'rsatadi; natija mantiqsiz bo'lsa (`compare.js` `doubt`: qatorlarning
+  ≥ 30 % i «удалено/новая», tejash so'ralganidan 1,5 baravar ko'p, smetasiz fayl, boshqa smetaga yaqinroq yagona fayl —
+  `S.compare.nearer`) kartalar ustida qizil «Проверьте сравнение» chiqadi. Bizning Таблица №2 (eksport yoki javob) smeta
+  bo'lib yuklanmaydi (`S.isTable2`: dastur yozadigan «TAQQOSLASH JADVALI №2» sarlavhasi yoki varaqlarning yarmida ruscha
+  sarlavha; 95 haqiqiy faylda 10/10 va 0/85) — «Лист1» smeta bo'lib o'qilib, resurslar ikki marta sanalardi; saqlangan
+  ariza tiklanayotganda bu tekshiruv ishlamaydi.
   Ресурс ikki marta sanalmaydi; solishtirish va «Наш ответ» o'chirilgan loyihaga qaramaydi. «Наш ответ» ning «объем»
   varag'i boshqa obyektni nomlasa (sarlavhadagi «по объекту:» yoki «ТАБЛИЦА №2» ostidagi qator narx varag'inikidan farq
   qiladi) va qatorlarining yarmidan ko'pi smetada yo'q bo'lsa — u o'qilmaydi, faqat narxlar olinadi va sahifa aytadi

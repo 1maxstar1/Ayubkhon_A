@@ -431,6 +431,11 @@ table.cmp tr.t-head td{background:var(--sf2);border-top:1px solid var(--rule2)}
 table.cmp s.mute{text-decoration:line-through}
 .cmp-miss{font-size:12px;color:var(--mute);margin-top:4px}
 .cmp-miss ul{margin:4px 0 0 18px;padding:0;max-height:140px;overflow:auto}
+.cmp-doubt{margin:10px 16px 0;padding:10px 12px;border:1px solid var(--pink2);border-left:4px solid var(--bad);border-radius:6px;background:#fde3e5;line-height:1.5}
+.cmp-doubt ul{margin:4px 0 0 18px;padding:0}
+.cmp-pairs ul{max-height:220px}
+.cmp-pairs li.alone{color:var(--mute)}
+.cmp-pairs li.lost{color:var(--bad)}
 .cmp-works>div{max-height:260px;overflow:auto;margin-top:4px}
 .cmp-works table.cmp{min-width:0;max-width:900px}
 .cmp-works table.cmp th:nth-child(1){width:auto}

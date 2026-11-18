@@ -140,6 +140,12 @@ fayllar kompyuterdan chiqmaydi.
      yuklansa, dastur uni taniydi (bir xil qatorlar va miqdorlar, boshqa narxlar), o'chiradi
      va aytadi — aks holda resurslar Таблица №2 da ikki marta sanalardi va solishtirish
      tuzatilgan faylni o'zi bilan solishtirardi.
+   * **Dastur solishtirishni o'zi tekshiradi** (v2.16.20): «Сопоставление файлов» ro'yxati
+     qaysi tuzatilgan fayl qaysi smeta bilan solishtirilganini ko'rsatadi; fayli qaytmagan
+     smeta «o'zgarmagan» deb turadi (qatorlari «удалено» bo'lmaydi); natija mantiqsiz
+     bo'lsa (qatorlarning uchdan biri «удалено/новая», tejash so'ralganidan ancha ko'p, fayl
+     boshqa smetaga yaqinroq) kartalar ustida qizil **«Проверьте сравнение»** chiqadi.
+     Bizning Таблица №2 fayli smeta sifatida yuklanmaydi — sahifa qayerga yuklashni aytadi.
    * Arizada bir nechta smeta bo'lsa, ularning tuzatilgan fayllari birga tanlanadi
      va har biri o'z smetasi bilan solishtiriladi. Juftlash (v2.16.19) avval **fayl
      nomi** bo'yicha (katta-kichik harf, «_»/«-»/bo'sh joy, kengaytma va «(1)» farq

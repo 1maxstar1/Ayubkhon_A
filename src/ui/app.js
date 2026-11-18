@@ -531,6 +531,7 @@
           var left = [];
           res = { ok: true, objects: S.smeta.parseWorkbook(wb, file.name, left), works: works, sheetCount: wb.sheets.length };
           if (left.length) res.summaries = left;
+          if (S.isTable2 && S.isTable2(wb)) res.table2 = true;
         } catch (err) {
           res = { ok: false, error: String(err.message || err) };
         }
@@ -576,6 +577,12 @@
     if (S.Formats) S.Formats.take(entry && entry.file, name, res);
     if (!res.ok) {
       this.toast(name + ': ' + res.error, true);
+    } else if (res.table2 && !(S.Sync && S.Sync.loading)) {
+      // our own Таблица №2 — the document «Скачать Excel» writes, or the reply made from it. Its full sheet reads as an
+      // estimate (name, unit, quantity, price), and loaded among the estimates it counted every resource twice. Not
+      // while a workspace is brought back: what was saved there stays as it was.
+      this.toast(name + ': это не смета, а наша Таблица №2 (ответ). Как смета она не загружается — ресурсы посчитались бы дважды. ' +
+        'Загрузите её кнопкой «Наш ответ (Excel/PDF)» на вкладке «Сравнение версий» или через «Книга цен».', true);
     } else if (!res.objects.length) {
       this.toast(name + ': листы ресурсов не найдены. На листе нужна строка заголовков «НАИМЕНОВАНИЕ · КОЛ-ВО · ' +
         'ЦЕНА · СУММА» или хотя бы один из разделов «ЗАТРАТЫ ТРУДА / МАШИНЫ / МАТЕРИАЛЫ / ' +

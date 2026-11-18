@@ -626,12 +626,20 @@
    * name of their estimate (`where`, so that the table says which «РЕСУРС» a line is on). One file on each side is
    * returned as it is: the comparison of one estimate stays exactly what it was.
    *
+   *
+   * `fill`: an estimate left without a corrected file stands as it was — its own sheets are its second version. The
+   * sender returns the estimates he changed; the others were not deleted (64453: four files back for nine estimates —
+   * 1375 lines «deleted», and the remarks on those five estimates gone from «Осталось исправить»). Only when some
+   * file found its estimate: files that are none of the estimates change nothing.
+   *
    * @param {Array<{label, objects}>} oldSets  the estimates (projects, or one file)
    * @param {Array<{label, objects}>} newSets  the corrected files
-   * @returns {{olds, news, to: number[]}}  to[j] — the estimate of corrected file j, or -1
+   * @param {boolean} [fill]
+   * @returns {{olds, news, to: number[], alone: number[], how: string[]}}  to[j] — the estimate of corrected file j, or
+   *   -1; how[j] — 'name' | 'lines' | ''; alone — the estimates without a corrected file (filled, with `fill`)
    */
-  function join(oldSets, newSets) {
-    if (oldSets.length === 1 && newSets.length === 1) return { olds: oldSets[0].objects, news: newSets[0].objects, to: [0] };
+  function join(oldSets, newSets, fill) {
+    if (oldSets.length === 1 && newSets.length === 1) return { olds: oldSets[0].objects, news: newSets[0].objects, to: [0], alone: [], how: [''] };
     var bag = function (set) {
       var b = {};
       set.objects.forEach(function (o) { var x = bagOf(o); for (var k in x) b[k] = (b[k] || 0) + x[k]; });
@@ -646,13 +654,14 @@
       return b;
     };
     var to = newSets.map(function () { return -1; }), used = oldSets.map(function () { return false; });
+    var how = newSets.map(function () { return ''; });
     // by name: one estimate and one corrected file of that name
     var count = function (sets) { var c = {}; sets.forEach(function (s) { var k = fileKey(s.label); if (k) c[k] = (c[k] || 0) + 1; }); return c; };
     var cOld = count(oldSets), cNew = count(newSets);
     newSets.forEach(function (s, j) {
       var k = fileKey(s.label);
       if (!k || cOld[k] !== 1 || cNew[k] !== 1) return;
-      for (var i = 0; i < oldSets.length; i++) if (fileKey(oldSets[i].label) === k) { to[j] = i; used[i] = true; return; }
+      for (var i = 0; i < oldSets.length; i++) if (fileKey(oldSets[i].label) === k) { to[j] = i; used[i] = true; how[j] = 'name'; return; }
     });
     // the rest by their lines
     var A = oldSets.map(bag), B = newSets.map(bag), QA = null, QB = null, cand = [];
@@ -667,16 +676,43 @@
       });
     });
     cand.sort(function (x, y) { return y[0] - x[0] || y[1] - x[1] || y[2] - x[2] || x[3] - y[3] || x[4] - y[4]; });
-    cand.forEach(function (c) { if (to[c[4]] < 0 && !used[c[3]]) { to[c[4]] = c[3]; used[c[3]] = true; } });
+    cand.forEach(function (c) { if (to[c[4]] < 0 && !used[c[3]]) { to[c[4]] = c[3]; used[c[3]] = true; how[c[4]] = 'lines'; } });
+    var alone = [];
+    if (to.some(function (i) { return i >= 0; })) used.forEach(function (u, i) { if (!u) alone.push(i); });
     var mark = function (o, group, where) { return Object.assign({}, o, { group: group, where: where }); };
     var olds = [], news = [];
     oldSets.forEach(function (set, i) { set.objects.forEach(function (o) { olds.push(mark(o, i, set.label)); }); });
     newSets.forEach(function (set, j) {
       set.objects.forEach(function (o) { news.push(mark(o, to[j] >= 0 ? to[j] : 'n' + j, to[j] >= 0 ? oldSets[to[j]].label : set.label)); });
     });
-    return { olds: olds, news: news, to: to };
+    if (fill) alone.forEach(function (i) { oldSets[i].objects.forEach(function (o) { news.push(mark(o, i, oldSets[i].label)); }); });
+    return { olds: olds, news: news, to: to, alone: alone, how: how };
   }
 
-  S.compare = { versions: versions, join: join, fileKey: fileKey, workbook: workbook, requested: requested, classify: classify, align: align,
+  /**
+   * One corrected file compared with the estimate chosen as «Было», among several estimates: the estimate it is
+   * strictly nearer to than the chosen one — by the lines they share, then those with their quantities — or -1.
+   * A check, not a choice: the page says it, the person chooses.
+   */
+  function nearer(oldSets, part, chosen) {
+    var bagOfSet = function (set, withQty) {
+      var b = {};
+      (set.objects || []).forEach(function (o) {
+        itemsOf(o).forEach(function (r) { var k = nuKey(r) + (withQty ? '\u241f' + Math.round((r.qty || 0) * 1000) : ''); b[k] = (b[k] || 0) + 1; });
+      });
+      return b;
+    };
+    var p0 = bagOfSet(part, false), p1 = bagOfSet(part, true);
+    var score = function (set) { return [dice(bagOfSet(set, false), p0), dice(bagOfSet(set, true), p1)]; };
+    var mine = oldSets[chosen] ? score(oldSets[chosen]) : [0, 0], best = -1, top = mine;
+    oldSets.forEach(function (set, i) {
+      if (i === chosen) return;
+      var s = score(set);
+      if (s[0] > top[0] + 0.05 || (Math.abs(s[0] - top[0]) <= 0.05 && s[1] > top[1] + 0.05)) { top = s; best = i; }
+    });
+    return best;
+  }
+
+  S.compare = { versions: versions, join: join, fileKey: fileKey, nearer: nearer, workbook: workbook, requested: requested, classify: classify, align: align,
                 STATUS: STATUS, AMOUNT: AMOUNT, statusText: statusText, rowLabel: rowLabel, sheetLabel: sheetLabel, unasked: unasked };
 })(S);

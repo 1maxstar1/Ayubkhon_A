@@ -394,6 +394,39 @@ try {
       fixed: [].concat(...app.compare_ui.res.objects.map((o) => o.rows)).filter((r) => r.nm === 'ТЕСТОВЫЙ АНКЕР М8').map((r) => r.p2).join() }));
     check(d.n === 2 && d.name === 'Тест_v1_испр.xlsx' && d.reply === 'Наш_ответ.pdf' && d.fixed === '15',
       'files dropped on «Сравнение версий» go to the comparison: the reply and the corrected file, no estimate added (' + JSON.stringify(d) + ')');
+
+    // our own Таблица №2 loaded as an estimate: refused and said where it goes (its full sheet reads as an estimate)
+    const [dlT] = await Promise.all([page.waitForEvent('download'), page.click('#export')]);
+    const fOurs = join(dir, 'Наша_таблица.xlsx');
+    await dlT.saveAs(fOurs);
+    await page.setInputFiles('#pick', fOurs);
+    await page.waitForFunction(() => /наша Таблица №2/.test(document.getElementById('toast').textContent), null, { timeout: 30 * 1000 });
+    check(await page.evaluate(() => app.projects.length) === 2 && /Наш ответ \(Excel\/PDF\)/.test(await page.textContent('#toast')),
+      'our own Таблица №2 loaded as an estimate is refused and said where it goes');
+  }
+
+  // the comparison checks itself: one corrected file compared with another estimate's is said over the cards; with the
+  // files of both estimates the list says which was compared with which, and an estimate without a file stands unchanged
+  {
+    const fL = join(dir, 'Тест_освещение.xlsx'), fLx = join(dir, 'Тест_освещение_испр.xlsx');
+    await page.goto('file://' + join(root, 'dist/smeta-taqqoslash.html'));
+    await page.setInputFiles('#pick', [f1, fL]);
+    await page.waitForFunction(() => window.app && app.projects.length === 2 && app.model && app.pending <= 0, null, { timeout: 30 * 1000 });
+    await page.click('.tab[data-pane="compare"]');
+    await page.selectOption('#cmpOld', 'p0');
+    await page.setInputFiles('#cmpNewFile', fLx);
+    await page.waitForFunction(() => app.compare_ui.res, null, { timeout: 30 * 1000 });
+    const w = await page.evaluate(() => ({ doubts: app.compare_ui.doubts, box: (document.querySelector('#cmpSummary .cmp-doubt') || {}).textContent || '' }));
+    check(w.doubts.some((t) => /больше похож на смету «Тест_освещение\.xlsx», а сравнивается с «Тест_v1\.xlsx»/.test(t)) && /Проверьте сравнение/.test(w.box),
+      'a corrected file compared with another estimate\'s: said over the cards (' + w.doubts.join(' | ').slice(0, 200) + ')');
+    await page.selectOption('#cmpOld', 'p1');
+    await page.waitForFunction(() => app.compare_ui.doubts && !app.compare_ui.doubts.length, null, { timeout: 30 * 1000 });
+    check(!(await page.$('#cmpSummary .cmp-doubt')), 'compared with its own estimate, nothing is doubted');
+    await page.setInputFiles('#cmpNewFile', [fLx, f2]);
+    await page.waitForFunction(() => app.compare_ui.newFile && app.compare_ui.newFile.parts.length === 2 && app.compare_ui.pairs && app.compare_ui.pairs.pairs.length === 2, null, { timeout: 30 * 1000 });
+    const pb = (await page.textContent('#cmpSummary .cmp-pairs')).replace(/\s+/g, ' ');
+    check(/Сопоставление файлов: пар 2/.test(pb) && /«Тест_освещение_испр\.xlsx» ↔ «Тест_освещение\.xlsx»/.test(pb) && /«Тест_v2\.xlsx» ↔ «Тест_v1\.xlsx»/.test(pb),
+      'the list says which corrected file was compared with which estimate (' + pb.slice(0, 160) + ')');
   }
 
   check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' / ') : ''));

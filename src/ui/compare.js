@@ -424,17 +424,67 @@
     if (parts.length > 1) b = this.wholeBase(b);
     var t0 = performance.now();
     var sets = b.sets || [{ label: b.label, objects: b.objects }];
-    var j = S.compare.join(sets, parts);
+    var j = S.compare.join(sets, parts, true);
     this.res = S.compare.versions(j.olds, j.news, b.requested, b.known);
     this.works = workDiff(sets, parts, j.to);
     // a corrected file that is none of the estimates: said, its sheets are shown without a pair
     var lost = parts.filter(function (p, i) { return j.to[i] < 0; }).map(function (p) { return p.label; });
-    if (parts.length > 1 && lost.length) this.app.toast('Не удалось сопоставить со сметами заявки: ' + lost.join(', ') + ' — его листы показаны как листы без пары', true);
+    // which file was compared with which estimate — shown, so that a wrong pair is seen and not guessed from the sums
+    this.pairs = { on: sets.length > 1 || parts.length > 1,
+      pairs: parts.map(function (p, i) { return j.to[i] >= 0 ? { n: p.label, o: sets[j.to[i]].label, how: j.how[i] } : null; }).filter(Boolean),
+      alone: j.alone.map(function (i) { return sets[i].label; }), lost: lost };
+    this.doubts = this.doubt(b, parts, lost);
     this.labels = { oldLabel: b.label, newLabel: this.newFile.name, asked: Object.keys(b.requested).length,
                     reply: this.reply && this.reply.base === $('cmpOld').value ? this.reply : null };
     this.ms = Math.round(performance.now() - t0);
     this.render();
   };
+
+  /**
+   * Does the result look like a comparison of the right files? What every wrong pairing seen so far had in common is
+   * checked on each result and said over the cards, in red — a file compared with another estimate's, a corrected file
+   * loaded as an estimate, files of another application: a third of the lines «deleted» or «new», or far more saved
+   * «by our remarks» than was asked. The sums are shown all the same; the person is told not to take them as they are.
+   */
+  Compare.prototype.doubt = function (b, parts, lost) {
+    var out = [], T = this.res.totals, c = T.counts, app = this.app;
+    var gone = (c.removed || 0) + (c.added || 0);
+    if (T.rows >= 20 && gone >= 0.3 * T.rows) out.push('Строк «удалено» или «новых»: ' + gone + ' из ' + T.rows +
+      ' — так бывает, когда исправленный файл сравнивается не со своей сметой. Проверьте «Было» и список сопоставления файлов ниже.');
+    if (T.askedSaving > 0 && T.gotSaving > 1.5 * T.askedSaving) out.push('Снижение по замечаниям (' + money(T.gotSaving) +
+      ') больше запрошенного (' + money(T.askedSaving) + ') в полтора раза и более — проверьте, что файлы сопоставлены со своими сметами.');
+    if (lost.length) out.push('Не сопоставлен ни с одной сметой заявки: ' + lost.join(', ') + ' — его листы показаны без пары.');
+    // one corrected file against the estimate chosen as «Было», while another estimate of the application is nearer
+    var v = $('cmpOld').value;
+    if (parts.length === 1 && v !== 'file') {
+      var on = app.projects.filter(function (p) { return p.enabled !== false; });
+      var chosen = on.indexOf(app.projects[+String(v).slice(1)]);
+      if (on.length > 1) {
+        var k = S.compare.nearer(on.map(function (p) { return { objects: p.objects || [] }; }), parts[0], chosen);
+        if (k >= 0) out.push('Файл «' + parts[0].label + '» больше похож на смету «' + (on[k].file || on[k].name) +
+          '», а сравнивается с «' + b.label + '». Выберите нужную смету в списке «Было» — или загрузите исправленные файлы всех смет сразу.');
+      }
+    }
+    return out;
+  };
+
+  /** The doubts over the cards. */
+  function doubtBox(list) {
+    if (!list || !list.length) return '';
+    return '<div class="cmp-doubt" role="alert"><b>Проверьте сравнение.</b><ul>' +
+      list.map(function (t) { return '<li>' + S.esc(t) + '</li>'; }).join('') + '</ul></div>';
+  }
+  /** Which corrected file stands against which estimate, and the estimates that came back without a file. */
+  function pairBox(P) {
+    if (!P || !P.on) return '';
+    var li = P.pairs.map(function (x) {
+      return '<li>«' + S.esc(x.n) + '» ↔ «' + S.esc(x.o) + '»' + (x.how === 'name' ? ' <small>(по имени файла)</small>' : x.how === 'lines' ? ' <small>(по строкам)</small>' : '') + '</li>';
+    }).concat(P.alone.map(function (n) { return '<li class="alone">«' + S.esc(n) + '» — исправленного файла нет: считается неизменённой</li>'; }))
+      .concat(P.lost.map(function (n) { return '<li class="lost">«' + S.esc(n) + '» — не сопоставлен ни с одной сметой</li>'; }));
+    return '<details class="cmp-miss cmp-pairs"' + (P.alone.length || P.lost.length ? ' open' : '') + '><summary>Сопоставление файлов: пар ' + P.pairs.length +
+      (P.alone.length ? ' · без исправленного файла ' + P.alone.length : '') + (P.lost.length ? ' · без сметы ' + P.lost.length : '') +
+      '</summary><ul>' + li.join('') + '</ul></details>';
+  }
 
   /* -------------------------------------------------------------- render */
 
@@ -566,7 +616,7 @@
     var rc = T.resCounts;
     var left = (rc.partial || 0) + (rc.notfixed || 0) + (rc.worse || 0);
     var pct = T.askedSaving > 0 ? Math.round(T.gotSaving / T.askedSaving * 100) : null;
-    sum.innerHTML =
+    sum.innerHTML = doubtBox(this.doubts) +
       '<div class="cmp-cards">' +
       card('', 'Сумма по смете', money(T.oldSum) + ' → ' + money(T.newSum), delta(T.newSum - T.oldSum)) +
       card('good', 'Снижение по нашим замечаниям', money(T.gotSaving) + ' из ' + money(T.askedSaving),
@@ -590,7 +640,7 @@
       '<div class="cmp-files">Было: <b>' + S.esc(L.oldLabel) + '</b> · Стало: <b>' + S.esc(L.newLabel) + '</b> · ' +
       (L.reply ? 'замечания из файла «' + S.esc(L.reply.name) + '»: ' + L.asked + ' (строк в файле ' + L.reply.entries.length + ')' :
         'замечаний в нашей таблице: ' + L.asked) + ' · ' + lines(T.rows) + ' · ' + this.ms + ' мс</div>' +
-      (L.reply ? replyNotes(L.reply) : '') + worksList(this.works);
+      pairBox(this.pairs) + (L.reply ? replyNotes(L.reply) : '') + worksList(this.works);
 
     var view = $('cmpView').value, filter = $('cmpFilter').value;
     var q = S.nameKey($('cmpQ').value || '');

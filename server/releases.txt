@@ -36,3 +36,4 @@ v2.16.6 78f60ddec1026918ba646017365f8f5cd96a097a open v2.16.1 findings: rollback
 v2.16.10 6e9c2ddda0c25db42882b12c75594119ac8271ab Windows restore of a database copy, the Mac's too (laptop.cmd restore)
 v2.16.11 81f0e4634c65a88dd04a8b786864b9b93ff0beb9 new smeta layouts, reply units, workspace keeps unfetched files
 v2.16.12 9f124dffaad8da3346b428044b118a860b23abbd review fixes, summary sheet not counted twice, percentage haulage lines, haulage names in replies
+v2.16.14 fd12ccbef2ffe615e0e922cf97bdfe235d047dc5 PDF reply: word gaps from the page, not from space glyphs

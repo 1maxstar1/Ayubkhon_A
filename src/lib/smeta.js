@@ -105,13 +105,17 @@
    * money, quantity × price = sum, and not the name of a summary line (form 4А's «В Т.Ч. ЗАТРАТЫ ТРУДА МАШИНИСТОВ» and
    * closing «ЗАТРАТЫ ТРУДА РАБОЧИХ» carry a quantity and are not resources). Estimators add such lines by hand at the
    * end of a band — «<разъединитель> | комплект | 1 | <цена> | <сумма>», no number, above an «ИТОГО ПО СТРОИТЕЛЬНЫМ
-   * МАТЕРИАЛАМ» whose SUM counts them — and they were left out (2026-11-17).
+   * МАТЕРИАЛАМ» whose SUM counts them — and they were left out (2026-11-17). Money is every spelling of the currency,
+   * not only money()'s «СУМ»: a «ТРАНСПОРТНЫЕ РАСХОДЫ | сўм | 0.03 | 186 | 5.58» (a percentage × its base) also has
+   * quantity × price = sum, and it is a money line, not a line added by hand. The statement of required resources still
+   * goes by money(): its rule is older than this one and was not what went wrong here.
    */
+  var MONEY = /^((ТЫС|ТЫСЯЧ|Т|МЛН|МЛРД|МИНГ|MING|MLN|1000) ?)?(СУМ|СЎМ|SO ?M|SUM|РУБ|РУБЛЕЙ|RUB|UZS)$/;
   var SUMMARY_LINE = /^(В ?Т ?Ч|В ТОМ ЧИСЛЕ|ЗАТРАТЫ ТРУДА|ИТОГО|ВСЕГО)( |$)/;
   function pricedLine(cells, L, nm, qty, price, sum) {
     if (!(qty > 0 && price > 0 && sum > 0)) return false;
     var unit = txt(cells[L.unit]).trim();
-    if (!unit || money(cells[L.unit]) || unit.indexOf('%') >= 0 || SUMMARY_LINE.test(up(nm))) return false;
+    if (!unit || MONEY.test(up(unit)) || unit.indexOf('%') >= 0 || SUMMARY_LINE.test(up(nm))) return false;
     return Math.abs(qty * price - sum) <= Math.max(1, sum * 0.002);
   }
 
@@ -151,16 +155,18 @@
       else if (u.indexOf('ШИФР') === 0) { L = L || {}; L.code = c; }
     }
     if (!L || !L.name || !L.qty) return null;
+    var sub = rows[r + 1] || [];
+    // «Количество» over two columns — «на единицу измерения» (the norm of one unit of the work) and «по проектным
+    // данным» (the quantity): the second is the quantity, and the first is neither the quantity nor the price (the
+    // local resource statement, «ЛОКАЛЬНО-РЕСУРСНАЯ ВЕДОМОСТЬ», where the works and their resources stand together).
+    // Looked for whatever the header row itself names: with «Цена» and «Сумма» written there, the quantity was read
+    // from the norm column
+    for (var kq = 1; kq < sub.length; kq++) {
+      if (!/^ПО ПРОЕКТНЫМ/.test(up(txt(sub[kq])))) continue;
+      if (kq > L.qty && kq <= L.qty + 2 && up(txt(sub[L.qty])).indexOf('НА ЕДИНИЦУ') === 0) { L.unitQty = L.qty; L.qty = kq; }
+      break;
+    }
     if (!L.price || !L.sum) {
-      var sub = rows[r + 1] || [];
-      // «Количество» over two columns — «на единицу измерения» (the norm of one unit of the work) and «по проектным
-      // данным» (the quantity): the second is the quantity, and the first is neither the quantity nor the price (the
-      // local resource statement, «ЛОКАЛЬНО-РЕСУРСНАЯ ВЕДОМОСТЬ», where the works and their resources stand together)
-      for (var kq = 1; kq < sub.length; kq++) {
-        if (!/^ПО ПРОЕКТНЫМ/.test(up(txt(sub[kq])))) continue;
-        if (kq > L.qty && kq <= L.qty + 2 && up(txt(sub[L.qty])).indexOf('НА ЕДИНИЦУ') === 0) { L.unitQty = L.qty; L.qty = kq; }
-        break;
-      }
       for (var k = 1; k < sub.length; k++) {
         var s = up(txt(sub[k]));
         if (!L.price && s.indexOf('НА ЕДИНИЦУ') === 0 && k !== L.unitQty) L.price = k;
@@ -191,6 +197,11 @@
       }
       if (!L.price || !L.sum) return null;
     }
+    // with the price and the sum named in the header row itself, the row below holds the two quantity columns alone:
+    // the header's second line all the same, and the «1 2 3 …» row is the one under it. (Set here, after the price and
+    // the sum, and only when nothing above has set it: a statement read so far keeps its layout key for key, in the
+    // same order — test/smeta-corpus.cjs fingerprints the layout as it is written out)
+    if (L.unitQty && !L.subRow) L.subRow = r + 1;
     // «№ п/п» folds to «П П», so the number column is found by its raw «№» — with a code column in between, or any
     // other («Обоснование»): never guessed as the one left of the name when the header says where it is. A header
     // with «№» right before the name gives the same column as the guess did.
@@ -402,7 +413,13 @@
       }
     }
 
-    var out = [], section = '', band = '', items = 0, sections = 0, wide = L.lastCol;
+    var out = [], section = '', band = '', work = '', items = 0, sections = 0, wide = L.lastCol;
+    // the number of the first numbered line below row r, as text ('' when there is none): the local resource
+    // statement tells by it whether a line is itself a work (see below)
+    var nextNo = function (r) {
+      for (var n = r + 1; n <= last; n++) { var t = txt((sheet.rows[n] || [])[L.no]).trim(); if (t) return t; }
+      return '';
+    };
     // A sheet read by its shape starts at its first resource band or line, below a «ПЕРЕВОЗКА» band that opens it:
     // that band still names the lines under it (the reading itself — where it starts — stays as it was)
     if (!L.headerRow) {
@@ -438,8 +455,15 @@
       // «ЗАТРАТЫ ТРУДА РАБОЧИХ» carry a quantity but are not resources.
       else if (L.code && !noTxt && nm && qty == null && isSection(nm)) { kind = 'section'; section = sectionOf(nm); sections++; }
       // the local resource statement: a work («РАЗРАБОТКА ГРУНТА …», 1000 М3) has no norm of one unit — only its
-      // resources below it have one; the work is not a resource, its resources are
-      else if (L.unitQty && nm && qty != null && S.num(cells[L.unitQty] && cells[L.unitQty].v) == null) kind = 'extra';
+      // resources below it have one; the work is not a resource, its resources are. A line numbered under the work
+      // above it («1.4» under «1») is that work's resource even with nothing per unit — a material the project names,
+      // its norm left blank, «-» or a word. Only the number of that very work counts: «1.2» after a work «1.1» is the
+      // next work, and where the numbering says nothing (no number, or a number of its own) the norm decides alone.
+      // And only a line priced as a resource is (not a money, «%» or «В Т.Ч. …» line), and one with nothing numbered
+      // under it: «1.1» followed by «1.1.1» is a work of its own, not a resource of «1»
+      else if (L.unitQty && nm && qty != null && S.num(cells[L.unitQty] && cells[L.unitQty].v) == null &&
+        !(work && noTxt.trim().indexOf(work + '.') === 0 && pricedLine(cells, L, nm, qty, price, sum) &&
+          nextNo(r).indexOf(noTxt.trim() + '.') !== 0)) { kind = 'extra'; work = noTxt.trim(); }
       // a т·км line under a haulage band with its price but its quantity left empty (and so its sum 0): a line of the
       // estimate all the same — numbered or not — read with the quantity 0, so that nothing on the sheet goes unseen
       else if (qty == null && !sum && price != null && nm && LETTER.test(nm) && haulBand(band) && TKM.test(up(txt(cells[L.unit])))) { kind = 'item'; qty = 0; items++; }
@@ -556,13 +580,18 @@
         else if (/^СТОИМОСТЬ ЗА/.test(u)) h.price = c;           // «Стоимость за один тн/км» — before the km test
         else if (/^НА Т(Н|ОН)? ?КМ$/.test(u)) h.price = c;       // «на тн/км» under «автотр расход»
         else if (/^(ТН|Т|ТОН|ТОНН) КМ$/.test(u)) h.tkm = c;
-        else if (/(^| )КМ$/.test(u) || /^РАСС ?Т(Е)?( |$)/.test(u)) h.km = c;     // «… км», or «Расст» / «расс-т»
+        // «… км», or «Расст» / «расс-т» / «Расст-е» alone: «Расст-е на перев-у» is the rail distance (under «расход ж/д
+        // перевозки»), which must not be taken for the road km wherever it stands
+        else if (/(^| )КМ$/.test(u) || /^РАСС ?Т( ?Е)?$/.test(u)) h.km = c;
         // read for the checks below only: the material's own quantity, its specific weight, the tonnes
         else if (/^КОЛ(ИЧЕСТВ|И ЧЕСТВО|ВО$)|^ПОТРЕБНОСТ/.test(u)) h.amount = c;
         else if (/^(УДЕЛЬ? ?НЫЙ|ОБ[ЪЬ]?ЕМ ?НЫЙ) ВЕС/.test(u)) h.weight = c;     // «Удельный», «Удель- ный», «Объем- ный»
         else if (/^(ОБЩ|ОБШ)(ИЙ|АЯ)? ?(ТОНН|ВЕС)/.test(u)) h.tons = c;
         else if (/^ОБЩАЯ ЦЕНА/.test(u)) h.sum = c;          // «Общая цена» — the whole cost, beside a «Всего» of one unit
-        else if ((u === 'ВСЕГО' && !h.sum) || u.indexOf('СУММА') === 0 || /^СТОИМОСТЬ ГРУЗОПЕРЕВОЗ/.test(u) || (u === 'ИТОГО' && !h.sum)) h.sum = c;
+        // a later «Всего» is the sum over an earlier «Сумма …» / «Итого» / «Всего», as it always was — but not over «Общая
+        // цена» (a «Всего» beside it is the cost of one unit)
+        else if ((u === 'ВСЕГО' && !(h.sum && /^ОБЩАЯ ЦЕНА/.test(up(txt(cells[h.sum]))))) || u.indexOf('СУММА') === 0 ||
+          /^СТОИМОСТЬ ГРУЗОПЕРЕВОЗ/.test(u) || (u === 'ИТОГО' && !h.sum)) h.sum = c;
         else if (/^\s*№/.test(raw) || /^N П П$/.test(u)) h.no = c;
       }
       return h;
@@ -609,7 +638,7 @@
       if (!t) continue;
       if (!title) title = t; else if (!subtitle) subtitle = t;
     }
-    var out = [], items = 0, last = lastContentRow(rows);
+    var out = [], items = 0, last = lastContentRow(rows), fits = 0, misfits = 0;
     for (r = L.headerRow; r <= last; r++) {
       var cs = rows[r] || [];
       var name = nameAt(cs);
@@ -632,6 +661,11 @@
       else if (isTotal(name) || isTotal(noTxt)) row.kind = 'total';
       else if (name && LETTER.test(name) && tkm != null && tkm > 0 && price != null && dist != null && dist > 0) {
         row.kind = 'item'; items++;
+        // «Расчёт стоимости перевозки»: its whole cost is the т·км × the price of one т·км. A sheet where no line's cost
+        // is («Общая цена» = the material's own price + its haulage, per unit) is a calculation of prices, whatever its
+        // header calls the material's price: the resource sheet already carries that price. A line off on a sheet whose
+        // other lines agree is the estimator's slip: the sheet is read, and the line keeps the sum the sheet gives it
+        if (byAmount && sum != null) { if (Math.abs(tkm * price - sum) <= Math.max(1, sum * 0.002)) fits++; else misfits++; }
         row.nm = 'Транспортировка ' + name + ' ' + km(dist) + ' км';
         row.unit = 'т/км';
         row.cells = slim(cs, (function () {
@@ -645,7 +679,7 @@
     }
     // the header's own second line («тн» under «Удельный вес») sits before the numbering
     out.forEach(function (x) { if (x.r > L.headerRow && L.numRow && x.r < L.numRow && x.kind === 'blank') { x.kind = 'header'; x.sub = true; if (!L.subRow) L.subRow = x.r; } });
-    if (!items) return null;
+    if (!items || (misfits && !fits)) return null;
     return { name: sheet.name, title: title, subtitle: subtitle || sheet.name, layout: L, rows: out, items: items, sections: 0, maxCol: L.sum,
       checks: haulChecks(rows, out, H) };
   }

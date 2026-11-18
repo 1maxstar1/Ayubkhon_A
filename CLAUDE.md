@@ -209,16 +209,42 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   qolsa yoki ИТОГО hech biriga teng bo'lmasa aytiladi. «ОБЩИЙ ИТОГ» o'chirilgani — xato emas, oddiy xabar (qizil emas).
   Kod ustuni bor varaqda raqamsiz qator ham resurs, agar resursdek narxlangan bo'lsa (birlik pul emas, kol-vo × narx = summa,
   yig'ma qator nomi emas — «В Т.Ч. …», «ЗАТРАТЫ ТРУДА …», «ИТОГО/ВСЕГО»): smeta tuzuvchi band oxiriga qo'lda qo'shgan qatorlar
-  (2026-11-17, `smeta-header` 21). «ЛОКАЛЬНО-РЕСУРСНАЯ ВЕДОМОСТЬ» (har ish ostida o'z resurslari):
+  (2026-11-17, `smeta-header` 21).
+  Bu qoidada pul birligi faqat «СУМ» emas: «сўм», «тыс.сум», «1000 сум», «so'm», «руб», «UZS» ham (`smeta.js` `MONEY`) —
+  shunday birlikdagi raqamsiz qator («ТРАНСПОРТНЫЕ РАСХОДЫ | сўм | 0,03 | …») kol-vo × narx = summa bo'lsa ham resurs emas,
+  pul qatori (v2.16.12, `smeta-header` 31); «у.е.» pul emas — u sanoq birligi ham bo'ladi; «Сметная потребность» vedomosti
+  va kod ustunisiz varaqlar avvalgidek.
+  «ЛОКАЛЬНО-РЕСУРСНАЯ ВЕДОМОСТЬ» (har ish ostida o'z resurslari):
   «Количество» ikki ustun («на единицу измерения» / «по проектным данным») — miqdor loyihaviy ustundan; birlikka miqdori yo'q
-  ish qatori (shifr, «1000 М3») resurs emas — uning summasi ostidagi resurslar yig'indisi (`smeta-header` 22). «N п/п» —
+  ish qatori (shifr, «1000 М3») resurs emas — uning summasi ostidagi resurslar yig'indisi (`smeta-header` 22).
+  Shu vedomostda birlikka miqdori yo'q (bo'sh, «-» yoki so'z) qator ham resurs, agar uchta shart birga bajarilsa: raqami
+  ustidagi ishning raqami ostida («1» ishi ostida «1.4» — loyiha bo'yicha olingan, normasi yozilmagan material); resursdek
+  narxlangan (birlik pul yoki «%» emas, «В Т.Ч. …» emas, kol-vo × narx = summa); ostida o'z raqamli qatorlari yo'q («1.1»
+  dan keyin «1.1.1» kelsa, «1.1» o'zi ish). Raqam hech narsa demasa (raqamsiz qator, o'z raqamli qator, «1.1» ishidan
+  keyingi «1.2») — avvalgidek birlikka miqdor hal qiladi: yo'q bo'lsa — ish (v2.16.12, 26). «Количество» ning ikki ustuni
+  sarlavha qatorining o'zida «Цена» va «Сумма» yozilgan bo'lsa ham topiladi: ostidagi qator sarlavhaning ikkinchi qatori,
+  «1 2 3 …» undan pastda, miqdor norma ustunidan o'qilmaydi (27).
+  «N п/п» —
   raqam ustuni, kod ustuni oraliqda tursa ham: bandlar shu ustunda ko'rinadi (25). «Расчёт стоимости перевозки» varag'i:
   т·км = потребность × вес × км, narx «на тн/км», summa «Общая цена» (23); yonida «Стоимость мат-ов без перевозки» ustuni
   bor varaq o'qilmaydi — u tashishni material narxiga qo'shadi, resurs varag'i esa o'sha narxni allaqachon olgan (24).
+  Bunday varaqni sarlavha so'zidan tashqari arifmetika ham ushlaydi: «потребность × вес × км» varag'ida summasi bor
+  qatorlarning birortasida ham «Общая цена» т·км × «на тн/км» ga teng bo'lmasa (material narxi + tashish) — varaq
+  o'qilmaydi; bitta qatordagi xato yoki bo'sh summa — smeta tuzuvchining xatosi, varaq avvalgidek o'qiladi va xato ko'rinib
+  turadi (v2.16.12, 29). Tashish varag'ida summa ustuni — o'ngdagi «Всего», undan chapdagi «Сумма …» / «Итого» / «Всего»
+  emas; faqat «Общая цена» yonidagi «Всего» (bir birlik narxi) summa emas (28). Masofa ustuni — «… км» yoki yolg'iz «Расст»
+  / «расс-т» / «Расст-е»; «Расст-е на перев-у» (temir yo'l masofasi) qayerda tursa ham avtomobil km i emas (30).
   Javob jadvalida «МАШ-ЧАС»/«ЧЕЛ-ЧАС» = «маш.-ч»/«чел.-ч» (`reply.js` `unitOf`, `match.js` ga tegmaydi); «%» qatori resurs
-  emas; boshqacha yozilgan nom faqat smeta narxi — jadvalning o'z ustuni yoki «Цены по ПСД» — teng bo'lsa topiladi
-  (o'xshashlik ≥ 0,8). «Наш ответ» da narxsiz, faqat izohli qator («-», «обоснов» yoki bo'sh narx + izoh) — so'ralgan,
-  narxsiz qator (`market: null`): narx qo'ymaydi, «Сравнение версий» uni so'ralgan deb baholaydi; raqamli, lekin son emas
+  emas;
+  boshqacha yozilgan nom faqat smeta narxi teng bo'lsa topiladi: jadvalning o'z narx ustuni bilan — o'xshashlik ≥ 0,9, faqat
+  «Цены по ПСД» bilan — ≥ 0,8 (v2.16.12). Xuddi shunday yaqin boshqa nom bo'lsa (0,9 dan pastda — umuman boshqa nom bo'lsa)
+  hech biriga qo'yilmaydi, «не найдено» bo'ladi; bitta nomning yaxlitlashda farq qiladigan ikki narxi — bitta resurs, narx
+  ikkalasiga tushadi. «ПСД» li sarlavha faqat narx so'zi bilan («Цены по ПСД», «Стоимость по ПСД») yoki yolg'iz («ПСД», «По
+  ПСД» — ikki qatorli sarlavhaning pastki qatori) bo'lsa «Цены по ПСД» ustuni: «Наименование … по ПСД» — nom, «Ед.изм. по
+  ПСД» — birlik, «Кол-во по ПСД» — narx emas.
+  «Наш ответ» da narxsiz, faqat izohli qator («-», «обоснов» yoki bo'sh narx + izoh; izohsiz yolg'iz chiziqcha — «-», «—»
+  yoki minus belgisi — ham, agar qatorda birlik bo'lsa) — so'ralgan, narxsiz qator (`market: null`): narx qo'ymaydi,
+  «Сравнение версий» uni so'ralgan deb baholaydi; raqamli, lekin son emas
   narx («7 500 сум») avvalgidek «цена не прочитана».
   Boshqa smetalarni qatorma-qator takrorlaydigan fayl («ОБЩИЙ ИТОГ», `S.copiesOf`) yuklanganda o'chiriladi va aytiladi —
   ресурс ikki marta sanalmaydi; solishtirish va «Наш ответ» o'chirilgan loyihaga qaramaydi. «Наш ответ» ning «объем»
@@ -227,6 +253,16 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   (egasining qarori, 2026-11-15: ekspert eski javobni shablon qilib, «объем» varag'ini o'chirmay qoldiradi).
 * Raqamlar hech qachon yo'qolmaydi: `АНКЕР М5` ≠ `АНКЕР М8`, `4.1.1` ≠ `4.11`;
   ikki raqam orasidagi ajratgich o'chirilmaydi.
+* **Ekranda yo'q smetalar** (v2.16.12, `src/ui/sync.js` `away`, `test/away-files.mjs`). Ariza ochilganda saqlangan holatdagi
+  smetaning fayli serverda turgan, lekin ekranga chiqmagan bo'lishi mumkin: yuklab bo'lmagan (aloqa, 404) yoki o'qilmagan
+  (vaqt chegarasi, qoida endi varaq topmaydi). Bunday smeta «away»: saqlash uning faylini serverdan o'chirmaydi, loyihasini
+  esa holatda o'z joyida (tartibi bilan) qoldiradi. Har bir fayl alohida olinadi — bitta olinmagan fayl qolganlarini
+  yashirmaydi. Loyihalar ro'yxati ustidagi qator har bir shunday smetani sababi bilan nomlaydi, belgi «✓» emas, «!» bo'ladi.
+  «Скачать Excel» va «✓ Завершить» avval so'raydi. Faylni arizadan faqat odamning o'zi chiqaradi («Убрать из заявки»). Xuddi
+  shu nomli fayl qayta qo'shilsa, eskisining o'rnini oladi; eski fayl yangisiga ishora qiluvchi holat bilan birga, keyingi
+  saqlashda o'chiriladi (undan oldin emas). Sahifa fayllar yuklanayotganda ketishga so'ralsa (beforeunload), shu paytdagi
+  xato hisobga olinmaydi; sahifa 2 soniyadan keyin ham o'rnida bo'lsa — shu paytda uzilgan fayllar qayta olinadi; faqat
+  pagehide yakuniy.
 * **Xavfsizlik bo'limi hozircha o'chirilgan (egasining qarori, 2026-10-24).**
   Dastur bitta odamning o'z kompyuterida ishlaydi, uni boshqa hech kim
   ishlatmaydi va ko'rmaydi — shuning uchun noutbuk rejimida kirish oynasi,

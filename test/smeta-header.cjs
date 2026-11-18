@@ -637,5 +637,226 @@ const vri = vr.length ? vr[0].rows.filter((r) => r.kind === 'item') : [];
 check(vr.length === 1 && vr[0].layout.no === 1 && vri.length === 3 && vri.map((r) => r.section).join() === 'labor,machines,materials',
   '«N п/п» is the number column, and the bands in it are seen: labor, machines, materials (' + JSON.stringify(vr[0] && vr[0].layout.no) + ' ' + vri.map((r) => r.section).join() + ')');
 
+/* 26 — the local resource statement (22): a resource with nothing «на единицу измерения» — a material the project names, its
+        norm left blank, «-» or a word — is a resource all the same when it is numbered under the work above it («1.3» under
+        «1»); it was taken for a work and left out, and the resources read fell short of the «ИТОГО». A line the numbering
+        does not put under a work is still told by its norm, as before */
+const b26head = [
+  ['N п/п', 'Шифр номера нормативов и коды ресурсов', 'Наименование работ и затрат, характеристика оборудования', 'Единица измерения', 'Количество', null, 'Сметная стоимость'],
+  [null, null, null, null, 'на единицу измерения', 'по проектным данным', 'на единицу измерения', 'общая'],
+  ['1', '2', '3', '4', '5', '6', '7', '8']];
+const b26read = (norm, line) => one({ sheets: [sheet('ЛОКАЛЬНО-РЕС', [['ТЕСТОВАЯ ДОРОГА'], ['ЛОКАЛЬНО-РЕСУРСНАЯ ВЕДОМОСТЬ № 2'], [], ...b26head,
+  ['1', 'Е01-01-003-8', 'РАЗРАБОТКА ТЕСТОВОГО ГРУНТА', '1000 М3', null, '0,5', '6800,00', '3400,00'],
+  ['1.1', '00001', 'ЗАТРАТЫ ТРУДА РАБОЧИХ-СТРОИТЕЛЕЙ', 'ЧЕЛ-ЧАС', '10', '5', '100,00', '500,00'],
+  ['1.2', '02264', 'ТЕСТОВЫЙ ЭКСКАВАТОР 0,65 М3', 'МАШ-ЧАС', '20', '10', '200,00', '2000,00'],
+  line || ['1.3', '9001', 'ТЕСТОВАЯ ТРУБА ПО ПРОЕКТУ', 'М', norm, '100', '9,00', '900,00'],
+  ['2', 'Е27-04-003-6', 'УСТРОЙСТВО ТЕСТОВОГО ОСНОВАНИЯ', '1000 М2 ОСНОВАНИЯ ИЛИ ПОКРЫТИЯ', null, '2', '500,00', '1000,00'],
+  ['2.1', '4071', 'ТЕСТОВАЯ СМЕСЬ ПЕСЧАНО-ГРАВИЙНАЯ', 'М3', '50', '100', '10,00', '1000,00'],
+  ['ИТОГО: ', null, null, null, null, null, null, '4400,00']])] });
+const b26items = (o) => (o.length ? o[0].rows.filter((r) => r.kind === 'item') : []);
+const b26work = (r) => /^(РАЗРАБОТКА|УСТРОЙСТВО)/.test(r.nm);
+[null, '-', 'по проекту'].forEach((norm) => {
+  const b26o = b26read(norm), b26i = b26items(b26o), b26pipe = b26i.find((r) => r.nm === 'ТЕСТОВАЯ ТРУБА ПО ПРОЕКТУ');
+  const b26said = norm == null ? 'nothing' : '«' + norm + '»';
+  check(b26o.length === 1 && b26i.length === 4 && !!b26pipe && b26pipe.qty === 100 && b26pipe.price === 9 && b26pipe.sum === 900,
+    'a line numbered under its work («1.3» under «1») with ' + b26said + ' per unit is a resource (' + b26i.map((r) => r.nm).join(' | ') + ')');
+  check(Math.abs(b26i.reduce((t, r) => t + r.sum, 0) - 4400) < 1e-6 && !b26i.some(b26work) &&
+    b26o.length === 1 && b26o[0].rows.filter((r) => r.kind === 'extra' && b26work(r)).length === 2,
+    '… the resources read add up to the «ИТОГО» (4 400), and the two works are still not resources');
+});
+// where the numbering says nothing the norm still decides, as it did: works numbered «1.1», «1.2» (the second is not under
+// the first), their resources without numbers, and a line with no number and nothing per unit
+const b26flat = one({ sheets: [sheet('ЛОКАЛЬНО-РЕС', [['ТЕСТОВАЯ ДОРОГА'], ['ЛОКАЛЬНО-РЕСУРСНАЯ ВЕДОМОСТЬ № 3'], [], ...b26head,
+  ['1.1', 'Е01-01-003-8', 'РАЗРАБОТКА ТЕСТОВОГО ГРУНТА', '1000 М3', null, '0,5', '5000,00', '2500,00'],
+  [null, '02264', 'ТЕСТОВЫЙ ЭКСКАВАТОР 0,65 М3', 'МАШ-ЧАС', '25', '12,5', '200,00', '2500,00'],
+  ['1.2', 'Е27-04-003-6', 'УСТРОЙСТВО ТЕСТОВОГО ОСНОВАНИЯ', '1000 М2 ОСНОВАНИЯ ИЛИ ПОКРЫТИЯ', null, '2', '500,00', '1000,00'],
+  [null, '4071', 'ТЕСТОВАЯ СМЕСЬ ПЕСЧАНО-ГРАВИЙНАЯ', 'М3', '50', '100', '10,00', '1000,00'],
+  [null, null, 'ТЕСТОВЫЕ ПРОЧИЕ РАБОТЫ', 'М2', null, '10', '7,00', '70,00'],
+  ['ИТОГО: ', null, null, null, null, null, null, '3570,00']])] });
+check(b26flat.length === 1 && b26items(b26flat).map((r) => r.nm).join('|') === 'ТЕСТОВЫЙ ЭКСКАВАТОР 0,65 М3|ТЕСТОВАЯ СМЕСЬ ПЕСЧАНО-ГРАВИЙНАЯ' &&
+  b26flat[0].rows.filter((r) => r.kind === 'extra' && (b26work(r) || r.nm === 'ТЕСТОВЫЕ ПРОЧИЕ РАБОТЫ')).length === 3,
+  'a line the numbering does not put under the work above it («1.2» after «1.1», or no number) and with nothing per unit is a work, as before (' +
+  b26items(b26flat).map((r) => r.nm).join(' | ') + ')');
+// … and a line numbered under the work is rescued only when it is priced as a resource: a money line («СУМ»), a «%» line and
+// a «В Т.Ч. …» line with nothing per unit stay out, as they were
+[['1.3', '9002', 'ТЕСТОВЫЙ КОМПЛЕКТ', 'СУМ', null, '100', '9,00', '900,00'],
+  ['1.3', '9003', 'ТЕСТОВЫЕ НАКЛАДНЫЕ', '%', null, '100', '9,00', '900,00'],
+  ['1.3', null, 'В Т.Ч. ЗАТРАТЫ ТРУДА МАШИНИСТОВ', 'ЧЕЛ-ЧАС', null, '3', null, null]].forEach((line) => {
+  const b26o = b26read(null, line), b26i = b26items(b26o);
+  check(b26o.length === 1 && b26i.length === 3 && !b26i.some((r) => r.nm === line[2]) && b26o[0].rows.some((r) => r.kind === 'extra' && r.nm === line[2]),
+    '«' + line[2] + ' | ' + line[3] + '» numbered under its work with nothing per unit is not a resource (' + b26i.map((r) => r.nm).join(' | ') + ')');
+});
+// … nor a line with lines numbered under it: «1.1» followed by «1.1.1» is a work of its own (numbered three levels deep), not
+// a resource of the work «1» above it — the works stay out of the resources
+const b26deep = one({ sheets: [sheet('ЛОКАЛЬНО-РЕС', [['ТЕСТОВАЯ ДОРОГА'], ['ЛОКАЛЬНО-РЕСУРСНАЯ ВЕДОМОСТЬ № 6'], [], ...b26head,
+  ['1', 'Е01', 'ТЕСТОВЫЕ ЗЕМЛЯНЫЕ РАБОТЫ', '1000 М3', null, '1', '3000,00', '3000,00'],
+  ['1.1', 'Е01-01-003-8', 'РАЗРАБОТКА ТЕСТОВОГО ГРУНТА', '1000 М3', null, '0,5', '2000,00', '1000,00'],
+  ['1.1.1', '00001', 'ЗАТРАТЫ ТРУДА РАБОЧИХ-СТРОИТЕЛЕЙ', 'ЧЕЛ-ЧАС', '10', '5', '200,00', '1000,00'],
+  ['1.2', 'Е27-04-003-6', 'УСТРОЙСТВО ТЕСТОВОГО ОСНОВАНИЯ', '1000 М2 ОСНОВАНИЯ ИЛИ ПОКРЫТИЯ', null, '0,5', '4000,00', '2000,00'],
+  ['1.2.1', '02264', 'ТЕСТОВЫЙ ЭКСКАВАТОР 0,65 М3', 'МАШ-ЧАС', '20', '10', '200,00', '2000,00'],
+  ['ИТОГО: ', null, null, null, null, null, null, '3000,00']])] });
+check(!b26items(b26deep).some(b26work), 'works numbered «1.1», «1.2» with lines «1.1.1», «1.2.1» under them are not resources of the work «1» (' +
+  b26items(b26deep).map((r) => r.nm).join(' | ') + ')');
+
+/* 27 — the same statement with «Цена» and «Сумма» named in the main header row, each over both rows, so that the row below
+        holds nothing but the two columns of «Количество» («на единицу измерения» | «по проектным данным»): the two were only
+        looked for when the price or the sum had to be found on that row, and the quantity was read from the norm column
+        (10, 20, 1 for 5, 10, 100) */
+const b27lines = [
+  ['1', 'Е01-01-003-8', 'РАЗРАБОТКА ТЕСТОВОГО ГРУНТА', '1000 М3', null, '0,5', '5000,00', '2500,00'],
+  ['1.1', '00001', 'ЗАТРАТЫ ТРУДА РАБОЧИХ-СТРОИТЕЛЕЙ', 'ЧЕЛ-ЧАС', '10', '5', '100,00', '500,00'],
+  ['1.2', '02264', 'ТЕСТОВЫЙ ЭКСКАВАТОР 0,65 М3', 'МАШ-ЧАС', '20', '10', '200,00', '2000,00'],
+  ['2', 'Е27-04-003-6', 'УСТРОЙСТВО ТЕСТОВОГО ОСНОВАНИЯ', '1000 М2 ОСНОВАНИЯ ИЛИ ПОКРЫТИЯ', null, '2', '500,00', '1000,00'],
+  ['2.1', '4071', 'ТЕСТОВАЯ СМЕСЬ ПЕСЧАНО-ГРАВИЙНАЯ', 'М3', '1', '100', '10,00', '1000,00'],
+  ['ИТОГО: ', null, null, null, null, null, null, '3500,00']];
+const b27 = one({ sheets: [sheet('ЛОКАЛЬНО-РЕС', [['ТЕСТОВАЯ ДОРОГА'], ['ЛОКАЛЬНО-РЕСУРСНАЯ ВЕДОМОСТЬ № 4'], [],
+  ['N п/п', 'Шифр', 'Наименование работ и затрат', 'Единица измерения', 'Количество', null, 'Цена', 'Сумма'],
+  [null, null, null, null, 'на единицу измерения', 'по проектным данным'],
+  ['1', '2', '3', '4', '5', '6', '7', '8'], ...b27lines])] });
+const b27work = (r) => /^(РАЗРАБОТКА|УСТРОЙСТВО)/.test(r.nm);
+const b27L = b27.length ? b27[0].layout : {};
+const b27i = b27.length ? b27[0].rows.filter((r) => r.kind === 'item') : [];
+check(b27.length === 1 && b27L.unitQty === 5 && b27L.qty === 6 && b27L.price === 7 && b27L.sum === 8,
+  '«Количество» over two columns is seen under a header that names «Цена» and «Сумма» itself (' + JSON.stringify([b27L.unitQty, b27L.qty, b27L.price, b27L.sum]) + ')');
+check(b27i.length === 3 && b27i.map((r) => r.qty).join() === '5,10,100' && b27i.every((r) => Math.abs(r.qty * r.price - r.sum) < 1e-6),
+  'the quantity is the project one, not the one per unit: quantity × price is the sum (' + b27i.map((r) => r.qty + '×' + r.price + '=' + r.sum).join(' | ') + ')');
+check(b27.length === 1 && !b27i.some(b27work) && b27[0].rows.filter((r) => r.kind === 'extra' && b27work(r)).length === 2 &&
+  Math.abs(b27i.reduce((t, r) => t + r.sum, 0) - 3500) < 1e-6, 'the works are not resources, and the resources read add up to the «ИТОГО» (3 500)');
+const b27at = (r) => (b27.length ? b27[0].rows.find((x) => x.r === r) : null) || {};
+check(b27at(5).kind === 'header' && b27at(5).sub === true && b27at(6).kind === 'numbering' && !(b27.length && b27[0].rows.some((r) => r.kind === 'extra' && r.nm === '3')),
+  'the row of the two columns is the header\'s second line, and the «1 2 3 …» row under it is the numbering — not a line of the estimate (' + b27at(5).kind + ', ' + b27at(6).kind + ')');
+// the same header without a code column
+const b27plain = one({ sheets: [sheet('ЛОКАЛЬНО-РЕС', [['ТЕСТОВАЯ ДОРОГА'], ['ЛОКАЛЬНО-РЕСУРСНАЯ ВЕДОМОСТЬ № 5'], [],
+  ['N п/п', 'Наименование работ и затрат', 'Единица измерения', 'Количество', null, 'Цена', 'Сумма'],
+  [null, null, null, 'на единицу измерения', 'по проектным данным'],
+  ['1', '2', '3', '4', '5', '6', '7'], ...b27lines.map((l) => (l.length > 1 ? [l[0], ...l.slice(2)] : l))])] });
+const b27pi = b27plain.length ? b27plain[0].rows.filter((r) => r.kind === 'item') : [];
+check(b27plain.length === 1 && b27plain[0].layout.unitQty === 4 && b27plain[0].layout.qty === 5 && b27pi.map((r) => r.qty).join() === '5,10,100' && !b27pi.some(b27work),
+  '… and without a code column: the same three resources with their project quantities (' + b27pi.map((r) => r.nm + ' ' + r.qty).join(' | ') + ')');
+// the statement of 22 (the price and the sum on the row of the two columns) keeps the layout it was read by — key for key, in
+// the same order: test/smeta-corpus.cjs fingerprints the layout as it is written out, so a key set earlier than before would
+// call every recorded statement of that kind «read differently» with not one of its rows changed (the string changes only
+// together with a «test/smeta-corpus.cjs --record» the owner has decided on)
+const b27was = '{"code":2,"name":3,"unit":4,"qty":6,"unitQty":5,"price":7,"sum":8,"subRow":8,"no":1,"headerRow":7,"numRow":9,"lastCol":8}';
+check(lrv.length === 1 && JSON.stringify(lrv[0].layout) === b27was, 'the statement of 22 keeps its layout as it was recorded (' + JSON.stringify(lrv[0] && lrv[0].layout) + ')');
+
+/* 28 — a haulage sheet with a «Всего» to the right of another sum column: the «Всего» is the sum, as it was before v2.16.11
+        («Итого | Погрузка | Всего», «Сумма материалов | … | Всего»); only «Общая цена» keeps the sum against a «Всего» of
+        one unit beside it */
+const c28head = (sums) => ['№ П/П', 'Наименование материалов', 'Ед. изм.', 'Количество', 'Удельный вес', 'Общая тонна', 'Автотранспорт км', 'тн/км', 'Стоимость за один тн/км'].concat(sums);
+const c28a = one({ sheets: [sheet('ТРАНСПОРТ', [['Транспортные расходы'], ['ТЕСТОВАЯ СТРОЙКА'], [],
+  c28head(['Итого', 'Погрузка', 'Всего']),
+  [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+  [1, 'ЩЕБЕНЬ ТЕСТОВЫЙ', 'т', 40, 1, 40, 19, 760, 3, 2280, 120, 2400],
+  [2, 'ПЕСОК ТЕСТОВЫЙ', 'т', 10, 1, 10, 5, 50, 4, 200, 30, 230],
+  [null, 'ВСЕГО', null, null, null, null, null, null, null, 2480, 150, 2630]])] });
+const c28ai = c28a.length ? c28a[0].rows.filter((r) => r.kind === 'item') : [];
+check(c28a.length === 1 && c28a[0].layout.sum === 12 && c28ai.length === 2 && c28ai[0].sum === 2400 && c28ai[1].sum === 230 && !(c28a[0].checks || []).length,
+  '«Итого | Погрузка | Всего»: the sum is the «Всего» (' + c28ai.map((r) => r.sum).join(', ') + ')');
+const c28b = one({ sheets: [sheet('ТРАНСПОРТ', [['Транспортные расходы'], ['ТЕСТОВАЯ СТРОЙКА'], [],
+  ['№ П/П', 'Наименование материалов', 'Ед. изм.', 'Количество', 'Сумма материалов', 'Удельный вес', 'Общая тонна', 'Автотранспорт км', 'тн/км', 'Стоимость за один тн/км', 'Всего'],
+  [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+  [1, 'ЩЕБЕНЬ ТЕСТОВЫЙ', 'т', 40, 4000, 1, 40, 19, 760, 3, 2280],
+  [2, 'ПЕСОК ТЕСТОВЫЙ', 'т', 10, 900, 1, 10, 5, 50, 4, 200],
+  [null, 'ВСЕГО', null, null, 4900, null, null, null, null, null, 2480]])] });
+const c28bi = c28b.length ? c28b[0].rows.filter((r) => r.kind === 'item') : [];
+check(c28b.length === 1 && c28b[0].layout.sum === 11 && c28bi.length === 2 && c28bi[0].sum === 2280 && c28bi[1].sum === 200,
+  '«Сумма материалов | … | Всего»: the haulage sum is the «Всего», not the materials\' own sum (' + c28bi.map((r) => r.sum).join(', ') + ')');
+const c28c = one({ sheets: [sheet('расчет', [[null, 'Стоимости перевозки материальных ресурсов'], [null, 'ТЕСТОВЫЙ ОБЪЕКТ'], [],
+  ['№', 'Наименование работ и затрат', 'Ед. изм.', 'потребность', 'Объёмный вес', 'Расст', 'на тн/км', 'Общая цена', 'Всего'],
+  [1, 2, 3, 4, 5, 6, 7, 8, 9],
+  [1, 'ТЕСТОВАЯ ПЕСЧАНО-ГРАВИЙНАЯ СМЕСЬ', 'м3', 10, 1.6, 25.5, 3, 1224, 122.4]])] });
+const c28ci = c28c.length ? c28c[0].rows.filter((r) => r.kind === 'item') : [];
+check(c28c.length === 1 && c28c[0].layout.sum === 8 && c28ci.length === 1 && c28ci[0].sum === 1224,
+  '«Общая цена | Всего» in one header row: the sum stays the «Общая цена», the «Всего» is the cost of one unit (' + c28ci.map((r) => r.sum).join(', ') + ')');
+
+/* 29 — a «Расчёт стоимости перевозки» that adds the haulage to the material's price, whatever its header calls that price
+        («Цена материала без перевозки», «Стоим. мат.», «Отпускная цена», or no word for a price at all): its «Общая цена»
+        (the material + its haulage, per unit) is not the т·км × the price of one т·км on any line, so it is not read and the
+        haulage is not counted twice; a genuine one with one line off (a slip) or one sum left empty is still read */
+const c29res = sheet('Р1', [...TOP, HEAD, [1, 2, 3, 4, 5, 6], ['СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'],
+  [1, 'ТЕСТОВАЯ СМЕСЬ ГОРЯЧАЯ', 'Т', 10, 1620, '=D7*E7'], ['ИТОГО', null, 'СУМ', null, null, '=SUM(F7:F7)']]);
+const c29calc = (word) => sheet('перевозка1', [[], [null, 'Расчёт'], [null, 'Стоимости перевозки материалных'], [null, 'ТЕСТОВЫЙ ОБЪЕКТ'], [],
+  ['№', 'Наименование работ и затрат, характеристика оборудования', 'Еди-ница изме-рение', 'потребность', 'Наименова-ние поставшика и пункт отправления', word, 'Объём- ный весь т/м3', 'расход транс перевозки', null, null, 'Общая цена материалов'],
+  [null, null, null, null, null, null, null, 'Расст', 'на тн/км', 'Всего'],
+  [], [], [],
+  [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+  [null, 'Материалные ресурсы'],
+  [1, 'ТЕСТОВАЯ СМЕСЬ ГОРЯЧАЯ', 'Т', 10, 'ТЕСТОВЫЙ АБЗ', 1500, 1, 40, 3, 120, 1620]]);
+const c29words = ['Стоимост мат-ов без перевозки на ед.', 'Цена материала без перевозки', 'Стоим. мат.', 'Отпускная цена', 'Гр. 6'];
+const c29read = c29words.map((w) => one({ sheets: [c29res, c29calc(w)] }).map((o) => o.name).join('+'));
+check(c29read.every((n) => n === 'Р1'),
+  'a haulage calculation folded into the material prices is not read, whatever the material\'s price is called (' + c29words.map((w, i) => w + ': ' + c29read[i]).join(' | ') + ')');
+const c29true = (last) => sheet('перевозка1', [[], [null, 'Расчёт'], [null, 'Стоимости перевозки материалных'], [null, 'ТЕСТОВЫЙ ОБЪЕКТ'], [],
+  ['№', 'Наименование работ и затрат, характеристика оборудования', 'Еди-ница изме-рение', 'потребность', 'Наименова-ние поставшика и пункт отправления', 'Гр. 6', 'Объём- ный весь т/м3', 'расход транс перевозки', null, null, 'Общая цена материалов'],
+  [null, null, null, null, null, null, null, 'Расст', 'на тн/км', 'Всего'],
+  [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+  [1, 'ТЕСТОВАЯ СМЕСЬ ПЛОТНАЯ', 'тн', 100, 'ТЕСТОВЫЙ АБЗ', null, 1, 20, 3, 60, 6000],
+  [2, 'ТЕСТОВАЯ ПЕСЧАНО-ГРАВИЙНАЯ СМЕСЬ', 'м3', 10, 'ТЕСТОВЫЙ КАРЬЕР', null, 1.6, 25.5, 3, 122.4, last]]);
+const c29slip = [1250, null].map((last) => {
+  const o = one({ sheets: [c29true(last)] });
+  return o.length ? o[0].rows.filter((r) => r.kind === 'item').map((r) => r.qty + '×' + r.price + '=' + r.sum).join(' ') : '(not read)';
+});
+check(c29slip[0] === '2000×3=6000 408×3=1250' && c29slip[1] === '2000×3=6000 408×3=null',
+  '… but a genuine one with a slip in one line, or one sum left empty, is read, the line as the sheet has it (' + c29slip.join(' | ') + ')');
+
+/* 30 — rail and road distance in one header: «Расст-е на перев-у» (under «расход ж/д перевозки») is the rail distance and is
+        never the road km, whether it stands to the right of the road «расс-т» or to the left */
+const c30calc = (railFirst, roadKm) => {
+  const road = [['автотр расход', null, null], [roadKm || 'расс-т', 'на тн/км', 'Всего']];
+  const rail = [['расход ж/д перевозки', null, null], ['Расст-е на перев-у', 'на 1тн', 'Стоим-ть транс-ка мат 1 м3 по ж/д']];
+  const g = railFirst ? [rail, road] : [road, rail];
+  const line = (no, nm, unit, q, src, w, km, p, one1, all) => {
+    const rd = [km, p, one1], rl = [null, null, null];
+    return [no, null, nm, unit, q, src, w].concat(railFirst ? rl.concat(rd) : rd.concat(rl), [all]);
+  };
+  return sheet('расчет', [[], [], [null, 'Р А С Ч Ё Т'], [null, 'Стоимости перевозки материальных ресурсов'], [], [null, 'ТЕСТОВЫЙ ОБЪЕКТ'], [],
+    ['№', 'Наименование работ и затрат, характеристика оборудования и его масса', null, 'Еди-ница изме-рение', 'потребность', ' ', 'Объём- ный весь т/м3'].concat(g[0][0], g[1][0], ['Общая цена материалов']),
+    [null, null, null, null, null, null, null].concat(g[0][1], g[1][1]),
+    [], [1, 2, null, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+    line(1, 'ТЕСТОВАЯ СМЕСЬ ПЛОТНАЯ', 'тн', 100, 'АБЗ', 1, 20, 3, 60, 6000),
+    line(2, 'ТЕСТОВАЯ ПЕСЧАНО-ГРАВИЙНАЯ СМЕСЬ', 'м3', 10, 'КАРЬЕР', 1.6, 25.5, 3, 122.4, 1224),
+    [null, null, null, null, null, null, null, null, null, null, null, null, null, 7224]]);
+};
+const c30 = [false, true].map((railFirst) => {
+  const o = one({ sheets: [c30calc(railFirst)] });
+  return o.length ? o[0].rows.filter((r) => r.kind === 'item').map((r) => r.nm + ' ' + r.qty + '×' + r.price + '=' + r.sum) : [];
+});
+const c30want = 'Транспортировка ТЕСТОВАЯ СМЕСЬ ПЛОТНАЯ 20 км 2000×3=6000|Транспортировка ТЕСТОВАЯ ПЕСЧАНО-ГРАВИЙНАЯ СМЕСЬ 25,5 км 408×3=1224';
+check(c30[0].join('|') === c30want, 'the rail distance to the right of the road «расс-т» is not the road km: both lines read (' + c30[0].join(' | ') + ')');
+check(c30[1].join('|') === c30want, '… and to the left of it neither (' + c30[1].join(' | ') + ')');
+const c30road = ['Расст', 'Расст.', 'Расст-е'].map((k) => {
+  const o = one({ sheets: [c30calc(false, k)] });
+  return o.length ? o[0].rows.filter((r) => r.kind === 'item').length : 0;
+});
+check(c30road.join() === '2,2,2', 'the road distance headed «Расст», «Расст.» or «Расст-е» is the road km beside the rail «Расст-е на перев-у» (' + c30road.join() + ')');
+
+/* 31 — money lines without a number on a sheet with a code column, priced in another spelling of the currency than «СУМ»
+        («сўм», «тыс.сум», «so'm», «1000 сум», «руб»), quantity × price = sum: money lines all the same, not lines added by
+        hand — they were read as resources, offered for a market price and counted in the totals. A line added by hand in
+        an ordinary unit («шт», «усл. ед.») is still read */
+const d31Money = ['сўм', 'тыс.сум', "so'm", 'руб.', 'тыс. сўм', 'UZS', 'млн.сум', 'минг сўм', "ming so'm", 'sum', 'SOM',
+  '1000 сум', 'тысяч сум', 'т.сум', 'рублей', 'RUB', 'млрд сум', "mln so'm", 'сум'];
+const d31 = one({ sheets: [sheet('3', [[null, 'ТЕСТОВАЯ СТРОЙКА'], [null, '(наименование стройки)'], [null, null, 'ЛОКАЛЬНЫЙ РЕСУРСНЫЙ СМЕТНЫЙ РАСЧЕТ'], [],
+  ['N п.п.', 'Шифр номера нормативов и коды ресурсов', 'Наименование работ и затрат', 'Единица измерения', 'Количество ', 'Сметная стоимость'],
+  [null, null, null, null, null, 'в базисном уровне'],
+  [null, null, null, null, null, 'на.ед.изм.', 'общая'],
+  [1, 2, 3, 4, 5, 6, 7],
+  [null, null, 'МАТЕРИАЛЬНЫЕ РЕСУРСЫ'],
+  ['1', 'СЦЕНА', 'ТЕСТОВЫЙ ИЗОЛЯТОР ПОДВЕСНОЙ', 'ШТ', 6, 31, 186],
+  [null, 'СЦЕНА', 'ТЕСТОВЫЙ РАЗРЯДНИК', 'шт', 3, 47.5, 142.5],
+  [null, null, 'ТЕСТОВАЯ НАЦЕНКА', 'усл. ед.', 2, 50, 100],
+  ...d31Money.map((u, i) => [null, null, 'ТЕСТОВЫЕ РАСХОДЫ ' + (i + 1), u, 0.03, 186, 5.58]),
+  [null, null, 'ТРАНСПОРТНЫЕ РАСХОДЫ', 'сўм', 0.03, 186, 5.58],
+  [null, null, 'ЗАГОТОВИТЕЛЬНО-СКЛАДСКИЕ РАСХОДЫ', 'тыс.сум', 0.02, 186, 3.72],
+  [null, 'ИТОГО ПО СТРОИТЕЛЬНЫМ МАТЕРИАЛАМ:', null, 'СУМ', null, null, 428.5]])] });
+const d31i = d31.length ? d31[0].rows.filter((r) => r.kind === 'item') : [];
+const d31n = d31i.map((r) => r.nm);
+check(d31.length === 1 && !d31n.some((n) => /РАСХОДЫ/.test(n)),
+  'a money line in «' + d31Money.join('», «') + '» priced like a resource is not a resource (' + d31n.join(' | ') + ')');
+check(d31n.join('|') === 'ТЕСТОВЫЙ ИЗОЛЯТОР ПОДВЕСНОЙ|ТЕСТОВЫЙ РАЗРЯДНИК|ТЕСТОВАЯ НАЦЕНКА' &&
+  Math.abs(d31i.reduce((t, r) => t + r.sum, 0) - 428.5) < 1e-6,
+  '… while the lines added by hand in a unit that is not money are read, and the materials add up to their «ИТОГО» (428,5)');
+
 console.log(fail ? '\nFAILED: ' + fail : '\nall passed');
 process.exit(fail ? 1 : 0);

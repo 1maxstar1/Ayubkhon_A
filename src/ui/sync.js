@@ -56,6 +56,8 @@
   // The server takes a state of 5 MB and no more (server/pb_schema.json, workspaces.state). What is saved is
   // kept under this, with room for the request around it.
   var STATE_MAX = 4 * 1024 * 1024;
+  // A page asked to leave while its files come is given this long to go; still here after it, it fetches them again.
+  var STAY_MS = 2000;
 
   function $(id) { return document.getElementById(id); }
   function A() { return window.app; }
@@ -74,6 +76,9 @@
     cmp: {},                // «Сравнение версий»: the files chosen there (slot → { name, id }) and its «Было»
     seq: 0,                 // which open() is the current one; see open()
     unsaved: {},            // file name -> { file, why, retry }: estimates on screen whose file is not on the server
+    away: {}, awayWhy: {},  // file name -> { id, why }: estimates of the application that are not on screen; see «not on screen»
+    going: false,           // the page was asked to leave while the files of an application came; see mayGo()
+    drop: [],               // stored files replaced by one added again under their name: the next save removes them
     frozen: false,          // this application was opened in another tab after this one: nothing is saved from here
     read: [],               // files of the batch being read that have given a project and are to be stored
     wal: {}, walN: 0,       // prices not yet inside a saved state: key -> { v, t, n, s }; see «kept in the browser»
@@ -106,6 +111,13 @@
       };
       var self = this;
       var P = S.App.prototype;
+      // «Скачать Excel» while estimates of the application are not on screen: the document would be made without
+      // them, and nothing in it would say so — asked first, by name
+      var exportWb = P.exportWorkbook;
+      P.exportWorkbook = function () {
+        if (self.ws && !self.awayAsk('Документ будет собран без них. Скачать?')) return;
+        return exportWb.apply(this, arguments);
+      };
       wrap(P, 'rebuild', function () { self.touch(); });
       wrap(P, 'saveOpts', function () { self.touch(); });
       wrap(P, 'setPrice', function (key, value) {
@@ -128,7 +140,11 @@
       // together. Stored at the moment it was picked, as it used to be, a file that could not be read or was no
       // estimate went to the server first and was taken off it again a moment later.
       wrap(P, 'fileRead', function (file) { self.read.push(file); });
-      wrap(P, 'onParsed', function () {
+      wrap(P, 'onParsed', function (name, res) {
+        // a stored file that came and was not read as an estimate: why, for the line over the list (see restore())
+        if (self.loading && !(res && res.ok && res.objects && res.objects.length)) {
+          self.awayWhy[name] = res && !res.ok && res.error ? String(res.error) : 'листы ресурсов не найдены';
+        }
         if (this.pending > 0) return;
         var files = self.read;
         self.read = [];
@@ -147,13 +163,14 @@
       this.listen();
       this.walSweep();
       window.addEventListener('beforeunload', function (e) {
-        // a page going away while its files come takes nothing more in: the browser cuts them off, and that is no
-        // failure to go on from (open() would restore an empty application, and the next save would be that)
-        if (self.loading) self.seq++;
+        // a page going away while its files come: the browser cuts them off, and that is no failure to go on from
+        // (see mayGo()). The open is not given up here, though — the page may stay after all
+        if (self.loading) self.mayGo();
         self.leave();
         // an estimate whose file is not on the server would not be there after the reload: the browser asks
         if (self.ws && !self.frozen && self.hasUnsaved()) { e.preventDefault(); e.returnValue = ''; }
       });
+      // here the page is going for certain: nothing still arriving is taken in
       window.addEventListener('pagehide', function () { if (self.loading) self.seq++; self.leave(); });
       // kept by the browser and shown again (back/forward): what was cut off above is fetched anew
       window.addEventListener('pageshow', function (e) { if (e.persisted && self.loading && self.ws) location.reload(); });
@@ -186,8 +203,9 @@
       newSlots().forEach(function (k) { if (k !== 'new' && sc[k]) this.cmp[k] = sc[k]; }, this);
       this.corr = {};
       this.unsaved = {};
-      this.away = {};
-      clearTimeout(this.ut);
+      this.away = {}; this.awayWhy = {};
+      this.going = false; this.again = null; this.drop = [];
+      clearTimeout(this.ut); clearTimeout(this.gt);
       this.loading = true;
       this.wal = this.walRead(w.id);
       this.walN = Object.keys(this.wal).reduce(function (m, k) { return Math.max(m, +self.wal[k].n || 0); }, 0);
@@ -231,24 +249,61 @@
       this.after = opts && opts.compareNew ? { seq: this.seq, file: opts.compareNew } : null;
       if (!wanted.length) { this.restore(); return; }
       app.busy(true, 'Получение файлов с сервера…');
-      Promise.all(wanted.map(function (f) {
+      // Each file by itself. They used to come all or none: one stored file the server could not give — and every
+      // estimate of the application stayed off the screen, at every opening, with nothing on it to take out.
+      var get = function (f) {
         return S.fileURL(w, f.id).then(function (u) { return fetch(u); }).then(function (r) {
-          if (!r.ok) throw new Error(f.name + ': ' + r.status);
+          if (!r.ok) { var bad = new Error(f.name + ': ' + r.status); bad.status = r.status; throw bad; }
           return r.blob();
-        }).then(function (b) { return new File([b], f.name, { type: b.type }); });
-      })).then(function (files) {
-        if (!current()) return;               // another application was opened meanwhile
-        app.addFiles(files);                  // upload is skipped while loading
-      }).catch(function (e) {
-        if (!current()) return;
-        app.busy(false);
-        // the files stay the workspace's: not on screen now, they are no files a project dropped — a save must neither
-        // remove them from the server nor their projects from the state (it used to do both: a link lost for a moment
-        // on opening, or a page reloaded while its files came, and the next save emptied the application)
-        wanted.forEach(function (f) { self.away[f.name] = f.id; });
-        app.toast('Не удалось получить файлы: ' + (e.message || e) + '. Они остаются в заявке — обновите страницу', true);
-        self.restore();
-      });
+        }).then(function (b) { return new File([b], f.name, { type: b.type }); })
+          .catch(function (e) { return { lost: f.name, error: e }; });
+      };
+      var fetchAll = function () {
+        if (!current()) return;               // the application was left meanwhile
+        Promise.all(wanted.map(get)).then(function (got) {
+          if (!current()) return;             // another application was opened meanwhile
+          var files = got.filter(function (g) { return !g.lost; }), lost = got.filter(function (g) { return g.lost; });
+          // cut off by a page that was asked to leave: nothing to go on from. Fetched again if the page stays (mayGo())
+          if (lost.length && self.going) { self.again = fetchAll; return; }
+          // A file that did not come stays the workspace's: restore() keeps it as an estimate that is not on screen.
+          // A save removes neither it from the server nor its project from the state (it used to do both: a link
+          // lost for a moment on opening, and the next save emptied the application)
+          lost.forEach(function (g) {
+            self.awayWhy[g.lost] = 'не получен с сервера (' + (g.error && g.error.status ? 'ответ ' + g.error.status : 'нет связи') + ')';
+          });
+          if (lost.length) {
+            // a file the server answered for and did not give (404, 403) is not given at the next opening either
+            var refused = lost.every(function (g) { return g.error && g.error.status; });
+            app.toast('Не удалось получить файлы: ' + lost.map(function (g) { return g.lost; }).join(', ') +
+              '. Они остаются в заявке — ' + (refused ? 'сервер их не отдаёт: загрузите их снова или уберите из заявки ' +
+              '(строка над списком проектов)' : 'обновите страницу'), true);
+          }
+          if (files.length) app.addFiles(files);          // upload is skipped while loading; restore() follows the reading
+          else { app.busy(false); self.restore(); }
+        });
+      };
+      fetchAll();
+    },
+
+    /**
+     * The page was asked to leave (beforeunload) while the files of an application came. From here to its going the
+     * browser cuts them off, and that is no failure to go on from: taken as one, the application was restored without
+     * its estimates and the save made on the way out wrote that to the server (two tabs handing over — test/two-tabs.mjs).
+     * So a file that fails now is not acted on.
+     *
+     * The open is not given up either: the page may stay — a reload stopped, a link that turned out a download or
+     * answered «no content». It used to be given up, and such a page said «Получение файлов с сервера…» for good, with
+     * every save refused. Still here a moment later, the page fetches the files again.
+     */
+    mayGo: function () {
+      var self = this;
+      this.going = true;
+      clearTimeout(this.gt);
+      this.gt = setTimeout(function () {
+        var again = self.again;
+        self.going = false; self.again = null;
+        if (again) again();
+      }, STAY_MS);
     },
 
     /**
@@ -317,10 +372,18 @@
 
     /** Apply the saved state to the freshly parsed projects, then go live. */
     restore: function () {
-      var app = A();
+      var app = A(), self = this;
       var st = (this.ws && this.ws.state) || {};
       var byFile = {};
       app.projects.forEach(function (p) { byFile[p.file] = p; });
+      // Every estimate of the saved state whose file is still the workspace's and which is not on screen now is
+      // «away», whatever kept it off: the file did not come, or it came and was not read (see «not on screen»)
+      var stored = {};
+      ((this.ws && this.ws.files) || []).forEach(function (n) { stored[n] = 1; });
+      (st.projects || []).forEach(function (sp) {
+        if (byFile[sp.file] || !sp.fileId || !stored[sp.fileId]) return;
+        self.away[sp.file] = { id: sp.fileId, why: self.awayWhy[sp.file] || 'не прочитан' };
+      });
       var ordered = [];
       (st.projects || []).forEach(function (sp) {
         var p = byFile[sp.file];
@@ -371,6 +434,7 @@
       this.loading = false; this.dirty = false;
       app.busy(false);
       this.renderBox();
+      this.renderAway();
       if (remapped) this.touch();          // write the workspace back under the new keys
       if (app.projects.length) app.toast('Рабочая область восстановлена: файлов ' + app.projects.length);
       this.replay();
@@ -698,18 +762,26 @@
     state: function () {
       var app = A(), self = this, prices = this.savedPrices(), live = {};
       app.projects.forEach(function (p) { live[p.file] = 1; });
-      // the projects whose files could not be fetched on opening (see open()): kept as they were saved
-      var away = ((this.ws && this.ws.state && this.ws.state.projects) || []).filter(function (sp) {
-        return self.away && self.away[sp.file] && !live[sp.file];
+      // The estimates that are not on screen (see «not on screen») are kept as they were saved, and where: each
+      // follows the estimate it followed. Put after the others, as they used to be, one save made while an estimate
+      // was away changed the order of the projects for good — and with it the order of the sheets of the document.
+      var first = [], after = {}, last = null;
+      ((this.ws && this.ws.state && this.ws.state.projects) || []).forEach(function (sp) {
+        if (live[sp.file]) { last = sp.file; return; }
+        if (!self.away[sp.file]) return;
+        if (last == null) first.push(sp); else (after[last] = after[last] || []).push(sp);
+      });
+      var projects = first;
+      app.projects.forEach(function (p) {
+        projects.push({
+          file: p.file, fileId: self.files[p.file] || null, name: p.name, title: p.title, intro: p.intro,
+          enabled: p.enabled !== false, open: p.open !== false,
+          objects: p.objects.map(function (o) { return { name: o.name, enabled: o.enabled !== false }; })
+        });
+        if (after[p.file]) { projects = projects.concat(after[p.file]); delete after[p.file]; }
       });
       return {
-        projects: app.projects.map(function (p) {
-          return {
-            file: p.file, fileId: self.files[p.file] || null, name: p.name, title: p.title, intro: p.intro,
-            enabled: p.enabled !== false, open: p.open !== false,
-            objects: p.objects.map(function (o) { return { name: o.name, enabled: o.enabled !== false }; })
-          };
-        }).concat(away),
+        projects: projects,
         files: this.files,
         prices: this.downgrade(prices),       // readable by the previous version
         prices2: prices,
@@ -743,9 +815,15 @@
       var live = {};
       app.projects.forEach(function (p) { live[p.file] = 1; });
       this.renderUnsaved();     // a held file whose project was taken off the list is no longer waited for
+      this.renderAway();        // and an estimate that was away and has been added again is on screen
       var gone = function (n) { return !live[n] && !(self.away && self.away[n]); };
       var stale = Object.keys(this.files).filter(gone).map(function (n) { return self.files[n]; });
       Object.keys(this.files).forEach(function (n) { if (gone(n)) delete self.files[n]; });
+      // a stored file replaced by one added again under its name (upload()) leaves with the state that no longer
+      // points to it — not before: a state not saved yet still opens the estimate from it
+      var mine = {};
+      Object.keys(this.files).forEach(function (n) { mine[self.files[n]] = 1; });
+      this.drop.forEach(function (id) { if (!mine[id] && (self.ws.files || []).indexOf(id) >= 0) stale.push(id); });
       st.files = this.files;
       var changed = app.model ? app.model.resources.filter(function (r) { return !S.near(r.price, r.market); }).length : 0;
       var body = { state: st, changed: changed, updated_by: S.me().id };
@@ -850,9 +928,18 @@
         send.forEach(function (f) { fd.append('files+', f); });
         return S.pb.collection('workspaces').update(ws.id, fd).then(function (w) {
           var added = (w.files || []).filter(function (n) { return !had[n]; });
-          send.forEach(function (f, i) { if (added[i]) { self.files[f.name] = added[i]; delete self.unsaved[f.name]; } });
+          send.forEach(function (f, i) {
+            if (!added[i]) return;
+            // A file added again under the name of an estimate that is away takes its place, and the stored file it
+            // replaces leaves with the next save (saveNow()). Left behind, nothing pointed to it and nothing ever
+            // removed it: such files piled up towards the limit of the workspace.
+            var old = self.away[f.name];
+            if (old && had[old.id]) self.drop.push(old.id);
+            self.files[f.name] = added[i]; delete self.unsaved[f.name]; delete self.away[f.name];
+          });
           ws.files = w.files;
           self.unsavedChanged(false);
+          self.renderAway();
           self.touch();
         }).catch(function (e) {
           // the link, or the server itself: worth trying again without being asked
@@ -913,6 +1000,60 @@
       box.querySelectorAll('button[data-i]').forEach(function (b) {
         b.addEventListener('click', function () { self.retryUploads(names[+b.dataset.i]); });
       });
+    },
+
+    /* --------------------------------------------------- not on screen */
+    /*
+     * An estimate of the application can be off the screen though its file is the workspace's: the file did not
+     * come when the application was opened (the link, a stored file the server no longer has), or it came and was
+     * not read (the time limit on a slow machine, a reader's rule that finds no sheet in it any more). Such an
+     * estimate is «away» (restore() says which are). It is no estimate a person took off the list, so a save keeps
+     * its file on the server and its project in the state, where it was.
+     *
+     * It used to be said once, in a message that went away, under a green «✓» — and only for a file that did not
+     * come; one that came and was not read was removed from the server by the next save. The table, the document
+     * and «✓ Завершить» went on without the estimate, and nothing on the page showed that it was missing.
+     *
+     * Now a line over the list of projects names every such estimate, with why, for as long as it is away; the mark
+     * does not say «saved»; the document and «✓ Завершить» ask first; and the line is where an estimate that will
+     * never come is taken out of the application, by a person's own decision. Adding its file again puts it back
+     * (upload()).
+     */
+    awayNames: function () {
+      var live = {}, app = A();
+      ((app && app.projects) || []).forEach(function (p) { live[p.file] = 1; });
+      return Object.keys(this.away || {}).filter(function (n) { return !live[n]; });
+    },
+    /** Before something is made of the application as it is on screen: true when nothing is away, or the person says yes. */
+    awayAsk: function (what) {
+      var names = this.awayNames();
+      return !names.length || window.confirm('Сметы заявки, которых сейчас нет на экране: ' + names.join(', ') + '.\n\n' + what);
+    },
+    /** «Убрать из заявки»: the estimate is no longer the application's — the next save takes its file off the server. */
+    dropAway: function (name) {
+      if (!this.ws || this.loading || this.frozen || !this.away[name]) return;
+      if (!window.confirm('Убрать «' + name + '» из заявки? Файл будет удалён с сервера.' +
+        '\n\nЦены, введённые для его ресурсов, останутся и вернутся, если загрузить этот файл снова.')) return;
+      delete this.away[name];
+      this.renderAway();
+      this.touch();
+    },
+    renderAway: function () {
+      var self = this, box = $('wsAway');
+      if (!box) return;
+      var names = this.awayNames();
+      box.hidden = !names.length;
+      box.innerHTML = names.map(function (n, i) {
+        return '<div class="row"><span><b>' + S.esc(n) + '</b> — нет на экране: ' + S.esc(self.away[n].why) + '</span>' +
+          '<button type="button" class="btn sm" data-i="' + i + '" title="Убрать смету из заявки и удалить её файл с сервера">Убрать из заявки</button></div>';
+      }).join('') + (names.length ? '<div class="row"><span class="hint">Эти сметы остаются в заявке, но в таблицу, итоги и документ ' +
+        'не входят, пока их нет на экране.</span><button type="button" class="btn sm" data-reload title="Получить файлы с сервера ещё раз">' +
+        'Обновить страницу</button></div>' : '');
+      box.querySelectorAll('button[data-i]').forEach(function (b) {
+        b.addEventListener('click', function () { self.dropAway(names[+b.dataset.i]); });
+      });
+      var again = box.querySelector('button[data-reload]');
+      if (again) again.addEventListener('click', function () { location.reload(); });
     },
 
     /* ------------------------------------------------------ corrections */
@@ -1171,10 +1312,13 @@
       if (this.offline && s === '✓') s = '⚠';
       // «saved» is not said while an estimate on screen has no file on the server
       var held = s === '✓' && this.hasUnsaved();
-      if (held) s = '!';
+      // … nor while an estimate of the application is not on screen (see «not on screen»)
+      var missing = s === '✓' && !held && this.awayNames().length > 0;
+      if (held || missing) s = '!';
       if (el) {
         el.textContent = s;
-        el.title = held ? 'Есть сметы, не сохранённые на сервере' : s === '●' ? 'Сохранение…' : s === '✓' ? 'Сохранено' :
+        el.title = held ? 'Есть сметы, не сохранённые на сервере' : missing ? 'Есть сметы заявки, которых нет на экране' :
+          s === '●' ? 'Сохранение…' : s === '✓' ? 'Сохранено' :
           s === '⚠' ? 'Нет связи с сервером' : 'Ошибка сохранения';
       }
     },
@@ -1226,6 +1370,9 @@
     finish: function () {
       var self = this, ws = this.ws, J = S.Journal;
       if (!ws || this.frozen) return Promise.resolve();
+      // estimates that are not on screen take no part in it: neither in what is counted below nor in the prices
+      // the memory keeps (a second finish replaces the first) — asked first, by name
+      if (!this.awayAsk('Заявка будет завершена без них, и в память цен они не попадут. Завершить?')) return Promise.resolve();
       var ask = J && J.finishDialog ? J.finishDialog() : Promise.resolve({ plain: true });
       return ask.then(function (opts) {
         if (!opts || self.ws !== ws) return;                       // «Отмена», or the application was left meanwhile
@@ -1274,8 +1421,8 @@
         throw e;
       }).then(function () {
         self.wal = {}; self.walN = 0; self.mine = {}; self.refused = ''; self.cutSaid = 0;
-        self.ws = null; self.app = null; self.files = {}; self.away = {}; self.corr = {}; self.marks = {}; self.cmp = {};
-        self.unsaved = {}; clearTimeout(self.ut); self.renderUnsaved();
+        self.ws = null; self.app = null; self.files = {}; self.away = {}; self.awayWhy = {}; self.drop = []; self.corr = {}; self.marks = {}; self.cmp = {};
+        self.unsaved = {}; clearTimeout(self.ut); self.renderUnsaved(); self.renderAway();
         self.thaw();
         S.hashSet('ws', '');
         self.loading = true;

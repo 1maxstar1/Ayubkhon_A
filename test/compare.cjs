@@ -350,6 +350,89 @@ check(rm4.prices[grK] === 327 && Object.keys(rm4.prices).length === 1,
 check(rm4.requested[S.resKey('Затраты труда тестовых рабочих', 'чел.-ч', 30)] && rm4.missing.length === 1 && rm4.missing[0].psd === 410,
   '«ЧЕЛ-ЧАС» is «чел.-ч»; a line whose «Цены по ПСД» (410) is no price of the smeta is not put on the nearest name (' + rm4.missing.map((e) => e.name + ' ' + e.psd).join('; ') + ')');
 
+// ПСД in a header is a price only when the header says price: «Наименование ресурсов по ПСД» is the name, «Ед.изм. по ПСД»
+// the unit, «Кол-во по ПСД» no price at all — the «Цены по ПСД» beside it is
+const e5a = S.reply.parse({ sheets: [sheet('A', [['СОПОСТАВИТЕЛЬНАЯ ТАБЛИЦА №2'], [],
+  ['№ п/п', 'Наименование ресурсов по ПСД', 'Ед.изм.', 'Сметная цена', 'Рыночная цена', 'Примечание'],
+  [1, 'ТЕСТОВАЯ ТРУБА 120', 'М', 9, 7, 'Пересмотреть стоимость ресурса']])] });
+check(e5a.sheets.length === 1 && e5a.entries.length === 1 && e5a.entries[0].name === 'ТЕСТОВАЯ ТРУБА 120' && e5a.entries[0].price === 9,
+  '«Наименование ресурсов по ПСД» is the name column: the table is read (' + JSON.stringify(e5a.cols) + ')');
+const e5b = S.reply.parse({ sheets: [sheet('B', [['СОПОСТАВИТЕЛЬНАЯ ТАБЛИЦА №2'], [],
+  ['№ п/п', 'Наименование ресурса', 'Ед.изм. по ПСД', 'Кол-во по ПСД', 'Цены по ПСД', 'Рыночная цена', 'Примечание'],
+  [1, 'ТЕСТОВАЯ ТРУБА 120', 'М', 100, 9, 7, 'Пересмотреть стоимость ресурса']])] });
+check(e5b.entries.length === 1 && e5b.entries[0].unit === 'М' && e5b.entries[0].psd === 9,
+  '«Ед.изм. по ПСД» is the unit, and «Цены по ПСД» the price beside the line, not «Кол-во по ПСД» (' + JSON.stringify(e5b.cols) + ')');
+// «Цена за ед. изм. по ПСД» is the price, not the unit (it says «ед. изм.» too); «По ПСД» alone, the lower row of a
+// two-row header, is the price as well
+const e5c = S.reply.parse({ sheets: [sheet('B2', [['СОПОСТАВИТЕЛЬНАЯ ТАБЛИЦА №2'], [],
+  ['№ п/п', 'Наименование ресурса', 'Ед.изм.', 'Цена за ед. изм. по ПСД', 'Рыночная цена', 'Примечание'],
+  [1, 'ТЕСТОВАЯ ТРУБА 120', 'М', 9, 7, 'Пересмотреть стоимость ресурса']])] });
+const e5d = S.reply.parse({ sheets: [sheet('B3', [['СОПОСТАВИТЕЛЬНАЯ ТАБЛИЦА №2'], ['', '', '', 'Цена', ''],
+  ['№ п/п', 'Наименование ресурса', 'Ед.изм.', 'По ПСД', 'Рыночная', 'Примечание'],
+  [1, 'ТЕСТОВАЯ ТРУБА 120', 'М', 9, 7, 'Пересмотреть стоимость ресурса']])] });
+check(e5c.cols && e5c.cols.psd === 4 && e5c.cols.unit === 3 && e5c.entries[0].unit === 'М' && e5c.entries[0].psd === 9 &&
+  e5d.cols && e5d.cols.psd === 4 && e5d.entries[0].psd === 9,
+  '«Цена за ед. изм. по ПСД» is the price and «Ед.изм.» the unit; «По ПСД» alone is the price (' +
+  JSON.stringify(e5c.cols) + ' ' + JSON.stringify(e5d.cols) + ')');
+
+// a line answered with a bare dash and no note is a line answered without a price, like «-» with a note: asked, not
+// a price that could not be read. The third line holds two minus signs (U+2212, what Excel writes for a typed minus)
+const e6minus = String.fromCharCode(0x2212);
+const e6 = S.reply.parse({ sheets: [sheet('C', [['СОПОСТАВИТЕЛЬНАЯ ТАБЛИЦА №2'], [],
+  ['№ п/п', 'Наименование ресурса', 'Ед.изм.', 'Цены по ПСД', 'Рыночные цены', 'Примечание'],
+  [1, 'ТЕСТОВЫЙ АНКЕР М5', 'ШТ', 17, '-', ''],
+  [2, 'ТЕСТОВАЯ ПЛИТА 4.1.1', 'ШТ', 40, '—', null],
+  [3, 'ТЕСТОВЫЙ КАБЕЛЬ', 'М', 30, e6minus + ' ' + e6minus, '']])] });
+check(e6.entries.length === 3 && e6.entries.every((e) => e.market == null && e.note) && e6.unread.length === 0,
+  'a bare «-», «—» or two minus signs with no note is read: a line asked, no price; nothing listed as not read (' + e6.unread.map((u) => u.name + ': ' + u.text).join('; ') + ')');
+const e6m = S.reply.match(e6.entries, rsm);
+check(e6m.missing.length === 0 && Object.keys(e6m.prices).length === 0 &&
+  S.compare.classify({ price: 17, qty: 4 }, { price: 17, qty: 4 }, e6m.requested[k('ТЕСТОВЫЙ АНКЕР М5', 'ШТ', 17)]) === 'note',
+  'the bare-dash line is asked, sets no price, and a line left as it was is «примечание»');
+
+// a name written differently is put on a resource only when nothing else could be meant: by the table's own price at
+// similarity 0.9 (0.8 is for «Цены по ПСД» only), never on one of two names as close, and below 0.9 never with a rival
+const e7sm = [{ rows: [
+  { kind: 'item', nm: 'ТЕСТОВАЯ ГРУНТОВКА ПЕНТАФТАЛЕВАЯ', unit: 'КГ', price: 50 },
+  { kind: 'item', nm: 'ТЕСТОВАЯ ГРУНТОВКА ПЕНТАФТАЛЕВАЯ', unit: 'КГ', price: 50.3 },
+  { kind: 'item', nm: 'ТЕСТОВАЯ ЭМАЛЬ ПЕНТАФТАЛЕВАЯ', unit: 'КГ', price: 60 },
+  { kind: 'item', nm: 'ТЕСТОВАЯ ЭМАЛЬ ГЛИФТАЛЕВАЯ БЕЛАЯ', unit: 'КГ', price: 60 },
+  { kind: 'item', nm: 'ТЕСТОВЫЙ БРУС А', unit: 'М3', price: 70 },
+  { kind: 'item', nm: 'ТЕСТОВЫЙ БРУС Б', unit: 'М3', price: 70 }] }];
+const e7own = S.reply.parse({ sheets: [sheet('D', [['СОПОСТАВИТЕЛЬНАЯ ТАБЛИЦА №2'], [],
+  ['№ п/п', 'Наименование ресурса', 'Ед.изм.', 'Сметная цена', 'Рыночная цена', 'Примечание'],
+  [1, 'ТЕСТОВАЯ ГРУНТОВКА ГЛИФТАЛЕВАЯ', 'КГ', 50, 40, 'Пересмотреть стоимость ресурса'],
+  [2, 'ТЕСТОВЫЙ БРУС', 'М3', 70, 55, 'Пересмотреть стоимость ресурса']])] });
+const e7m = S.reply.match(e7own.entries, e7sm);
+check(Object.keys(e7m.prices).length === 0 && e7m.missing.length === 2,
+  'by the table\'s own price: «ГРУНТОВКА ГЛИФТАЛЕВАЯ» (0.84) is not put on «ГРУНТОВКА ПЕНТАФТАЛЕВАЯ», «БРУС» not on «БРУС А» or «БРУС Б» (' +
+  Object.keys(e7m.prices).join('; ') + ')');
+const e7psd = S.reply.parse({ sheets: [sheet('E', [['СОПОСТАВИТЕЛЬНАЯ ТАБЛИЦА №2'], [],
+  ['№ п/п', 'Наименование ресурса', 'Ед.изм.', 'Цены по ПСД', 'Рыночная цена', 'Примечание'],
+  [1, 'ТЕСТОВАЯ ЭМАЛЬ ГЛИФТАЛЕВАЯ', 'КГ', 60, 45, 'Пересмотреть стоимость ресурса']])] });
+const e7pm = S.reply.match(e7psd.entries, e7sm);
+check(Object.keys(e7pm.prices).length === 0 && e7pm.missing.length === 1,
+  'by «Цены по ПСД»: «ЭМАЛЬ ГЛИФТАЛЕВАЯ» is near both «ЭМАЛЬ ПЕНТАФТАЛЕВАЯ» (0.82) and «ЭМАЛЬ ГЛИФТАЛЕВАЯ БЕЛАЯ» (0.81): neither (' +
+  Object.keys(e7pm.prices).join('; ') + ')');
+// one name at two prices that differ by rounding is one resource, not a rival of itself: a name written differently is
+// put on both its keys — by the table's own price at 0.96, and by «Цены по ПСД» at 0.84 (ГРУНТОВКА at 50 and 50.3) — and
+// with no unit, a name the smeta has in М and in КМ is `ambiguous`, not a guess and not «не найдено»
+const e7two = [{ rows: [
+  { kind: 'item', nm: 'ТЕСТОВЫЙ ПРОВОД МЕДНЫЙ ГИБКИЙ', unit: 'М', price: 1234.5678 },
+  { kind: 'item', nm: 'ТЕСТОВЫЙ ПРОВОД МЕДНЫЙ ГИБКИЙ', unit: 'М', price: 1234.6 },
+  { kind: 'item', nm: 'ТЕСТОВЫЙ ПРОВОД МЕДНЫЙ ГИБКИЙ', unit: 'КМ', price: 70 },
+  { kind: 'item', nm: 'ТЕСТОВЫЙ ПРОВОД МЕДНЫЙ ГИБКИЙ', unit: 'М', price: 70 }] }];
+const e7tm = S.reply.match([{ name: 'ТЕСТОВЫЙ ПРОВОД МЕДНЫЙ ГИБКИ', unit: 'М', price: 1235, psd: null, market: 900, note: '' },
+  { name: 'ТЕСТОВЫЙ ПРОВОД МЕДНЫЙ ГИБКИ', unit: '', price: 70, psd: null, market: 50, note: '' }], e7two);
+const e7tp = S.reply.match([{ name: 'ТЕСТОВАЯ ГРУНТОВКА ГЛИФТАЛЕВАЯ', unit: 'КГ', price: null, psd: 50, market: 40, note: '' }], e7sm);
+check(e7tm.prices[k('ТЕСТОВЫЙ ПРОВОД МЕДНЫЙ ГИБКИЙ', 'М', 1234.5678)] === 900 && e7tm.prices[k('ТЕСТОВЫЙ ПРОВОД МЕДНЫЙ ГИБКИЙ', 'М', 1234.6)] === 900 &&
+  Object.keys(e7tm.prices).length === 2 && e7tm.ambiguous.length === 1 && e7tm.missing.length === 0 &&
+  e7tp.prices[k('ТЕСТОВАЯ ГРУНТОВКА ПЕНТАФТАЛЕВАЯ', 'КГ', 50)] === 40 && e7tp.prices[k('ТЕСТОВАЯ ГРУНТОВКА ПЕНТАФТАЛЕВАЯ', 'КГ', 50.3)] === 40 &&
+  e7tp.missing.length === 0,
+  'one name at two prices is no rival of itself: priced on both keys (own price, «Цены по ПСД»); with no unit, `ambiguous` (' +
+  Object.keys(e7tm.prices).concat(Object.keys(e7tp.prices)).join('; ') + ' | ambiguous ' + e7tm.ambiguous.length + ', missing ' +
+  (e7tm.missing.length + e7tp.missing.length) + ')');
+
 // our own export of two projects: one report sheet each, both read back
 const proj2 = S.smeta.parseWorkbook(replySmeta(), 'r.xlsx');
 const p2 = Object.assign({}, rm.prices);

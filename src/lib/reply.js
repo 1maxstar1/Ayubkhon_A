@@ -24,15 +24,21 @@
     ['note', /ESLATMA|ПРИМЕЧ|IZOH|ИЗОХ|NOTE/],
     ['market', /BOZOR|РЫН|MARKET/],
     ['price', /LOYIHA|СМЕТ|SMETA/],
+    ['name', /NOMI|НАИМЕН|NAME/],
     // «Цены по ПСД» (the price of the project documentation): the smeta's own price under another name. Read apart from
     // `price` — a line is not tied to it — and used only to confirm a name written differently («АВТОГРЕЙДЕРЫ … 99 КВТ
-    // /135 Л.С/» is the smeta's «Автогрейдеры … 99 (135) кВт (л.с.)» when the price agrees)
-    ['psd', /ПСД|PSD/],
-    ['name', /NOMI|НАИМЕН|NAME/],
+    // /135 Л.С/» is the smeta's «Автогрейдеры … 99 (135) кВт (л.с.)» when the price agrees). A price that says ПСД, or
+    // ПСД alone (the lower row of a two-row header: «Цена» above «по ПСД | рыночная»), after the name: «Наименование
+    // ресурсов по ПСД» is the name, «Кол-во по ПСД» or «Ед.изм. по ПСД» no price at all
+    ['psd', /(ЦЕН|СТОИМ|НАРХ|NARX|PRICE).*(ПСД|PSD)|(ПСД|PSD).*(ЦЕН|СТОИМ|НАРХ|NARX|PRICE)|^((ПО|PO) )?(ПСД|PSD)$/],
     ['unit', /O.?LCHOV|ЕД\.?\s*ИЗМ|^ЕД\.?$|UNIT|BIRLIK/],
     ['no', /^№|^N(\s|$)|T\/R|П\/П/]
   ];
   var SKIP = /СУММ|SUMMA|ОБЩАЯ|JAMI|РАЗН|FARQ|КОЛ-?ВО|MIQDOR/;
+  // A cell of dashes only: the hyphen-minus and the dashes Excel writes for it - U+2010, U+2011, U+2013 (en dash),
+  // U+2014 (em dash), U+2212 (the minus sign) - with spaces between them. Built from the codes: by eye most of them
+  // cannot be told from a hyphen, and typed into the source they would not be seen to be there
+  var DASHES = new RegExp('^[-' + String.fromCharCode(0x2010, 0x2011, 0x2013, 0x2014, 0x2212) + ' ]+$');
 
   function text(c) { return c && c.v != null ? String(c.v) : ''; }
   function key(s) { return S.nameKey(s).replace(/[ʻʼ‘’`´]/g, "'"); }
@@ -47,7 +53,7 @@
         for (var k = 0; k < ROLES.length; k++) {
           var role = ROLES[k][0];
           if (cols[role] || !ROLES[k][1].test(t)) continue;
-          if ((role === 'market' || role === 'price') && SKIP.test(t)) continue;
+          if ((role === 'market' || role === 'price' || role === 'psd') && SKIP.test(t)) continue;
           cols[role] = c;
           break;
         }
@@ -83,9 +89,10 @@
           if (mt && (NAME.test(key(name)) || MARKET.test(key(mt)) || PRICE.test(key(mt)))) continue;
           // a resource line we answered without a price of our own — «-», «обоснов», or the note alone («Стоимость
           // ресурса должна быть обоснована…»): asked all the same, a note and no price (it used to be dropped, or
-          // listed as a price that could not be read). A cell with figures in it («7 500 сум») is a price we wrote:
-          // that one is listed as not read, as before
-          if (unit && !/\d/.test(mt) && (note || /[A-Za-zА-Яа-яЁё]/.test(mt))) {
+          // listed as a price that could not be read). A dash with no note is that too (any dash Excel writes, the
+          // minus sign included - DASHES): nothing in it is a price. A cell with figures in it («7 500 сум») is a price
+          // we wrote: that one is listed as not read, as before
+          if (unit && !/\d/.test(mt) && (note || /[A-Za-zА-Яа-яЁё]/.test(mt) || DASHES.test(mt))) {
             var said = /[A-Za-zА-Яа-яЁё]/.test(mt) && key(mt) !== key(note) ? mt + (note ? ' — ' + note : '') : note || mt;
             entries.push({ no: no, name: name, unit: unit, price: C.price ? S.num(text(row[C.price])) : null, psd: psd, market: null, note: said, sheet: sh });
             n++;
@@ -133,8 +140,8 @@
    * Each line of the reply to the smeta's resources: name and unit, and the smeta price when the
    * table gives one. A name broken over lines («2-» / «3,75 М») is matched without its spaces and
    * punctuation, unless that joins numbers apart («ТРУБА 1 20» is not ТРУБА 120, «4.11» not
-   * 4.1.1); failing that, the closest name of the same unit and the same smeta price (similarity ≥ 0.8;
-   * the price from the table's own column, else its «Цены по ПСД») with the same numbers — АНКЕР М8
+   * 4.1.1); failing that, the closest name of the same unit and the same smeta price (similarity ≥ 0.9
+   * by the table's own price column, ≥ 0.8 by its «Цены по ПСД»; with no rival as close) with the same numbers — АНКЕР М8
    * never lands on АНКЕР М5. A line with no unit, whose name the smeta has
    * in several units, prices none of them (`ambiguous`). A resource priced again by a later line
    * at another price keeps the first (`conflicts`).
@@ -160,16 +167,26 @@
         hit = all.filter(function (x) { return x.bk === bk && fits(x) && S.numberRelation(x.nm, e.name) !== 'conflict'; });
       }
       // a name written differently: the closest one of the same unit, the same numbers and the same smeta price — the
-      // table's own column, or its «Цены по ПСД»; the price is what makes it safe (0.8: «… 99 КВТ /135 Л.С/» is 0.83)
+      // table's own column (similarity ≥ 0.9), or its «Цены по ПСД» (≥ 0.8: «… 99 КВТ /135 Л.С/» is 0.83, and no table
+      // tied by its own price needed less than 0.9). Counted by name: one resource at two prices that differ by rounding
+      // is one name, priced on all its keys like an exact name (and `ambiguous` below when it has several units). Another
+      // name as close, or below 0.9 any other name at all, and the line does not say which resource it is: none (listed
+      // as not found, never put on a guess)
       var ref = e.price != null ? e.price : e.psd;
       if (!hit.length && ref != null) {
-        var best = null, bs = 0.8;
+        var min = e.price != null ? 0.9 : 0.8, byName = {}, names = [];
         all.forEach(function (x) {
           if ((uk && x.uk !== uk) || !samePrice(x.price, ref) || !S.sameNumbers(x.nm, e.name)) return;
           var sim = S.charSimilarity(x.nm, e.name);
-          if (sim >= bs) { bs = sim; best = x; }
+          if (sim < min) return;
+          var g = byName[x.nk];
+          if (!g) { g = byName[x.nk] = { sim: 0, xs: [] }; names.push(g); }
+          g.xs.push(x);
+          if (sim > g.sim) g.sim = sim;
         });
-        if (best) hit = [best];
+        names.sort(function (a, b) { return b.sim - a.sim; });
+        var rival = names.length > 1 ? names[1].sim : 0;
+        if (names.length && rival < names[0].sim && (names[0].sim >= 0.9 || !rival)) hit = names[0].xs;
       }
       if (!hit.length) { out.missing.push(e); return; }
       if (!uk) {

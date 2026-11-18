@@ -188,6 +188,7 @@ browser_run e2e-compare-keep node test/e2e-compare-keep.mjs
 browser_run upload-order node test/upload-order.mjs
 browser_run upload-fail  node test/upload-fail.mjs
 browser_run two-tabs     node test/two-tabs.mjs
+browser_run away-files   node test/away-files.mjs
 browser_run close-tab    node test/close-tab.mjs
 browser_run state-size   node test/state-size.mjs
 browser_run e2e-workspace node test/e2e-workspace.mjs "$S1" "$S2"

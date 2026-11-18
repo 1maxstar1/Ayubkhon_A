@@ -98,7 +98,17 @@
     document.addEventListener('drop', function (e) {
       e.preventDefault();
       var files = e.dataTransfer && e.dataTransfer.files;
-      if (files && files.length) self.addFiles(Array.prototype.slice.call(files));
+      if (!files || !files.length) return;
+      files = Array.prototype.slice.call(files);
+      // on «Сравнение версий» a file dropped is a version to compare, never one more estimate of the application: the
+      // corrected files the sender returned, dropped there, went among the estimates (64453) — counted twice, and
+      // compared with themselves
+      var cmp = document.getElementById('pane-compare');
+      if (cmp && cmp.classList.contains('on') && self.compare_ui && self.compare_ui.dropped) {
+        self.compare_ui.dropped(files, e.target);
+        return;
+      }
+      self.addFiles(files);
     });
 
     document.querySelectorAll('.tab').forEach(function (t) {
@@ -419,7 +429,9 @@
     opts = opts || {};
     var box = document.getElementById('toast');
     var el = document.createElement('div');
-    el.className = 'toast-item' + (err ? ' err' : '');
+    // a notice to be read (`opts.close`) is not pushed out by the plain notices said after it (the workspace restored,
+    // the hints found…): those three go first — it used to be the notice that a file was switched off that went
+    el.className = 'toast-item' + (err ? ' err' : opts.close ? ' keep' : '');
     el.setAttribute('role', err ? 'alert' : 'status');
     var text = document.createElement('span');
     text.textContent = msg;
@@ -445,7 +457,7 @@
       if (same[i].firstChild.textContent === msg && same[i].classList.contains('err') === !!err) box.removeChild(same[i]);
     }
     box.appendChild(el);
-    var mine = box.querySelectorAll(err ? '.toast-item.err' : '.toast-item:not(.err)');
+    var mine = box.querySelectorAll(err ? '.toast-item.err' : opts.close ? '.toast-item.keep' : '.toast-item:not(.err):not(.keep)');
     for (i = 0; i < mine.length - (err ? ERRORS : NOTICES); i++) box.removeChild(mine[i]);
     timer = setTimeout(close, opts.ms || (err ? 12 * SEC : opts.action ? 10 * SEC : 2.6 * SEC));
     return close;
@@ -602,6 +614,7 @@
       });
       this.queue = [];
       this.offCopies(added);
+      if (!(S.Sync && S.Sync.loading)) this.offVersions(added);
       this.busy(false);
       this.rebuild();
       this.renderSide();
@@ -628,6 +641,43 @@
     // a notice, not an error: nothing went wrong — the program kept the resources from being counted twice
     if (said.length) this.toast(said.join('; ') + ' — такой сводный файл выключен, чтобы ресурсы не считались дважды. ' +
       'Если он нужен, включите его галочкой слева.', false, { close: true, ms: 20 * 1000 });
+  };
+
+  /**
+   * One estimate twice in the application (S.versionsOf). Another version of an estimate — the same lines and quantities,
+   * other prices: the corrected file the sender returned, loaded as one more estimate. Its resources would be counted
+   * twice in Таблица №2, and «Сравнение версий» would compare the corrected file with itself (64453: the nine files the
+   * sender returned, four corrected and five unchanged, loaded among the nine estimates). Such a file is switched off —
+   * the one loaded later — and so is a file repeating an estimate line for line that came with it (the unchanged files
+   * of the same returned set). A file repeating an estimate line for line and nothing else may be two alike objects of
+   * one application: it is only said. The checkbox puts a file back; none is looked at twice (`versionNoted`, kept in
+   * the workspace). `added` — the files just loaded; null — every estimate, as a workspace is brought back (the
+   * applications saved before this check). Returns whether anything was marked.
+   */
+  App.prototype.offVersions = function (added) {
+    if (!S.versionsOf) return false;
+    var ps = this.projects, off = [], twins = [], seen = {};
+    var pairs = S.versionsOf(ps).filter(function (v) {
+      var p = ps[v.i], of = ps[v.of];
+      return p.enabled !== false && of.enabled !== false && !p.versionNoted && (!added || added.indexOf(p) >= 0 || added.indexOf(of) >= 0);
+    });
+    var returned = pairs.some(function (v) { return v.prices > 0; });
+    pairs.forEach(function (v) {
+      var p = ps[v.i], of = ps[v.of];
+      if (seen[v.i] || of.enabled === false) return;
+      seen[v.i] = true;
+      p.versionNoted = true;
+      var text = '«' + p.file + '» — ' + (v.prices ? 'другая версия сметы «' + of.file + '» (те же строки и количества, другая цена в ' +
+        v.prices + ' стр.)' : 'та же смета, что «' + of.file + '» (строка в строку)');
+      if (v.prices > 0 || returned) { p.enabled = false; off.push(text); } else twins.push(text);
+    });
+    var list = function (xs) { return xs.slice(0, 4).join('; ') + (xs.length > 4 ? '; и ещё ' + (xs.length - 4) : ''); };
+    if (off.length) this.toast(list(off) + ' — ' + (off.length > 1 ? 'эти файлы выключены' : 'файл выключен') + ', чтобы ресурсы не считались дважды. ' +
+      'Исправленную смету отправителя загружайте на вкладке «Сравнение версий» («Загрузить исправленную смету»), а лишний файл уберите из заявки. ' +
+      'Если он нужен как смета заявки, включите его галочкой слева.', false, { close: true, ms: 40 * 1000 });
+    if (twins.length) this.toast(list(twins) + '. Если это один и тот же файл — уберите лишний из заявки, иначе ресурсы посчитаются дважды; ' +
+      'если это два одинаковых объекта — всё верно.', false, { close: true, ms: 30 * 1000 });
+    return off.length + twins.length > 0;
   };
 
   /** A sheet tab name has to be short and unique; keep it human. */

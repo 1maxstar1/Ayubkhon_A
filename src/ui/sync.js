@@ -390,6 +390,7 @@
         if (!p) return;
         p.name = sp.name || p.name; p.intro = sp.intro != null ? sp.intro : p.intro;
         p.enabled = sp.enabled !== false; p.open = sp.open !== false;
+        p.versionNoted = !!sp.versionNoted;
         var byName = {};
         p.objects.forEach(function (o) { byName[o.name] = o; });
         var objs = [];
@@ -405,6 +406,9 @@
       });
       Object.keys(byFile).forEach(function (k) { ordered.push(byFile[k]); });
       app.projects = ordered;
+      // an application saved with one estimate in it twice (a corrected file loaded as an estimate, before this was
+      // checked): switched off now, once, and said — and written back
+      if (app.offVersions && app.offVersions(null)) this.dirty = true;
       // this application's settings, or the defaults — never the ones of the application opened before it
       app.resetOpts(st.opts);
       $('reportMode').value = st.mode || 'changed';
@@ -776,6 +780,8 @@
         projects.push({
           file: p.file, fileId: self.files[p.file] || null, name: p.name, title: p.title, intro: p.intro,
           enabled: p.enabled !== false, open: p.open !== false,
+          // switched off once as a repeat of another estimate (app.offVersions): never again, if the person put it back
+          versionNoted: p.versionNoted || undefined,
           objects: p.objects.map(function (o) { return { name: o.name, enabled: o.enabled !== false }; })
         });
         if (after[p.file]) { projects = projects.concat(after[p.file]); delete after[p.file]; }

@@ -529,7 +529,48 @@
     return out;
   }
 
+  /**
+   * One estimate twice among the estimates of an application: the same lines (name + unit) with the same quantities —
+   * nine in ten of the longer one's at least, ten lines or more — and no other object named (titles alike, or one
+   * without). A corrected version changes prices (now and then a quantity), never what is built; two estimates of one
+   * road list the same resources, each with quantities of its own (67503: none of fifteen alike in half their lines).
+   * 64453: the nine files the sender returned were loaded among the nine estimates — every resource counted twice, and
+   * «Сравнение версий» compared each corrected file with itself.
+   *
+   * @returns {Array<{i, of, prices}>}  estimate i repeats an earlier estimate `of` (every such earlier one, nearest
+   *   first); `prices` — its lines at another price (0: the very same file under another name)
+   */
+  function versionsOf(projects) {
+    var r3 = function (v) { return v == null ? '' : String(Math.round(v * 1000) / 1000); };
+    var bags = (projects || []).map(function (p) {
+      var q = {}, qp = {}, n = 0;
+      (p.objects || []).forEach(function (o) {
+        (o.rows || []).forEach(function (r) {
+          if (r.kind !== 'item') return;
+          var k = S.nameKey(r.nm || '') + '\u241f' + S.unitKey(r.unit || '') + '\u241f' + r3(r.qty);
+          q[k] = (q[k] || 0) + 1;
+          qp[k + '\u241f' + r3(r.price)] = (qp[k + '\u241f' + r3(r.price)] || 0) + 1;
+          n++;
+        });
+      });
+      return { q: q, qp: qp, n: n, title: S.nameKey(String(p.title || '')) };
+    });
+    var shared = function (x, y) { var s = 0; for (var k in x) s += Math.min(x[k], y[k] || 0); return s; };
+    var out = [];
+    bags.forEach(function (a, i) {
+      if (a.n < 10) return;
+      for (var j = i - 1; j >= 0; j--) {
+        var b = bags[j], m = Math.max(a.n, b.n);
+        if (b.n < 10 || (a.title && b.title && a.title !== b.title)) continue;
+        if (shared(a.q, b.q) < 0.9 * m) continue;
+        out.push({ i: i, of: j, prices: m - shared(a.qp, b.qp) });
+      }
+    });
+    return out;
+  }
+
   S.copiesOf = copiesOf;
+  S.versionsOf = versionsOf;
   S.assemble = assemble;
   S.applyPrices = applyPrices;
   S.spanStats = spanStats;

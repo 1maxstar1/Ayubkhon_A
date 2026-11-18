@@ -285,7 +285,17 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   «Сравнение версий» uni so'ralgan deb baholaydi; raqamli, lekin son emas
   narx («7 500 сум») avvalgidek «цена не прочитана».
   Boshqa smetalarni qatorma-qator takrorlaydigan fayl («ОБЩИЙ ИТОГ», `S.copiesOf`) yuklanganda o'chiriladi va aytiladi —
-  ресурс ikki marta sanalmaydi; solishtirish va «Наш ответ» o'chirilgan loyihaga qaramaydi. «Наш ответ» ning «объем»
+  ресурс ikki marta sanalmaydi. Arizada bitta smeta ikki marta (v2.16.20, `S.versionsOf`, `app.offVersions`; 64453: yuboruvchi
+  qaytargan 9 fayl 9 smeta ustiga smeta bo'lib yuklangan — Таблица №2 da ikki marta, «Сравнение версий» tuzatilganni o'zi bilan
+  solishtirardi): bir xil qatorlar (nom + birlik) va miqdorlar (uzunining 90 % i, kamida 10 qator, sarlavhalar boshqa obyektni
+  nomlamasa). Narxi farq qiladigani — boshqa versiya (tuzatilgan smeta): kechroq yuklangani o'chiriladi va «Сравнение версий» ga
+  yo'naltiriladi; aynan bir xil nusxa faqat shunday versiya bilan birga kelsa o'chiriladi (qaytgan to'plamning o'zgarmagan
+  fayllari), yolg'iz bo'lsa — faqat aytiladi (ikkita bir xil obyekt bo'lishi mumkin). Haqiqiy fayllarda: har bir «Было/Стало»
+  jufti 100 %, turli smetalar (67503 ning resurslari bir xil smetalari ham) 50 % ga ham yetmaydi. Har biri bir marta ko'riladi
+  (`versionNoted`, holatda saqlanadi): galochka qaytarsa, qayta o'chirilmaydi; avval saqlangan ariza ochilganda ham tekshiriladi.
+  «Сравнение версий» vkladkasiga sudrab tashlangan fayl smeta bo'lib qo'shilmaydi: PDF yoki «Наш ответ» tugmasiga — javob,
+  qolgani — tuzatilgan smeta (`compare.js` `dropped`). «×» li xabar (`opts.close`) keyingi oddiy xabarlar ostida yo'qolmaydi.
+  Ресурс ikki marta sanalmaydi; solishtirish va «Наш ответ» o'chirilgan loyihaga qaramaydi. «Наш ответ» ning «объем»
   varag'i boshqa obyektni nomlasa (sarlavhadagi «по объекту:» yoki «ТАБЛИЦА №2» ostidagi qator narx varag'inikidan farq
   qiladi) va qatorlarining yarmidan ko'pi smetada yo'q bo'lsa — u o'qilmaydi, faqat narxlar olinadi va sahifa aytadi
   (egasining qarori, 2026-11-15: ekspert eski javobni shablon qilib, «объем» varag'ini o'chirmay qoldiradi).

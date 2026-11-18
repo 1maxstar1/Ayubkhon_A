@@ -359,6 +359,43 @@ try {
       'a summary book copying the estimates is switched off and said: every resource counted once (' + JSON.stringify(r3).slice(0, 300) + ')');
   }
 
+  // the corrected file the sender returned, loaded as one more estimate (64453): it is the same estimate — switched off and
+  // said, where it goes instead; dropped on «Сравнение версий» it is the corrected file to compare, never one more estimate
+  {
+    const fx = book(1);
+    fx.sheets[0].rows.forEach((cs) => {
+      const k = (cs || []).findIndex((c) => c && c.v === 'ТЕСТОВЫЙ АНКЕР М8');
+      if (k > 0) { cs[k + 3] = { v: 15 }; if (cs[k + 4]) cs[k + 4] = { v: 45 }; }
+    });
+    const fFix = join(dir, 'Тест_v1_испр.xlsx');
+    writeFileSync(fFix, xlsx(S, fx));
+    await page.goto('file://' + join(root, 'dist/smeta-taqqoslash.html'));
+    await page.setInputFiles('#pick', f1);
+    await page.waitForFunction(() => window.app && app.projects.length === 1 && app.model && app.pending <= 0, null, { timeout: 30 * 1000 });
+    await page.setInputFiles('#pick', fFix);
+    await page.waitForFunction(() => app.projects.length === 2 && app.pending <= 0, null, { timeout: 30 * 1000 });
+    await page.waitForTimeout(300);
+    const v = await page.evaluate(() => ({ on: app.projects.map((p) => p.file + ':' + (p.enabled !== false)), toast: document.getElementById('toast').textContent,
+      crane: app.model.resources.find((x) => x.name === 'ТЕСТОВЫЙ КРАН 10 Т').qty }));
+    check(v.on.join(' ') === 'Тест_v1.xlsx:true Тест_v1_испр.xlsx:false' &&
+      /«Тест_v1_испр\.xlsx» — другая версия сметы «Тест_v1\.xlsx» \(те же строки и количества, другая цена в 1 стр\.\)/.test(v.toast) &&
+      /вкладке «Сравнение версий»/.test(v.toast) && v.crane === 2,
+      'a corrected file loaded as an estimate is switched off and said where it goes: every resource counted once (' + JSON.stringify(v).slice(0, 260) + ')');
+    // dropped on «Сравнение версий»: the PDF is our reply, the spreadsheet the corrected file — no estimate is added
+    await page.click('.tab[data-pane="compare"]');
+    const data = [fPdf, fFix].map((f) => ({ name: f.split('/').pop(), b64: readFileSync(f).toString('base64') }));
+    await page.evaluate((files) => {
+      const dt = new DataTransfer();
+      files.forEach((d) => { const bin = atob(d.b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); dt.items.add(new File([u], d.name)); });
+      document.getElementById('cmpSummary').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+    }, data);
+    await page.waitForFunction(() => app.compare_ui.res && app.compare_ui.reply && app.compare_ui.newFile, null, { timeout: 30 * 1000 });
+    const d = await page.evaluate(() => ({ n: app.projects.length, name: document.getElementById('cmpNewName').textContent, reply: app.compare_ui.reply.name,
+      fixed: [].concat(...app.compare_ui.res.objects.map((o) => o.rows)).filter((r) => r.nm === 'ТЕСТОВЫЙ АНКЕР М8').map((r) => r.p2).join() }));
+    check(d.n === 2 && d.name === 'Тест_v1_испр.xlsx' && d.reply === 'Наш_ответ.pdf' && d.fixed === '15',
+      'files dropped on «Сравнение версий» go to the comparison: the reply and the corrected file, no estimate added (' + JSON.stringify(d) + ')');
+  }
+
   check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' / ') : ''));
 } finally {
   await browser.close();

@@ -343,6 +343,40 @@ try {
   check(pdfBack.name === 'Наш_ответ.pdf' && pdfBack.n === 7 && pdfBack.m8 === 16,
     'after a reload the PDF reply is back: its 7 lines, its prices on the project (' + JSON.stringify(pdfBack) + ')');
 
+  // an application saved with its corrected file among the estimates (before this was checked, 64453): switched off as
+  // it is opened, said, and written back; put back by the person, it stays on
+  {
+    const fx = book(1);
+    fx.sheets[0].rows.forEach((cs) => {
+      const k = (cs || []).findIndex((c) => c && c.v === 'ТЕСТОВЫЙ АНКЕР М8');
+      if (k > 0) { cs[k + 3] = { v: 15 }; if (cs[k + 4]) cs[k + 4] = { v: 45 }; }
+    });
+    const fFix = join(dir, 'Тест_v1_испр.xlsx');
+    writeFileSync(fFix, xlsx(S, fx));
+    await page.setInputFiles('#pick', fFix);
+    await page.waitForFunction(() => app.projects.length === 2 && !S.Sync.loading && app.pending <= 0, null, T);
+    check(await page.evaluate(() => app.projects[1].enabled === false && app.projects[1].versionNoted === true), 'loaded as an estimate, the corrected file is switched off at once');
+    // as an older page saved it: both on, nothing noted
+    await page.evaluate(() => { app.projects.forEach((p) => { p.enabled = true; p.versionNoted = false; }); app.rebuild(); app.renderSide(); S.Sync.touch(); });
+    await saved();
+    const stored = () => page.evaluate(() => S.pb.collection('workspaces').getOne(S.Sync.ws.id).then((w) => (w.state.projects || []).map((p) => p.file + ':' + p.enabled + ':' + !!p.versionNoted).join(' ')));
+    check(await stored() === 'Тест_v1.xlsx:true:false Тест_v1_испр.xlsx:true:false', '(saved as before: both on)');
+    await reload();
+    await page.waitForFunction(() => app.projects.length === 2 && !S.Sync.loading, null, T);
+    await saved();
+    const back = await page.evaluate(() => ({ on: app.projects.map((p) => p.file + ':' + (p.enabled !== false)), toast: document.getElementById('toast').textContent }));
+    back.kept = await stored();
+    check(back.on.join(' ') === 'Тест_v1.xlsx:true Тест_v1_испр.xlsx:false' && /другая версия сметы «Тест_v1\.xlsx»/.test(back.toast) &&
+      back.kept === 'Тест_v1.xlsx:true:false Тест_v1_испр.xlsx:false:true',
+      'opened again, the corrected file among the estimates is switched off, said, and saved so (' + JSON.stringify(back).slice(0, 300) + ')');
+    // the person puts it back: it stays on after a reload
+    await page.evaluate(() => { app.projects[1].enabled = true; app.rebuild(); app.renderSide(); S.Sync.touch(); });
+    await saved();
+    await reload();
+    await page.waitForFunction(() => app.projects.length === 2 && !S.Sync.loading, null, T);
+    check(await page.evaluate(() => app.projects[1].enabled !== false), 'put back by the person, it is not switched off again');
+  }
+
   check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' / ') : ''));
 } catch (e) {
   check(false, 'the run stopped: ' + (e.message || e).split('\n')[0]);

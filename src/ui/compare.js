@@ -92,6 +92,20 @@
     step();
   };
 
+  /**
+   * Files dropped on this tab: «Наш ответ» when dropped on its button or a PDF, the corrected estimate(s) otherwise —
+   * as the two buttons take them. Never one more estimate of the application (app.js, the page's drop).
+   */
+  Compare.prototype.dropped = function (files, target) {
+    var onReply = target && target.closest && target.closest('#cmpReplyBtn');
+    var isPdf = function (f) { return /\.pdf$/i.test(f.name || ''); };
+    var reply = onReply ? files[0] : files.filter(isPdf)[0];
+    var rest = files.filter(function (f) { return f !== reply && !isPdf(f); });
+    if (reply) this.loadReply(reply);
+    if (rest.length) this.takeNew(rest);
+    if (!reply && !rest.length) this.app.toast('Перетащите исправленную смету (.xlsx, .xls) или наш ответ (Excel/PDF)', true);
+  };
+
   Compare.prototype.bind = function () {
     var self = this;
     if (!$('cmpOld')) return;

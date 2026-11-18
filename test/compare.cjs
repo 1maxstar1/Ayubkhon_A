@@ -556,5 +556,31 @@ check(bigRm.prices[bigKey] === bigM && bigRm.requested[bigKey] && bigRm.requeste
     'estimates of their own are no copies; nor is a second version of one estimate — one file is for the person to choose');
 }
 
+/* ------------------------------------------------ one estimate twice among the estimates of an application */
+{
+  const est = (rows) => S.smeta.parseWorkbook({ sheets: [sheet('РЕСУРС', [[null, null, null, null, null, 'Форма 4А АВС-4'],
+    ['Наименование стройки -', null, 'ТЕСТОВАЯ СТРОЙКА'], [], ...estimate('ТЕСТОВЫЕ РАБОТЫ', rows, { direct: 1 })])] }, 'x.xlsx');
+  const MAT = [null, null, 'СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'];
+  const rowsOf = (q, p) => [MAT, ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((i) => line(i, 'ТЕСТОВЫЙ МАТЕРИАЛ ' + i, 'Т', q(i), p(i)))];
+  const proj = (file, objects, title) => ({ file, objects, title: title == null ? 'ТЕСТОВАЯ СТРОЙКА' : title, enabled: true });
+  const road = proj('дорога.xls', est(rowsOf((i) => i, (i) => 10 + i)));
+  // the sender's corrected file: the same lines and quantities, two prices lowered
+  const fixed = proj('дорога-испр.xls', est(rowsOf((i) => i, (i) => (i <= 2 ? 5 + i : 10 + i))));
+  const same = proj('дорога (копия).xls', est(rowsOf((i) => i, (i) => 10 + i)));
+  const other = proj('мост.xls', est(rowsOf((i) => i * 3, (i) => 10 + i)));          // the same resources, quantities of its own
+  const v = S.versionsOf([road, other, fixed]);
+  check(v.length === 1 && v[0].i === 2 && v[0].of === 0 && v[0].prices === 2,
+    'a corrected file among the estimates is found as another version of its estimate, with its lines at another price (' + JSON.stringify(v) + ')');
+  const c = S.versionsOf([road, same]);
+  check(c.length === 1 && c[0].i === 1 && c[0].prices === 0, 'the same file under another name: a repeat, no line at another price (' + JSON.stringify(c) + ')');
+  check(!S.versionsOf([road, other]).length, 'two estimates of the same resources with quantities of their own are no versions');
+  check(!S.versionsOf([road, proj('дорога-2.xls', same.objects, 'ДРУГОЙ ОБЪЕКТ')]).length, 'nor two alike estimates of objects named otherwise');
+  const small = (p) => proj('малая.xls', est([MAT, ...[1, 2, 3].map((i) => line(i, 'ТЕСТОВЫЙ МАТЕРИАЛ ' + i, 'Т', i, p))]));
+  check(!S.versionsOf([small(5), small(6)]).length, 'nor two estimates of a few lines');
+  const three = S.versionsOf([road, fixed, same]);
+  check(three.filter((x) => x.i === 2).map((x) => x.of + ':' + x.prices).join() === '1:2,0:0',
+    'every earlier estimate it repeats is named, the nearest first (' + JSON.stringify(three) + ')');
+}
+
 console.log(fail ? '\nFAILED: ' + fail : '\nall compare checks passed');
 process.exit(fail ? 1 : 0);

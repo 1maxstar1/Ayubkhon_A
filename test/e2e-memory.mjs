@@ -8,13 +8,15 @@
  *     from the memory (mem:<row>), in the correction and in the journal;
  *   - a smeta price both A and B left alone is «ранее принято» in C; lower the accepted price and it is «выше
  *     принятого», with an amber cell; take B's row away and A's own price confirms nothing for C;
- *   - the switch «Память» hides all of it and is remembered; another region shows none of it.
+ *   - the switch «Память» hides all of it and is remembered; another region shows none of it;
+ *   - a «Перевозка» line in т·км is offered the haulage prices of the same distance band (1–10, 11–50, 51+ km),
+ *     whatever the line was called: the same material first, each naming its line; another band is not offered.
  *
  *   node test/e2e-memory.mjs
  */
 import { chromium } from 'playwright';
 import { createRequire } from 'node:module';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { launchOpts } from './chromium.mjs';
@@ -24,6 +26,20 @@ const require = createRequire(import.meta.url);
 const { load } = require('./load.cjs');
 const dir = mkdtempSync(join(tmpdir(), 'memory-'));
 const smeta = require('./synth.cjs').write(load(load.PIPELINE), join(dir, 'first.xlsx'), 1);
+// an estimate with haulage lines, written the way some estimators write them («ГПС км 8»)
+const haulSmeta = join(dir, 'haul.xlsx');
+{
+  const SB = load(load.PIPELINE, 'xlsx-write');
+  const { estimate, sheet, xlsx, line } = require('./compare-books.cjs');
+  writeFileSync(haulSmeta, xlsx(SB, { sheets: [sheet('1', estimate('ТЕСТОВАЯ ДОРОГА', [
+    [null, null, 'СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'],
+    line(1, 'ТЕСТОВЫЙ ЦЕМЕНТ', 'Т', 2, 900),
+    [null, null, 'ПЕРЕВОЗКА СТРОИТЕЛЬНЫХ МАТЕРИАЛОВ'],
+    line(2, 'Перевозка ГПС км 8', 'тн-км', 100, 1500),
+    line(3, 'Перевозка Песок - 60 км', 'тн-км', 50, 1800)
+  ], { direct: 1 }))] }));
+}
+const NK = load('normalize', 'match');
 
 const pb = await startServer({ port: 8164, registry: true, build: true });
 const { api, su } = pb;
@@ -50,7 +66,7 @@ const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 page.on('dialog', (d) => d.accept());
 
-async function openApp(number, region) {
+async function openApp(number, region, file) {
   await page.waitForSelector('#screen-list:not([hidden])');
   await page.fill('#appQ', number);
   await page.waitForFunction((n) => { const tr = document.querySelectorAll('#appTable tbody tr'); return tr.length >= 1 && tr[0].textContent.includes(n); }, number);
@@ -59,7 +75,7 @@ async function openApp(number, region) {
   await page.selectOption('#regionSel', region || 'fargona');
   await page.click('#regionForm button[type=submit]');
   await page.waitForSelector('#wsBox:not([hidden])');
-  await page.setInputFiles('#pick', smeta);
+  await page.setInputFiles('#pick', file || smeta);
   await page.waitForFunction(() => window.app && S.Sync.ws && !S.Sync.loading && app.model && app.model.rows.length > 0 && app.pending === 0 &&
     S.Sync.ws.files.length === 1, null, { timeout: 60 * SEC });
 }
@@ -195,6 +211,40 @@ try {
   await page.waitForSelector('#priceScroll .mceil', { timeout: 20 * SEC });
   check(true, 'on again: the marks are back');
   await closeApp();
+
+  /* haulage: by the distance band, not by the name */
+  {
+    const E = rows.find((r) => r.inn && ![A, B, C, D].some((x) => x.number === r.number));
+    const appA = (await mem(`workspace='${wsA}'`))[0];
+    const today = new Date().toISOString().slice(0, 10);
+    const put = (name, unit, price) => api('/api/collections/price_memory/records', { method: 'POST', body: JSON.stringify({
+      workspace: wsA, application: appA.application, contragent: appA.contragent, region: 'fargona', res_key: 'haul|' + name,
+      name, unit, match_key: NK.matchKey(name), match_unit_key: NK.matchUnitKey(unit), section: 'other', smeta_price: 1900, final_price: price,
+      kind: 'corrected', source: 'typed', asof: today, finished: new Date().toISOString().replace('T', ' '), accepted: false }) }, su);
+    await put('Перевозка ТЕСТОВЫЙ ЩЕБЕНЬ - 5 км', 'тн/км', 1111);          // 1–10 km, another material
+    await put('Перевозка Гравийно-песчаная смесь - 3 км', 'т·км', 1222);   // 1–10 km, the same material (ГПС)
+    await put('Перевозка Битум - 75 км', 'тн/км', 1333);                  // 51 km and more
+    await put('Перевозка ТЕСТОВЫЙ ЩЕБЕНЬ - 20 км', 'тн/км', 1444);         // 11–50 km: offered to neither line
+    await openApp(E.number, 'fargona', haulSmeta);
+    await page.waitForSelector(rowSel('Перевозка ГПС км 8') + ' .tagp', { timeout: 20 * SEC });
+    await page.click(rowSel('Перевозка ГПС км 8') + ' .tagp');
+    await page.waitForSelector('#memPop:not([hidden])');
+    const hp = await page.$$eval('#memPop .mp-row', (rs) => rs.map((r) => r.querySelector('.mp-price').textContent.replace(/\s/g, '') + ' ' + r.textContent));
+    const heads = await page.$$eval('#memPop .mp-sub', (s) => s.map((x) => x.textContent));
+    check(hp.length === 2 && hp[0].startsWith('1222') && hp[1].startsWith('1111') && /для «Перевозка Гравийно-песчаная смесь - 3 км»/.test(hp[0]) &&
+      /Тот же груз, расстояние 1–10 км/.test(heads[0]) && /Другой груз/.test(heads[1] || ''),
+      '«Перевозка ГПС км 8»: the haulage prices of 1–10 km, the same material first, each naming its line (' + hp.map((x) => x.slice(0, 60)).join(' | ') + ')');
+    await page.click('#memPop button[data-i="0"]');
+    await page.waitForFunction(() => { const r = app.model.resources.find((x) => x.name === 'Перевозка ГПС км 8'); return r && r.market === 1222; }, null, { timeout: 10 * SEC })
+      .then(() => check(true, '«Применить» puts that price'), () => check(false, '«Применить» puts that price'));
+    await page.click(rowSel('Перевозка Песок - 60 км') + ' .tagp');
+    await page.waitForSelector('#memPop:not([hidden])');
+    const sp = await page.$$eval('#memPop .mp-row .mp-price', (rs) => rs.map((r) => r.textContent.replace(/\s/g, '')));
+    check(sp.join() === '1333', '«Перевозка Песок - 60 км»: only the price of 51 km and more (' + sp.join() + ')');
+    await page.keyboard.press('Escape');
+    check(!(await page.$(rowSel('ТЕСТОВЫЙ ЦЕМЕНТ') + ' .tagp')), 'a material is not matched by distance');
+    await closeApp();
+  }
 
   /* another region */
   await openApp(D.number, 'andijon');

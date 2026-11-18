@@ -11,6 +11,10 @@
  *     one before («ранее принято»), «▲» and an amber cell when the smeta price is above what was accepted. The popover
  *     names the applications. What makes a ceiling, and how it ages, is S.memory (src/lib/memory.js).
  *
+ *   - a «Перевозка» line in т·км (S.memory.haul) is offered the earlier prices of every «Перевозка» line whose distance
+ *     is in the same band (1–10, 11–50, 51+ km), whatever the estimator called it — the same material first; each
+ *     names the line it was set for. The owner's rule (2026-11-18): the price of haulage goes by the distance.
+ *
  * The switch «Память» on the toolbar turns all of it off (kept in this browser). Nothing here sets a price by itself,
  * and nothing here reorders the other suggestions.
  *
@@ -23,7 +27,7 @@
   var PER = 40;              // match keys in one request
   var PREF = 'smeta.memory.off';
   var SEP = '␟';
-  var FIELDS = 'id,workspace,application,contragent,match_key,match_unit_key,kind,source,smeta_price,final_price,asof,finished,accepted,' +
+  var FIELDS = 'id,workspace,application,contragent,name,unit,match_key,match_unit_key,kind,source,smeta_price,final_price,asof,finished,accepted,' +
     'expand.application.number,expand.application.org_name,expand.contragent.name';
 
   function $(id) { return document.getElementById(id); }
@@ -33,6 +37,11 @@
   function day(d) { var t = new Date(String(d || '').replace(' ', 'T')); return isNaN(t) ? '' : t.toLocaleDateString('ru-RU'); }
   function today() { return new Date().toISOString().slice(0, 10); }
   function off() { try { return localStorage.getItem(PREF) === '1'; } catch (e) { return false; } }
+  /** A distance band of S.memory.haul in words: «1–10 км», «11–50 км», «от 51 км». */
+  function bandText(b) {
+    var B = S.memory.HAUL_BANDS, lo = b > 1 ? B[b - 2] + 1 : 1, hi = B[b - 1];
+    return hi ? lo + '–' + hi + ' км' : 'от ' + lo + ' км';
+  }
   function srcText(s) {
     return /^ref:/.test(s) ? 'из справочника' : /^uzex:/.test(s) ? 'с биржи UZEX' : /^(hint|mem):/.test(s) ? 'из прежней заявки' : 'введена вручную';
   }
@@ -42,11 +51,13 @@
     map: {},           // match pair → rows of price_memory
     asked: {},         // match key → 1
     cache: {},         // match pair → S.memory.rank(...)
+    haul: null,        // the corrected prices of «Перевозка» lines in the region (S.memory.haulRank), once read
+    haulAsked: false,
     gen: 0, t: 0, key: null, pop: null,
 
     usable: function () { var Sy = S.Sync; return !!(this.on && Sy && Sy.ws && !Sy.loading && A() && A().model); },
 
-    reset: function () { this.gen++; this.map = {}; this.asked = {}; this.cache = {}; this.hide(); clearTimeout(this.t); },
+    reset: function () { this.gen++; this.map = {}; this.asked = {}; this.cache = {}; this.haul = null; this.haulAsked = false; this.hide(); clearTimeout(this.t); },
 
     loadSoon: function () {
       var self = this;
@@ -57,11 +68,25 @@
     /** Ask for every resource not asked about yet. */
     load: function () {
       if (!this.usable()) return;
-      var self = this, gen = this.gen, Sy = S.Sync, want = [];
+      var self = this, gen = this.gen, Sy = S.Sync, want = [], hauls = false;
       A().model.resources.forEach(function (r) {
         var k = S.matchKey(r.name);
         if (k && !self.asked[k]) { self.asked[k] = 1; want.push(k); }
+        if (!hauls && S.memory.haul(r.name, r.unit)) hauls = true;
       });
+      // «Перевозка» lines: every corrected haulage price of the region, once — matched by distance, not by name
+      if (hauls && !this.haulAsked) {
+        this.haulAsked = true;
+        S.pb.collection('price_memory').getFullList({
+          batch: 500, sort: '-finished', expand: 'application,contragent', fields: FIELDS,
+          filter: S.pb.filter("region = {:r} && workspace != {:w} && kind = 'corrected' && match_key ~ {:p}", { r: Sy.ws.region, w: Sy.ws.id, p: 'PEREVOZK%' })
+        }).then(function (rows) {
+          if (gen !== self.gen) return;
+          self.haul = rows.map(function (c) { return self.rowOf(c); });
+          self.cache = {};
+          self.repaint();
+        }).catch(function () { /* an older server: the haulage lines are matched by name, as before */ });
+      }
       if (!want.length) return;
       var chunks = [];
       for (var i = 0; i < want.length; i += PER) chunks.push(want.slice(i, i + PER));
@@ -76,17 +101,22 @@
           }).then(function (rows) {
             if (gen !== self.gen || !rows.length) return;
             rows.forEach(function (c) {
-              var a = c.expand && c.expand.application, ct = c.expand && c.expand.contragent;
               var pair = c.match_key + SEP + c.match_unit_key;
-              (self.map[pair] = self.map[pair] || []).push({ id: c.id, workspace: c.workspace, application: c.application, contragent: c.contragent,
-                kind: c.kind, source: c.source || '', smeta_price: c.smeta_price, final_price: c.final_price, asof: c.asof, finished: c.finished, accepted: !!c.accepted,
-                number: a ? a.number : '', who: ct ? ct.name : (a ? a.org_name : '') });
+              (self.map[pair] = self.map[pair] || []).push(self.rowOf(c));
               delete self.cache[pair];
             });
             self.repaint();
           });
         });
       }, Promise.resolve()).catch(function () { /* an older server, or none: the page stays as it was */ });
+    },
+
+    /** A price_memory record as S.memory reads it. */
+    rowOf: function (c) {
+      var a = c.expand && c.expand.application, ct = c.expand && c.expand.contragent;
+      return { id: c.id, workspace: c.workspace, application: c.application, contragent: c.contragent, name: c.name || '', unit: c.unit || '',
+        kind: c.kind, source: c.source || '', smeta_price: c.smeta_price, final_price: c.final_price, asof: c.asof, finished: c.finished, accepted: !!c.accepted,
+        number: a ? a.number : '', who: ct ? ct.name : (a ? a.org_name : '') };
     },
 
     repaint: function () {
@@ -101,8 +131,12 @@
       if (!this.on || !r) return { prices: [], ceiling: null };
       var mk = mkOf(r), c = this.cache[mk];
       if (!c) {
-        var Sy = S.Sync;
-        c = this.cache[mk] = S.memory.rank(this.map[mk] || [], { contragent: Sy && Sy.app ? Sy.app.contragent : '', today: today() });
+        var Sy = S.Sync, ctx = { contragent: Sy && Sy.app ? Sy.app.contragent : '', today: today() };
+        c = S.memory.rank(this.map[mk] || [], ctx);
+        // a «Перевозка» line: the earlier haulage prices of its distance band, whatever the line was called there
+        var h = this.haul && S.memory.haul(r.name, r.unit);
+        if (h) c = { prices: S.memory.haulRank(this.haul, ctx, h), ceiling: c.ceiling, haul: h };
+        this.cache[mk] = c;
       }
       return c;
     },
@@ -114,7 +148,8 @@
       if (!e.prices.length) return '';
       var top = e.prices[0];
       return '<button class="tagp' + (top.cls === 1 ? ' own' : '') + '" data-mem="' + S.esc(r.key) + '" title="' +
-        S.esc('Память: ваша цена из завершённой заявки — ' + fmt(top.price) + (top.cls === 1 ? ' (этот контрагент)' : '') +
+        S.esc((e.haul ? 'Память: цена перевозки на том же расстоянии (' + bandText(e.haul.band) + ') из завершённой заявки — ' + fmt(top.price) +
+          ' («' + top.haul.name + '»)' : 'Память: ваша цена из завершённой заявки — ' + fmt(top.price)) + (top.cls === 1 ? ' (этот контрагент)' : '') +
           (e.prices.length > 1 ? ', всего ' + e.prices.length : '') + '. Нажмите — подробности') + '">пам.</button>';
     },
 
@@ -158,11 +193,18 @@
       if (!S.near(rec.market, rec.price)) html += '<div class="mp-mine">Ваша цена: <b>' + fmt(rec.market) + '</b></div>';
       var cls = 0;
       e.prices.slice(0, 8).forEach(function (p, i) {
-        if (p.cls !== cls) { cls = p.cls; html += '<div class="mp-sub">' + (cls === 1 ? 'Этот контрагент' : 'Другие контрагенты') + '</div>'; }
+        // haulage: the same material first, then the others of the same distance band; else by contragent
+        var g = e.haul ? (p.same ? 'h1' : 'h2') : p.cls;
+        if (g !== cls) {
+          cls = g;
+          html += '<div class="mp-sub">' + (e.haul ? (g === 'h1' ? 'Тот же груз' : 'Другой груз') + ', расстояние ' + bandText(e.haul.band)
+            : g === 1 ? 'Этот контрагент' : 'Другие контрагенты') + '</div>';
+        }
         var r = p.row;
         html += '<div class="mp-row"><b class="mp-price">' + fmt(p.price) + '</b><div class="mp-what">' +
           (p.accepted ? '<em class="mp-acc" title="В возвращённой смете подрядчик поставил эту цену («Исправлено»)">принята подрядчиком</em> ' : '') +
           '<span>' + S.esc(srcText(r.source)) + '</span>' +
+          (p.haul ? '<small class="mp-for">для «' + S.esc(p.haul.name) + '»</small>' : '') +
           '<small>№ ' + S.esc(r.number) + ' · ' + S.esc(r.who) + ' · ' + S.esc(day(S.memory.dateOf(r))) +
           (r.smeta_price > 0 ? ' · сметная цена там: ' + fmt(r.smeta_price) : '') + '</small></div>' +
           '<button class="btn sm" data-i="' + i + '">Применить</button></div>';
@@ -223,6 +265,7 @@
     byId: function (id) {
       var maps = this.map, out = null;
       Object.keys(maps).some(function (k) { return maps[k].some(function (r) { if (r.id === id) { out = r; return true; } return false; }); });
+      if (!out && this.haul) this.haul.some(function (r) { if (r.id === id) { out = r; return true; } return false; });
       return out;
     },
 

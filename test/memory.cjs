@@ -83,5 +83,54 @@ check(S.memory.dateOf({ asof: '2025-03-01', finished: '2031-05-01T10:00:00.000Z'
   const r2 = rank([oldApp({ kind: 'checked', contragent: 'B', smeta_price: 50, final_price: 50 }), oldApp({ kind: 'checked', contragent: 'C', smeta_price: 50, final_price: 50 })]);
   check(r2.ceiling === null, 'nor is an old acceptance a ceiling because it was put in today');
 }
+/* ------------------------------------------------------------- haulage: by the distance band, not by the name */
+const H = (n, u) => S.memory.haul(n, u === undefined ? 'тн/км' : u);
+const hk = (n, u) => { const h = H(n, u); return h ? h.band + ':' + h.mat + ':' + h.km : 'null'; };
+check(hk('Перевозка Гравийно-песчаная смесь- 5 км ') === '1:ГПС:5' && hk('Перевозка  ГПС  км 20 ', 'тн-км') === '2:ГПС:20' && hk('Перевозка ПГС - 7 км') === '1:ГПС:7',
+  'ГПС, ПГС and «Гравийно-песчаная смесь» are one material; «- 5 км» and «км 20» are distances');
+check(hk('Перевозка  а-б  км 19', 'тн-км') === '2:АСФАЛЬТОБЕТОН:19' && hk('Перевозка Асфальт - 11 км') === '2:АСФАЛЬТОБЕТОН:11' &&
+  hk('Перевозка Асфальтобетонная смесь - 19  км') === '2:АСФАЛЬТОБЕТОН:19' && hk('Перевозка Бетон (всех марок) - 59 км') === '3:БЕТОН:59',
+  '«а-б», «Асфальт», «Асфальтобетонная смесь» are one material; concrete is another');
+check(hk('Перевозка песок км 20', 'тн-км') === '2:ПЕСОК:20' && hk('Перевозка Битум км 53', 'тн-км') === '3:БИТУМ:53' && hk('Перевозка Щебень - 5 км') === '1:ЩЕБЕНЬ:5' &&
+  hk('ПЕРЕВОЗКА ЦЕМЕНТА - 25 КМ', 'ТН/КМ') === '2:ЦЕМЕНТ:25' && hk('Перевозка грунта 3км', 'т.км') === '1:ГРУНТ:3',
+  'sand, bitumen, crushed stone, cement, soil — in any case, with or without a space before «км»');
+check(['10', '10,5', '11', '50', '51'].map((k) => H('Перевозка Щебень - ' + k + ' км').band).join() === '1,2,2,2,3',
+  'the bands: 1–10 km, 11–50 km, 51 km and more (10 → 1, 10,5 → 2, 50 → 2, 51 → 3)');
+check(['тн/км', 'тн-км', 'т·км', 'ткм', 'т.км', 'т/км', 'тонно-км', 'ТН/КМ'].every((u) => H('Перевозка Щебень - 5 км', u)),
+  'every spelling of т·км');
+check(H('Перевозка Щебень - 5 км', 'т') === null && H('Перевозка Щебень - 5 км', 'м3') === null && H('Доставка Щебень - 5 км') === null &&
+  H('Перевозка Щебень') === null && H('Щебень фр. 5-20 мм') === null && H('Транспортные расходы 5 км') === null,
+  'only «Перевозка» in т·км with a distance: per tonne, another word, no distance — none');
+
+let hn = 0;
+const hrow = (name, price, o) => Object.assign({ id: 'h' + (++hn), workspace: 'hw' + hn, contragent: 'B', name, unit: 'тн/км', kind: 'corrected', source: 'typed',
+  smeta_price: 2000, final_price: price, finished: '2031-05-01T10:00:00.000Z', accepted: false }, o);
+const hrows = [
+  hrow('Перевозка Щебень - 5 км', 111),
+  hrow('Перевозка Гравийно-песчаная смесь - 3 км', 222, { contragent: 'A' }),
+  hrow('Перевозка ГПС - 8 км', 333),
+  hrow('Перевозка Щебень - 20 км', 444),
+  hrow('Перевозка Битум - 75 км', 555),
+  hrow('Перевозка Песок - 7 км', 666, { source: 'pct' }),
+  hrow('Перевозка Песок - 6 км', 0, { kind: 'zeroed' }),
+  hrow('Перевозка Песок - 9 км', 777, { finished: '2028-01-01' }),
+  hrow('Перевозка Песок - 4 км', 888, { kind: 'checked', source: 'mark' }),
+  hrow('Перевозка Песок - 2 км', 999, { unit: 'т' })
+];
+const hr = (name, unit, contragent) => S.memory.haulRank(hrows, { contragent: contragent === undefined ? 'A' : contragent, today: TODAY }, H(name, unit));
+let hp = hr('Перевозка ГПС км 9', 'тн-км');
+check(hp.map((p) => p.price).join() === '222,333,111' && hp[0].same && hp[1].same && !hp[2].same,
+  'a haulage line of 1–10 km: the same material first (its own contragent before another), then the others of the band (' + hp.map((p) => p.price).join() + ')');
+check(hp[0].haul.name === 'Перевозка Гравийно-песчаная смесь - 3 км' && hp[0].haul.km === 3 && hp[0].cls === 1,
+  'each entry names the line its price was set for');
+check(hr('Перевозка Битум км 53', 'тн-км').map((p) => p.price).join() === '555' && hr('Перевозка а-б км 19', 'тн-км').map((p) => p.price).join() === '444',
+  'another band is never offered: 51+ km gets 51+ km, 11–50 km gets 11–50 km');
+check(!hp.some((p) => [666, 777, 888, 999, 0].indexOf(p.price) >= 0),
+  'never offered: «Применить %», a price of 0, older than two years, a price left alone, a line per tonne');
+check(S.memory.haulRank([hrow('Перевозка Щебень - 5 км', 50, { workspace: 'one' }), hrow('Перевозка Бетон - 8 км', 50, { workspace: 'one' }),
+  hrow('Перевозка ГПС - 2 км', 60, { workspace: 'one' })], { today: TODAY }, H('Перевозка Щебень - 3 км')).map((p) => p.price).join() === '50,60',
+  'one line per application and price — the same material\'s kept');
+check(S.memory.haulRank(hrows, { today: TODAY }, null).length === 0, 'a line that is no haulage gets nothing this way');
+
 console.log(fail ? `FAILED (${fail})` : 'memory OK');
 process.exit(fail ? 1 : 0);

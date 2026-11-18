@@ -159,7 +159,12 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   o'rganilmaydi, daraja tartibi buzilmaydi, narx faqat «Применить» bilan qo'yiladi. Egasi sinamagan versiya
   `--unlisted` bilan chiqariladi. Xotira qoidalari (`src/lib/memory.js`): tegilmagan narx — bozor narxi emas,
   chegara; u faqat mustaqil arizalar (turli kontragentlar) kelishsa kuchga kiradi; kontragentning o'z narxi o'zini
-  tasdiqlamaydi; boshqa viloyat o'qilmaydi. Dataset (`src/lib/ml/dataset.js`, v2.13.0): bitta savol — bitta
+  tasdiqlamaydi; boshqa viloyat o'qilmaydi. **Tashish** (v2.16.16, egasining qarori 2026-11-18; `memory.js` `haul`/`haulRank`): «Перевозка …»
+  qatori (birligi т·км, nomida masofa) nomi bo'yicha emas, **masofa oralig'i** bo'yicha topiladi — 1–10, 11–50, 51+ km
+  (`HAUL_BANDS`); shu oraliqdagi har qanday «Перевозка» qatorining avvalgi tuzatilgan narxi taklif qilinadi: avval xuddi shu yuk
+  («ГПС» = «Гравийно-песчаная смесь», «а-б» = «Асфальт…»), keyin boshqalari, har biri qaysi qator uchun qo'yilganini aytadi;
+  boshqa oraliq taklif qilinmaydi; bu faqat «Перевозка» uchun (material, «Доставка», tonna birligi — avvalgidek nom bo'yicha).
+  Dataset (`src/lib/ml/dataset.js`, v2.13.0): bitta savol — bitta
   yakunlangan narx, o'z arizasi sanasida qayta so'ralgan; belgilash qoidalari (qo'llangan qator, 2 % ichida yozilgan
   narx, «hech biri», qoldirilgan-lekin-pastrog'i-bor; barcha qatorlar smeta narxidan yuqori bo'lsa — o'qitilmaydi)
   egasining qarori bilan o'zgaradi. Eng yangi arizalarning beshdan biri — test qismi: unda hech narsa o'qitilmaydi,

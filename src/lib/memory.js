@@ -106,5 +106,80 @@ var S = (typeof S !== 'undefined' && S) || {};
     return smeta <= ceiling.price || near(smeta, ceiling.price) ? 'accepted' : 'above';
   }
 
-  S.memory = { rank: rank, verdict: verdict, ageFactor: ageFactor, dateOf: dateOf, PRICE_MONTHS: PRICE_MONTHS, CEIL_MONTHS: CEIL_MONTHS, UNMARKED: UNMARKED, NEED: NEED };
+  /* ------------------------------------------------------------------ haulage: by its distance, not its name */
+
+  // The price of hauling a tonne a kilometre goes by the distance, in bands (the owner's rule, 2026-11-18: 1–10 km,
+  // 11–50 km, 51 km and more) — not by the way an estimator wrote the line. «Перевозка ГПС км 20», «Перевозка
+  // Гравийно-песчаная смесь - 20 км» and «Перевозка Щебень - 5 км» never share a name key, and an earlier price of
+  // one was never offered for another. For «Перевозка» lines in т·км only, an earlier corrected price of any
+  // «Перевозка» line of the same band is offered: the same material first, then the others; each says the line it was
+  // set for. Nothing else is matched this way.
+  var HAUL_BANDS = [10, 50];
+  var HAUL_UNIT = /^\s*т(?:н|онн?|онна|онно)?\.?\s*[\/\-·.*×x•]?\s*км\.?\s*$/i;
+  // what is hauled, as one word: the abbreviations estimators use and the full names
+  var HAUL_MAT = [
+    [/(^|[^А-ЯЁ])(ГПС|ПГС)([^А-ЯЁ]|$)|ГРАВИЙНО|ПЕСЧАНО[\s-]*ГРАВ/, 'ГПС'],
+    [/(^|[^А-ЯЁ])А\s*-?\s*Б([^А-ЯЁ]|$)|АСФАЛЬТ/, 'АСФАЛЬТОБЕТОН'],
+    [/ЩЕБ[ЕЁ]?Н/, 'ЩЕБЕНЬ'],
+    [/БИТУМ/, 'БИТУМ'],
+    [/ЦЕМЕНТ/, 'ЦЕМЕНТ'],
+    [/БЕТОН/, 'БЕТОН'],
+    [/ПЕС[ОК]К|ПЕСОК|ПЕСКА/, 'ПЕСОК'],
+    [/ГРУНТ/, 'ГРУНТ'],
+    [/ГРАВИЙ/, 'ГРАВИЙ']
+  ];
+  /**
+   * A «Перевозка» line in т·км: { km, band, mat } — band 1, 2, 3 by HAUL_BANDS; mat the material in one word (or the
+   * rest of the name, folded). Anything else — another unit, no distance in the name, «Доставка …» — null.
+   */
+  function haul(name, unit) {
+    var nm = String(name || '').replace(/\s+/g, ' ').trim();
+    if (!/^ПЕРЕВОЗК/i.test(nm) || !HAUL_UNIT.test(String(unit || ''))) return null;
+    // («\b» is no boundary next to a Cyrillic letter: the end of «км» is told by the letter that does not follow)
+    var m = /(\d+(?:[.,]\d+)?)\s*км(?![А-Яа-яЁё])/i.exec(nm) || /(?:^|[^А-Яа-яЁё])км\.?\s*(\d+(?:[.,]\d+)?)/i.exec(nm);
+    if (!m) return null;
+    var km = parseFloat(m[1].replace(',', '.'));
+    if (!(km > 0)) return null;
+    var band = 1;
+    while (band <= HAUL_BANDS.length && km > HAUL_BANDS[band - 1]) band++;
+    var rest = nm.replace(/^ПЕРЕВОЗК\S*\s*/i, '').replace(m[0], ' ').toUpperCase().replace(/Ё/g, 'Е');
+    var mat = '';
+    for (var i = 0; i < HAUL_MAT.length && !mat; i++) if (HAUL_MAT[i][0].test(rest)) mat = HAUL_MAT[i][1];
+    if (!mat) mat = rest.replace(/[^А-ЯA-Z0-9]+/g, ' ').trim();
+    return { km: km, band: band, mat: mat };
+  }
+  /**
+   * The earlier prices of «Перевозка» lines for one such line (`me` = haul(name, unit)): rows are price_memory records
+   * with their name and unit, of other workspaces of the region. Corrected prices only, as rank() offers them (no
+   * «Применить %», no 0, at most PRICE_MONTHS old); the same band only; the same material first, then the same
+   * contragent, one the contractor took, the newest. One line per application and price. Each entry carries the line
+   * it was set for (haul: { km, mat, name }).
+   */
+  function haulRank(rows, ctx, me) {
+    ctx = ctx || {};
+    if (!me) return [];
+    var mine = ctx.contragent || '', today = ctx.today || new Date().toISOString().slice(0, 10);
+    var out = [], seen = {};
+    (rows || []).forEach(function (r) {
+      if (!r || r.kind !== 'corrected' || r.source === 'pct' || !(r.final_price > 0)) return;
+      var h = haul(r.name, r.unit);
+      if (!h || h.band !== me.band) return;
+      var age = months(dateOf(r), today);
+      if (age == null || age > PRICE_MONTHS) return;
+      out.push({ row: r, cls: mine && r.contragent === mine ? 1 : 2, accepted: !!r.accepted, age: age, price: r.final_price,
+        same: h.mat === me.mat, haul: { km: h.km, mat: h.mat, name: String(r.name || '').replace(/\s+/g, ' ').trim() } });
+    });
+    out.sort(function (a, b) {
+      return (b.same ? 1 : 0) - (a.same ? 1 : 0) || a.cls - b.cls || (b.accepted ? 1 : 0) - (a.accepted ? 1 : 0) || a.age - b.age || a.price - b.price;
+    });
+    return out.filter(function (p) {
+      var one = (p.row.workspace || p.row.id) + '|' + p.price;
+      if (seen[one]) return false;
+      seen[one] = 1;
+      return true;
+    });
+  }
+
+  S.memory = { rank: rank, verdict: verdict, ageFactor: ageFactor, dateOf: dateOf, haul: haul, haulRank: haulRank, HAUL_BANDS: HAUL_BANDS,
+    PRICE_MONTHS: PRICE_MONTHS, CEIL_MONTHS: CEIL_MONTHS, UNMARKED: UNMARKED, NEED: NEED };
 })(S);

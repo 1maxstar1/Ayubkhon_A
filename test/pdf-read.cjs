@@ -101,6 +101,21 @@ check(same(rowsOf(S.readPdf(turned)), rows), 'a page turned by /Rotate 90 is rea
   check(S.num(got[3][3]) === 1234.5, 'a printed «1 234,50» is the number 1234.5');
 }
 
+/* -------------------------------- a number padded to the right of its cell with spaces */
+
+// Excel's accounting format pads a number to the right of its cell with spaces, and Windows' printer puts the last of
+// them over the number's first digit: taken as text, that space went inside the number («1 21 744,00»)
+{
+  const pg = new Page(595, 842);
+  const bottom = pg.table(40, 60, [150, 90], [['Наименование', 'Цена'], ['ТЕСТОВЫЙ ПЕСОК', null], ['ТЕСТОВЫЙ ЩЕБЕНЬ', null]]);
+  const rowH = (bottom - 60) / 3;
+  // twelve spaces, then the number moved back by more than one space's width: its first digit starts before the last space
+  pg.tj(192, 60 + rowH + rowH / 2 + 3, [' '.repeat(12), 280, '987,50']);
+  pg.tj(192, 60 + 2 * rowH + rowH / 2 + 3, [' '.repeat(10), 260, '5 432,00']);
+  const got = rowsOf(S.readPdf(makePdf([pg], { style: 'print' })));
+  check(got[1][1] === '987,50' && got[2][1] === '5 432,00', 'a number padded with spaces that run over its first digit reads as printed (' + got[1][1] + ' / ' + got[2][1] + ')');
+}
+
 /* ---------------------------------------------------------- no ruled table */
 
 {

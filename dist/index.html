@@ -6903,7 +6903,10 @@ if (typeof self !== 'undefined') self.S = S;
       parts.forEach(function (c) { c = doc.resolve(c); if (c && c.$raw) text += latin1(decode(c, doc)) + '\n'; });
       var got = { t: [], h: [], v: [] };
       run(doc, text, p.res || doc.resolve(p.page.Resources) || {}, turn(p), got, 0);
-      var known = got.t.filter(function (gl) { return gl.c !== ''; });
+      // the space glyphs are left out: a word's end is where the page leaves a gap (lines()). Taken as text they could
+      // land inside a word — Excel pads a number to the right of its cell with spaces, the last of them over the
+      // number's first digit, and «121 744,00» came out «1 21 744,00» (2026-11-18)
+      var known = got.t.filter(function (gl) { return gl.c !== '' && !/^\s+$/.test(gl.c); });
       glyphs += got.t.length;
       read += known.length;
       pageRows(known, got).forEach(function (r) { rows.push(r); });

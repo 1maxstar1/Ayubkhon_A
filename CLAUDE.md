@@ -205,7 +205,8 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   **«Наш ответ» PDF da** (v2.16.13, `src/lib/pdf-read.js`, `S.readPdf`/`S.readTable`): jadval Excel'dan yoki «Microsoft: Print
   To PDF» bilan chop etilgan PDF dan o'qiladi — har bir harf sahifadagi o'rniga qo'yiladi, qatorlar va ustunlar jadvalning o'z
   chiziqlaridan (ingichka to'rtburchak yoki chiziq), birlashtirilgan katak matni yuqori-chap katakda, katak ichida defisdan
-  keyin bo'lingan so'z («ПМ-» / «100А») qayta qo'shiladi. Natija `S.readXlsx` bilan bir xil shaklda, shuning uchun
+  keyin bo'lingan so'z («ПМ-» / «100А») qayta qo'shiladi; bo'sh joy belgilari matnga olinmaydi — so'z chegarasi harflar
+  orasidagi masofadan (v2.16.14: Excel sonni o'ngga surgan bo'sh joylar raqam ichiga tushardi, «1 21 744,00»). Natija `S.readXlsx` bilan bir xil shaklda, shuning uchun
   `reply.parse` o'zgarmagan; «Сравнение версий» («Наш ответ (Excel/PDF)») va «Книга цен» ikkalasi o'qiydi; server ish
   maydoni PDF ni ham saqlaydi (`pb_schema.json` workspaces.files: `application/pdf`). Skan (rasm), parolli PDF va belgilar
   jadvali yo'q shrift — aniq xabar bilan rad etiladi; rasmdan matn taxmin qilinmaydi. Testlar faqat test o'zi yasagan PDF da. Tashish varag'i («перевозка», `transportSheet`) xatolari

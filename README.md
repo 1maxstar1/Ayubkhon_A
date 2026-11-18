@@ -727,7 +727,8 @@ yozib boriladi; ekran, takliflar va narxlar bundan **o'zgarmaydi**:
 * Admin sahifasi → **«Обучение»**: faqat sonlar; «Скопировать числа».
 * **Xotira ekranda (v2.12.0):** nom yonida «пам.» — yakunlangan arizada o'zingiz qo'ygan narx (shu kontragentniki
   birinchi, pudratchi qabul qilgani oldinda), «Применить» bilan qo'yiladi; smeta narxi yonida «✓» — kamida ikki
-  mustaqil arizada shu narxgacha qabul qilingan, «▲» — undan baland. **Tashish qatorlari** («Перевозка …», т·км, v2.16.16) nomi
+  mustaqil arizada shu narxgacha qabul qilingan, «▲» — undan baland (v2.16.17 dan bitta arizada qabul qilingan narxdan
+  baland bo'lsa ham «▲ … (1 заявка)» — bu ishora, «✓» bermaydi). **Tashish qatorlari** («Перевозка …», т·км, v2.16.16) nomi
   bo'yicha emas, masofa oralig'i bo'yicha topiladi (1–10, 11–50, 51+ km): «Перевозка ГПС км 20» ga boshqa arizadagi
   «Перевозка Асфальт - 11 км» narxi ham taklif qilinadi — avval xuddi shu yuk, har biri qaysi qator uchun qo'yilgani bilan.
   «Память» kaliti hammasini o'chiradi. Qoidalar —

@@ -159,7 +159,9 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   o'rganilmaydi, daraja tartibi buzilmaydi, narx faqat «Применить» bilan qo'yiladi. Egasi sinamagan versiya
   `--unlisted` bilan chiqariladi. Xotira qoidalari (`src/lib/memory.js`): tegilmagan narx — bozor narxi emas,
   chegara; u faqat mustaqil arizalar (turli kontragentlar) kelishsa kuchga kiradi; kontragentning o'z narxi o'zini
-  tasdiqlamaydi; boshqa viloyat o'qilmaydi. **Tashish** (v2.16.16, egasining qarori 2026-11-18; `memory.js` `haul`/`haulRank`): «Перевозка …»
+  tasdiqlamaydi; chegara bo'lmasa ham smeta narxi avval qabul qilingan eng yuqori narxdan baland bo'lsa — bitta arizada
+  ham — «▲ выше принятого (1 заявка)» ishorasi chiqadi (`rank().hint`, `hintVerdict`, v2.16.17, egasining qarori 2026-11-18),
+  ishora hech qachon «✓» bermaydi; boshqa viloyat o'qilmaydi. **Tashish** (v2.16.16, egasining qarori 2026-11-18; `memory.js` `haul`/`haulRank`): «Перевозка …»
   qatori (birligi т·км, nomida masofa) nomi bo'yicha emas, **masofa oralig'i** bo'yicha topiladi — 1–10, 11–50, 51+ km
   (`HAUL_BANDS`); shu oraliqdagi har qanday «Перевозка» qatorining avvalgi tuzatilgan narxi taklif qilinadi: avval xuddi shu yuk
   («ГПС» = «Гравийно-песчаная смесь», «а-б» = «Асфальт…»), keyin boshqalari, har biri qaysi qator uchun qo'yilganini aytadi;

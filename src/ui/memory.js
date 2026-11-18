@@ -9,7 +9,9 @@
  *     with its application, contragent and date. «Применить» sets the price as every suggestion does (and only it);
  *   - the mark in the «цена по смете» cell: «✓» when independent applications accepted this smeta price or a higher
  *     one before («ранее принято»), «▲» and an amber cell when the smeta price is above what was accepted. The popover
- *     names the applications. What makes a ceiling, and how it ages, is S.memory (src/lib/memory.js).
+ *     names the applications. What makes a ceiling, and how it ages, is S.memory (src/lib/memory.js). With fewer than
+ *     two independent applications, a smeta price above every price accepted before still gets «▲» (rank().hint,
+ *     the owner's rule 2026-11-18) — never «✓»;
  *
  *   - a «Перевозка» line in т·км (S.memory.haul) is offered the earlier prices of every «Перевозка» line whose distance
  *     is in the same band (1–10, 11–50, 51+ km), whatever the estimator called it — the same material first; each
@@ -37,6 +39,11 @@
   function day(d) { var t = new Date(String(d || '').replace(' ', 'T')); return isNaN(t) ? '' : t.toLocaleDateString('ru-RU'); }
   function today() { return new Date().toISOString().slice(0, 10); }
   function off() { try { return localStorage.getItem(PREF) === '1'; } catch (e) { return false; } }
+  /** «1 заявка», «2 заявки», «5 заявок». */
+  function appsText(n) {
+    var d = n % 10, h = n % 100;
+    return n + (d === 1 && h !== 11 ? ' заявка' : d >= 2 && d <= 4 && (h < 12 || h > 14) ? ' заявки' : ' заявок');
+  }
   /** A distance band of S.memory.haul in words: «1–10 км», «11–50 км», «от 51 км». */
   function bandText(b) {
     var B = S.memory.HAUL_BANDS, lo = b > 1 ? B[b - 2] + 1 : 1, hi = B[b - 1];
@@ -135,7 +142,7 @@
         c = S.memory.rank(this.map[mk] || [], ctx);
         // a «Перевозка» line: the earlier haulage prices of its distance band, whatever the line was called there
         var h = this.haul && S.memory.haul(r.name, r.unit);
-        if (h) c = { prices: S.memory.haulRank(this.haul, ctx, h), ceiling: c.ceiling, haul: h };
+        if (h) c = { prices: S.memory.haulRank(this.haul, ctx, h), ceiling: c.ceiling, hint: c.hint, haul: h };
         this.cache[mk] = c;
       }
       return c;
@@ -155,12 +162,17 @@
 
     /** The mark of the smeta-price cell: { cls, html }. */
     ceil: function (r) {
-      var e = this.of(r), v = S.memory.verdict(r.price, e.ceiling);
+      var e = this.of(r), v = S.memory.verdict(r.price, e.ceiling), c = e.ceiling, t;
+      if (v) {
+        t = v === 'accepted'
+          ? 'Ранее принято: такую или более высокую сметную цену оставили без изменений в ' + c.apps + ' независимых заявках (до ' + fmt(c.price) + ')'
+          : 'Выше принятого ранее: без изменений оставляли до ' + fmt(c.price) + ' (' + c.apps + ' независимых заявок), здесь ' + fmt(r.price);
+      } else if (S.memory.hintVerdict(r.price, e.hint) === 'above') {
+        // fewer than two independent applications: only «above», never «accepted»
+        v = 'above'; c = e.hint;
+        t = 'Выше принятого ранее: без изменений оставляли до ' + fmt(c.price) + ' (' + appsText(c.apps) + '), здесь ' + fmt(r.price);
+      }
       if (!v) return { cls: '', html: '' };
-      var c = e.ceiling;
-      var t = v === 'accepted'
-        ? 'Ранее принято: такую или более высокую сметную цену оставили без изменений в ' + c.apps + ' независимых заявках (до ' + fmt(c.price) + ')'
-        : 'Выше принятого ранее: без изменений оставляли до ' + fmt(c.price) + ' (' + c.apps + ' независимых заявок), здесь ' + fmt(r.price);
       return { cls: v === 'above' ? ' mover' : '', html: '<button class="mceil ' + (v === 'accepted' ? 'ok' : 'over') + '" data-memc="' + S.esc(r.key) +
         '" title="' + S.esc(t + '. Нажмите — подробности') + '">' + (v === 'accepted' ? '✓' : '▲') + '</button>' };
     },
@@ -171,7 +183,7 @@
       A().model.resources.forEach(function (r) {
         var e = self.of(r);
         if (e.prices.length) n++;
-        if (S.memory.verdict(r.price, e.ceiling) === 'above') over++;
+        if (S.memory.verdict(r.price, e.ceiling) === 'above' || (!e.ceiling && S.memory.hintVerdict(r.price, e.hint) === 'above')) over++;
       });
       return (n ? ' · в памяти ' + n : '') + (over ? ' · выше принятого ' + over : '');
     },
@@ -185,7 +197,8 @@
 
     show: function (anchor, key) {
       var self = this, rec = this.recOf(key), e = this.of(rec);
-      if (!rec || (!e.prices.length && !e.ceiling)) { this.hide(); return; }
+      var weak = !e.ceiling && S.memory.hintVerdict(rec && rec.price, e.hint) === 'above' ? e.hint : null;
+      if (!rec || (!e.prices.length && !e.ceiling && !weak)) { this.hide(); return; }
       this.key = key;
       var region = S.Sync && S.Sync.ws ? S.regionLabel(S.Sync.ws.region) : '';
       var html = '<div class="mp-head"><span>Память: завершённые заявки · ' + S.esc(region) + ' <small>цены без НДС</small></span>' +
@@ -209,6 +222,15 @@
           (r.smeta_price > 0 ? ' · сметная цена там: ' + fmt(r.smeta_price) : '') + '</small></div>' +
           '<button class="btn sm" data-i="' + i + '">Применить</button></div>';
       });
+      if (weak) {
+        html += '<div class="mp-sub">Оставлено как в смете</div><div class="mp-ceil over">▲ Сметная цена ' + fmt(rec.price) +
+          ' выше принятого ранее: без изменений оставляли до <b>' + fmt(weak.price) + '</b> — ' + appsText(weak.apps) +
+          '<small>меньше двух независимых заявок — это подсказка, не граница</small></div>' +
+          weak.rows.slice(0, 6).map(function (r) {
+            return '<div class="mp-ev">' + fmt(r.final_price) + ' · № ' + S.esc(r.number) + ' · ' + S.esc(r.who) + ' · ' + S.esc(day(S.memory.dateOf(r))) +
+              ' · ' + (r.kind === 'checked' ? 'проверено' : 'оставлено') + '</div>';
+          }).join('');
+      }
       if (e.ceiling) {
         var c = e.ceiling, v = S.memory.verdict(rec.price, c);
         html += '<div class="mp-sub">Оставлено как в смете</div><div class="mp-ceil ' + (v === 'above' ? 'over' : 'ok') + '">' +

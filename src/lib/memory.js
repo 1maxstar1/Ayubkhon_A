@@ -31,6 +31,10 @@
  *       contragent of the application open now — accepted at or above, with weights adding up to NEED or more.
  *   A smeta price at or below the ceiling is «ранее принято»; above it, the row is pointed out.
  *
+ *   With no ceiling, what was accepted still says something when the smeta price is above it (the owner's rule,
+ *   2026-11-18: one application is enough for that): rank() gives a HINT — the highest price any application accepted,
+ *   with how many applications — and hintVerdict() says 'above' over it. A hint never makes «ранее принято».
+ *
  * Other regions are never read (the query is by region, as «Прежние проекты»).
  */
 var S = (typeof S !== 'undefined' && S) || {};
@@ -97,7 +101,17 @@ var S = (typeof S !== 'undefined' && S) || {};
         ceiling = { price: list[i].price, apps: n, weight: w, rows: used.reduce(function (o, g) { return o.concat(g.rows); }, []) };
       }
     }
-    return { prices: prices, ceiling: ceiling };
+    // no ceiling: the highest price an application accepted, however few — for «выше принятого» only
+    var live = list.filter(function (g) { return g.w > 0; });
+    var hint = !ceiling && live.length
+      ? { price: live[0].price, apps: live.length, rows: live.reduce(function (o, g) { return o.concat(g.rows); }, []) } : null;
+    return { prices: prices, ceiling: ceiling, hint: hint };
+  }
+
+  /** A smeta price above every price accepted before, when there is no ceiling (rank().hint): 'above', else ''. */
+  function hintVerdict(smeta, hint) {
+    if (!hint || !(smeta > 0)) return '';
+    return smeta > hint.price && !near(smeta, hint.price) ? 'above' : '';
   }
 
   /** How a smeta price stands to the ceiling: at or below it — accepted before; above — to be looked at. */
@@ -180,6 +194,6 @@ var S = (typeof S !== 'undefined' && S) || {};
     });
   }
 
-  S.memory = { rank: rank, verdict: verdict, ageFactor: ageFactor, dateOf: dateOf, haul: haul, haulRank: haulRank, HAUL_BANDS: HAUL_BANDS,
+  S.memory = { rank: rank, verdict: verdict, hintVerdict: hintVerdict, ageFactor: ageFactor, dateOf: dateOf, haul: haul, haulRank: haulRank, HAUL_BANDS: HAUL_BANDS,
     PRICE_MONTHS: PRICE_MONTHS, CEIL_MONTHS: CEIL_MONTHS, UNMARKED: UNMARKED, NEED: NEED };
 })(S);

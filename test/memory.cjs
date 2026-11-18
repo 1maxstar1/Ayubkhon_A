@@ -83,6 +83,20 @@ check(S.memory.dateOf({ asof: '2025-03-01', finished: '2031-05-01T10:00:00.000Z'
   const r2 = rank([oldApp({ kind: 'checked', contragent: 'B', smeta_price: 50, final_price: 50 }), oldApp({ kind: 'checked', contragent: 'C', smeta_price: 50, final_price: 50 })]);
   check(r2.ceiling === null, 'nor is an old acceptance a ceiling because it was put in today');
 }
+/* ------------------------------------------------------------- fewer than two independent applications: a hint, «▲» only */
+let h = rank([marked({ contragent: 'B', final_price: 100 })]);
+check(h.ceiling === null && h.hint && h.hint.price === 100 && h.hint.apps === 1, 'one application accepted a price: no ceiling, a hint (' + JSON.stringify(h.hint && { p: h.hint.price, a: h.hint.apps }) + ')');
+check(S.memory.hintVerdict(120, h.hint) === 'above' && S.memory.hintVerdict(100, h.hint) === '' && S.memory.hintVerdict(90, h.hint) === '' &&
+  S.memory.hintVerdict(100.0000001, h.hint) === '' && S.memory.hintVerdict(0, h.hint) === '' && S.memory.hintVerdict(120, null) === '',
+  'a smeta price above it is «above»; at or below it nothing — a hint never says «accepted»');
+h = rank([marked({ contragent: 'B', final_price: 100 }), left({ contragent: 'B', final_price: 130 })]);
+check(h.hint.price === 130 && h.hint.apps === 1, 'one contragent twice: one application, its highest price');
+check(rank([marked({ contragent: 'A', final_price: 100 })]).hint.price === 100, 'the contragent\'s own price gives a hint too («above» is a fact, not a confirmation)');
+check(rank([left({ contragent: 'B' })]).hint && rank([marked({ contragent: 'B', finished: '2030-05-01' })]).hint === null,
+  'a price merely left gives a hint; one older than twelve months does not');
+check(rank([marked({ contragent: 'B' }), marked({ contragent: 'C' })]).hint === null && rank([row({ contragent: 'B' })]).hint === null,
+  'with a ceiling there is no hint; a corrected price is never one');
+
 /* ------------------------------------------------------------- haulage: by the distance band, not by the name */
 const H = (n, u) => S.memory.haul(n, u === undefined ? 'тн/км' : u);
 const hk = (n, u) => { const h = H(n, u); return h ? h.band + ':' + h.mat + ':' + h.km : 'null'; };

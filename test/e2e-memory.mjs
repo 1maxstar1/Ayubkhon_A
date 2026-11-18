@@ -194,6 +194,23 @@ try {
     /выше принятого 1/.test(await page.textContent('#priceCount')), 'a smeta price above what was accepted: «▲», an amber cell, and counted');
   await only(picked.own.name);
   check(!(await page.$(rowSel(picked.own.name) + ' .mceil')), 'a contragent\'s own price left alone confirms nothing for its next application');
+  // … but a smeta price above what one application accepted is pointed out: «▲ (1 заявка)», a hint, never «✓»
+  const rA = (await mem(`workspace='${wsA}'`)).find((x) => x.res_key === picked.own.key);
+  const lowerOwn = Math.round(picked.own.price * 0.9);
+  await api('/api/collections/price_memory/records/' + rA.id, { method: 'PATCH', body: JSON.stringify({ final_price: lowerOwn, smeta_price: lowerOwn }) }, su);
+  await page.reload();
+  await page.waitForSelector('#wsBox:not([hidden])');
+  await page.waitForFunction(() => window.app && app.model && app.model.rows.length > 0 && !S.Sync.loading, null, { timeout: 60 * SEC });
+  await memLoaded();
+  await only(picked.own.name);
+  await page.waitForSelector(rowSel(picked.own.name) + ' .mceil.over', { timeout: 20 * SEC });
+  const hintTitle = await page.getAttribute(rowSel(picked.own.name) + ' .mceil', 'title');
+  await page.click(rowSel(picked.own.name) + ' .mceil');
+  await page.waitForSelector('#memPop:not([hidden])');
+  const hintPop = await page.textContent('#memPop');
+  check(/1 заявка/.test(hintTitle) && /выше принятого/i.test(hintPop) && /подсказка, не граница/.test(hintPop) && hintPop.includes('№ ' + A.number),
+    'one application accepted less: «▲ (1 заявка)», and the popover says it is a hint and names the application');
+  await page.keyboard.press('Escape');
 
   /* the switch */
   await page.fill('#q', '');

@@ -75,6 +75,15 @@ qo'shilgan. Dastur o'chirishni «tejash» deb sanagan edi. Qo'riqchi: tejash uch
 foiz qiladi; o'chirilgan so'ralgan qator — qizil ogohlantirish, shu varaqning yangi qatorlari bilan (`test/compare.cjs`,
 `test/e2e-compare.mjs`). Saboq: **«ko'p tejash» ham xato belgisi** — har bir yig'ma son o'z qismlariga bo'linib tekshiriladi.
 
+**Ogohlantirishlarning o'zi o'lchanadi (v2.16.22).** 68106 da «Итоги листов» 32 ta «итог ≠ сумма строк» ko'rsatdi —
+birortasi haqiqiy emas edi: smetaning yaxlitlangan summalari miqdor × narx bilan solishtirilgan; «ИТОГО С НАКЛАДНЫМИ /
+ПО РЕСУРСНОМУ РАСЧЕТУ» va «Итого прямой затрат» band jamisi deb olingan; smetadagi xato jamini yuboruvchi tuzatgani
+«xato» deb chiqqan. 64453 da ikki blokli «ВСЕГО», tashish bandidagi «5 %» pul qatori; 67168 da yuboruvchi uskunalarni
+«материалы» sarlavhasi ostiga qo'ygan. Endi barcha haqiqiy solishtirishlar (9 ariza) to'plami bilan avval/keyin o'lchanadi:
+53 → 4 (qolgani haqiqiy). Shu arizada asfalt qatori «o'chirilgan» emas, nomi o'zgartirilgan va hajmi 8 baravar kamaytirilgan
+edi — endi shunday aytiladi. Saboq: har bir ogohlantirish turi uchun **qancha noto'g'ri ogohlantirgani** hisoblanadi; qizil
+belgi faqat haqiqiy xatoga beriladi, aks holda odam ularga ishonmay qo'yadi.
+
 ### 4. Ekran yozganni buzadi yoki xabarni yashiradi
 
 Narx katagiga yozishda raqamlar o'rni almashgan («207187» → «207 871»); o'qilishi shart bo'lgan xabar keyingi oddiy

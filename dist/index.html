@@ -5768,12 +5768,19 @@ if (typeof self !== 'undefined') self.S = S;
   }
   /** Paired by kind, band and words: «=5%» and «=7%» are the same line with its text changed. */
   function amountKey(r) {
+    // a band total by its band, whatever its words: «ИТОГО ПО СТРОИТЕЛЬНЫМ МАТЕРИАЛАМ:» is «Итого по материальным
+    // ресурсам» rewritten (67168: every total of a sheet made anew stood as one line «deleted» and one «new»)
+    if (bandTotal(r)) return 'total|' + (r.section || '') + '|band';
     return r.kind + '|' + (r.section || '') + '|' + S.nameKey(amountLabel(r)).replace(/[\d.,=%]+/g, ' ').replace(/\s+/g, ' ').trim();
   }
-  /** A band total: «ИТОГО» of one band, not «ИТОГО ПРЯМЫЕ ЗАТРАТЫ» nor «ВСЕГО …». */
+  /**
+   * A band total: «ИТОГО» of one band, not one of the whole estimate — «ИТОГО ПРЯМЫЕ ЗАТРАТЫ» / «Итого прямой затрат», «ИТОГО
+   * С НАКЛАДНЫМИ РАСХОДАМИ», «ИТОГО ПО РЕСУРСНОМУ РАСЧЕТУ», «ВСЕГО …». Those were checked against the last band's lines and
+   * flagged on every sheet whose overheads moved (68106: 32 «итог ≠ сумма строк», none of them a sum typed over).
+   */
   function bandTotal(r) {
     var l = S.nameKey(amountLabel(r));
-    return r.kind === 'total' && /^ИТОГО(\s|$)/.test(l) && !/ПРЯМЫЕ|ВСЕГО|УЧЕТОМ|СМЕТ/.test(l) && !!r.section;
+    return r.kind === 'total' && /^ИТОГО(\s|$)/.test(l) && !/ПРЯМ|ВСЕГО|УЧЕТОМ|СМЕТ|НАКЛАДН|ПРИБЫЛ|РАСЧЕТ/.test(l) && !!r.section;
   }
   var BAND = { labor: 'трудовые ресурсы', machines: 'машины и механизмы', materials: 'материалы', equipment: 'оборудование' };
   /** A bare «ИТОГО» says which band it closes. */
@@ -5781,14 +5788,70 @@ if (typeof self !== 'undefined') self.S = S;
     var l = amountLabel(r);
     return /^ИТОГО$/i.test(l) && BAND[r.section] ? l + ' (' + BAND[r.section] + ')' : l;
   }
+  /**
+   * The sum of each band's lines as the sheet shows them: the line's own sum, quantity × price where it has none. A band
+   * total is what its lines add up to on the sheet; checked against quantity × price instead, an estimate whose sums are
+   * rounded (quantities to four places) made a «gap» the returned file, summed by formulas, did not have.
+   */
   function bandSums(obj) {
     var s = {};
-    itemsOf(obj).forEach(function (r) { s[r.section] = (s[r.section] || 0) + (r.qty || 0) * (r.price || 0); });
+    itemsOf(obj).forEach(function (r) {
+      var v = r.sum != null && isFinite(r.sum) ? r.sum : (r.qty || 0) * (r.price || 0);
+      s[r.section] = (s[r.section] || 0) + v;
+    });
     return s;
+  }
+  /**
+   * What each band total closes: the lines above it since the band total before it (their own sums, as bandSums), and the
+   * money lines among them («Перевозка материалов 5 % от стоимости», «ТРАНСПОРТНЫЕ РАСХОДЫ» — a band total may take them in).
+   * By position, not by the band the heading named: 67168 returned its equipment under a second heading «Строительные
+   * материалы…», closed by «Итого по оборудованию» — summed by band, the materials total was «off» by the equipment; and a
+   * band of several sub-totals (64453 «сеть связи») is checked total by total.
+   */
+  function blockSums(obj) {
+    // the lines of the total's own band only: a band without a total of its own (labour, machines) is no part of the next
+    var m = new Map(), lines = {}, extras = {};
+    (obj && obj.rows || []).forEach(function (r) {
+      var k = r.section || '';
+      if (r.kind === 'item') lines[k] = (lines[k] || 0) + (r.sum != null && isFinite(r.sum) ? r.sum : (r.qty || 0) * (r.price || 0));
+      else if (r.kind === 'extra' && r.sum != null && isFinite(r.sum)) extras[k] = (extras[k] || 0) + r.sum;
+      else if (bandTotal(r)) { m.set(r, { lines: lines[k] || 0, extras: extras[k] || 0 }); lines = {}; extras = {}; }
+    });
+    return m;
+  }
+  /**
+   * How far a band total is from its lines: none when it is their sum, with the band's money lines or without (both
+   * are found, and neither is an error — the owner's corrected files have both). A haulage band «Итого: по перевозка»
+   * that takes in its «5 % от стоимости» line was flagged whenever that line moved with the materials (64453).
+   */
+  function bandGap(total, lines, extras) {
+    var g = total - (lines || 0);
+    return extras && Math.abs(g - extras) <= Math.max(0.5, Math.abs(extras) * 1e-6) ? 0 : g;
+  }
+  /**
+   * What each whole total («ВСЕГО», «ИТОГО ПРЯМЫЕ ЗАТРАТЫ») stands over: the lines and money lines since the whole total
+   * before it. A sheet of two blocks, each closed by its «ВСЕГО» (64453 «сеть связи»), had its second «ВСЕГО» flagged «not
+   * recounted» because the first block's lines moved — its own did not.
+   */
+  function wholeBlocks(obj) {
+    // a whole total with no line of its own since the one before («ВСЕГО МАТЕРИАЛОВ» over two «ВСЕГО») adds totals up:
+    // it stands over every line above it
+    var m = new Map(), lines = 0, extras = 0, n = 0, allLines = 0, allExtras = 0;
+    (obj && obj.rows || []).forEach(function (r) {
+      if (r.kind === 'item') {
+        var v = r.sum != null && isFinite(r.sum) ? r.sum : (r.qty || 0) * (r.price || 0);
+        lines += v; allLines += v; n++;
+      } else if (r.kind === 'extra' && r.sum != null && isFinite(r.sum)) { extras += r.sum; allExtras += r.sum; }
+      else if (wholeTotal(r)) {
+        m.set(r, n ? { lines: lines, extras: extras } : { lines: allLines, extras: allExtras });
+        lines = 0; extras = 0; n = 0;
+      }
+    });
+    return m;
   }
   function sameAmount(a, b) { return Math.abs((a || 0) - (b || 0)) <= Math.max(1, Math.abs(a || 0) * 1e-6); }
   /** A total of the whole estimate: «ИТОГО ПРЯМЫЕ ЗАТРАТЫ», «ВСЕГО …» (the rule test/export-formulas.cjs holds). */
-  function wholeTotal(r) { return r.kind === 'total' && !bandTotal(r) && /ПРЯМЫЕ|^ВСЕГО/.test(S.nameKey(amountLabel(r))); }
+  function wholeTotal(r) { return r.kind === 'total' && !bandTotal(r) && /ПРЯМ|^ВСЕГО/.test(S.nameKey(amountLabel(r))); }
   function sumOf(o) { var t = 0; for (var k in o) t += o[k]; return t; }
 
   /**
@@ -5800,26 +5863,35 @@ if (typeof self !== 'undefined') self.S = S;
    * overheads and VAT scale with the lines.
    */
   function compareAmounts(oa, ob) {
-    var A = amountRows(oa), B = amountRows(ob), b1 = bandSums(oa), b2 = bandSums(ob), out = [];
-    var dItems = sumOf(b2) - sumOf(b1), dExtra = 0;      // dExtra: the overhead lines met so far
+    var A = amountRows(oa), B = amountRows(ob), k1 = blockSums(oa), k2 = blockSums(ob), w1 = wholeBlocks(oa), w2 = wholeBlocks(ob), out = [];
     alignKeys(A.map(amountKey), B.map(amountKey)).forEach(function (p) {
       var a = p[0] >= 0 ? A[p[0]] : null, b = p[1] >= 0 ? B[p[1]] : null;
       var x = { kind: (a || b).kind, section: (a || b).section || '', label1: a ? bandName(a) : '', label2: b ? bandName(b) : '',
                 s1: a ? a.sum : null, s2: b ? b.sum : null, gap: null };
-      if (!a) x.st = 'added';
+      // a heading that carries no amount («ИТОГО ПО ЛОКАЛЬНОМУ РЕСУРСНОМУ РАСЧЕТУ» over the lines), gone or new: nothing to check
+      if (!a && b.sum == null || !b && a.sum == null) x.st = 'same';
+      else if (!a) x.st = 'added';
       else if (!b) x.st = 'removed';
-      else if (S.nameKey(x.label1) !== S.nameKey(x.label2)) x.st = 'label';
+      // one band's total: its words may be rewritten, its sum is what is checked
+      else if (!(bandTotal(a) && bandTotal(b)) && S.nameKey(x.label1) !== S.nameKey(x.label2)) x.st = 'label';
       else {
         if (bandTotal(a) && a.sum != null && b.sum != null) {
-          var g1 = a.sum - (b1[a.section] || 0), g2 = b.sum - (b2[b.section] || 0);
-          if (!sameAmount(g1, g2)) { x.st = 'gap'; x.gap = g2; }
+          var q1 = k1.get(a) || {}, q2 = k2.get(b) || {};
+          var g1 = bandGap(a.sum, q1.lines, q1.extras), g2 = bandGap(b.sum, q2.lines, q2.extras);
+          // Flagged only when the first version's total was its lines' sum and the returned one's is not: a total typed
+          // over. A gap only the first version had is a total corrected (68106: «ИТОГО ПО МАТЕРИАЛАМ» 132 329 834 over
+          // lines of 196 644 080 in the estimate, summed right in the corrected file) —
+          // and a total that did not match its lines in the first version either cannot be judged so: its band is laid
+          // out otherwise (several sub-totals in one band — 64453 «сеть связи»), and its gap moved with every price fixed
+          if (sameAmount(g1, 0) && !sameAmount(g2, 0)) { x.st = 'gap'; x.gap = g2; }
         } else if (wholeTotal(a) && a.sum != null && b.sum != null) {
-          var stayed = sameAmount(a.sum, b.sum);
-          if (stayed ? !sameAmount(dItems + dExtra, 0) : sameAmount(dItems, 0) && sameAmount(dExtra, 0)) x.st = 'typed';
+          // what changed under it: its own block — the lines and money lines since the whole total before it
+          var u1 = w1.get(a) || { lines: 0, extras: 0 }, u2 = w2.get(b) || { lines: 0, extras: 0 };
+          var dLines = u2.lines - u1.lines, dMoney = u2.extras - u1.extras, stayed = sameAmount(a.sum, b.sum);
+          if (stayed ? !sameAmount(dLines + dMoney, 0) : sameAmount(dLines, 0) && sameAmount(dMoney, 0)) x.st = 'typed';
         }
         if (!x.st) x.st = sameAmount(x.s1, x.s2) ? 'same' : 'amount';
       }
-      if (x.kind === 'extra') dExtra += (x.s2 || 0) - (x.s1 || 0);
       out.push(x);
     });
     return out;
@@ -6020,7 +6092,8 @@ if (typeof self !== 'undefined') self.S = S;
             T.gotQty += ((a.qty || 0) - (b.qty || 0)) * row.p2;
           } else {
             T.gotGone += s1;
-            T.goneAsked.push({ nm: row.nm, unit: row.unit, s1: s1, asked: (a.qty || 0) * row.market, object: o.name, group: o.group });
+            T.goneAsked.push({ nm: row.nm, unit: row.unit, q1: a.qty || 0, p1: row.p1, s1: s1, asked: (a.qty || 0) * row.market,
+                               market: row.market, object: o.name });
           }
         } else T.otherChange += s2 - s1;
 
@@ -6038,6 +6111,32 @@ if (typeof self !== 'undefined') self.S = S;
       });
       objects.push(o);
     });
+
+    // A requested line «deleted» may stand on the same sheet under a longer name: same unit, the old name the start of
+    // the new one (68106: «СМЕСЬ АСФАЛЬТОБЕТОННАЯ» 1011,9 т at 550 000 is «СМЕСЬ АСФАЛЬТОБЕТОННАЯ МЕЛКОЗЕРНИСТАЯ … ТИП А»
+    // 127,8 т at our 450 000). Then it was renamed, not deleted: its saving is told by its price and its volume.
+    T.goneAsked.forEach(function (g) {
+      var k = S.nameKey(g.nm), u = S.unitKey(g.unit || ''), best = null;
+      objects.forEach(function (o) {
+        if (o.name !== g.object) return;
+        o.rows.forEach(function (r) {
+          if (r.st !== 'added' || r.asOf || S.unitKey(r.unit || '') !== u) return;
+          var n = S.nameKey(r.nm);
+          if (n.length <= k.length || n.indexOf(k + ' ') !== 0) return;
+          // the one at our price first, then the longest kept part of the name
+          var score = (r.p2 != null && samePrice(r.p2, g.market) ? 2 : 0) + k.length / n.length;
+          if (!best || score > best.score) best = { r: r, score: score };
+        });
+      });
+      if (!best) return;
+      var r = best.r;
+      r.asOf = g.nm;
+      g.as = { nm: r.nm, q2: r.q2, p2: r.p2, s2: r.s2 };
+      T.gotGone -= g.s1;
+      T.gotPrice += g.q1 * (g.p1 - r.p2);
+      T.gotQty += (g.q1 - (r.q2 || 0)) * r.p2;
+    });
+    T.goneAsked = T.goneAsked.filter(function (g) { return !g.as; }).concat(T.goneAsked.filter(function (g) { return g.as; }));
 
     var resources = [];
     groups.forEach(function (g) { g.st = groupStatus(g); resources.push(g); });
@@ -8678,11 +8777,21 @@ var S = (typeof S !== 'undefined' && S) || {};
     // a line we asked to lower, deleted — and new lines on the same sheet: the resource may have been replaced by a
     // dearer one, and the deletion counted as our saving (67168: 322 lamps asked cheaper, deleted, LED lamps added)
     (T.goneAsked || []).forEach(function (g) {
-      var added = 0, names = [];
+      if (g.as) {
+        out.push('Строка с нашим замечанием переименована: «' + g.nm + '» → «' + g.as.nm + '» (' + g.unit + '): цена ' +
+          S.price(g.p1) + ' → ' + S.price(g.as.p2) + (samePriceUi(g.as.p2, g.market) ? ' (наша цена)' : ' (наша ' + S.price(g.market) + ')') +
+          ', объём ' + S.qty(g.q1) + ' → ' + S.qty(g.as.q2) + '. Проверьте, что это та же позиция, и обоснование нового объёма.');
+        return;
+      }
+      var added = 0, cands = [], w0 = S.nameKey(g.nm).split(' ');
+      // the new lines of that sheet, those sharing the deleted name's first words first (a replacement is named like it)
+      var common = function (n) { var w = S.nameKey(n).split(' '), i = 0; while (i < w.length && i < w0.length && w[i] === w0[i]) i++; return i; };
       this.res.objects.forEach(function (o) {
         if (o.name !== g.object) return;
-        o.rows.forEach(function (r) { if (r.st === 'added') { added += r.s2 || 0; if (names.length < 3) names.push(r.nm); } });
+        o.rows.forEach(function (r) { if (r.st === 'added' && !r.asOf) { added += r.s2 || 0; cands.push(r.nm); } });
       });
+      var names = cands.map(function (n, i) { return { n: n, c: common(n), i: i }; })
+        .sort(function (a, b) { return b.c - a.c || a.i - b.i; }).slice(0, 3).map(function (x) { return x.n; });
       out.push('Строка с нашим замечанием удалена: «' + g.nm + '» (' + g.unit + ', было ' + money(g.s1) + ', по нашей цене ' + money(g.asked) + ')' +
         (added >= 1 ? ' — а в том же листе новые строки на ' + money(added) + ': ' + names.map(function (n) { return '«' + n + '»'; }).join(', ') +
           '. Похоже, ресурс заменён другим — проверьте его цену.' : '.'));
@@ -8701,6 +8810,8 @@ var S = (typeof S !== 'undefined' && S) || {};
     }
     return out;
   };
+
+  function samePriceUi(a, b) { return a != null && b != null && Math.abs(a - b) < Math.max(1, Math.abs(b) * 1e-3); }
 
   /** The doubts over the cards. */
   function doubtBox(list) {

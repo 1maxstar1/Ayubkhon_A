@@ -618,6 +618,73 @@ check(bigRm.prices[bigKey] === bigM && bigRm.requested[bigKey] && bigRm.requeste
     'a requested line deleted is told apart, with what it cost and what we asked (' + JSON.stringify({ got: T2.gotSaving, price: T2.gotPrice, gone: T2.gotGone }) + ')');
 }
 
+/* ------------------------------------------------ sheet totals: what is a real «итог ≠ сумма строк», what is not */
+{
+  // a sheet as the «Форма N 6a» / «_РС» books lay it out: band totals, a money line, whole totals; each line with its own sum
+  const ln = (no, nm, unit, q, p, s) => ({ kind: 'item', no: no, noTxt: String(no), nm: nm, unit: unit, qty: q, price: p, sum: s == null ? q * p : s });
+  const sheetOf = (name, parts) => [{ name: name, rows: [].concat(...parts.map((p) => p.map((r) => Object.assign({ section: r.section }, r)))) }];
+  const band = (sec, lines, total, label) => [...lines.map((r) => Object.assign({ section: sec }, r)), { kind: 'total', section: sec, nm: label, sum: total }];
+  const money = (sec, nm, s) => ({ kind: 'extra', section: sec, nm: nm, sum: s });
+  const whole = (sec, nm, s) => ({ kind: 'total', section: sec, nm: nm, sum: s });
+  const flagsOf = (a, b) => S.compare.versions(a, b, {}, {}).objects[0].amounts.filter((x) => ['gap', 'typed', 'label', 'added', 'removed'].includes(x.st)).map((x) => x.st + ':' + (x.label1 || x.label2));
+  // the estimate rounds its sums (a quantity to four places), the corrected file sums by formulas: no gap
+  const was = sheetOf('X', [band('machines', [ln(1, 'ТЕСТОВЫЙ КАТОК', 'МАШ.-Ч', 6.0666, 327409, 1986271)], 1986271, 'ИТОГО ПО СТРОИТЕЛЬНЫМ МАШИНАМ:'),
+    band('materials', [ln(2, 'ТЕСТОВЫЙ БЕТОН', 'М3', 10, 900)], 9000, 'ИТОГО ПО СТРОИТЕЛЬНЫМ МАТЕРИАЛАМ:'),
+    [whole('materials', 'ИТОГО ПРЯМЫЕ ЗАТРАТЫ', 10986271), money('materials', 'НАКЛАДНЫЕ РАСХОДЫ', 5000),
+      whole('materials', 'ИТОГО С НАКЛАДНЫМИ РАСХОДАМИ:', 10991271), whole('materials', 'ИТОГО ПО РЕСУРСНОМУ РАСЧЕТУ:', 10991271), whole('materials', 'Итого прямой затрат:', 10986271)]]);
+  const now = sheetOf('X', [band('machines', [ln(1, 'ТЕСТОВЫЙ КАТОК', 'МАШ.-Ч', 6.0666, 327409)], 6.0666 * 327409, 'ИТОГО ПО СТРОИТЕЛЬНЫМ МАШИНАМ:'),
+    band('materials', [ln(2, 'ТЕСТОВЫЙ БЕТОН', 'М3', 10, 800)], 8000, 'ИТОГО ПО СТРОИТЕЛЬНЫМ МАТЕРИАЛАМ:'),
+    [whole('materials', 'ИТОГО ПРЯМЫЕ ЗАТРАТЫ', 8000 + 6.0666 * 327409), money('materials', 'НАКЛАДНЫЕ РАСХОДЫ', 4000),
+      whole('materials', 'ИТОГО С НАКЛАДНЫМИ РАСХОДАМИ:', 12000 + 6.0666 * 327409), whole('materials', 'ИТОГО ПО РЕСУРСНОМУ РАСЧЕТУ:', 12000 + 6.0666 * 327409),
+      whole('materials', 'Итого прямой затрат:', 8000 + 6.0666 * 327409)]]);
+  check(!flagsOf(was, now).length, 'rounded sums, whole totals with overheads, «Итого прямой затрат»: no «итог ≠ сумма строк» (' + flagsOf(was, now).join(' | ') + ')');
+  // the estimate's own total was wrong, the corrected file sums it: a correction, not a flag
+  const wrong = sheetOf('X', [band('materials', [ln(1, 'ТЕСТОВЫЙ БЕТОН', 'М3', 10, 900)], 7000, 'ИТОГО ПО СТРОИТЕЛЬНЫМ МАТЕРИАЛАМ:')]);
+  const right = sheetOf('X', [band('materials', [ln(1, 'ТЕСТОВЫЙ БЕТОН', 'М3', 10, 800)], 8000, 'ИТОГО ПО СТРОИТЕЛЬНЫМ МАТЕРИАЛАМ:')]);
+  check(!flagsOf(wrong, right).length, 'a total wrong in the estimate and summed right in the corrected file is no flag');
+  // a band total that takes in its money line (5 % haulage), the money line moving with the materials
+  const hw = sheetOf('X', [[ln(1, 'ТЕСТОВАЯ ПЕРЕВОЗКА', 'Т·КМ', 100, 2), money('other', 'Перевозка материалов 5% от стоимости', 50)].map((r) => Object.assign({ section: 'other' }, r)),
+    [{ kind: 'total', section: 'other', nm: 'Итого: по перевозка строительные материалы', sum: 250 }]]);
+  const hn = sheetOf('X', [[ln(1, 'ТЕСТОВАЯ ПЕРЕВОЗКА', 'Т·КМ', 100, 2), money('other', 'Перевозка материалов 5% от стоимости', 40)].map((r) => Object.assign({ section: 'other' }, r)),
+    [{ kind: 'total', section: 'other', nm: 'Итого: по перевозка строительные материалы', sum: 240 }]]);
+  check(!flagsOf(hw, hn).length, 'a band total with its money line in it is its sum');
+  // a second block under a wrong heading (equipment under «материалы»), closed by its own total: checked block by block
+  const twoW = sheetOf('X', [band('materials', [ln(1, 'ТЕСТОВЫЙ БЕТОН', 'М3', 10, 900)], 9000, 'ИТОГО ПО СТРОИТЕЛЬНЫМ МАТЕРИАЛАМ:'),
+    band('equipment', [ln(2, 'ТЕСТОВЫЙ НАСОС', 'ШТ', 2, 500)], 1000, 'ИТОГО ОБОРУДОВАНИЕ:')]);
+  const twoN = sheetOf('X', [band('materials', [ln(1, 'ТЕСТОВЫЙ БЕТОН', 'М3', 10, 800)], 8000, 'Итого по материальным ресурсам'),
+    band('materials', [ln(2, 'ТЕСТОВЫЙ НАСОС', 'ШТ', 2, 500)], 1000, 'Итого по оборудованию')]);
+  check(!flagsOf(twoW, twoN).some((f) => /^gap/.test(f)), 'a band total is checked against the lines above it, a rewritten heading is no gap (' + flagsOf(twoW, twoN).join(' | ') + ')');
+  // two blocks each closed by «ВСЕГО», the second untouched: its «ВСЕГО» is not «not recounted»; a total over both moves
+  const blk = (p) => sheetOf('X', [band('materials', [ln(1, 'ТЕСТОВЫЙ КАБЕЛЬ', 'М', 10, p)], 10 * p, 'ИТОГО'), [whole('materials', 'ВСЕГО', 10 * p)],
+    band('materials', [ln(2, 'ТЕСТОВАЯ МУФТА', 'ШТ', 3, 70)], 210, 'ИТОГО'), [whole('materials', 'ВСЕГО', 210), whole('materials', 'ВСЕГО МАТЕРИАЛОВ', 10 * p + 210)]]);
+  check(!flagsOf(blk(90), blk(80)).length, 'two blocks with their own «ВСЕГО», the second untouched: nothing flagged (' + flagsOf(blk(90), blk(80)).join(' | ') + ')');
+  // and still a total typed over: summed in the estimate, not in the corrected file
+  const typedNow = sheetOf('X', [band('materials', [ln(1, 'ТЕСТОВЫЙ БЕТОН', 'М3', 10, 800)], 9000, 'ИТОГО ПО СТРОИТЕЛЬНЫМ МАТЕРИАЛАМ:')]);
+  check(flagsOf(right, typedNow).join() === 'gap:ИТОГО ПО СТРОИТЕЛЬНЫМ МАТЕРИАЛАМ:', 'a band total typed over in the corrected file is still flagged');
+}
+
+/* ------------------------------------------------ a requested line renamed, not deleted */
+{
+  const est = (rows) => S.smeta.parseWorkbook({ sheets: [sheet('РЕСУРС', [[null, null, null, null, null, 'Форма 4А АВС-4'],
+    ['Наименование стройки -', null, 'ТЕСТОВАЯ СТРОЙКА'], [], ...estimate('ТЕСТОВЫЕ РАБОТЫ', rows, { direct: 1 })])] }, 'x.xlsx');
+  const MAT = [null, null, 'СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'];
+  const was = est([MAT, line(1, 'ТЕСТОВАЯ СМЕСЬ АСФАЛЬТОБЕТОННАЯ', 'Т', 100, 55)]);
+  const now = est([MAT, line(1, 'ТЕСТОВАЯ СМЕСЬ АСФАЛЬТОБЕТОННАЯ МЕЛКОЗЕРНИСТАЯ ТИП А', 'Т', 20, 45)]);
+  const req = {}; req[S.resKey('ТЕСТОВАЯ СМЕСЬ АСФАЛЬТОБЕТОННАЯ', 'Т', 55)] = { market: 45 };
+  const T = S.compare.versions(was, now, req, {}).totals;
+  // (paired as a rename by the lines, or found afterwards on the sheet — either way its saving is its price and its volume)
+  check(T.gotPrice === 1000 && T.gotQty === 3600 && T.gotGone === 0 && T.goneAsked.every((g) => g.as && g.as.p2 === 45),
+    'a requested line under a longer name on the same sheet is renamed: its price and volume told, nothing «deleted» (' + JSON.stringify({ price: T.gotPrice, qty: T.gotQty, gone: T.gotGone }) + ')');
+  // moved down the sheet among other changes, the lines do not pair it: found afterwards by its name and unit
+  const f = (i) => line(i, 'ТЕСТОВЫЙ ПРОЧИЙ МАТЕРИАЛ ' + i, 'ШТ', i, 10);
+  const was2 = est([MAT, f(1), f(2), line(3, 'ТЕСТОВАЯ СМЕСЬ АСФАЛЬТОБЕТОННАЯ', 'Т', 100, 55), f(4), f(5)]);
+  const now2 = est([MAT, f(1), f(2), f(4), line(9, 'ТЕСТОВЫЙ НОВЫЙ БОРТ', 'М', 3, 7), f(5), line(10, 'ТЕСТОВАЯ СМЕСЬ АСФАЛЬТОБЕТОННАЯ МЕЛКОЗЕРНИСТАЯ ТИП А', 'Т', 20, 45)]);
+  const r2 = S.compare.versions(was2, now2, req, {}), T2 = r2.totals;
+  check(r2.objects[0].rows.filter((x) => /АСФАЛЬТ/.test(x.nm)).map((x) => x.st).join() === 'removed,added' &&
+    T2.gotPrice === 1000 && T2.gotQty === 3600 && T2.gotGone === 0 && T2.goneAsked.length === 1 && T2.goneAsked[0].as.nm === 'ТЕСТОВАЯ СМЕСЬ АСФАЛЬТОБЕТОННАЯ МЕЛКОЗЕРНИСТАЯ ТИП А',
+    'and when the lines leave it «deleted» and «new», it is found by its name and unit, its saving told the same way');
+}
+
 /* ------------------------------------------------ our own Таблица №2 is not an estimate */
 {
   const m = S.assemble([{ id: 'p1', name: 'T', title: 'T', objects: v1, enabled: true }], {});

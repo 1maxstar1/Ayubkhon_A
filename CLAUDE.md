@@ -314,7 +314,17 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   qismini sanaydi (v2.16.22, 67168: «128 % запрошенного» chiqqan edi): `totals.gotSaving` = `gotPrice` (narx, birinchi miqdorda)
   + `gotQty` (so'ralgan qatorlarning hajmi, yangi narxda) + `gotGone` (zamechaniye berilgan qator o'chirilgan; `goneAsked`).
   Hajm va o'chirilgan qator kartada alohida yoziladi; o'chirilgan har bir so'ralgan qator — qizil ogohlantirish, shu varaqdagi
-  yangi qatorlar summasi va nomlari bilan (yuboruvchi resursni qimmatrog'iga almashtirgan bo'lishi mumkin). Bizning Таблица №2 (eksport yoki javob) smeta
+  yangi qatorlar summasi va nomlari bilan (yuboruvchi resursni qimmatrog'iga almashtirgan bo'lishi mumkin; nomi o'xshashlari
+  birinchi). O'chirilgan so'ralgan qator o'sha varaqda shu birlikda, nomi uning davomi bo'lgan yangi qator sifatida tursa — nomi
+  o'zgartirilgan (68106: «СМЕСЬ АСФАЛЬТОБЕТОННАЯ» 1011,9 t → «… МЕЛКОЗЕРНИСТАЯ … ТИП А» 127,8 t bizning narxda): tejash narx va
+  hajmga bo'linadi, «удалено» emas, ogohlantirish «переименована» deydi.
+  «Итоги листов» (v2.16.22, `compareAmounts`; 9 haqiqiy solishtirishda noto'g'ri ogohlantirishlar 53 → 4, qolgan 4 tasi —
+  67168 javobidagi haqiqiy g'alatilik): band jamisi o'zidan yuqoridagi, oldingi band jamisigacha bo'lgan **o'z bandidagi**
+  qatorlar bilan (`blockSums`; qatorning o'z summasi — yaxlitlangan smetada miqdor × narx emas), band pul qatorini («5 % от
+  стоимости») ichiga olgan bo'lsa ham to'g'ri; «Итого прямой затрат», «С НАКЛАДНЫМИ», «ПО РЕСУРСНОМУ РАСЧЕТУ» — butun smeta
+  jamisi, band emas; band jamisi so'zlari qayta yozilsa band bo'yicha juftlanadi; summasiz sarlavha tekshirilmaydi; «итог ≠
+  сумма строк» faqat birinchi versiyada jami qatorlar yig'indisi bo'lib, qaytganda bo'lmasa (qo'lda yozilgan jami); «ВСЕГО»
+  o'z blokiga qaraydi (`wholeBlocks`; o'z qatori bo'lmagan «ВСЕГО МАТЕРИАЛОВ» — yuqoridagi hammasiga). Bizning Таблица №2 (eksport yoki javob) smeta
   bo'lib yuklanmaydi (`S.isTable2`: dastur yozadigan «TAQQOSLASH JADVALI №2» sarlavhasi yoki varaqlarning yarmida ruscha
   sarlavha; 95 haqiqiy faylda 10/10 va 0/85) — «Лист1» smeta bo'lib o'qilib, resurslar ikki marta sanalardi; saqlangan
   ariza tiklanayotganda bu tekshiruv ishlamaydi.

@@ -457,11 +457,21 @@
     // a line we asked to lower, deleted — and new lines on the same sheet: the resource may have been replaced by a
     // dearer one, and the deletion counted as our saving (67168: 322 lamps asked cheaper, deleted, LED lamps added)
     (T.goneAsked || []).forEach(function (g) {
-      var added = 0, names = [];
+      if (g.as) {
+        out.push('Строка с нашим замечанием переименована: «' + g.nm + '» → «' + g.as.nm + '» (' + g.unit + '): цена ' +
+          S.price(g.p1) + ' → ' + S.price(g.as.p2) + (samePriceUi(g.as.p2, g.market) ? ' (наша цена)' : ' (наша ' + S.price(g.market) + ')') +
+          ', объём ' + S.qty(g.q1) + ' → ' + S.qty(g.as.q2) + '. Проверьте, что это та же позиция, и обоснование нового объёма.');
+        return;
+      }
+      var added = 0, cands = [], w0 = S.nameKey(g.nm).split(' ');
+      // the new lines of that sheet, those sharing the deleted name's first words first (a replacement is named like it)
+      var common = function (n) { var w = S.nameKey(n).split(' '), i = 0; while (i < w.length && i < w0.length && w[i] === w0[i]) i++; return i; };
       this.res.objects.forEach(function (o) {
         if (o.name !== g.object) return;
-        o.rows.forEach(function (r) { if (r.st === 'added') { added += r.s2 || 0; if (names.length < 3) names.push(r.nm); } });
+        o.rows.forEach(function (r) { if (r.st === 'added' && !r.asOf) { added += r.s2 || 0; cands.push(r.nm); } });
       });
+      var names = cands.map(function (n, i) { return { n: n, c: common(n), i: i }; })
+        .sort(function (a, b) { return b.c - a.c || a.i - b.i; }).slice(0, 3).map(function (x) { return x.n; });
       out.push('Строка с нашим замечанием удалена: «' + g.nm + '» (' + g.unit + ', было ' + money(g.s1) + ', по нашей цене ' + money(g.asked) + ')' +
         (added >= 1 ? ' — а в том же листе новые строки на ' + money(added) + ': ' + names.map(function (n) { return '«' + n + '»'; }).join(', ') +
           '. Похоже, ресурс заменён другим — проверьте его цену.' : '.'));
@@ -480,6 +490,8 @@
     }
     return out;
   };
+
+  function samePriceUi(a, b) { return a != null && b != null && Math.abs(a - b) < Math.max(1, Math.abs(b) * 1e-3); }
 
   /** The doubts over the cards. */
   function doubtBox(list) {

@@ -40,3 +40,4 @@ v2.16.14 fd12ccbef2ffe615e0e922cf97bdfe235d047dc5 PDF reply: word gaps from the 
 v2.16.15 ddebb0ed67f16def15bd4e9abec1b937a63ee43c Price box keeps what is typed when the list redraws
 v2.16.17 fedd2c271955ae855113b90c6c376fd28323d130 Above-accepted hint from one application
 v2.16.19 df63a3b9b394d0b4f229be8f87333dfdcf32aac4 Compare versions: corrected files paired by name, work volumes card
+v2.16.20 60989c320f9775903a7e4e6bed64938870408e3b Comparison checks itself; one estimate loaded twice is switched off

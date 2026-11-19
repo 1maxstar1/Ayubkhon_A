@@ -226,7 +226,23 @@
           if (!p3 && (/^НА ЕД/.test(s3) || s3 === 'ЕДИНИЦЫ')) p3 = k3;
           else if (p3 && !s3c && (s3 === 'ОБЩАЯ' || s3 === 'ВСЕГО')) s3c = k3;
         }
-        if (p3 && s3c) { L.price = L.price || p3; L.sum = L.sum || s3c; L.subRow = r + 2; }
+        if (p3 && s3c) {
+          // The current columns of some books stay «--» on every line and the prices stand in the base ones, while
+          // the sheet says «Составлен В ТЕКУЩИХ ЦЕНАХ» (68106): read from the current columns, every price was empty.
+          // The base pair is taken only when the current one holds no price on any line and the base one prices the
+          // lines (quantity × price = sum on at least three); a sheet with current prices is read as it always was.
+          var bas = 0, bp = 0, bs = 0;
+          for (var kb = 1; kb < sub.length && !bas; kb++) if (/^В БАЗИСН/.test(up(txt(sub[kb])))) bas = kb;
+          if (bas && bas < cur) {
+            for (var kc = bas; kc < cur && kc < sub3.length; kc++) {
+              var sb = up(txt(sub3[kc]));
+              if (!bp && (/^НА ЕД/.test(sb) || sb === 'ЕДИНИЦЫ')) bp = kc;
+              else if (bp && !bs && (sb === 'ОБЩАЯ' || sb === 'ВСЕГО')) bs = kc;
+            }
+          }
+          if (bp && bs && !L.price && !L.sum && basePriced(rows, r + 3, L.name, L.qty, p3, s3c, bp, bs)) { p3 = bp; s3c = bs; L.level = 'base'; }
+          L.price = L.price || p3; L.sum = L.sum || s3c; L.subRow = r + 2;
+        }
       }
       if (!L.price || !L.sum) return null;
     }
@@ -247,6 +263,24 @@
     L.numRow = nxt && S.num(nxt[L.name] && nxt[L.name].v) != null ? nr : 0;
     L.lastCol = Math.max(L.sum, L.price, L.qty, L.unit, L.name, L.no);
     return L;
+  }
+
+  /**
+   * The lines below a two-level header: no price in the current columns on any of them, and quantity × price = sum in
+   * the base columns on three or more.
+   */
+  function basePriced(rows, from, nm, q, cp, cs, bp, bs) {
+    var cur = 0, base = 0;
+    for (var r = from; r < Math.min(rows.length, from + 400); r++) {
+      var row = rows[r];
+      // no line: an empty row, or the «1 2 3 …» row that numbers the columns
+      if (!row || S.num(row[nm] && row[nm].v) != null) continue;
+      var val = function (c) { return S.num(row[c] && row[c].v); };
+      if (val(cp) || val(cs)) cur++;
+      var qty = val(q), pr = val(bp), sm = val(bs);
+      if (qty && pr && sm && Math.abs(qty * pr - sm) <= Math.max(2, Math.abs(sm) * 0.005)) base++;
+    }
+    return cur === 0 && base >= 3;
   }
 
   /** Locate the header row and the six meaningful columns. */

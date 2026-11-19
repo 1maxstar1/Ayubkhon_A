@@ -60,6 +60,14 @@ sarlavha; ichida zip baytlari bor .xls rad etilgan; PDF da raqam ichiga bo'sh jo
 qolgan barcha fayllar **avvalgidek** o'qilishini isbotlaydi. Yangi arizaning fayllari to'plamga qo'shiladi va `--record`
 qilinadi — shunda keyingi qoida ularni ham buzmaydi.
 
+**68106 (v2.16.21).** «Форма N 6a» smetasida narxlar «в базисном уровне» ustunlarida, «в текущем» — hamma qatorda «--»;
+o'quvchi doim joriy ustundan o'qigani uchun barcha narx bo'sh chiqdi. Qo'riqchi: `smeta-header` 36 (eski kodda yiqiladi) va
+teskari holat — bitta qatorda joriy narx bo'lsa joriy ustun o'qiladi. O'lchov: boshqa 93 haqiqiy fayl aynan avvalgidek.
+Shu arizada umumiy tekshiruvning o'zi ham xato qildi: yuboruvchi narxdan tashqari hajmni ham kamaytirgan, «tejash» so'ralganidan
+196 % chiqib, «проверьте сопоставление» deb noto'g'ri ogohlantirdi. Endi tekshiruv faqat narx qismiga qaraydi
+(`totals.gotPrice`, `test/compare.cjs`). Saboq: o'zini tekshirish qoidasi ham haqiqiy fayllarda **noto'g'ri ogohlantirish**
+bo'yicha o'lchanadi, faqat ushlagani bo'yicha emas.
+
 ### 4. Ekran yozganni buzadi yoki xabarni yashiradi
 
 Narx katagiga yozishda raqamlar o'rni almashgan («207187» → «207 871»); o'qilishi shart bo'lgan xabar keyingi oddiy

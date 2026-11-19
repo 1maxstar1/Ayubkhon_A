@@ -596,6 +596,20 @@ check(bigRm.prices[bigKey] === bigM && bigRm.requested[bigKey] && bigRm.requeste
     'every earlier estimate it repeats is named, the nearest first (' + JSON.stringify(three) + ')');
 }
 
+/* ------------------------------------------------ a volume cut beside the prices is no sign of files paired wrong */
+{
+  const est = (rows) => S.smeta.parseWorkbook({ sheets: [sheet('РЕСУРС', [[null, null, null, null, null, 'Форма 4А АВС-4'],
+    ['Наименование стройки -', null, 'ТЕСТОВАЯ СТРОЙКА'], [], ...estimate('ТЕСТОВЫЕ РАБОТЫ', rows, { direct: 1 })])] }, 'x.xlsx');
+  const MAT = [null, null, 'СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'];
+  const was = est([MAT, line(1, 'ТЕСТОВЫЙ БЕТОН', 'М3', 10, 100)]);
+  const now = est([MAT, line(1, 'ТЕСТОВЫЙ БЕТОН', 'М3', 4, 90)]);               // our price, and the volume cut to 4
+  const key = S.resKey('ТЕСТОВЫЙ БЕТОН', 'М3', 100);
+  const req = {}; req[key] = { market: 90 };
+  const T = S.compare.versions(was, now, req, {}).totals;
+  check(T.askedSaving === 100 && T.gotSaving === 640 && T.gotPrice === 100,
+    'the saving by the price is told apart from the one a smaller volume makes (asked ' + T.askedSaving + ', got ' + T.gotSaving + ', by the price ' + T.gotPrice + ')');
+}
+
 /* ------------------------------------------------ our own Таблица №2 is not an estimate */
 {
   const m = S.assemble([{ id: 'p1', name: 'T', title: 'T', objects: v1, enabled: true }], {});

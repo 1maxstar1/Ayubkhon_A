@@ -451,7 +451,8 @@
     var gone = (c.removed || 0) + (c.added || 0);
     if (T.rows >= 20 && gone >= 0.3 * T.rows) out.push('Строк «удалено» или «новых»: ' + gone + ' из ' + T.rows +
       ' — так бывает, когда исправленный файл сравнивается не со своей сметой. Проверьте «Было» и список сопоставления файлов ниже.');
-    if (T.askedSaving > 0 && T.gotSaving > 1.5 * T.askedSaving) out.push('Снижение по замечаниям (' + money(T.gotSaving) +
+    // by the prices alone: a volume cut beside them saves too, and is shown on its own card
+    if (T.askedSaving > 0 && T.gotPrice > 1.5 * T.askedSaving) out.push('Снижение цен по замечаниям (' + money(T.gotPrice) +
       ') больше запрошенного (' + money(T.askedSaving) + ') в полтора раза и более — проверьте, что файлы сопоставлены со своими сметами.');
     if (lost.length) out.push('Не сопоставлен ни с одной сметой заявки: ' + lost.join(', ') + ' — его листы показаны без пары.');
     // one corrected file against the estimate chosen as «Было», while another estimate of the application is nearer

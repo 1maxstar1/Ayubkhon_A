@@ -947,5 +947,40 @@ check(g35a.objs === 3 && g35a.left.join() === 'Ресурс:3', 'a summary of th
 check(g35b.objs === 18 && g35b.left.join() === 'Ресурс:18', 'a summary of eighteen objects is told (' + JSON.stringify(g35b) + ')');
 check(g35c.objs === 18 && g35c.left.join() === 'Ресурс:18', '… also with a line changed on it (' + JSON.stringify(g35c) + ')');
 
+/* 36 — the same two-level «Сметная стоимость», the other way round (68106, «Форма N 6a», «_БР» sheets): the sheet says
+        «Составлен В ТЕКУЩИХ ЦЕНАХ» but every current column is «--», the prices and sums stand in the base ones. Read
+        from the current columns, every price was empty. The base pair is taken only when no line has a current price */
+const twoLevel = (rows) => one({ sheets: [sheet('205000000_БР', [[null, null, null, null, null, null, null, null, 'Форма N 6a'], [null, 'ТЕСТОВАЯ СТРОЙКА'],
+  [null, '(наименование стройки)'], [null, null, 'ЛОКАЛЬНЫЙ РЕСУРСНЫЙ СМЕТНЫЙ РАСЧЕТ', ' № ', '1-1'],
+  [null, null, null, null, null, 'В базисных ценах ', null, 'В текущих ценах '],
+  ['Сметная стоимость', null, null, null, null, '2,148', 'ТЫС.СУМ.', '--', 'ТЫС.СУМ.'], [],
+  ['Составлен В ТЕКУЩИХ ЦЕНАХ', null, null, null, null, null, null, null, 'СУМ'],
+  ['N п.п.', 'Шифр номера нормативов и коды ресурсов', 'Наименование работ и затрат', 'Единица измерения', 'Количество ', 'Сметная стоимость'],
+  [null, null, null, null, null, 'в базисном уровне', null, 'в текущем (прогнозном)'],
+  [null, null, null, null, null, 'на.ед.изм.', 'общая', 'на.ед.изм.', 'общая'],
+  [1, 2, 3, 4, 5, 6, 7, 8, 9], [],
+  ['ИТОГО ПО ЛОКАЛЬНОМУ РЕСУРСНОМУ РАСЧЕТУ'],
+  [null, null, 'ТРУДОВЫЕ РЕСУРСЫ'], ...rows, []])] });
+const basePriced36 = [
+  [1, 1, 'ЗАТРАТЫ ТРУДА РАБОЧИХ-СТРОИТЕЛЕЙ', 'ЧЕЛ.-Ч', 10, 53, 530, '--', '--'],
+  [2, 3, 'ЗАТРАТЫ ТРУДА МАШИНИСТОВ', 'ЧЕЛ.-Ч', 4, '--', '--', '--', '--'],
+  [null, 'ИТОГО ПО ТРУДОВЫМ РЕСУРСАМ:', null, 'СУМ', null, null, 530, null, '--'],
+  [null, null, 'СТРОИТЕЛЬНЫЕ МАШИНЫ И МЕХАНИЗМЫ'],
+  [3, 107, 'ТЕСТОВЫЙ АВТОГРЕЙДЕР', 'МАШ.-Ч', 2, 327, 654, '--', '--'],
+  [4, 246, 'ТЕСТОВЫЙ БУЛЬДОЗЕР', 'МАШ.-Ч', 3, 207, 621, '--', '--'],
+  [null, 'ИТОГО ПО СТРОИТЕЛЬНЫМ МАШИНАМ:', null, 'СУМ', null, null, 1275, null, '--'],
+  [null, null, 'СТРОИТЕЛЬНЫЕ МАТЕРИАЛЫ И КОНСТРУКЦИИ'],
+  [5, 6321, 'ТЕСТОВЫЙ БЕТОН В15', 'М3', 5, 900, 4500, '--', '--'],
+  [null, 'ИТОГО ПО СТРОИТЕЛЬНЫМ МАТЕРИАЛАМ:', null, 'СУМ', null, null, 4500, null, '--']];
+const b6 = twoLevel(basePriced36), b6i = b6.length ? b6[0].rows.filter((r) => r.kind === 'item') : [];
+const bull = b6i.find((r) => r.nm === 'ТЕСТОВЫЙ БУЛЬДОЗЕР');
+check(b6.length === 1 && b6i.length === 5 && bull && bull.qty === 3 && bull.price === 207 && bull.sum === 621 && b6[0].layout.level === 'base' &&
+  b6i.filter((r) => r.price > 0).length === 4,
+  'every current column «--», the prices in the base ones: read from the base columns (' + JSON.stringify(bull && [bull.qty, bull.price, bull.sum]) + ')');
+// one line priced in the current columns: the sheet is read from them, as it always was
+const oneCur = basePriced36.map((r) => (r[2] === 'ТЕСТОВЫЙ БЕТОН В15' ? [5, 6321, 'ТЕСТОВЫЙ БЕТОН В15', 'М3', 5, 900, 4500, 950, 4750] : r));
+const c6 = twoLevel(oneCur), concrete = c6.length ? c6[0].rows.find((r) => r.nm === 'ТЕСТОВЫЙ БЕТОН В15') : null;
+check(c6.length === 1 && concrete && concrete.price === 950 && !c6[0].layout.level, 'a current price on one line: the current columns are read (' + JSON.stringify(concrete && concrete.price) + ')');
+
 console.log(fail ? '\nFAILED: ' + fail : '\nall passed');
 process.exit(fail ? 1 : 0);

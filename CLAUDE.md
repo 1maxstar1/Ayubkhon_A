@@ -232,6 +232,11 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   tushib qolgan) — sahifa ogohlantiradi, smetaning o'zi o'zgartirilmaydi. Ikki qavatli «Сметная стоимость» sarlavhasi
   («в базисном» — «--», «в текущем» — «на ед. / общая» bir qator pastda) joriy narxdan o'qiladi; kod ustunidagi «ИТОГО …»
   jami hisoblanadi; nomi kod ustunida turgan qator («ПЕРЕВОЗКА … ТН/КМ») resurs bo'ladi (v2.16.4, `smeta-header` 19).
+  Teskarisi (v2.16.21, 68106, «Форма N 6a», «_БР» varaqlari, `smeta.js` `basePriced`, `smeta-header` 36): varaq «Составлен В
+  ТЕКУЩИХ ЦЕНАХ» desa ham «в текущем» ustunlari hamma qatorda «--», narx va summa «в базисном» ustunlarida — joriy ustundan
+  o'qilganda hamma narx bo'sh chiqardi. Bazis jufti faqat joriy ustunlarning birorta qatorida narx bo'lmasa va bazis ustunlarida
+  kamida uch qatorda miqdor × narx = summa bo'lsa olinadi (`layout.level = 'base'`); joriy narxi bor varaq avvalgidek. O'lchov:
+  93 ta boshqa haqiqiy fayl (21 090 qator) aynan avvalgidek o'qiladi.
   «Наш ответ» bitta jadval butun ariza uchun — u arizaning barcha smetalari bilan solishtiriladi. Raqam ustunidagi
   «Перевозка материалов» bandi ostidagi qatorlar — «other» (mashinalar emas); miqdori bo'sh, summasi 0 bo'lgan т·км qatori
   ham o'qiladi (miqdor 0) — varaqdagi hech narsa ko'rinmay qolmaydi; «(наименование стройки)» izohi — ustidagi qator nomi
@@ -303,7 +308,8 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   «Сравнение версий» o'zini tekshiradi (v2.16.20, `docs/saboqlar.md`): tuzatilgan fayli qaytmagan smeta o'zgarmagan deb
   turadi (`join(…, fill)`; 9 smetadan 4 tasi qaytganda qolganlarining 1375 qatori «удалено» chiqardi); «Сопоставление
   файлов» ro'yxati har bir juftni va qanday topilganini ko'rsatadi; natija mantiqsiz bo'lsa (`compare.js` `doubt`: qatorlarning
-  ≥ 30 % i «удалено/новая», tejash so'ralganidan 1,5 baravar ko'p, smetasiz fayl, boshqa smetaga yaqinroq yagona fayl —
+  ≥ 30 % i «удалено/новая», narx bo'yicha tejash (`totals.gotPrice`, birinchi versiya miqdorida; v2.16.21 — hajm kamaygani
+  ham tejash bo'lib qo'shilardi va 68106 da noto'g'ri ogohlantirardi) so'ralganidan 1,5 baravar ko'p, smetasiz fayl, boshqa smetaga yaqinroq yagona fayl —
   `S.compare.nearer`) kartalar ustida qizil «Проверьте сравнение» chiqadi. Bizning Таблица №2 (eksport yoki javob) smeta
   bo'lib yuklanmaydi (`S.isTable2`: dastur yozadigan «TAQQOSLASH JADVALI №2» sarlavhasi yoki varaqlarning yarmida ruscha
   sarlavha; 95 haqiqiy faylda 10/10 va 0/85) — «Лист1» smeta bo'lib o'qilib, resurslar ikki marta sanalardi; saqlangan

@@ -68,6 +68,13 @@ Shu arizada umumiy tekshiruvning o'zi ham xato qildi: yuboruvchi narxdan tashqar
 (`totals.gotPrice`, `test/compare.cjs`). Saboq: o'zini tekshirish qoidasi ham haqiqiy fayllarda **noto'g'ri ogohlantirish**
 bo'yicha o'lchanadi, faqat ushlagani bo'yicha emas.
 
+**67168 (v2.16.22).** Juftlash to'g'ri edi, lekin «Снижение по нашим замечаниям» kartasi «128 % запрошенного» ko'rsatdi.
+Qatorma-qator mustaqil hisob: 1 970 517 428 narx tushgani, 577 449 634 so'ralgan qatorlarda hajm kamaygani, 400 200 000 —
+narxini so'ragan qatorimiz (322 dona quyosh chirog'i) **o'chirilgani**, o'sha varaqqa 1,23 mlrd lik yangi LED chiroqlar
+qo'shilgan. Dastur o'chirishni «tejash» deb sanagan edi. Qo'riqchi: tejash uch qismga bo'linadi, karta faqat narx qismini
+foiz qiladi; o'chirilgan so'ralgan qator — qizil ogohlantirish, shu varaqning yangi qatorlari bilan (`test/compare.cjs`,
+`test/e2e-compare.mjs`). Saboq: **«ko'p tejash» ham xato belgisi** — har bir yig'ma son o'z qismlariga bo'linib tekshiriladi.
+
 ### 4. Ekran yozganni buzadi yoki xabarni yashiradi
 
 Narx katagiga yozishda raqamlar o'rni almashgan («207187» → «207 871»); o'qilishi shart bo'lgan xabar keyingi oddiy

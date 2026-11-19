@@ -370,7 +370,10 @@
     requested = requested || {};
     known = known || {};
     var objects = [], groups = new Map();
-    var T = { oldSum: 0, newSum: 0, askedSaving: 0, gotSaving: 0, gotPrice: 0, otherChange: 0, rows: 0, changedRows: 0, leftRows: 0, counts: {},
+    // gotSaving — all a requested line lost; split as gotPrice (its price, at the first quantity) + gotQty (its volume,
+    // at the new price) + gotGone (requested lines deleted — `goneAsked`). Only gotPrice is the remarks' work: 67168
+    // showed «128 % of what was asked», a third of it a line the sender deleted and replaced with dearer ones.
+    var T = { oldSum: 0, newSum: 0, askedSaving: 0, gotSaving: 0, gotPrice: 0, gotQty: 0, gotGone: 0, goneAsked: [], otherChange: 0, rows: 0, changedRows: 0, leftRows: 0, counts: {},
               unaskedRows: 0, unaskedUp: 0, unaskedDown: 0, amountFlags: 0, amountRows: 0 };
     Object.keys(STATUS).forEach(function (k) { T.counts[k] = 0; });
 
@@ -444,7 +447,13 @@
           T.gotSaving += s1 - s2;
           // the part of it the price made, at the first version's quantity: a smaller volume saves too, and that is
           // no sign of files paired wrong (68106: volumes cut beside the prices — twice the saving asked)
-          if (row.p2 != null) T.gotPrice += (a.qty || 0) * (row.p1 - row.p2);
+          if (row.p2 != null) {
+            T.gotPrice += (a.qty || 0) * (row.p1 - row.p2);
+            T.gotQty += ((a.qty || 0) - (b.qty || 0)) * row.p2;
+          } else {
+            T.gotGone += s1;
+            T.goneAsked.push({ nm: row.nm, unit: row.unit, s1: s1, asked: (a.qty || 0) * row.market, object: o.name, group: o.group });
+          }
         } else T.otherChange += s2 - s1;
 
         var g = groups.get(key);
@@ -524,7 +533,9 @@
     var title = [opts.title || 'Сравнение версий сметы', (opts.oldLabel ? 'Было: ' + opts.oldLabel : '') +
       (opts.newLabel ? '   ·   Стало: ' + opts.newLabel : ''),
       'Сумма было ' + S.money(T.oldSum) + ' · стало ' + S.money(T.newSum) + ' · разница ' + S.money(T.newSum - T.oldSum) +
-      '   ·   снижение по замечаниям: запрошено ' + S.money(T.askedSaving) + ', получено ' + S.money(T.gotSaving)];
+      '   ·   снижение по замечаниям: запрошено ' + S.money(T.askedSaving) + ', получено по цене ' + S.money(T.gotPrice) +
+      (Math.abs(T.gotQty) >= 1 ? ', за счёт объёмов ' + S.money(T.gotQty) : '') +
+      (T.gotGone >= 1 ? ', строки с замечанием удалены на ' + S.money(T.gotGone) : '')];
 
     sheet('По ресурсам',
       ['№', 'Наименование', 'Ед. изм.', 'Цена в первой смете', 'Наша цена (замечание)', 'Цена в исправленной смете',

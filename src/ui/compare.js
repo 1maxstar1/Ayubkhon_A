@@ -454,6 +454,18 @@
     // by the prices alone: a volume cut beside them saves too, and is shown on its own card
     if (T.askedSaving > 0 && T.gotPrice > 1.5 * T.askedSaving) out.push('Снижение цен по замечаниям (' + money(T.gotPrice) +
       ') больше запрошенного (' + money(T.askedSaving) + ') в полтора раза и более — проверьте, что файлы сопоставлены со своими сметами.');
+    // a line we asked to lower, deleted — and new lines on the same sheet: the resource may have been replaced by a
+    // dearer one, and the deletion counted as our saving (67168: 322 lamps asked cheaper, deleted, LED lamps added)
+    (T.goneAsked || []).forEach(function (g) {
+      var added = 0, names = [];
+      this.res.objects.forEach(function (o) {
+        if (o.name !== g.object) return;
+        o.rows.forEach(function (r) { if (r.st === 'added') { added += r.s2 || 0; if (names.length < 3) names.push(r.nm); } });
+      });
+      out.push('Строка с нашим замечанием удалена: «' + g.nm + '» (' + g.unit + ', было ' + money(g.s1) + ', по нашей цене ' + money(g.asked) + ')' +
+        (added >= 1 ? ' — а в том же листе новые строки на ' + money(added) + ': ' + names.map(function (n) { return '«' + n + '»'; }).join(', ') +
+          '. Похоже, ресурс заменён другим — проверьте его цену.' : '.'));
+    }, this);
     if (lost.length) out.push('Не сопоставлен ни с одной сметой заявки: ' + lost.join(', ') + ' — его листы показаны без пары.');
     // one corrected file against the estimate chosen as «Было», while another estimate of the application is nearer
     var v = $('cmpOld').value;
@@ -616,12 +628,15 @@
     var T = this.res.totals, L = this.labels;
     var rc = T.resCounts;
     var left = (rc.partial || 0) + (rc.notfixed || 0) + (rc.worse || 0);
-    var pct = T.askedSaving > 0 ? Math.round(T.gotSaving / T.askedSaving * 100) : null;
+    // the remarks' work is what the prices lost; a smaller volume and a deleted line are told beside it, never as it
+    var pct = T.askedSaving > 0 ? Math.round(T.gotPrice / T.askedSaving * 100) : null;
+    var beside = (Math.abs(T.gotQty) >= 1 ? '<br>за счёт объёмов этих строк: ' + money(T.gotQty) : '') +
+      (T.gotGone >= 1 ? '<br>строки с замечанием удалены: ' + money(T.gotGone) : '');
     sum.innerHTML = doubtBox(this.doubts) +
       '<div class="cmp-cards">' +
       card('', 'Сумма по смете', money(T.oldSum) + ' → ' + money(T.newSum), delta(T.newSum - T.oldSum)) +
-      card('good', 'Снижение по нашим замечаниям', money(T.gotSaving) + ' из ' + money(T.askedSaving),
-        pct == null ? 'замечаний с ценой нет' : pct + ' % запрошенного') +
+      card(T.gotGone >= 1 ? 'part' : 'good', 'Снижение цен по нашим замечаниям', money(T.gotPrice) + ' из ' + money(T.askedSaving),
+        (pct == null ? 'замечаний с ценой нет' : pct + ' % запрошенного') + beside) +
       card('good', 'Исправлено полностью', res(rc.fixed || 0), lines(T.counts.fixed || 0)) +
       card(left ? 'bad' : 'good', 'Осталось исправить', res(left),
         'частично ' + (rc.partial || 0) + ' · не исправлено ' + (rc.notfixed || 0) + ' · повышено ' + (rc.worse || 0) +

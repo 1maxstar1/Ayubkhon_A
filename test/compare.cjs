@@ -606,8 +606,16 @@ check(bigRm.prices[bigKey] === bigM && bigRm.requested[bigKey] && bigRm.requeste
   const key = S.resKey('ТЕСТОВЫЙ БЕТОН', 'М3', 100);
   const req = {}; req[key] = { market: 90 };
   const T = S.compare.versions(was, now, req, {}).totals;
-  check(T.askedSaving === 100 && T.gotSaving === 640 && T.gotPrice === 100,
-    'the saving by the price is told apart from the one a smaller volume makes (asked ' + T.askedSaving + ', got ' + T.gotSaving + ', by the price ' + T.gotPrice + ')');
+  check(T.askedSaving === 100 && T.gotSaving === 640 && T.gotPrice === 100 && T.gotQty === 540 && T.gotGone === 0,
+    'the saving by the price is told apart from the one a smaller volume makes (asked ' + T.askedSaving + ', got ' + T.gotSaving + ', by the price ' + T.gotPrice + ', by the volume ' + T.gotQty + ')');
+  // a line we asked to lower, deleted, and a dearer one added instead (67168): its sum is no saving by our remarks
+  const was2 = est([MAT, line(1, 'ТЕСТОВЫЙ БЕТОН', 'М3', 10, 100), line(2, 'ТЕСТОВЫЙ СВЕТИЛЬНИК СОЛНЕЧНЫЙ', 'ШТ', 3, 50)]);
+  const now2 = est([MAT, line(1, 'ТЕСТОВЫЙ БЕТОН', 'М3', 10, 90), line(2, 'ТЕСТОВАЯ ОПОРА ОСВЕЩЕНИЯ С ПАНЕЛЬЮ', 'ШТ', 3, 80)]);
+  const req2 = {}; req2[key] = { market: 90 }; req2[S.resKey('ТЕСТОВЫЙ СВЕТИЛЬНИК СОЛНЕЧНЫЙ', 'ШТ', 50)] = { market: 30 };
+  const T2 = S.compare.versions(was2, now2, req2, {}).totals;
+  check(T2.askedSaving === 160 && T2.gotSaving === 250 && T2.gotPrice === 100 && T2.gotGone === 150 && T2.goneAsked.length === 1 &&
+    T2.goneAsked[0].nm === 'ТЕСТОВЫЙ СВЕТИЛЬНИК СОЛНЕЧНЫЙ' && T2.goneAsked[0].asked === 90,
+    'a requested line deleted is told apart, with what it cost and what we asked (' + JSON.stringify({ got: T2.gotSaving, price: T2.gotPrice, gone: T2.gotGone }) + ')');
 }
 
 /* ------------------------------------------------ our own Таблица №2 is not an estimate */

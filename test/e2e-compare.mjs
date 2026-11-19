@@ -429,6 +429,32 @@ try {
       'the list says which corrected file was compared with which estimate (' + pb.slice(0, 160) + ')');
   }
 
+  // a line we asked to lower, deleted by the sender and replaced with a dearer one (67168): the card counts only what
+  // the prices lost, the deletion is told beside it and over the cards, with the new lines of that sheet
+  {
+    const fx = book(1);
+    fx.sheets[0].rows.forEach((cs) => {
+      const k = (cs || []).findIndex((c) => c && c.v === 'ТЕСТОВЫЙ АНКЕР М8');
+      if (k > 0) { cs[k] = { v: 'ТЕСТОВЫЙ СВЕТИЛЬНИК НА СОЛНЕЧНОЙ ПАНЕЛИ' }; cs[k + 1] = { v: 'КОМПЛ' }; cs[k + 3] = { v: 40 }; if (cs[k + 4]) cs[k + 4] = { v: 120 }; }
+    });
+    const fGone = join(dir, 'Тест_v1_заменено.xlsx');
+    writeFileSync(fGone, xlsx(S, fx));
+    await page.goto('file://' + join(root, 'dist/smeta-taqqoslash.html'));
+    await page.setInputFiles('#pick', f1);
+    await page.waitForFunction(() => window.app && app.projects.length === 1 && app.model && app.pending <= 0, null, { timeout: 30 * 1000 });
+    await page.click('.tab[data-pane="compare"]');
+    await page.setInputFiles('#cmpReplyFile', f3);
+    await page.waitForFunction(() => app.compare_ui.reply, null, { timeout: 30 * 1000 });
+    await page.setInputFiles('#cmpNewFile', fGone);
+    await page.waitForFunction(() => app.compare_ui.res, null, { timeout: 30 * 1000 });
+    const g = await page.evaluate(() => ({ T: app.compare_ui.res.totals, doubts: app.compare_ui.doubts,
+      card: [...document.querySelectorAll('#cmpSummary .cmp-card')].map((c) => c.innerText.replace(/\s+/g, ' ')).find((t) => /ПО НАШИМ ЗАМЕЧАНИЯМ/i.test(t)) || '' }));
+    check(g.T.gotGone > 0 && g.T.goneAsked.some((x) => x.nm === 'ТЕСТОВЫЙ АНКЕР М8') && /строки с замечанием удалены/.test(g.card) &&
+      /ЗАМЕЧАНИЯМ 0 из/.test(g.card) && g.T.gotSaving > 0 &&
+      g.doubts.some((t) => /Строка с нашим замечанием удалена: «ТЕСТОВЫЙ АНКЕР М8»/.test(t) && /новые строки на .*ТЕСТОВЫЙ СВЕТИЛЬНИК НА СОЛНЕЧНОЙ ПАНЕЛИ/.test(t)),
+      'a requested line deleted and a new one added: told apart on the card and over it (' + g.card + ' | ' + g.doubts.join(' | ').slice(0, 200) + ')');
+  }
+
   check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' / ') : ''));
 } finally {
   await browser.close();

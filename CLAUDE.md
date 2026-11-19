@@ -310,7 +310,11 @@ Server rejimi uch joyda turishi mumkin: noutbukda (`server/laptop.sh` Mac/Linux,
   файлов» ro'yxati har bir juftni va qanday topilganini ko'rsatadi; natija mantiqsiz bo'lsa (`compare.js` `doubt`: qatorlarning
   ≥ 30 % i «удалено/новая», narx bo'yicha tejash (`totals.gotPrice`, birinchi versiya miqdorida; v2.16.21 — hajm kamaygani
   ham tejash bo'lib qo'shilardi va 68106 da noto'g'ri ogohlantirardi) so'ralganidan 1,5 baravar ko'p, smetasiz fayl, boshqa smetaga yaqinroq yagona fayl —
-  `S.compare.nearer`) kartalar ustida qizil «Проверьте сравнение» chiqadi. Bizning Таблица №2 (eksport yoki javob) smeta
+  `S.compare.nearer`) kartalar ustida qizil «Проверьте сравнение» chiqadi. «Снижение цен по нашим замечаниям» kartasi faqat narx
+  qismini sanaydi (v2.16.22, 67168: «128 % запрошенного» chiqqan edi): `totals.gotSaving` = `gotPrice` (narx, birinchi miqdorda)
+  + `gotQty` (so'ralgan qatorlarning hajmi, yangi narxda) + `gotGone` (zamechaniye berilgan qator o'chirilgan; `goneAsked`).
+  Hajm va o'chirilgan qator kartada alohida yoziladi; o'chirilgan har bir so'ralgan qator — qizil ogohlantirish, shu varaqdagi
+  yangi qatorlar summasi va nomlari bilan (yuboruvchi resursni qimmatrog'iga almashtirgan bo'lishi mumkin). Bizning Таблица №2 (eksport yoki javob) smeta
   bo'lib yuklanmaydi (`S.isTable2`: dastur yozadigan «TAQQOSLASH JADVALI №2» sarlavhasi yoki varaqlarning yarmida ruscha
   sarlavha; 95 haqiqiy faylda 10/10 va 0/85) — «Лист1» smeta bo'lib o'qilib, resurslar ikki marta sanalardi; saqlangan
   ariza tiklanayotganda bu tekshiruv ishlamaydi.

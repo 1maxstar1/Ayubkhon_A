@@ -19,6 +19,8 @@ namunasi yig'ish, 100 fayldan keyin model, AI faqat qoidalar o'qiy olmagan fayld
 xato topilganda bajariladigan tartib (haqiqiy faylda takrorlash → eski kodda yiqiladigan sintetik test → shu turdagi
 qo'shni holatlarni darhol sinash → umumiy o'zini tekshirish → barcha haqiqiy fayllarda o'lchov → yozib qo'yish).
 Xato tuzatilganda shu tartib **to'liq** bajariladi va hujjat yangilanadi.
+`docs/yopiq-repo-reja.md` — repo'ni yopiq qilish rejasi (saqlab qo'yilgan): avval Windows yangilagichiga GitHub kaliti,
+noutbuk uni o'rnatgach — yopish. Tartib buzilsa, Windows yangilanishni ololmay qoladi.
 
 ## Muloqot tili
 

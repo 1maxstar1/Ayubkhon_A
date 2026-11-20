@@ -88,5 +88,21 @@ check 'wait_new "$OLD"' "a server that fell over answers again by itself, as a n
 check 'grep -q "qayta ishga tushirilmoqda" "$T/start.out"' "and the launcher says it restarted it"
 stop_bg
 
+# 4 — the port the setup's temporary server takes is held by another copy of the program (a sandbox on 8091):
+#     the update does not fail with «superuser auth failed», the next free port is used; asked for, the taken
+#     port is said
+# (the very port of the Mac, 8091: the default list is what is under test. Held by something already — a copy of
+# the program on a developer's machine — it is just as taken.)
+node -e "require('http').createServer((q,s)=>{s.writeHead(404);s.end('{}')}).on('error',()=>{}).listen(8091,'127.0.0.1')" &
+HOLD=$!
+i=0; while [ $i -lt 20 ] && ! curl -s -m 1 -o /dev/null http://127.0.0.1:8091/; do sleep 0.3; i=$((i + 1)); done
+set +e
+OUT=$(cd "$APP/server" && env -u PB_SETUP_PORT -u PB_SETUP_PORTS PB_ADMIN_PASS=owner-pass-1234567 sh setup.sh 2>&1); CODE=$?
+OUT2=$(cd "$APP/server" && PB_SETUP_PORT=8091 PB_ADMIN_PASS=owner-pass-1234567 sh setup.sh 2>&1); CODE2=$?
+set -e
+check '[ "$CODE" = 0 ] && echo "$OUT" | grep -q "collections imported"' "a taken setup port: the next free one is used and the collections are imported"
+check '[ "$CODE2" != 0 ] && echo "$OUT2" | grep -q "port 8091 band" && ! echo "$OUT2" | grep -q "auth failed"' "asked for a taken port, the setup says so, not «superuser auth failed»"
+kill "$HOLD" 2>/dev/null || true; wait "$HOLD" 2>/dev/null || true; HOLD=0
+
 echo
 if [ $FAIL = 0 ]; then echo "laptop-faults: all ok"; else echo "laptop-faults: $FAIL failed"; exit 1; fi

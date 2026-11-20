@@ -84,6 +84,14 @@ birortasi haqiqiy emas edi: smetaning yaxlitlangan summalari miqdor × narx bila
 edi — endi shunday aytiladi. Saboq: har bir ogohlantirish turi uchun **qancha noto'g'ri ogohlantirgani** hisoblanadi; qizil
 belgi faqat haqiqiy xatoga beriladi, aks holda odam ularga ishonmay qo'yadi.
 
+**Mac yangilanishi «superuser auth failed» (v2.16.23).** `server/setup.sh` bazani tayyorlash uchun vaqtinchalik serverni
+doim 8091 da ochardi; egasi kompyuterida sinov nusxasi (`Ayubkhon_A-sinov`) shu 8091 da turgan — men yozgan sinov prompt'i
+unga aynan 8091 ni bergan edi. Vaqtinchalik server ishga tushmadi, parol sinov serveriga ketdi. Qo'riqchi: `setup.sh` port
+bo'shligini tekshiradi (hech narsa javob bermasa — bo'sh), band bo'lsa keyingisini oladi (`PB_SETUP_PORTS`), aniq berilgan
+band portni aytadi (`test/laptop-faults.sh` 4, eski kodda yiqiladi). Saboq: ikki nusxa bitta kompyuterda yonma-yon turishi
+mumkin — **har bir port** (asosiy, vaqtinchalik, test) tekshiriladi, faqat asosiysi emas; boshqa loyiha uchun yozilgan
+ko'rsatma ham shu ro'yxat bo'yicha tekshiriladi.
+
 ### 4. Ekran yozganni buzadi yoki xabarni yashiradi
 
 Narx katagiga yozishda raqamlar o'rni almashgan («207187» → «207 871»); o'qilishi shart bo'lgan xabar keyingi oddiy
